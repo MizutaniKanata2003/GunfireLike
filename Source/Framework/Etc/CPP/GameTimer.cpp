@@ -1,0 +1,45 @@
+#include "../H/GameTimer.h"
+
+#include <algorithm>
+
+#include "../H/AppConfig.h"
+
+// 高精度タイマーを初期化し、最初の時刻を記録する。
+void GameTimer::Initialize()
+{
+	QueryPerformanceFrequency( &m_Frequency );
+	QueryPerformanceCounter( &m_PreviousCounter );
+}
+
+// DeltaTime、総経過時間、FPSを更新する。
+void GameTimer::Update()
+{
+	LARGE_INTEGER currentCounter{};
+	QueryPerformanceCounter( &currentCounter );
+
+	const double elapsedTicks = static_cast<double>( currentCounter.QuadPart - m_PreviousCounter.QuadPart );
+
+	m_PreviousCounter = currentCounter;
+
+	const float realDeltaTime = static_cast<float>(
+		elapsedTicks / static_cast<double>( m_Frequency.QuadPart ) );
+
+	m_DeltaTime = std::min( realDeltaTime, Config::MAX_DELTA_TIME ) * m_TimeScale;
+	m_TotalTime += m_DeltaTime;
+
+	m_FrameAccumulator += realDeltaTime;
+	++m_FrameCount;
+
+	if ( m_FrameAccumulator >= 1.0f )
+	{
+		m_FrameRate = static_cast<float>( m_FrameCount ) / m_FrameAccumulator;
+		m_FrameAccumulator = 0.0f;
+		m_FrameCount = 0;
+	}
+}
+
+// ゲーム時間の進行倍率を設定する。
+void GameTimer::SetTimeScale( float timeScale )
+{
+	m_TimeScale = std::max( 0.0f, timeScale );
+}

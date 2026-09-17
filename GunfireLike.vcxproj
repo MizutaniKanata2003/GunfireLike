@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{27955798-5425-4144-b1b7-a422f9c696af}</ProjectGuid>
+    <RootNamespace>GunfireLike</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <Manifest>
+      <EnableSegmentHeap>true</EnableSegmentHeap>
+    </Manifest>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <Manifest>
+      <EnableSegmentHeap>true</EnableSegmentHeap>
+    </Manifest>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NOMINMAX</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>C:\Users\mizut\Desktop\GunfireLike\External\imgui\backends;C:\Users\mizut\Desktop\GunfireLike\External\imgui;C:\Users\mizut\Downloads\GunfireLike\GunfireLike\External\imgui\backends;$(ProjectDir)Source\Scene;$(ProjectDir)Source\Game;$(ProjectDir)Source\Graphics;$(ProjectDirSource\)Debug;$(ProjectDir)Source\Core;$(ProjectDir)Source\Shaders;$(ProjectDir)Source\;C:\Users\m1kan\source\repos\GunfireLike\External\imgui;C:\Users\m1kan\source\repos\GunfireLike\External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;windowscodecs.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <Manifest>
+      <EnableSegmentHeap>true</EnableSegmentHeap>
+    </Manifest>
+    <PreBuildEvent>
+      <Command>if not exist "$(OutDir)Shaders" mkdir "$(OutDir)Shaders"
+if not exist "$(OutDir)Assets\Textures" mkdir "$(OutDir)Assets\Textures"
+copy /Y "$(ProjectDir)Assets\Textures\Floor.png" "$(OutDir)Assets\Textures\Floor.png"
+copy /Y "$(ProjectDir)Assets\Textures\Wall.png" "$(OutDir)Assets\Textures\Wall.png"
+copy /Y "$(ProjectDir)Assets\Textures\Object.png" "$(OutDir)Assets\Textures\Object.png"
+xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NOMINMAX</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>C:\Users\mizut\Desktop\GunfireLike\External\imgui\backends;C:\Users\mizut\Desktop\GunfireLike\External\imgui;C:\Users\mizut\Downloads\GunfireLike\GunfireLike\External\imgui\backends;$(ProjectDir)Source\Scene;$(ProjectDir)Source\Game;$(ProjectDir)Source\Graphics;$(ProjectDirSource\)Debug;$(ProjectDir)Source\Core;$(ProjectDir)Source\Shaders;$(ProjectDir)Source\;C:\Users\m1kan\source\repos\GunfireLike\External\imgui;C:\Users\m1kan\source\repos\GunfireLike\External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;windowscodecs.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <Manifest>
+      <EnableSegmentHeap>true</EnableSegmentHeap>
+    </Manifest>
+    <PreBuildEvent>
+      <Command>if not exist "$(OutDir)Shaders" mkdir "$(OutDir)Shaders"
+if not exist "$(OutDir)Assets\Textures" mkdir "$(OutDir)Assets\Textures"
+copy /Y "$(ProjectDir)Assets\Textures\Floor.png" "$(OutDir)Assets\Textures\Floor.png"
+copy /Y "$(ProjectDir)Assets\Textures\Wall.png" "$(OutDir)Assets\Textures\Wall.png"
+copy /Y "$(ProjectDir)Assets\Textures\Object.png" "$(OutDir)Assets\Textures\Object.png"
+xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"
+if not exist "$(TargetDir)Assets\Audio\" mkdir "$(TargetDir)Assets\Audio\"
+xcopy "$(ProjectDir)Assets\Audio\*.*" "$(TargetDir)Assets\Audio\" /E /I /Y /D</Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="External\imgui\backends\imgui_impl_dx11.cpp" />
+    <ClCompile Include="External\imgui\backends\imgui_impl_win32.cpp" />
+    <ClCompile Include="External\imgui\imgui.cpp" />
+    <ClCompile Include="External\imgui\imgui_draw.cpp" />
+    <ClCompile Include="External\imgui\imgui_tables.cpp" />
+    <ClCompile Include="External\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="Source\Framework\Audio\CPP\AudioSystem.cpp" />
+    <ClCompile Include="Source\Framework\Etc\CPP\GameTimer.cpp" />
+    <ClCompile Include="Source\Framework\Input\CPP\InputSystem.cpp" />
+    <ClCompile Include="Source\Framework\2D\CPP\FadeOverlay.cpp" />
+    <ClCompile Include="Source\Framework\Imgui\CPP\ImGuiManager.cpp" />
+    <ClCompile Include="Source\Debug\CPP\DebugPlayer.cpp" />
+    <ClCompile Include="Source\Framework\Input\CPP\FpsCamera.cpp" />
+    <ClCompile Include="Source\Framework\3D\CPP\BasicMeshRenderer.cpp" />
+    <ClCompile Include="Source\Framework\2D\CPP\HudRenderer.cpp" />
+    <ClCompile Include="Source\Framework\2D\CPP\HudTextRenderer.cpp" />
+    <ClCompile Include="Source\Framework\3D\CPP\ObjModelRenderer.cpp" />
+    <ClCompile Include="Source\Scene\ResultScene\CPP\ResultScene.cpp" />
+    <ClCompile Include="Source\Scene\ShopScene\CPP\ShopScene.cpp" />
+    <ClCompile Include="Source\Framework\DirectX\CPP\GraphicsSystem.cpp" />
+    <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\Scene\GameScene\CPP\GameScene.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\SceneManager.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="Source\Scene\TitleScene\CPP\TitleScene.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="External\imgui\backends\imgui_impl_dx11.h" />
+    <ClInclude Include="External\imgui\backends\imgui_impl_win32.h" />
+    <ClInclude Include="External\imgui\imgui.h" />
+    <ClInclude Include="Source\Framework\Audio\H\AudioSystem.h" />
+    <ClInclude Include="Source\Framework\2D\H\FadeOverlay.h" />
+    <ClInclude Include="Source\Scene\Common\H\EnemyHealth.h" />
+    <ClInclude Include="Source\Scene\Common\H\GameProgress.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="Source\Scene\Common\H\PlayerHealth.h" />
+    <ClInclude Include="Source\Framework\Etc\H\AppConfig.h" />
+    <ClInclude Include="Source\Framework\Etc\H\GameTimer.h" />
+    <ClInclude Include="Source\Framework\Input\H\InputSystem.h" />
+    <ClInclude Include="Source\Framework\Imgui\H\ImGuiManager.h" />
+    <ClInclude Include="Source\Debug\H\DebugPlayer.h" />
+    <ClInclude Include="Source\Framework\Input\H\FpsCamera.h" />
+    <ClInclude Include="Source\Framework\Etc\H\GameObject.h" />
+    <ClInclude Include="Source\Framework\3D\H\BasicMeshRenderer.h" />
+    <ClInclude Include="Source\Framework\2D\H\HudRenderer.h" />
+    <ClInclude Include="Source\Framework\2D\H\HudTextRenderer.h" />
+    <ClInclude Include="Source\Framework\3D\H\ObjModelRenderer.h" />
+    <ClInclude Include="Source\Scene\ResultScene\H\ResultScene.h" />
+    <ClInclude Include="Source\Scene\ShopScene\H\ShopScene.h" />
+    <ClInclude Include="Source\Scene\Common\H\StageData.h" />
+    <ClInclude Include="Source\Framework\DirectX\H\GraphicsSystem.h" />
+    <ClInclude Include="Source\Scene\GameScene\H\GameScene.h" />
+    <ClInclude Include="Source\Scene\Common\H\IScene.h" />
+    <ClInclude Include="Source\Scene\Common\H\SceneManager.h" />
+    <ClInclude Include="Source\Scene\TitleScene\H\TitleScene.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Source\Framework\Shaders\BasicColorVS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">VSMain</EntryPointName>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)Shaders\BasicColorVS.cso</ObjectFileOutput>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">VSMain</EntryPointName>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)Shaders\BasicColorVS.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="Source\Framework\Shaders\BasicColorPS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">main</EntryPointName>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)Shaders\BasicColorPS.cso</ObjectFileOutput>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">main</EntryPointName>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)Shaders\BasicColorPS.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="Source\Framework\Shaders\HudPS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)Shaders\HudPS.cso</ObjectFileOutput>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)Shaders\HudPS.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="Source\Framework\Shaders\HudVS.hlsl">
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)Shaders\HudVS.cso</ObjectFileOutput>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)Shaders\HudVS.cso</ObjectFileOutput>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="Source\Framework\Shaders\ShaderCommon.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="packages\directxtk_desktop_2019.2025.10.28.2\build\native\directxtk_desktop_2019.targets" Condition="Exists('packages\directxtk_desktop_2019.2025.10.28.2\build\native\directxtk_desktop_2019.targets')" />
+  </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>このプロジェクトは、このコンピューター上にない NuGet パッケージを参照しています。それらのパッケージをダウンロードするには、[NuGet パッケージの復元] を使用します。詳細については、http://go.microsoft.com/fwlink/?LinkID=322105 を参照してください。見つからないファイルは {0} です。</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('packages\directxtk_desktop_2019.2025.10.28.2\build\native\directxtk_desktop_2019.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\directxtk_desktop_2019.2025.10.28.2\build\native\directxtk_desktop_2019.targets'))" />
+  </Target>
+</Project>

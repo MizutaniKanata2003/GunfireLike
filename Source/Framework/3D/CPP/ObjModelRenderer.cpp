@@ -1,0 +1,548 @@
+#include "../H/ObjModelRenderer.h"
+
+//========= C++標準ライブラリ インクルード=========
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+//========= Windows インクルード=========
+#include <windows.h>
+#include <wincodec.h>
+
+//========= Framework インクルード=========
+#include "Framework/DirectX/H/GraphicsSystem.h"
+
+namespace
+{
+	//========= Shaderファイルパス定数=========
+		// OBJモデル描画に使用するVertex ShaderのCSOファイルパス。
+	constexpr wchar_t MODEL_VERTEX_SHADER_CSO_PATH[] = L"Shaders/BasicColorVS.cso";
+	// OBJモデル描画に使用するPixel ShaderのCSOファイルパス。
+	constexpr wchar_t MODEL_PIXEL_SHADER_CSO_PATH[] = L"Shaders/BasicColorPS.cso";
+
+	//========= OBJ形式定数=========
+	// OBJ頂点形式で使用する位置座標とUV座標のセマンティック名。
+	constexpr char POSITION_SEMANTIC_NAME[] = "POSITION";
+	constexpr char TEXCOORD_SEMANTIC_NAME[] = "TEXCOORD";
+
+	//========= WICテクスチャ定数=========
+	// BGRA形式の画像データにおける1ピクセルのバイト数。
+	constexpr UINT BYTES_PER_PIXEL = 4;
+
+	//========= OBJ読込用構造体=========
+	// OBJのv/vt/vn形式から取得した位置、UV、法線のIndex。
+	struct ObjIndex
+	{
+		int positionIndex{};
+		int uvIndex{};
+		int normalIndex{};
+	};
+
+	//========= 補助関数=========
+	// ShaderのCSOファイルを読み込み、バイト列として返す。
+	bool LoadBinaryFile( const wchar_t* filePath, std::vector<char>& binaryData )
+	{
+		std::ifstream fileStream( filePath, std::ios::binary | std::ios::ate );
+
+		if ( !fileStream )
+		{
+			OutputDebugStringW( L"[Shader] ファイルを開けません: " );
+			OutputDebugStringW( filePath );
+			OutputDebugStringW( L"\n" );
+			return false;
+		}
+
+		const std::streamsize fileSize = fileStream.tellg();
+		if ( fileSize <= 0 )
+		{
+			OutputDebugStringW( L"[Shader] ファイルサイズが不正です: " );
+			OutputDebugStringW( filePath );
+			OutputDebugStringW( L"\n" );
+			return false;
+		}
+
+		binaryData.resize( static_cast<size_t>( fileSize ) );
+		fileStream.seekg( 0, std::ios::beg );
+
+		return static_cast<bool>( fileStream.read( binaryData.data(), fileSize ) );
+	}
+
+	// OBJのv/vt/vn形式を位置、UV、法線のIndexへ分解する。
+	bool ParseObjIndex( const std::string& token, ObjIndex& result )
+	{
+		std::stringstream stream( token );
+		std::string value{};
+
+		if ( !std::getline( stream, value, '/' ) ) return false;
+		if ( !value.empty() ) result.positionIndex = std::stoi( value );
+		if ( std::getline( stream, value, '/' ) && !value.empty() ) result.uvIndex = std::stoi( value );
+		if ( std::getline( stream, value, '/' ) && !value.empty() ) result.normalIndex = std::stoi( value );
+
+		return result.positionIndex != 0;
+	}
+
+	// 同じ位置、UV、法線の組み合わせを共有するための文字列Keyを作る。
+	std::string MakeVertexKey( const ObjIndex& index )
+	{
+		return std::to_string( index.positionIndex ) + "/" +
+			std::to_string( index.uvIndex ) + "/" +
+			std::to_string( index.normalIndex );
+	}
+
+	// WICを使い、画像ファイルからShader Resource Viewを生成する。
+	bool LoadWicTexture(
+		ID3D11Device* device,
+		const std::wstring& filePath,
+		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& textureView )
+	{
+		if ( device == nullptr ) return false;
+
+		// WICを使用して画像をデコードするためのCOMオブジェクト。
+		Microsoft::WRL::ComPtr<IWICImagingFactory> wicFactory{};
+		Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder{};
+		Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame{};
+		Microsoft::WRL::ComPtr<IWICFormatConverter> converter{};
+
+		HRESULT result = CoCreateInstance(
+			CLSID_WICImagingFactory,
+			nullptr,
+			CLSCTX_INPROC_SERVER,
+			IID_PPV_ARGS( wicFactory.GetAddressOf() ) );
+		if ( FAILED( result ) ) return false;
+
+		result = wicFactory->CreateDecoderFromFilename(
+			filePath.c_str(),
+			nullptr,
+			GENERIC_READ,
+			WICDecodeMetadataCacheOnLoad,
+			decoder.GetAddressOf() );
+		if ( FAILED( result ) ) return false;
+
+		result = decoder->GetFrame( 0, frame.GetAddressOf() );
+		if ( FAILED( result ) ) return false;
+
+		// デコードした画像サイズとRGBA変換後のピクセルデータを取得する。
+		UINT width{};
+		UINT height{};
+
+		result = frame->GetSize( &width, &height );
+		if ( FAILED( result ) || width == 0 || height == 0 ) return false;
+
+		result = wicFactory->CreateFormatConverter( converter.GetAddressOf() );
+		if ( FAILED( result ) ) return false;
+
+		result = converter->Initialize(
+			frame.Get(),
+			GUID_WICPixelFormat32bppBGRA,
+			WICBitmapDitherTypeNone,
+			nullptr,
+			0.0,
+			WICBitmapPaletteTypeCustom );
+		if ( FAILED( result ) ) return false;
+
+		const UINT rowPitch = width * BYTES_PER_PIXEL;
+		const UINT imageSize = rowPitch * height;
+		std::vector<unsigned char> pixels( imageSize );
+
+		result = converter->CopyPixels( nullptr, rowPitch, imageSize, pixels.data() );
+		if ( FAILED( result ) ) return false;
+
+		// Direct3DのTextureとShader Resource Viewを生成する。
+		D3D11_TEXTURE2D_DESC textureDescription{};
+		textureDescription.Width = width;
+		textureDescription.Height = height;
+		textureDescription.MipLevels = 1;
+		textureDescription.ArraySize = 1;
+		textureDescription.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+		textureDescription.SampleDesc.Count = 1;
+		textureDescription.Usage = D3D11_USAGE_DEFAULT;
+		textureDescription.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+		D3D11_SUBRESOURCE_DATA textureData{};
+		textureData.pSysMem = pixels.data();
+		textureData.SysMemPitch = rowPitch;
+
+		Microsoft::WRL::ComPtr<ID3D11Texture2D> texture{};
+
+		result = device->CreateTexture2D(
+			&textureDescription,
+			&textureData,
+			texture.GetAddressOf() );
+		if ( FAILED( result ) ) return false;
+
+		result = device->CreateShaderResourceView(
+			texture.Get(),
+			nullptr,
+			textureView.GetAddressOf() );
+
+		return SUCCEEDED( result );
+	}
+}
+
+// OBJ、Shader、Buffer、必要なTexture、Samplerを初期化する。
+bool ObjModelRenderer::Initialize(
+	GraphicsSystem& graphicsSystem,
+	const std::wstring& objFilePath,
+	const std::wstring& textureFilePath )
+{
+	Uninit();
+
+	// GPUリソースの生成に使用するDirect3D Deviceを取得する。
+	ID3D11Device* device = graphicsSystem.GetDevice();
+	if ( device == nullptr ) return false;
+
+	// OBJファイルからGPU Buffer生成に使用する頂点・Index情報を読み込む。
+	std::vector<Vertex> vertices{};
+	std::vector<unsigned int> indices{};
+
+	if ( !LoadObjFile( objFilePath, vertices, indices ) )
+	{
+		OutputDebugStringW( L"[ObjModelRenderer] OBJ読込失敗: " );
+		OutputDebugStringW( objFilePath.c_str() );
+		OutputDebugStringW( L"\n" );
+		return false;
+	}
+
+	// OBJモデルのVertex Bufferを生成する。
+	D3D11_BUFFER_DESC vertexBufferDesc{};
+	vertexBufferDesc.ByteWidth = static_cast<UINT>( sizeof( Vertex ) * vertices.size() );
+	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+
+	D3D11_SUBRESOURCE_DATA vertexData{};
+	vertexData.pSysMem = vertices.data();
+
+	if ( FAILED( device->CreateBuffer(
+		&vertexBufferDesc,
+		&vertexData,
+		m_VertexBuffer.GetAddressOf() ) ) )
+	{
+		OutputDebugStringW( L"[ObjModelRenderer] VertexBuffer生成失敗\n" );
+		Uninit();
+		return false;
+	}
+
+	// OBJモデルのIndex Bufferを生成する。
+	D3D11_BUFFER_DESC indexBufferDesc{};
+	indexBufferDesc.ByteWidth = static_cast<UINT>( sizeof( unsigned int ) * indices.size() );
+	indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+	indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+
+	D3D11_SUBRESOURCE_DATA indexData{};
+	indexData.pSysMem = indices.data();
+
+	if ( FAILED( device->CreateBuffer(
+		&indexBufferDesc,
+		&indexData,
+		m_IndexBuffer.GetAddressOf() ) ) )
+	{
+		Uninit();
+		return false;
+	}
+
+	// Vertex ShaderのCSO読込、Shader生成、Input Layout生成を行う。
+	std::vector<char> vertexShaderBinary{};
+
+	if ( !LoadBinaryFile( MODEL_VERTEX_SHADER_CSO_PATH, vertexShaderBinary ) )
+	{
+		Uninit();
+		return false;
+	}
+
+	if ( FAILED( device->CreateVertexShader(
+		vertexShaderBinary.data(),
+		vertexShaderBinary.size(),
+		nullptr,
+		m_VertexShader.GetAddressOf() ) ) )
+	{
+		OutputDebugStringW( L"[ObjModelRenderer] VertexShader生成失敗\n" );
+		Uninit();
+		return false;
+	}
+
+	const D3D11_INPUT_ELEMENT_DESC inputElements[]
+	{
+		{
+			POSITION_SEMANTIC_NAME,
+			0,
+			DXGI_FORMAT_R32G32B32_FLOAT,
+			0,
+			offsetof( Vertex, position ),
+			D3D11_INPUT_PER_VERTEX_DATA,
+			0
+		},
+		{
+			TEXCOORD_SEMANTIC_NAME,
+			0,
+			DXGI_FORMAT_R32G32_FLOAT,
+			0,
+			offsetof( Vertex, uv ),
+			D3D11_INPUT_PER_VERTEX_DATA,
+			0
+		}
+	};
+
+	if ( FAILED( device->CreateInputLayout(
+		inputElements,
+		ARRAYSIZE( inputElements ),
+		vertexShaderBinary.data(),
+		vertexShaderBinary.size(),
+		m_InputLayout.GetAddressOf() ) ) )
+	{
+		OutputDebugStringW( L"[ObjModelRenderer] InputLayout生成失敗\n" );
+		Uninit();
+		return false;
+	}
+
+	// Pixel Shaderを読み込み、OBJ描画用のPixel Shaderを生成する。
+	std::vector<char> pixelShaderBinary{};
+
+	if ( !LoadBinaryFile( MODEL_PIXEL_SHADER_CSO_PATH, pixelShaderBinary ) )
+	{
+		Uninit();
+		return false;
+	}
+
+	if ( FAILED( device->CreatePixelShader(
+		pixelShaderBinary.data(),
+		pixelShaderBinary.size(),
+		nullptr,
+		m_PixelShader.GetAddressOf() ) ) )
+	{
+		OutputDebugStringW( L"[ObjModelRenderer] PixelShader生成失敗\n" );
+		Uninit();
+		return false;
+	}
+
+	// World、View、Projection、色、Texture使用有無を渡す定数バッファを生成する。
+	D3D11_BUFFER_DESC transformBufferDesc{};
+	transformBufferDesc.ByteWidth = static_cast<UINT>( sizeof( TransformBuffer ) );
+	transformBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+	transformBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+
+	if ( FAILED( device->CreateBuffer(
+		&transformBufferDesc,
+		nullptr,
+		m_TransformBuffer.GetAddressOf() ) ) )
+	{
+		Uninit();
+		return false;
+	}
+
+	// 空パスの場合はTextureを読み込まず、単色描画として扱う。
+	if ( !textureFilePath.empty() && !LoadTextureFromFile( device, textureFilePath ) )
+	{
+		OutputDebugStringW( L"[ObjModelRenderer] Texture読込失敗: " );
+		OutputDebugStringW( textureFilePath.c_str() );
+		OutputDebugStringW( L"\n" );
+		Uninit();
+		return false;
+	}
+
+	// Texture参照時のフィルタリングとアドレス指定を行うSamplerを生成する。
+	D3D11_SAMPLER_DESC samplerDesc{};
+	samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.MinLOD = 0.0f;
+	samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+	if ( FAILED( device->CreateSamplerState(
+		&samplerDesc,
+		m_TextureSampler.GetAddressOf() ) ) )
+	{
+		Uninit();
+		return false;
+	}
+
+	m_IndexCount = static_cast<unsigned int>( indices.size() );
+
+	return true;
+}
+
+// OBJ描画で使用したDirect3Dリソースを解放する。
+void ObjModelRenderer::Uninit()
+{
+	// TextureとSamplerを解放する。
+	m_TextureSampler.Reset();
+	m_TextureView.Reset();
+
+	// 定数バッファとメッシュBufferを解放する。
+	m_TransformBuffer.Reset();
+	m_IndexBuffer.Reset();
+	m_VertexBuffer.Reset();
+
+	// ShaderとInput Layoutを解放する。
+	m_InputLayout.Reset();
+	m_PixelShader.Reset();
+	m_VertexShader.Reset();
+
+	m_IndexCount = {};
+}
+
+// 指定したWorld、View、Projection行列と色でOBJモデルを描画する。
+void ObjModelRenderer::Draw(
+	GraphicsSystem& graphicsSystem,
+	const DirectX::XMMATRIX& worldMatrix,
+	const DirectX::XMMATRIX& viewMatrix,
+	const DirectX::XMMATRIX& projectionMatrix,
+	const DirectX::XMFLOAT4& color )
+{
+	if ( !m_VertexBuffer || !m_IndexBuffer || !m_TransformBuffer || !m_VertexShader ||
+		!m_PixelShader || !m_InputLayout || !m_TextureSampler || m_IndexCount == 0 ) return;
+
+	// 描画に使用するDirect3D Contextを取得する。
+	ID3D11DeviceContext* context = graphicsSystem.GetContext();
+	if ( context == nullptr ) return;
+
+	// Shaderへ渡すWorld、View、Projection、色、Texture使用有無をまとめる。
+	const DirectX::XMMATRIX worldViewProjection =
+		DirectX::XMMatrixTranspose( worldMatrix * viewMatrix * projectionMatrix );
+	const TransformBuffer transformBuffer
+	{
+		worldViewProjection,
+		color,
+		DirectX::XMFLOAT2{ 1.0f, 1.0f },
+		m_TextureView ? 1.0f : 0.0f,
+		0.0f
+	};
+
+	// Input Assemblerへ設定する頂点Buffer情報をまとめる。
+	const UINT vertexStride = sizeof( Vertex );
+	const UINT vertexOffset{};
+	ID3D11Buffer* vertexBuffers[]{ m_VertexBuffer.Get() };
+
+	// Shaderへ設定する定数Buffer、Texture、Samplerをまとめる。
+	ID3D11Buffer* transformBuffers[]{ m_TransformBuffer.Get() };
+	ID3D11ShaderResourceView* textureViews[]{ m_TextureView.Get() };
+	ID3D11SamplerState* samplers[]{ m_TextureSampler.Get() };
+
+	context->UpdateSubresource( m_TransformBuffer.Get(), 0, nullptr, &transformBuffer, 0, 0 );
+
+	context->IASetVertexBuffers( 0, 1, vertexBuffers, &vertexStride, &vertexOffset );
+	context->IASetIndexBuffer( m_IndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0 );
+	context->IASetInputLayout( m_InputLayout.Get() );
+	context->IASetPrimitiveTopology( D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
+
+	context->VSSetShader( m_VertexShader.Get(), nullptr, 0 );
+	context->PSSetShader( m_PixelShader.Get(), nullptr, 0 );
+	context->VSSetConstantBuffers( 0, 1, transformBuffers );
+	context->PSSetConstantBuffers( 0, 1, transformBuffers );
+
+	// Textureなしの場合もnullptrを設定し、直前のSRV参照を残さない。
+	context->PSSetShaderResources( 0, 1, textureViews );
+	context->PSSetSamplers( 0, 1, samplers );
+	context->DrawIndexed( m_IndexCount, 0, 0 );
+}
+
+// OBJファイルを読み込み、頂点配列とIndex配列を生成する。
+bool ObjModelRenderer::LoadObjFile(
+	const std::wstring& objFilePath,
+	std::vector<Vertex>& vertices,
+	std::vector<unsigned int>& indices )
+{
+	std::ifstream file( objFilePath );
+	if ( !file ) return false;
+
+	// OBJから読み込む位置、UV、重複頂点の対応表を保持する。
+	std::vector<DirectX::XMFLOAT3> positions{};
+	std::vector<DirectX::XMFLOAT2> uvs{};
+	std::unordered_map<std::string, unsigned int> vertexMap{};
+
+	std::string line{};
+
+	while ( std::getline( file, line ) )
+	{
+		std::stringstream lineStream( line );
+		std::string type{};
+
+		lineStream >> type;
+
+		if ( type == "v" )
+		{
+			DirectX::XMFLOAT3 position{};
+			lineStream >> position.x >> position.y >> position.z;
+			positions.push_back( position );
+			continue;
+		}
+
+		if ( type == "vt" )
+		{
+			DirectX::XMFLOAT2 uv{};
+			lineStream >> uv.x >> uv.y;
+
+			// OBJのUV座標をDirect3Dの上下反転したUV座標へ変換する。
+			uv.y = 1.0f - uv.y;
+			uvs.push_back( uv );
+			continue;
+		}
+
+		if ( type != "f" ) continue;
+
+		// 面を構成するOBJ Indexを読み込む。
+		std::vector<ObjIndex> faceIndices{};
+		std::string token{};
+
+		while ( lineStream >> token )
+		{
+			ObjIndex objIndex{};
+			if ( ParseObjIndex( token, objIndex ) ) faceIndices.push_back( objIndex );
+		}
+
+		if ( faceIndices.size() < 3 ) continue;
+
+		// 四角形以上の面も三角形の扇形分割としてIndex化する。
+		for ( size_t index = 1; index + 1 < faceIndices.size(); ++index )
+		{
+			const ObjIndex triangle[]
+			{
+				faceIndices[ 0 ],
+				faceIndices[ index ],
+				faceIndices[ index + 1 ]
+			};
+
+			for ( const ObjIndex& objIndex : triangle )
+			{
+				const std::string key = MakeVertexKey( objIndex );
+				const auto found = vertexMap.find( key );
+
+				if ( found != vertexMap.end() )
+				{
+					indices.push_back( found->second );
+					continue;
+				}
+
+				const int positionIndex = objIndex.positionIndex - 1;
+				if ( positionIndex < 0 || positionIndex >= static_cast<int>( positions.size() ) ) return false;
+
+				DirectX::XMFLOAT2 uv{};
+
+				if ( objIndex.uvIndex > 0 )
+				{
+					const int uvIndex = objIndex.uvIndex - 1;
+					if ( uvIndex < 0 || uvIndex >= static_cast<int>( uvs.size() ) ) return false;
+
+					uv = uvs[ uvIndex ];
+				}
+
+				const Vertex vertex{ positions[ positionIndex ], uv };
+				const unsigned int newIndex = static_cast<unsigned int>( vertices.size() );
+
+				vertices.push_back( vertex );
+				vertexMap.emplace( key, newIndex );
+				indices.push_back( newIndex );
+			}
+		}
+	}
+
+	return !vertices.empty() && !indices.empty();
+}
+
+// テクスチャファイルを読み込み、Shader Resource Viewを生成する。
+bool ObjModelRenderer::LoadTextureFromFile( ID3D11Device* device, const std::wstring& textureFilePath )
+{
+	return LoadWicTexture( device, textureFilePath, m_TextureView );
+}
