@@ -1,19 +1,26 @@
 #include "../H/AudioSystem.h"
 
+//========= C++標準ライブラリ インクルード=========
 #include <exception>
 #include <memory>
 
+//========= Windows インクルード=========
 #include <windows.h>
 
+//========= DirectXTK インクルード=========
 #include <Audio.h>
 
 namespace
 {
+	//========= BGM音量定数=========
+		// 各SceneのBGM再生に使用する音量。
 	constexpr float TITLE_BGM_VOLUME = 0.45f;
 	constexpr float SHOP_BGM_VOLUME = 0.40f;
 	constexpr float GAME_BGM_VOLUME = 0.40f;
 	constexpr float RESULT_BGM_VOLUME = 0.45f;
 
+	//========= SE音量定数=========
+	// ゲーム中のSE再生に使用する音量。
 	constexpr float GUN_SE_VOLUME = 0.70f;
 	constexpr float WARP_SE_VOLUME = 0.65f;
 	constexpr float LOW_HP_SE_VOLUME = 0.75f;
@@ -22,11 +29,15 @@ namespace
 	constexpr float SPECIAL_SE_VOLUME = 0.80f;
 	constexpr float ENEMY_DEFEAT_SE_VOLUME = 0.80f;
 
+	//========= BGMファイルパス定数=========
+	// 各SceneのBGMファイルパス。
 	constexpr const wchar_t* TITLE_BGM_FILE_PATH = L"Assets/Audio/BGM/Bgm_Title.wav";
 	constexpr const wchar_t* SHOP_BGM_FILE_PATH = L"Assets/Audio/BGM/Bgm_Shop.wav";
 	constexpr const wchar_t* GAME_BGM_FILE_PATH = L"Assets/Audio/BGM/Bgm_Game.wav";
 	constexpr const wchar_t* RESULT_BGM_FILE_PATH = L"Assets/Audio/BGM/Bgm_Result.wav";
 
+	//========= SEファイルパス定数=========
+	// ゲーム中のSEファイルパス。
 	constexpr const wchar_t* GUN_SE_FILE_PATH = L"Assets/Audio/SE/Se_Gun.wav";
 	constexpr const wchar_t* WARP_SE_FILE_PATH = L"Assets/Audio/SE/Se_Warp.wav";
 	constexpr const wchar_t* LOW_HP_SE_FILE_PATH = L"Assets/Audio/SE/Se_Lowhp.wav";
@@ -40,15 +51,18 @@ namespace
 class AudioSystem::Impl final
 {
 public:
+	//========= AudioEngine=========
 	// XAudio2を利用した音声エンジン。
 	std::unique_ptr<DirectX::AudioEngine> audioEngine{};
 
+	//========= BGM=========
 	// 各Sceneで使用するBGM。
 	std::unique_ptr<DirectX::SoundEffect> titleBgm{};
 	std::unique_ptr<DirectX::SoundEffect> shopBgm{};
 	std::unique_ptr<DirectX::SoundEffect> gameBgm{};
 	std::unique_ptr<DirectX::SoundEffect> resultBgm{};
 
+	//========= SE=========
 	// ゲーム中に再生するSE。
 	std::unique_ptr<DirectX::SoundEffect> gunSe{};
 	std::unique_ptr<DirectX::SoundEffect> warpSe{};
@@ -58,6 +72,7 @@ public:
 	std::unique_ptr<DirectX::SoundEffect> specialSe{};
 	std::unique_ptr<DirectX::SoundEffect> enemyDefeatSe{};
 
+	//========= BGM再生Instance=========
 	// 現在ループ再生しているBGMのInstance。
 	std::unique_ptr<DirectX::SoundEffectInstance> bgmInstance{};
 };
@@ -81,45 +96,69 @@ bool AudioSystem::Initialize()
 	{
 		m_Impl = std::make_unique<Impl>();
 
+		// XAudio2を利用するAudioEngineを生成する。
 		OutputDebugStringW( L"[Audio] Creating AudioEngine...\n" );
-
 		m_Impl->audioEngine = std::make_unique<DirectX::AudioEngine>(
 			DirectX::AudioEngine_Default,
 			nullptr,
 			nullptr );
 
+		// 各Sceneで使用するBGMを読み込む。
 		OutputDebugStringW( L"[Audio] Loading: Bgm_Title.wav\n" );
-		m_Impl->titleBgm = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), TITLE_BGM_FILE_PATH );
+		m_Impl->titleBgm = std::make_unique<DirectX::SoundEffect>(
+			m_Impl->audioEngine.get(),
+			TITLE_BGM_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Bgm_Shop.wav\n" );
-		m_Impl->shopBgm = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), SHOP_BGM_FILE_PATH );
+		m_Impl->shopBgm = std::make_unique<DirectX::SoundEffect>(
+			m_Impl->audioEngine.get(),
+			SHOP_BGM_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Bgm_Game.wav\n" );
-		m_Impl->gameBgm = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), GAME_BGM_FILE_PATH );
+		m_Impl->gameBgm = std::make_unique<DirectX::SoundEffect>(
+			m_Impl->audioEngine.get(),
+			GAME_BGM_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Bgm_Result.wav\n" );
-		m_Impl->resultBgm = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), RESULT_BGM_FILE_PATH );
+		m_Impl->resultBgm = std::make_unique<DirectX::SoundEffect>(
+			m_Impl->audioEngine.get(),
+			RESULT_BGM_FILE_PATH );
 
+		// ゲーム中に使用するSEを読み込む。
 		OutputDebugStringW( L"[Audio] Loading: Se_Gun.wav\n" );
-		m_Impl->gunSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), GUN_SE_FILE_PATH );
+		m_Impl->gunSe = std::make_unique<DirectX::SoundEffect>(
+			m_Impl->audioEngine.get(),
+			GUN_SE_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Se_Warp.wav\n" );
-		m_Impl->warpSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), WARP_SE_FILE_PATH );
+		m_Impl->warpSe = std::make_unique<DirectX::SoundEffect>(
+			m_Impl->audioEngine.get(),
+			WARP_SE_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Se_Lowhp.wav\n" );
-		m_Impl->lowHpSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), LOW_HP_SE_FILE_PATH );
+		m_Impl->lowHpSe = std::make_unique<DirectX::SoundEffect>(
+			m_Impl->audioEngine.get(),
+			LOW_HP_SE_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Se_Purchase.wav\n" );
-		m_Impl->purchaseSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), PURCHASE_SE_FILE_PATH );
+		m_Impl->purchaseSe = std::make_unique<DirectX::SoundEffect>(
+			m_Impl->audioEngine.get(),
+			PURCHASE_SE_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Se_Damage.wav\n" );
-		m_Impl->damageSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), DAMAGE_SE_FILE_PATH );
+		m_Impl->damageSe = std::make_unique<DirectX::SoundEffect>(
+			m_Impl->audioEngine.get(),
+			DAMAGE_SE_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Se_Special.wav\n" );
-		m_Impl->specialSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), SPECIAL_SE_FILE_PATH );
+		m_Impl->specialSe = std::make_unique<DirectX::SoundEffect>(
+			m_Impl->audioEngine.get(),
+			SPECIAL_SE_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Se_EnemyDefeat.wav\n" );
-		m_Impl->enemyDefeatSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), ENEMY_DEFEAT_SE_FILE_PATH );
+		m_Impl->enemyDefeatSe = std::make_unique<DirectX::SoundEffect>(
+			m_Impl->audioEngine.get(),
+			ENEMY_DEFEAT_SE_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] All sound files loaded.\n" );
 
@@ -159,17 +198,17 @@ void AudioSystem::Uninit()
 {
 	if ( !m_Impl ) return;
 
-	// BGMを即時停止し、再生Instanceを先に解放する。
+	// BGMを停止し、AudioEngineより先に再生Instanceを解放する。
 	if ( m_Impl->bgmInstance )
 	{
 		m_Impl->bgmInstance->Stop( true );
 		m_Impl->bgmInstance.reset();
 	}
 
-	// AudioEngineを先に終了し、XAudio2の再生VoiceとCallbackを停止する。
+	// AudioEngineを終了し、XAudio2の再生VoiceとCallbackを停止する。
 	m_Impl->audioEngine.reset();
 
-	// AudioEngine停止後に各SoundEffectを解放する。
+	// AudioEngine停止後にSEを解放する。
 	m_Impl->enemyDefeatSe.reset();
 	m_Impl->specialSe.reset();
 	m_Impl->damageSe.reset();
@@ -178,6 +217,7 @@ void AudioSystem::Uninit()
 	m_Impl->warpSe.reset();
 	m_Impl->gunSe.reset();
 
+	// AudioEngine停止後にBGMを解放する。
 	m_Impl->resultBgm.reset();
 	m_Impl->gameBgm.reset();
 	m_Impl->shopBgm.reset();
@@ -195,7 +235,6 @@ void AudioSystem::PlayTitleBgm()
 	StopBgm();
 
 	m_Impl->bgmInstance = m_Impl->titleBgm->CreateInstance();
-
 	if ( !m_Impl->bgmInstance ) return;
 
 	m_Impl->bgmInstance->SetVolume( TITLE_BGM_VOLUME );
@@ -210,7 +249,6 @@ void AudioSystem::PlayShopBgm()
 	StopBgm();
 
 	m_Impl->bgmInstance = m_Impl->shopBgm->CreateInstance();
-
 	if ( !m_Impl->bgmInstance ) return;
 
 	m_Impl->bgmInstance->SetVolume( SHOP_BGM_VOLUME );
@@ -225,7 +263,6 @@ void AudioSystem::PlayGameBgm()
 	StopBgm();
 
 	m_Impl->bgmInstance = m_Impl->gameBgm->CreateInstance();
-
 	if ( !m_Impl->bgmInstance ) return;
 
 	m_Impl->bgmInstance->SetVolume( GAME_BGM_VOLUME );
@@ -240,7 +277,6 @@ void AudioSystem::PlayResultBgm()
 	StopBgm();
 
 	m_Impl->bgmInstance = m_Impl->resultBgm->CreateInstance();
-
 	if ( !m_Impl->bgmInstance ) return;
 
 	m_Impl->bgmInstance->SetVolume( RESULT_BGM_VOLUME );

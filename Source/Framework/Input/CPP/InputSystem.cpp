@@ -1,13 +1,13 @@
 #include "Framework/Input/H/InputSystem.h"
 
+//========= C++標準ライブラリ インクルード=========
 #include <cstring>
 
 // 入力対象のウィンドウを登録し、現在と前フレームのキー状態を初期化する。
 void InputSystem::Initialize( HWND windowHandle )
 {
+	// 入力対象のウィンドウとキー状態を初期化する。
 	m_WindowHandle = windowHandle;
-
-	// 起動直後に押下開始として判定されないよう、現在と前フレームの状態を一致させる。
 	GetKeyboardState( m_CurrentKeys );
 	std::memcpy( m_PreviousKeys, m_CurrentKeys, sizeof( m_CurrentKeys ) );
 
@@ -76,6 +76,7 @@ bool InputSystem::IsKeyTriggered( unsigned char keyCode ) const
 // WndProcで蓄積したマウス移動量を返し、内部の差分をリセットする。
 POINT InputSystem::ConsumeMouseDelta()
 {
+	// 現フレームのマウス差分を返し、次フレームへ持ち越さないようリセットする。
 	const POINT mouseDelta = m_MouseDelta;
 	m_MouseDelta = {};
 
@@ -87,6 +88,7 @@ void InputSystem::SetMouseCaptureEnabled( bool isEnabled )
 {
 	if ( m_IsMouseCaptureEnabled == isEnabled ) return;
 
+	// モード切替時に前モードのマウス差分を破棄する。
 	m_IsMouseCaptureEnabled = isEnabled;
 	m_MouseDelta = {};
 
@@ -111,6 +113,7 @@ void InputSystem::SetMouseCaptureEnabled( bool isEnabled )
 // クライアント領域の中央をスクリーン座標へ変換して保持する。
 void InputSystem::UpdateMouseCenter()
 {
+	// クライアント領域の中央をクライアント座標で計算する。
 	RECT clientRect{};
 	GetClientRect( m_WindowHandle, &clientRect );
 
@@ -118,6 +121,7 @@ void InputSystem::UpdateMouseCenter()
 	clientCenter.x = ( clientRect.right - clientRect.left ) / 2;
 	clientCenter.y = ( clientRect.bottom - clientRect.top ) / 2;
 
+	// SetCursorPosと比較できるよう、中央座標をスクリーン座標へ変換する。
 	ClientToScreen( m_WindowHandle, &clientCenter );
 	m_ScreenCenter = clientCenter;
 }
@@ -131,6 +135,7 @@ void InputSystem::ResetMousePosition()
 // FPS操作中にカーソルがウィンドウ外へ出ないよう制限する。
 void InputSystem::ClipMouseCursor()
 {
+	// クライアント領域の左上と右下をスクリーン座標へ変換する。
 	RECT clientRect{};
 	GetClientRect( m_WindowHandle, &clientRect );
 
@@ -140,8 +145,8 @@ void InputSystem::ClipMouseCursor()
 	ClientToScreen( m_WindowHandle, &clipTopLeft );
 	ClientToScreen( m_WindowHandle, &clipBottomRight );
 
-	// クライアント領域をスクリーン座標の制限矩形へ変換する。
-	const RECT clipRect{
+	const RECT clipRect
+	{
 		clipTopLeft.x,
 		clipTopLeft.y,
 		clipBottomRight.x,

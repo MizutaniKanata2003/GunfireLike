@@ -1,66 +1,63 @@
 #pragma once
 
-#include <windows.h>
-
+//========= Scene インクルード=========
 #include "Scene/Common/H/IScene.h"
+
+//========= Framework インクルード=========
 #include "Framework/2D/H/HudRenderer.h"
 #include "Framework/2D/H/HudTextRenderer.h"
 
+//========= 前方宣言=========
 class AudioSystem;
 class GraphicsSystem;
 class InputSystem;
 class SceneManager;
 
-namespace
-{
-	constexpr float TITLE_SCREEN_WIDTH = 1280.0f;
-	constexpr float TITLE_SCREEN_HEIGHT = 720.0f;
-
-	constexpr float TITLE_MAIN_PANEL_X = 190.0f;
-	constexpr float TITLE_MAIN_PANEL_Y = 90.0f;
-	constexpr float TITLE_MAIN_PANEL_WIDTH = 900.0f;
-	constexpr float TITLE_MAIN_PANEL_HEIGHT = 560.0f;
-
-	constexpr float TITLE_START_BUTTON_X = 470.0f;
-	constexpr float TITLE_START_BUTTON_Y = 480.0f;
-	constexpr float TITLE_START_BUTTON_WIDTH = 340.0f;
-	constexpr float TITLE_START_BUTTON_HEIGHT = 62.0f;
-
-	constexpr float TITLE_EXIT_BUTTON_X = 470.0f;
-	constexpr float TITLE_EXIT_BUTTON_Y = 555.0f;
-	constexpr float TITLE_EXIT_BUTTON_WIDTH = 340.0f;
-	constexpr float TITLE_EXIT_BUTTON_HEIGHT = 52.0f;
-
-	constexpr unsigned char TITLE_START_GAME_KEY =
-		VK_RETURN;
-
-	constexpr unsigned char TITLE_EXIT_KEY =
-		VK_ESCAPE;
-}
-
+// タイトル画面の入力、UI描画、BGM、Scene遷移を管理する。
 class TitleScene final : public IScene
 {
 public:
+	//========= 生成関数=========
+	// TitleSceneが使用するSceneManagerとFramework Systemを登録する。
 	TitleScene(
 		SceneManager& sceneManager,
 		InputSystem& inputSystem,
 		GraphicsSystem& graphicsSystem,
 		AudioSystem& audioSystem );
 
+	//========= Sceneライフサイクル関数=========
+	// タイトル画面の入力設定、HUD、文字、BGMを初期化する。
 	void Initialize() override;
-	bool Init() override;
+	// Asset読込などの深い初期化を行う。
+	bool Init() override
+	{
+		return true;
+	}
+	// タイトル画面の入力を更新する。
 	void Update( float deltaTime ) override;
+	// タイトル画面の背景、操作説明、ボタンを描画する。
 	void Draw() override;
+	// タイトル画面で使用したHUDと文字描画リソースを解放する。
 	void Uninit() override;
 
 private:
+	//========= 補助関数=========
+	// 新しいゲームを開始してShopSceneへの遷移を予約する。
 	void StartGame();
 
+	//========= Framework・Scene参照=========
+	// Scene遷移とゲーム進捗操作に使用するSceneManager。
 	SceneManager& m_SceneManager;
+	// タイトル画面のキーボード入力に使用するInputSystem。
 	InputSystem& m_InputSystem;
+	// HUDの描画State設定に使用するGraphicsSystem。
 	GraphicsSystem& m_GraphicsSystem;
+	// タイトルBGMとワープSEの再生に使用するAudioSystem。
 	AudioSystem& m_AudioSystem;
 
-	HudRenderer m_HudRenderer;
-	HudTextRenderer m_HudTextRenderer;
+	//========= HUD描画=========
+	// 単色Quadを描画するHUDレンダラー。
+	HudRenderer m_HudRenderer{};
+	// タイトル画面の文字列を描画するHUD文字レンダラー。
+	HudTextRenderer m_HudTextRenderer{};
 };

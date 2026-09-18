@@ -3,6 +3,10 @@
 // DirectX 11のDevice、Context、SwapChain、RenderTargetを初期化する。
 bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int height )
 {
+	// 二重初期化時に、既存のDirect3Dリソースを安全に解放する。
+	Uninit();
+
+	// DeviceとSwapChainの生成に使用する設定を作成する。
 	DXGI_SWAP_CHAIN_DESC swapChainDesc{};
 	swapChainDesc.BufferCount = 2;
 	swapChainDesc.BufferDesc.Width = width;
@@ -14,13 +18,15 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 	swapChainDesc.Windowed = TRUE;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 
-	const D3D_FEATURE_LEVEL requestedFeatureLevels[] =
+	// 使用するDirect3D Feature Levelを指定する。
+	const D3D_FEATURE_LEVEL requestedFeatureLevels[]
 	{
 		D3D_FEATURE_LEVEL_11_0
 	};
 
 	D3D_FEATURE_LEVEL createdFeatureLevel{};
 
+	// DirectX 11のDevice、Context、SwapChainを生成する。
 	const HRESULT result = D3D11CreateDeviceAndSwapChain(
 		nullptr,
 		D3D_DRIVER_TYPE_HARDWARE,
@@ -35,9 +41,13 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 		&createdFeatureLevel,
 		m_Context.GetAddressOf() );
 
-	if ( FAILED( result ) ) return false;
+	if ( FAILED( result ) )
+	{
+		Uninit();
+		return false;
+	}
 
-	// 半透明HUDやフェードを描画するための通常Alpha Blend Stateを生成する。
+	// 半透明HUDやフェードを描画するためのAlpha Blend Stateを生成する。
 	D3D11_BLEND_DESC blendDescription{};
 	blendDescription.AlphaToCoverageEnable = FALSE;
 	blendDescription.IndependentBlendEnable = FALSE;
@@ -52,9 +62,9 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 	renderTargetBlend.BlendOpAlpha = D3D11_BLEND_OP_ADD;
 	renderTargetBlend.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
-	const HRESULT blendResult = m_Device->CreateBlendState( &blendDescription, m_AlphaBlendState.GetAddressOf() );
-
-	if ( FAILED( blendResult ) )
+	if ( FAILED( m_Device->CreateBlendState(
+		&blendDescription,
+		m_AlphaBlendState.GetAddressOf() ) ) )
 	{
 		Uninit();
 		return false;
@@ -67,16 +77,15 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 	depthDisabledDescription.DepthFunc = D3D11_COMPARISON_ALWAYS;
 	depthDisabledDescription.StencilEnable = FALSE;
 
-	const HRESULT depthDisabledResult = m_Device->CreateDepthStencilState(
+	if ( FAILED( m_Device->CreateDepthStencilState(
 		&depthDisabledDescription,
-		m_DepthDisabledState.GetAddressOf() );
-
-	if ( FAILED( depthDisabledResult ) )
+		m_DepthDisabledState.GetAddressOf() ) ) )
 	{
 		Uninit();
 		return false;
 	}
 
+	// 現在のウィンドウサイズでRenderTarget、DepthStencil、Viewportを生成する。
 	if ( !CreateRenderTargets( width, height ) )
 	{
 		Uninit();
@@ -89,13 +98,17 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 // DirectX 11で生成したリソースを解放する。
 void GraphicsSystem::Uninit()
 {
+	// RenderTargetとDepthStencilを先に解放する。
 	ReleaseRenderTargets();
 
+	// Contextに設定されている描画Stateと参照を解除する。
 	if ( m_Context ) m_Context->ClearState();
 
+	// HUD描画に使用するStateを解放する。
 	m_AlphaBlendState.Reset();
 	m_DepthDisabledState.Reset();
 
+	// DirectX 11の主要リソースを解放する。
 	m_SwapChain.Reset();
 	m_Context.Reset();
 	m_Device.Reset();
@@ -106,7 +119,13 @@ void GraphicsSystem::BeginFrame( const float clearColor[ 4 ] )
 {
 	if ( !m_Context || !m_RenderTargetView || !m_DepthStencilView ) return;
 
-	m_Context->OMSetRenderTargets( 1, m_RenderTargetView.GetAddressOf(), m_DepthStencilView.Get() );
+	// 描画先としてBackBufferとDepthStencilを設定する。
+	m_Context->OMSetRenderTargets(
+		1,
+		m_RenderTargetView.GetAddressOf(),
+		m_DepthStencilView.Get() );
+
+	// 指定色と初期Depth値で描画先をクリアする。
 	m_Context->ClearRenderTargetView( m_RenderTargetView.Get(), clearColor );
 	m_Context->ClearDepthStencilView( m_DepthStencilView.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0 );
 }
@@ -122,11 +141,14 @@ void GraphicsSystem::Resize( unsigned int width, unsigned int height )
 {
 	if ( width == 0 || height == 0 || !m_SwapChain ) return;
 
+	// 旧サイズのRenderTargetとDepthStencilを解放する。
 	ReleaseRenderTargets();
 
+	// 新しいウィンドウサイズでBackBufferを再生成する。
 	if ( FAILED( m_SwapChain->ResizeBuffers( 0, width, height, DXGI_FORMAT_UNKNOWN, 0 ) ) ) return;
 
-	CreateRenderTargets( width, height );
+	// 新しいBackBufferからRenderTarget、DepthStencil、Viewportを再生成する。
+	if ( !CreateRenderTargets( width, height ) ) ReleaseRenderTargets();
 }
 
 // BackBuffer、RenderTargetView、DepthStencilView、Viewportを生成する。
@@ -134,13 +156,27 @@ bool GraphicsSystem::CreateRenderTargets( unsigned int width, unsigned int heigh
 {
 	if ( !m_Device || !m_Context || !m_SwapChain ) return false;
 
+	// SwapChainのBackBufferを取得してRenderTarget Viewを生成する。
 	Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer{};
 
-	if ( FAILED( m_SwapChain->GetBuffer( 0, IID_PPV_ARGS( backBuffer.GetAddressOf() ) ) ) ) return false;
+	if ( FAILED( m_SwapChain->GetBuffer(
+		0,
+		IID_PPV_ARGS( backBuffer.GetAddressOf() ) ) ) )
+	{
+		ReleaseRenderTargets();
+		return false;
+	}
 
 	if ( FAILED( m_Device->CreateRenderTargetView(
-		backBuffer.Get(), nullptr, m_RenderTargetView.GetAddressOf() ) ) ) return false;
+		backBuffer.Get(),
+		nullptr,
+		m_RenderTargetView.GetAddressOf() ) ) )
+	{
+		ReleaseRenderTargets();
+		return false;
+	}
 
+	// 3D描画の奥行き判定に使用するDepthStencil用Textureを生成する。
 	D3D11_TEXTURE2D_DESC depthTextureDesc{};
 	depthTextureDesc.Width = width;
 	depthTextureDesc.Height = height;
@@ -153,11 +189,24 @@ bool GraphicsSystem::CreateRenderTargets( unsigned int width, unsigned int heigh
 	Microsoft::WRL::ComPtr<ID3D11Texture2D> depthTexture{};
 
 	if ( FAILED( m_Device->CreateTexture2D(
-		&depthTextureDesc, nullptr, depthTexture.GetAddressOf() ) ) ) return false;
+		&depthTextureDesc,
+		nullptr,
+		depthTexture.GetAddressOf() ) ) )
+	{
+		ReleaseRenderTargets();
+		return false;
+	}
 
 	if ( FAILED( m_Device->CreateDepthStencilView(
-		depthTexture.Get(), nullptr, m_DepthStencilView.GetAddressOf() ) ) ) return false;
+		depthTexture.Get(),
+		nullptr,
+		m_DepthStencilView.GetAddressOf() ) ) )
+	{
+		ReleaseRenderTargets();
+		return false;
+	}
 
+	// 新しい画面サイズに合わせてViewportを設定する。
 	D3D11_VIEWPORT viewport{};
 	viewport.Width = static_cast<float>( width );
 	viewport.Height = static_cast<float>( height );
@@ -177,22 +226,25 @@ void GraphicsSystem::ReleaseRenderTargets()
 }
 
 // Alpha Blend Stateの有効・無効を切り替える。
-void GraphicsSystem::SetAlphaBlendEnabled( bool enabled )
+void GraphicsSystem::SetAlphaBlendEnabled( bool isEnabled )
 {
 	if ( !m_Context ) return;
 
+	// Blend Stateに渡す固定のBlend Factorを設定する。
 	const float blendFactor[ 4 ]{};
 
 	m_Context->OMSetBlendState(
-		enabled ? m_AlphaBlendState.Get() : nullptr,
+		isEnabled ? m_AlphaBlendState.Get() : nullptr,
 		blendFactor,
 		0xffffffff );
 }
 
 // Depth Testの有効・無効を切り替える。
-void GraphicsSystem::SetDepthTestEnabled( bool enabled )
+void GraphicsSystem::SetDepthTestEnabled( bool isEnabled )
 {
 	if ( !m_Context ) return;
 
-	m_Context->OMSetDepthStencilState( enabled ? nullptr : m_DepthDisabledState.Get(), 0 );
+	m_Context->OMSetDepthStencilState(
+		isEnabled ? nullptr : m_DepthDisabledState.Get(),
+		0 );
 }

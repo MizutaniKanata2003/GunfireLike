@@ -1,16 +1,18 @@
 #include "../H/FpsCamera.h"
 
+//========= C++標準ライブラリ インクルード=========
 #include <algorithm>
 #include <cmath>
 
+//========= Framework インクルード=========
 #include "Framework/Input/H/InputSystem.h"
 
 namespace
 {
+	//========= Pitch制限定数=========
 	// Pitchの最大角度を度で定義する。
 	constexpr float MAX_PITCH_DEGREES = 89.0f;
-
-	// DirectXMathのラジアン定数を使ってPitch制限値をラジアンへ変換する。
+	// Pitchとして許可する最大回転角をラジアンで定義する。
 	constexpr float MAX_PITCH_RADIANS = DirectX::XMConvertToRadians( MAX_PITCH_DEGREES );
 }
 
@@ -52,8 +54,7 @@ DirectX::XMFLOAT3 FpsCamera::GetRight() const
 	const DirectX::XMFLOAT3 forward = GetForward();
 	const DirectX::XMVECTOR upVector = DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
 	const DirectX::XMVECTOR forwardVector = DirectX::XMLoadFloat3( &forward );
-	const DirectX::XMVECTOR rightVector = DirectX::XMVector3Normalize(
-		DirectX::XMVector3Cross( upVector, forwardVector ) );
+	const DirectX::XMVECTOR rightVector = DirectX::XMVector3Normalize( DirectX::XMVector3Cross( upVector, forwardVector ) );
 
 	DirectX::XMFLOAT3 right{};
 	DirectX::XMStoreFloat3( &right, rightVector );
