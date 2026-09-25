@@ -203,7 +203,7 @@ void ShopScene::Draw()
 		DirectX::XMMatrixScaling( SHOP_SKYBOX_SCALE, SHOP_SKYBOX_SCALE, SHOP_SKYBOX_SCALE ) *
 		DirectX::XMMatrixTranslation( cameraPosition.x, cameraPosition.y, cameraPosition.z );
 
-	m_GraphicsSystem.SetDepthTestEnabled( false );
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_SKY );
 	m_BasicMeshRenderer.DrawCube(
 		m_GraphicsSystem,
 		skyboxWorldMatrix,
@@ -216,7 +216,7 @@ void ShopScene::Draw()
 			SHOP_SKY_COLOR_ALPHA },
 			DirectX::XMFLOAT2{ 1.0f, 1.0f },
 			BasicMeshRenderer::TextureType::Color );
-	m_GraphicsSystem.SetDepthTestEnabled( true );
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_OPAQUE );
 
 	// 床のWorld行列を作成してFloor Textureで描画する。
 	const DirectX::XMMATRIX floorWorldMatrix =
@@ -384,7 +384,7 @@ void ShopScene::Draw()
 		BasicMeshRenderer::TextureType::Color );
 
 	// HUDを画面固定で描画するためDepth Testを無効化する。
-	m_GraphicsSystem.SetDepthTestEnabled( false );
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_SCREEN_UI );
 	m_HudRenderer.DrawCrosshair( m_GraphicsSystem );
 	m_HudTextRenderer.Begin();
 
@@ -530,8 +530,7 @@ void ShopScene::Draw()
 	m_HudTextRenderer.End();
 
 	// 次の3D描画へ影響を残さないようDepth TestとAlpha Blendを戻す。
-	m_GraphicsSystem.SetDepthTestEnabled( true );
-	m_GraphicsSystem.SetAlphaBlendEnabled( false );
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_OPAQUE );
 }
 
 // Shopで使用した描画リソースを解放する。

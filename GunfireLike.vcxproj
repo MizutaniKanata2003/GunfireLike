@@ -190,6 +190,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="External\imgui\imgui_tables.cpp" />
     <ClCompile Include="External\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Source\Framework\Audio\CPP\AudioSystem.cpp" />
+    <ClCompile Include="Source\Framework\DirectX\CPP\GraphicsConstants.cpp" />
     <ClCompile Include="Source\Framework\Etc\CPP\GameTimer.cpp" />
     <ClCompile Include="Source\Framework\Etc\CPP\Logger.cpp" />
     <ClCompile Include="Source\Framework\Input\CPP\InputSystem.cpp" />
@@ -218,6 +219,8 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="External\imgui\imgui.h" />
     <ClInclude Include="Source\Framework\Audio\H\AudioSystem.h" />
     <ClInclude Include="Source\Framework\2D\H\FadeOverlay.h" />
+    <ClInclude Include="Source\Framework\DirectX\H\ConstantBuffer.h" />
+    <ClInclude Include="Source\Framework\DirectX\H\GraphicsConstants.h" />
     <ClInclude Include="Source\Framework\Etc\H\Logger.h" />
     <ClInclude Include="Source\Scene\Common\H\EnemyHealth.h" />
     <ClInclude Include="Source\Scene\Common\H\GameProgress.h">

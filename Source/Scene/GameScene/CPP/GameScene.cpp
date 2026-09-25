@@ -666,15 +666,14 @@ void GameScene::Draw()
 			cameraPosition.z );
 
 	// Sky DomeはDepth Testを無効にして最初に描画する。
-	m_GraphicsSystem.SetAlphaBlendEnabled( false );
-	m_GraphicsSystem.SetDepthTestEnabled( false );
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_SKY );
 	m_SkyDomeRenderer.Draw(
 		m_GraphicsSystem,
 		skyDomeWorldMatrix,
 		viewMatrix,
 		projectionMatrix,
 		DirectX::XMFLOAT4{ 1.0f, 1.0f, 1.0f, 1.0f } );
-	m_GraphicsSystem.SetDepthTestEnabled( true );
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_OPAQUE );
 
 	// 敵が生存中なら単色の敵OBJを描画する。
 	if ( !m_EnemyHealth.IsDead() )
@@ -876,7 +875,7 @@ void GameScene::Draw()
 				GUN_POSITION_Z + MUZZLE_FLASH_OFFSET_Z ) *
 			inverseViewMatrix;
 
-		m_GraphicsSystem.SetAlphaBlendEnabled( true );
+		m_GraphicsSystem.SetRenderPass( e_RenderPass::e_TRANSPARENT );
 
 		m_BasicMeshRenderer.DrawCube(
 			m_GraphicsSystem,
@@ -886,12 +885,10 @@ void GameScene::Draw()
 			DirectX::XMFLOAT4{ 1.0f, 0.65f, 0.05f, muzzleFlashAlpha },
 			DirectX::XMFLOAT2{ 1.0f, 1.0f },
 			BasicMeshRenderer::TextureType::Color );
-
-		m_GraphicsSystem.SetAlphaBlendEnabled( false );
 	}
 
 	// 発射中の弾を半透明で描画する。
-	m_GraphicsSystem.SetAlphaBlendEnabled( true );
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_TRANSPARENT );
 
 	for ( const Bullet& bullet : m_Bullets )
 	{
@@ -918,7 +915,6 @@ void GameScene::Draw()
 			BasicMeshRenderer::TextureType::Color );
 	}
 
-	m_GraphicsSystem.SetAlphaBlendEnabled( false );
 
 	// 敵が生存中なら、Camera方向を向くHPバーを敵の頭上へ描画する。
 	const float enemyHpRatio = std::clamp(
@@ -939,8 +935,9 @@ void GameScene::Draw()
 		DirectX::XMLoadFloat3( &hpBarPosition ) );
 	toCameraVector = DirectX::XMVectorSetY( toCameraVector, 0.0f );
 
-	const float toCameraLengthSquared = DirectX::XMVectorGetX(
-		DirectX::XMVector3LengthSq( toCameraVector ) );
+	const float toCameraLengthSquared = DirectX::XMVectorGetX( DirectX::XMVector3LengthSq( toCameraVector ) );
+
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_TRANSPARENT );
 
 	if ( isHpBarVisible && toCameraLengthSquared > BILLBOARD_MIN_CAMERA_DISTANCE_SQUARED )
 	{
@@ -1022,7 +1019,7 @@ void GameScene::Draw()
 	}
 
 	// HUDを画面固定で描画するためDepth Testを無効化する。
-	m_GraphicsSystem.SetDepthTestEnabled( false );
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_SCREEN_UI );
 	m_HudRenderer.DrawCrosshair( m_GraphicsSystem );
 	m_HudRenderer.DrawPlayerHealthBar(
 		m_GraphicsSystem,
@@ -1214,8 +1211,7 @@ void GameScene::Draw()
 	m_HudTextRenderer.End();
 
 	// 次の3D描画へ影響を残さないようDepth TestとAlpha Blendを戻す。
-	m_GraphicsSystem.SetDepthTestEnabled( true );
-	m_GraphicsSystem.SetAlphaBlendEnabled( false );
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_OPAQUE );
 
 	// ImGuiでStage、敵、通貨、Gate操作を確認できるDebug UIを描画する。
 	ImGui::Begin( "Game Debug" );

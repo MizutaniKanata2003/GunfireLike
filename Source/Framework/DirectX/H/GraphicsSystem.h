@@ -4,6 +4,19 @@
 #include <d3d11.h>
 #include <wrl/client.h>
 
+// 描画対象ごとに適用するDirect3D描画Stateを表す。
+enum class e_RenderPass
+{
+	// Skyを描画する。
+	e_SKY,
+	// 不透明な3D Objectを描画する。
+	e_OPAQUE,
+	// 半透明な3D Objectを描画する。
+	e_TRANSPARENT,
+	// 画面固定のHUDとTextを描画する。
+	e_SCREEN_UI
+};
+
 // DirectX 11のDevice、Context、SwapChain、RenderTarget、DepthStencilを管理する。
 class GraphicsSystem final
 {
@@ -36,6 +49,8 @@ public:
 	}
 
 	//========= 描画State設定関数=========
+	// 指定した描画Passに必要なBlend、Depth、Rasterizer Stateをまとめて設定する。
+	void SetRenderPass( e_RenderPass renderPass );
 	// Alpha Blend Stateの有効・無効を切り替える。
 	void SetAlphaBlendEnabled( bool isEnabled );
 	// Depth Testの有効・無効を切り替える。
@@ -63,8 +78,14 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_DepthStencilView{};
 
 	//========= 描画State関連=========
-	// HUDなどを描画するときにDepth Testを無効化するState。
+	// HUDとSkyを描画するときにDepth TestとDepth Writeを無効化するState。
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_DepthDisabledState{};
+	// 半透明3D ObjectでDepth Testを維持し、Depth Writeだけ無効化するState。
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_DepthReadOnlyState{};
 	// 半透明HUDなどを描画するときに使用するAlpha Blend State。
 	Microsoft::WRL::ComPtr<ID3D11BlendState> m_AlphaBlendState{};
+	// 不透明3D Objectと半透明3D Objectで背面を除外するRasterizer State。
+	Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_CullBackRasterizerState{};
+	// Skyと画面UIで表裏を除外しないRasterizer State。
+	Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_CullNoneRasterizerState{};
 };

@@ -79,6 +79,13 @@ namespace
 			createdFeatureLevel,
 			context );
 	}
+
+	// Alpha Blendに渡す固定のBlend Factorを返す。
+	const float* GetBlendFactor()
+	{
+		static const float blendFactor[ 4 ]{};
+		return blendFactor;
+	}
 }
 
 // DirectX 11のDevice、Context、SwapChain、RenderTargetを初期化する。
@@ -175,20 +182,64 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 		return false;
 	}
 
-	// HUD描画時にDepth Testを無効化するDepthStencil Stateを生成する。
+	// HUDとSkyを描画するときにDepth TestとDepth Writeを無効化するStateを生成する。
 	D3D11_DEPTH_STENCIL_DESC depthDisabledDescription{};
 	depthDisabledDescription.DepthEnable = FALSE;
 	depthDisabledDescription.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
 	depthDisabledDescription.DepthFunc = D3D11_COMPARISON_ALWAYS;
 	depthDisabledDescription.StencilEnable = FALSE;
 
-	const HRESULT depthStencilStateResult = m_Device->CreateDepthStencilState(
-		&depthDisabledDescription,
-		m_DepthDisabledState.GetAddressOf() );
+	const HRESULT depthDisabledStateResult = m_Device->CreateDepthStencilState( &depthDisabledDescription, m_DepthDisabledState.GetAddressOf() );
 
-	if ( FAILED( depthStencilStateResult ) )
+	if ( FAILED( depthDisabledStateResult ) )
 	{
-		WriteGraphicsError( L"ID3D11Device::CreateDepthStencilState", depthStencilStateResult );
+		WriteGraphicsError( L"ID3D11Device::CreateDepthStencilState", depthDisabledStateResult );
+		Uninit();
+		return false;
+	}
+
+	// 半透明3D ObjectでDepth Testを維持し、Depth Writeだけ無効化するStateを生成する。
+	D3D11_DEPTH_STENCIL_DESC depthReadOnlyDescription{};
+	depthReadOnlyDescription.DepthEnable = TRUE;
+	depthReadOnlyDescription.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+	depthReadOnlyDescription.DepthFunc = D3D11_COMPARISON_LESS;
+	depthReadOnlyDescription.StencilEnable = FALSE;
+
+	const HRESULT depthReadOnlyStateResult = m_Device->CreateDepthStencilState( &depthReadOnlyDescription, m_DepthReadOnlyState.GetAddressOf() );
+
+	if ( FAILED( depthReadOnlyStateResult ) )
+	{
+		WriteGraphicsError( L"ID3D11Device::CreateDepthStencilState", depthReadOnlyStateResult );
+		Uninit();
+		return false;
+	}
+
+	// 背面を除外する3D描画用Rasterizer Stateを生成する。
+	D3D11_RASTERIZER_DESC cullBackRasterizerDescription{};
+	cullBackRasterizerDescription.FillMode = D3D11_FILL_SOLID;
+	cullBackRasterizerDescription.CullMode = D3D11_CULL_BACK;
+	cullBackRasterizerDescription.DepthClipEnable = TRUE;
+
+	const HRESULT cullBackRasterizerStateResult = m_Device->CreateRasterizerState( &cullBackRasterizerDescription, m_CullBackRasterizerState.GetAddressOf() );
+
+	if ( FAILED( cullBackRasterizerStateResult ) )
+	{
+		WriteGraphicsError( L"ID3D11Device::CreateRasterizerState", cullBackRasterizerStateResult );
+		Uninit();
+		return false;
+	}
+
+	// 表裏を除外しないSkyと画面UI用Rasterizer Stateを生成する。
+	D3D11_RASTERIZER_DESC cullNoneRasterizerDescription{};
+	cullNoneRasterizerDescription.FillMode = D3D11_FILL_SOLID;
+	cullNoneRasterizerDescription.CullMode = D3D11_CULL_NONE;
+	cullNoneRasterizerDescription.DepthClipEnable = TRUE;
+
+	const HRESULT cullNoneRasterizerStateResult = m_Device->CreateRasterizerState( &cullNoneRasterizerDescription, m_CullNoneRasterizerState.GetAddressOf() );
+
+	if ( FAILED( cullNoneRasterizerStateResult ) )
+	{
+		WriteGraphicsError( L"ID3D11Device::CreateRasterizerState", cullNoneRasterizerStateResult );
 		Uninit();
 		return false;
 	}
@@ -199,6 +250,9 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 		Uninit();
 		return false;
 	}
+
+	// 初期Stateを不透明3D描画用へ設定する。
+	SetRenderPass( e_RenderPass::e_OPAQUE );
 
 	return true;
 }
@@ -212,8 +266,11 @@ void GraphicsSystem::Uninit()
 	// Contextに設定されている描画Stateと参照を解除する。
 	if ( m_Context ) m_Context->ClearState();
 
-	// HUD描画に使用するStateを解放する。
+	// 描画Stateを解放する。
+	m_CullNoneRasterizerState.Reset();
+	m_CullBackRasterizerState.Reset();
 	m_AlphaBlendState.Reset();
+	m_DepthReadOnlyState.Reset();
 	m_DepthDisabledState.Reset();
 
 	// DirectX 11の主要リソースを解放する。
@@ -233,6 +290,9 @@ void GraphicsSystem::BeginFrame( const float clearColor[ 4 ] )
 	// 指定色と初期Depth値で描画先をクリアする。
 	m_Context->ClearRenderTargetView( m_RenderTargetView.Get(), clearColor );
 	m_Context->ClearDepthStencilView( m_DepthStencilView.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0 );
+
+	// 各Frame開始時に不透明3D描画用Stateへ戻す。
+	SetRenderPass( e_RenderPass::e_OPAQUE );
 }
 
 // 描画済みフレームをSwapChainへ表示する。
@@ -345,15 +405,48 @@ void GraphicsSystem::ReleaseRenderTargets()
 	m_RenderTargetView.Reset();
 }
 
+// 指定した描画Passに必要なBlend、Depth、Rasterizer Stateをまとめて設定する。
+void GraphicsSystem::SetRenderPass( e_RenderPass renderPass )
+{
+	if ( !m_Context ) return;
+
+	switch ( renderPass )
+	{
+		case e_RenderPass::e_SKY:
+		m_Context->OMSetBlendState( nullptr, GetBlendFactor(), 0xffffffff );
+		m_Context->OMSetDepthStencilState( m_DepthDisabledState.Get(), 0 );
+		m_Context->RSSetState( m_CullNoneRasterizerState.Get() );
+		return;
+
+		case e_RenderPass::e_OPAQUE:
+		m_Context->OMSetBlendState( nullptr, GetBlendFactor(), 0xffffffff );
+		m_Context->OMSetDepthStencilState( nullptr, 0 );
+		m_Context->RSSetState( m_CullBackRasterizerState.Get() );
+		return;
+
+		case e_RenderPass::e_TRANSPARENT:
+		m_Context->OMSetBlendState( m_AlphaBlendState.Get(), GetBlendFactor(), 0xffffffff );
+		m_Context->OMSetDepthStencilState( m_DepthReadOnlyState.Get(), 0 );
+		m_Context->RSSetState( m_CullBackRasterizerState.Get() );
+		return;
+
+		case e_RenderPass::e_SCREEN_UI:
+		m_Context->OMSetBlendState( m_AlphaBlendState.Get(), GetBlendFactor(), 0xffffffff );
+		m_Context->OMSetDepthStencilState( m_DepthDisabledState.Get(), 0 );
+		m_Context->RSSetState( m_CullNoneRasterizerState.Get() );
+		return;
+
+		default:
+		return;
+	}
+}
+
 // Alpha Blend Stateの有効・無効を切り替える。
 void GraphicsSystem::SetAlphaBlendEnabled( bool isEnabled )
 {
 	if ( !m_Context ) return;
 
-	// Blend Stateに渡す固定のBlend Factorを設定する。
-	const float blendFactor[ 4 ]{};
-
-	m_Context->OMSetBlendState( isEnabled ? m_AlphaBlendState.Get() : nullptr, blendFactor, 0xffffffff );
+	m_Context->OMSetBlendState( isEnabled ? m_AlphaBlendState.Get() : nullptr, GetBlendFactor(), 0xffffffff );
 }
 
 // Depth Testの有効・無効を切り替える。
