@@ -3,11 +3,13 @@
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm>
 #include <array>
-#include <fstream>
+#include <string>
 #include <vector>
 
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/GraphicsSystem.h"
+#include "Framework/DirectX/H/ShaderBinaryLoader.h"
+#include "Framework/Etc/H/Logger.h"
 
 namespace
 {
@@ -49,19 +51,30 @@ namespace
 	constexpr const char* HUD_PIXEL_SHADER_PATH = "Shaders/HudPS.cso";
 
 	//========= 補助関数=========
-	// 指定したバイナリファイルを読み込む。
-	bool LoadBinaryFile( const char* filePath, std::vector<char>& outputData )
+	// GraphicsカテゴリでShader生成失敗を出力する。
+	void WriteHudShaderError( const wchar_t* functionName, const char* shaderPath, HRESULT result )
 	{
-		std::ifstream file( filePath, std::ios::binary | std::ios::ate );
-		if ( !file ) return false;
+		std::wstring message{ functionName };
+		message += L" に失敗しました。Shader: ";
 
-		const std::streamsize fileSize = file.tellg();
-		if ( fileSize <= 0 ) return false;
+		while ( *shaderPath != '\0' )
+		{
+			message += static_cast<wchar_t>( *shaderPath );
+			++shaderPath;
+		}
 
-		outputData.resize( static_cast<size_t>( fileSize ) );
-		file.seekg( 0, std::ios::beg );
+		message += L" HRESULT: 0x";
 
-		return file.read( outputData.data(), fileSize ).good();
+		constexpr wchar_t hexDigits[]{ L"0123456789ABCDEF" };
+		const unsigned long resultValue = static_cast<unsigned long>( result );
+
+		for ( int digitIndex = 7; digitIndex >= 0; --digitIndex )
+		{
+			const unsigned long digit = ( resultValue >> digitIndex * 4 ) & 0x0f;
+			message += hexDigits[ digit ];
+		}
+
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_GRAPHICS, message );
 	}
 }
 
@@ -73,30 +86,45 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	if ( device == nullptr ) return false;
 
 	// Vertex ShaderとPixel ShaderのCSOデータを読み込む。
-	std::vector<char> vertexShaderData;
-	std::vector<char> pixelShaderData;
+	std::vector<char> vertexShaderData{};
+	std::vector<char> pixelShaderData{};
 
-	if ( !LoadBinaryFile( HUD_VERTEX_SHADER_PATH, vertexShaderData ) ||
-		!LoadBinaryFile( HUD_PIXEL_SHADER_PATH, pixelShaderData ) ) return false;
-
-	// HUD Quadの描画に使用するVertex Shaderを生成する。
-	if ( FAILED( device->CreateVertexShader(
-		vertexShaderData.data(),
-		vertexShaderData.size(),
-		nullptr,
-		m_VertexShader.GetAddressOf() ) ) )
+	if ( !ShaderBinaryLoader::Load( HUD_VERTEX_SHADER_PATH, vertexShaderData ) )
 	{
 		Uninit();
 		return false;
 	}
 
-	// HUD Quadの描画に使用するPixel Shaderを生成する。
-	if ( FAILED( device->CreatePixelShader(
-		pixelShaderData.data(),
-		pixelShaderData.size(),
-		nullptr,
-		m_PixelShader.GetAddressOf() ) ) )
+	if ( !ShaderBinaryLoader::Load( HUD_PIXEL_SHADER_PATH, pixelShaderData ) )
 	{
+		Uninit();
+		return false;
+	}
+
+	// HUD Quadの描画に使用するVertex Shaderを生成する。
+	const HRESULT vertexShaderResult = device->CreateVertexShader(
+	vertexShaderData.data(),
+	vertexShaderData.size(),
+	nullptr,
+	m_VertexShader.GetAddressOf() );
+
+	if ( FAILED( vertexShaderResult ) )
+	{
+		WriteHudShaderError( L"ID3D11Device::CreateVertexShader", HUD_VERTEX_SHADER_PATH, vertexShaderResult );
+		Uninit();
+		return false;
+	}
+
+	// HUD Quadの描画に使用するPixel Shaderを生成する。
+	const HRESULT pixelShaderResult = device->CreatePixelShader(
+	pixelShaderData.data(),
+	pixelShaderData.size(),
+	nullptr,
+	m_PixelShader.GetAddressOf() );
+
+	if ( FAILED( pixelShaderResult ) )
+	{
+		WriteHudShaderError( L"ID3D11Device::CreatePixelShader", HUD_PIXEL_SHADER_PATH, pixelShaderResult );
 		Uninit();
 		return false;
 	}
@@ -107,13 +135,16 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 		{ "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	};
 
-	if ( FAILED( device->CreateInputLayout(
-		inputElements,
-		ARRAYSIZE( inputElements ),
-		vertexShaderData.data(),
-		vertexShaderData.size(),
-		m_InputLayout.GetAddressOf() ) ) )
+	const HRESULT inputLayoutResult = device->CreateInputLayout(
+	inputElements,
+	ARRAYSIZE( inputElements ),
+	vertexShaderData.data(),
+	vertexShaderData.size(),
+	m_InputLayout.GetAddressOf() );
+
+	if ( FAILED( inputLayoutResult ) )
 	{
+		WriteHudShaderError( L"ID3D11Device::CreateInputLayout", HUD_VERTEX_SHADER_PATH, inputLayoutResult );
 		Uninit();
 		return false;
 	}
