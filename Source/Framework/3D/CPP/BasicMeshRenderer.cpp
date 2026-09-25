@@ -1,16 +1,12 @@
 #include "../H/BasicMeshRenderer.h"
 
 //========= C++標準ライブラリ インクルード=========
-#include <filesystem>
 #include <string>
-#include <vector>
-
-//========= Windows インクルード=========
-#include <wincodec.h>
 
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/GraphicsSystem.h"
 #include "Framework/DirectX/H/ShaderBinaryLoader.h"
+#include "Framework/DirectX/H/TextureLoader.h"
 #include "Framework/Etc/H/Logger.h"
 
 namespace
@@ -40,10 +36,6 @@ namespace
 	constexpr char POSITION_SEMANTIC_NAME[] = "POSITION";
 	constexpr char TEXCOORD_SEMANTIC_NAME[] = "TEXCOORD";
 
-	//========= WICテクスチャ定数=========
-	// BGRA形式の画像データにおける1ピクセルのバイト数。
-	constexpr UINT BYTES_PER_PIXEL = 4;
-
 	//========= 補助関数=========
 	// GraphicsカテゴリでBasicMesh描画Resource生成失敗を出力する。
 	void WriteBasicMeshGraphicsError( const wchar_t* functionName, HRESULT result )
@@ -61,95 +53,6 @@ namespace
 		}
 
 		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_GRAPHICS, message );
-	}
-
-	// WICを使い、画像ファイルからShader Resource Viewを生成する。
-	bool LoadTextureFromFile(
-		ID3D11Device* device,
-		const wchar_t* filePath,
-		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& textureView )
-	{
-		if ( device == nullptr || !std::filesystem::exists( filePath ) ) return false;
-
-		// WICを使用して画像をデコードするためのCOMオブジェクト。
-		Microsoft::WRL::ComPtr<IWICImagingFactory> wicFactory{};
-		Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder{};
-		Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame{};
-		Microsoft::WRL::ComPtr<IWICFormatConverter> converter{};
-
-		HRESULT result = CoCreateInstance(
-			CLSID_WICImagingFactory,
-			nullptr,
-			CLSCTX_INPROC_SERVER,
-			IID_PPV_ARGS( wicFactory.GetAddressOf() ) );
-		if ( FAILED( result ) ) return false;
-
-		result = wicFactory->CreateDecoderFromFilename(
-			filePath,
-			nullptr,
-			GENERIC_READ,
-			WICDecodeMetadataCacheOnLoad,
-			decoder.GetAddressOf() );
-		if ( FAILED( result ) ) return false;
-
-		result = decoder->GetFrame( 0, frame.GetAddressOf() );
-		if ( FAILED( result ) ) return false;
-
-		// 画像サイズとBGRA変換後のピクセル情報を取得する。
-		UINT width{};
-		UINT height{};
-
-		result = frame->GetSize( &width, &height );
-		if ( FAILED( result ) || width == 0 || height == 0 ) return false;
-
-		result = wicFactory->CreateFormatConverter( converter.GetAddressOf() );
-		if ( FAILED( result ) ) return false;
-
-		result = converter->Initialize(
-			frame.Get(),
-			GUID_WICPixelFormat32bppBGRA,
-			WICBitmapDitherTypeNone,
-			nullptr,
-			0.0,
-			WICBitmapPaletteTypeCustom );
-		if ( FAILED( result ) ) return false;
-
-		const UINT rowPitch = width * BYTES_PER_PIXEL;
-		const UINT imageSize = rowPitch * height;
-		std::vector<unsigned char> pixels( imageSize );
-
-		result = converter->CopyPixels( nullptr, rowPitch, imageSize, pixels.data() );
-		if ( FAILED( result ) ) return false;
-
-		// Direct3DのTextureとShader Resource Viewを生成する。
-		D3D11_TEXTURE2D_DESC textureDescription{};
-		textureDescription.Width = width;
-		textureDescription.Height = height;
-		textureDescription.MipLevels = 1;
-		textureDescription.ArraySize = 1;
-		textureDescription.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-		textureDescription.SampleDesc.Count = 1;
-		textureDescription.Usage = D3D11_USAGE_DEFAULT;
-		textureDescription.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-
-		D3D11_SUBRESOURCE_DATA textureData{};
-		textureData.pSysMem = pixels.data();
-		textureData.SysMemPitch = rowPitch;
-
-		Microsoft::WRL::ComPtr<ID3D11Texture2D> texture{};
-
-		result = device->CreateTexture2D(
-			&textureDescription,
-			&textureData,
-			texture.GetAddressOf() );
-		if ( FAILED( result ) ) return false;
-
-		result = device->CreateShaderResourceView(
-			texture.Get(),
-			nullptr,
-			textureView.GetAddressOf() );
-
-		return SUCCEEDED( result );
 	}
 }
 
@@ -360,9 +263,9 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	}
 
 	// 床、壁、画像付きオブジェクトに使用するテクスチャを読み込む。
-	if ( !LoadTextureFromFile( device, FLOOR_TEXTURE_PATH, m_FloorTextureView ) ||
-		!LoadTextureFromFile( device, WALL_TEXTURE_PATH, m_WallTextureView ) ||
-		!LoadTextureFromFile( device, OBJECT_TEXTURE_PATH, m_ObjectTextureView ) )
+	if ( !TextureLoader::LoadWicTexture( device, FLOOR_TEXTURE_PATH, m_FloorTextureView ) ||
+	 !TextureLoader::LoadWicTexture( device, WALL_TEXTURE_PATH, m_WallTextureView ) ||
+	 !TextureLoader::LoadWicTexture( device, OBJECT_TEXTURE_PATH, m_ObjectTextureView ) )
 	{
 		Uninit();
 		return false;

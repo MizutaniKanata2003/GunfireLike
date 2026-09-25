@@ -7,13 +7,10 @@
 #include <unordered_map>
 #include <vector>
 
-//========= Windows インクルード=========
-#include <windows.h>
-#include <wincodec.h>
-
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/GraphicsSystem.h"
 #include "Framework/DirectX/H/ShaderBinaryLoader.h"
+#include "Framework/DirectX/H/TextureLoader.h"
 #include "Framework/Etc/H/Logger.h"
 
 namespace
@@ -26,10 +23,6 @@ namespace
 	// OBJ頂点形式で使用する位置座標とUV座標のセマンティック名。
 	constexpr char POSITION_SEMANTIC_NAME[] = "POSITION";
 	constexpr char TEXCOORD_SEMANTIC_NAME[] = "TEXCOORD";
-
-	//========= WICテクスチャ定数=========
-	// BGRA形式の画像データにおける1ピクセルのバイト数。
-	constexpr UINT BYTES_PER_PIXEL = 4;
 
 	//========= OBJ読込用構造体=========
 	// OBJのv/vt/vn形式から取得した位置、UV、法線のIndex。
@@ -89,95 +82,6 @@ namespace
 		return std::to_string( index.positionIndex ) + "/" +
 			std::to_string( index.uvIndex ) + "/" +
 			std::to_string( index.normalIndex );
-	}
-
-	// WICを使い、画像ファイルからShader Resource Viewを生成する。
-	bool LoadWicTexture(
-		ID3D11Device* device,
-		const std::wstring& filePath,
-		Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& textureView )
-	{
-		if ( device == nullptr ) return false;
-
-		// WICを使用して画像をデコードするためのCOMオブジェクト。
-		Microsoft::WRL::ComPtr<IWICImagingFactory> wicFactory{};
-		Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder{};
-		Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame{};
-		Microsoft::WRL::ComPtr<IWICFormatConverter> converter{};
-
-		HRESULT result = CoCreateInstance(
-			CLSID_WICImagingFactory,
-			nullptr,
-			CLSCTX_INPROC_SERVER,
-			IID_PPV_ARGS( wicFactory.GetAddressOf() ) );
-		if ( FAILED( result ) ) return false;
-
-		result = wicFactory->CreateDecoderFromFilename(
-			filePath.c_str(),
-			nullptr,
-			GENERIC_READ,
-			WICDecodeMetadataCacheOnLoad,
-			decoder.GetAddressOf() );
-		if ( FAILED( result ) ) return false;
-
-		result = decoder->GetFrame( 0, frame.GetAddressOf() );
-		if ( FAILED( result ) ) return false;
-
-		// デコードした画像サイズとRGBA変換後のピクセルデータを取得する。
-		UINT width{};
-		UINT height{};
-
-		result = frame->GetSize( &width, &height );
-		if ( FAILED( result ) || width == 0 || height == 0 ) return false;
-
-		result = wicFactory->CreateFormatConverter( converter.GetAddressOf() );
-		if ( FAILED( result ) ) return false;
-
-		result = converter->Initialize(
-			frame.Get(),
-			GUID_WICPixelFormat32bppBGRA,
-			WICBitmapDitherTypeNone,
-			nullptr,
-			0.0,
-			WICBitmapPaletteTypeCustom );
-		if ( FAILED( result ) ) return false;
-
-		const UINT rowPitch = width * BYTES_PER_PIXEL;
-		const UINT imageSize = rowPitch * height;
-		std::vector<unsigned char> pixels( imageSize );
-
-		result = converter->CopyPixels( nullptr, rowPitch, imageSize, pixels.data() );
-		if ( FAILED( result ) ) return false;
-
-		// Direct3DのTextureとShader Resource Viewを生成する。
-		D3D11_TEXTURE2D_DESC textureDescription{};
-		textureDescription.Width = width;
-		textureDescription.Height = height;
-		textureDescription.MipLevels = 1;
-		textureDescription.ArraySize = 1;
-		textureDescription.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-		textureDescription.SampleDesc.Count = 1;
-		textureDescription.Usage = D3D11_USAGE_DEFAULT;
-		textureDescription.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-
-		D3D11_SUBRESOURCE_DATA textureData{};
-		textureData.pSysMem = pixels.data();
-		textureData.SysMemPitch = rowPitch;
-
-		Microsoft::WRL::ComPtr<ID3D11Texture2D> texture{};
-
-		result = device->CreateTexture2D(
-			&textureDescription,
-			&textureData,
-			texture.GetAddressOf() );
-		if ( FAILED( result ) ) return false;
-
-		result = device->CreateShaderResourceView(
-			texture.Get(),
-			nullptr,
-			textureView.GetAddressOf() );
-
-		return SUCCEEDED( result );
 	}
 }
 
@@ -557,5 +461,5 @@ bool ObjModelRenderer::LoadObjFile(
 // テクスチャファイルを読み込み、Shader Resource Viewを生成する。
 bool ObjModelRenderer::LoadTextureFromFile( ID3D11Device* device, const std::wstring& textureFilePath )
 {
-	return LoadWicTexture( device, textureFilePath, m_TextureView );
+	return TextureLoader::LoadWicTexture( device, textureFilePath, m_TextureView );
 }
