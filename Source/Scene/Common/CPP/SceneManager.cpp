@@ -85,29 +85,35 @@ void SceneManager::Uninit()
 	m_AudioSystem = nullptr;
 }
 
-// 予約済みSceneを現在Sceneへ反映し、初期化とフェードインを行う。
+// 予約済みSceneを初期化し、成功した場合だけ現在Sceneへ反映してフェードインを開始する。
 void SceneManager::ApplySceneChange()
 {
 	if ( !m_NextScene ) return;
 
-	// 現在SceneのResourceを解放してから破棄する。
+	// 予約済みSceneを一時保持し、初期化成功まで現在Sceneを維持する。
+	std::unique_ptr<IScene> nextScene = std::move( m_NextScene );
+
+	// Scene固有の状態と失敗し得るResourceを順に初期化する。
+	nextScene->Initialize();
+
+	const bool isNextSceneInitialized = nextScene->Init();
+	if ( !isNextSceneInitialized )
+	{
+		OutputDebugStringW( L"[SceneManager] 次Scene初期化失敗。現在Sceneを維持します。\n" );
+		nextScene->Uninit();
+		m_FadeOverlay.StartFadeIn( SCENE_FADE_DURATION_SECONDS );
+		return;
+	}
+
+	// 次Sceneの初期化成功後に現在SceneのResourceを解放して破棄する。
 	if ( m_CurrentScene )
 	{
 		m_CurrentScene->Uninit();
 		m_CurrentScene.reset();
 	}
 
-	// 予約済みSceneを現在Sceneへ移し、初期化する。
-	m_CurrentScene = std::move( m_NextScene );
-	m_CurrentScene->Initialize();
-
-	// 深い初期化に失敗した場合、Resourceを解放して現在Sceneを破棄する。
-	if ( !m_CurrentScene->Init() )
-	{
-		m_CurrentScene->Uninit();
-		m_CurrentScene.reset();
-		return;
-	}
+	// 初期化済みの次Sceneを現在Sceneとして反映する。
+	m_CurrentScene = std::move( nextScene );
 
 	// 実際にSceneを切り替えた直後にフェードインを開始する。
 	m_FadeOverlay.StartFadeIn( SCENE_FADE_DURATION_SECONDS );

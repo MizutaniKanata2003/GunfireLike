@@ -208,7 +208,7 @@ GameScene::GameScene(
 {
 }
 
-// Stageの敵、Player、Renderer、HUD、BGMを初期化する。
+// Stageの敵、Player、HUD、BGMに使用するゲーム状態を初期化する。
 void GameScene::Initialize()
 {
 	// SceneManagerが所有する現在Stageの設定とPlayer強化後能力を取得する。
@@ -241,48 +241,63 @@ void GameScene::Initialize()
 	// 弾の使用状態を初期化する。
 	m_Bullets.fill( {} );
 
-	// GameSceneで使用する3D・2D描画リソースを初期化する。
-	const bool isBasicMeshRendererInitialized = m_BasicMeshRenderer.Initialize( m_GraphicsSystem );
-	const bool isSkyInitialized = m_SkyDomeRenderer.Initialize(
-		m_GraphicsSystem,
-		SKY_OBJ_PATH,
-		SKY_TEXTURE_PATH );
-	const bool isEnemyInitialized = m_EnemyModelRenderer.Initialize(
-		m_GraphicsSystem,
-		ENEMY_OBJ_PATH,
-		L"" );
-	const bool isHudRendererInitialized = m_HudRenderer.Initialize( m_GraphicsSystem );
-	const bool isHudTextRendererInitialized = m_HudTextRenderer.Initialize( m_GraphicsSystem );
-
-	// 初期化に失敗したRendererをデバッグ出力へ記録する。
-	if ( !isBasicMeshRendererInitialized )
-	{
-		OutputDebugStringW( L"[GameScene] BasicMeshRenderer初期化失敗\n" );
-	}
-
-	if ( !isSkyInitialized )
-	{
-		OutputDebugStringW( L"[GameScene] Sky初期化失敗\n" );
-	}
-
-	if ( !isEnemyInitialized )
-	{
-		OutputDebugStringW( L"[GameScene] Enemy初期化失敗\n" );
-	}
-
-	if ( !isHudRendererInitialized )
-	{
-		OutputDebugStringW( L"[GameScene] HudRenderer初期化失敗\n" );
-	}
-
-	if ( !isHudTextRendererInitialized )
-	{
-		OutputDebugStringW( L"[GameScene] HudTextRenderer初期化失敗\n" );
-	}
-
 	// GameSceneではFPS操作を有効にし、Game用BGMを再生する。
 	m_InputSystem.SetMouseCaptureEnabled( true );
 	m_AudioSystem.PlayGameBgm();
+}
+
+// GameSceneで使用する必須の3D・2D描画Resourceを初期化する。
+bool GameScene::Init()
+{
+	// Cube描画に使用するRendererを初期化する。
+	const bool isBasicMeshRendererInitialized = m_BasicMeshRenderer.Initialize( m_GraphicsSystem );
+	if ( !isBasicMeshRendererInitialized )
+	{
+		OutputDebugStringW( L"[GameScene] BasicMeshRenderer初期化失敗\n" );
+		Uninit();
+		return false;
+	}
+
+	// Sky DomeのOBJ、Texture、Shaderを初期化する。
+	const bool isSkyDomeRendererInitialized = m_SkyDomeRenderer.Initialize( m_GraphicsSystem, SKY_OBJ_PATH, SKY_TEXTURE_PATH );
+	if ( !isSkyDomeRendererInitialized )
+	{
+		OutputDebugStringW( L"[GameScene] SkyDomeRenderer初期化失敗\n" );
+		Uninit();
+		return false;
+	}
+
+	// 敵OBJと単色描画用Shaderを初期化する。
+	const bool isEnemyModelRendererInitialized = m_EnemyModelRenderer.Initialize(
+		m_GraphicsSystem,
+		ENEMY_OBJ_PATH,
+		L"" );
+	if ( !isEnemyModelRendererInitialized )
+	{
+		OutputDebugStringW( L"[GameScene] EnemyModelRenderer初期化失敗\n" );
+		Uninit();
+		return false;
+	}
+
+	// HUDのQuad描画Resourceを初期化する。
+	const bool isHudRendererInitialized = m_HudRenderer.Initialize( m_GraphicsSystem );
+	if ( !isHudRendererInitialized )
+	{
+		OutputDebugStringW( L"[GameScene] HudRenderer初期化失敗\n" );
+		Uninit();
+		return false;
+	}
+
+	// HUDのText描画Resourceを初期化する。
+	const bool isHudTextRendererInitialized = m_HudTextRenderer.Initialize( m_GraphicsSystem );
+	if ( !isHudTextRendererInitialized )
+	{
+		OutputDebugStringW( L"[GameScene] HudTextRenderer初期化失敗\n" );
+		Uninit();
+		return false;
+	}
+
+	return true;
 }
 
 // 戦闘、Player、敵、弾、ゲート、Scene遷移を更新する。

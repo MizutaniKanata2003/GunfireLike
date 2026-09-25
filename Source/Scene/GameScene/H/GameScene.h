@@ -40,10 +40,7 @@ public:
 	// Stageの敵、Player、Renderer、HUD、BGMを初期化する。
 	void Initialize() override;
 	// Asset読込などの深い初期化を行う。
-	bool Init() override
-	{
-		return true;
-	}
+	bool Init() override;
 	// 戦闘、Player、敵、弾、ゲート、Scene遷移を更新する。
 	void Update( float deltaTime ) override;
 	// 3D Stage、敵、弾、ゲート、HUD、Debug UIを描画する。
