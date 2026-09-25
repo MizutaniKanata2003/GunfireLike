@@ -191,6 +191,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="External\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Source\Framework\Audio\CPP\AudioSystem.cpp" />
     <ClCompile Include="Source\Framework\Etc\CPP\GameTimer.cpp" />
+    <ClCompile Include="Source\Framework\Etc\CPP\Logger.cpp" />
     <ClCompile Include="Source\Framework\Input\CPP\InputSystem.cpp" />
     <ClCompile Include="Source\Framework\2D\CPP\FadeOverlay.cpp" />
     <ClCompile Include="Source\Framework\Imgui\CPP\ImGuiManager.cpp" />
@@ -217,6 +218,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="External\imgui\imgui.h" />
     <ClInclude Include="Source\Framework\Audio\H\AudioSystem.h" />
     <ClInclude Include="Source\Framework\2D\H\FadeOverlay.h" />
+    <ClInclude Include="Source\Framework\Etc\H\Logger.h" />
     <ClInclude Include="Source\Scene\Common\H\EnemyHealth.h" />
     <ClInclude Include="Source\Scene\Common\H\GameProgress.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>

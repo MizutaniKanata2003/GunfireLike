@@ -17,6 +17,7 @@
 //========= Framework インクルード=========
 #include "Framework/Audio/H/AudioSystem.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
+#include "Framework/Etc/H/Logger.h"
 #include "Framework/Input/H/InputSystem.h"
 
 //========= Scene インクルード=========
@@ -205,17 +206,21 @@ namespace
 
 		if ( errorCode )
 		{
-			OutputDebugStringW( L"[GameScene] 必須Assetの存在確認に失敗しました: " );
-			OutputDebugStringW( assetPath );
-			OutputDebugStringW( L"\n" );
+			std::wstring message{ L"必須Assetの存在確認に失敗しました: " };
+			message += assetPath;
+
+			Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_ASSET, message );
+
 			return false;
 		}
 
 		if ( !isAssetAvailable )
 		{
-			OutputDebugStringW( L"[GameScene] 必須Assetが見つかりません: " );
-			OutputDebugStringW( assetPath );
-			OutputDebugStringW( L"\n" );
+			std::wstring message{ L"必須Assetが見つかりません: " };
+			message += assetPath;
+
+			Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_ASSET, message );
+
 			return false;
 		}
 
@@ -291,7 +296,7 @@ bool GameScene::Init()
 	const bool isBasicMeshRendererInitialized = m_BasicMeshRenderer.Initialize( m_GraphicsSystem );
 	if ( !isBasicMeshRendererInitialized )
 	{
-		OutputDebugStringW( L"[GameScene] BasicMeshRenderer初期化失敗\n" );
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"BasicMeshRenderer初期化失敗" );
 		Uninit();
 		return false;
 	}
@@ -300,19 +305,16 @@ bool GameScene::Init()
 	const bool isSkyDomeRendererInitialized = m_SkyDomeRenderer.Initialize( m_GraphicsSystem, SKY_OBJ_PATH, SKY_TEXTURE_PATH );
 	if ( !isSkyDomeRendererInitialized )
 	{
-		OutputDebugStringW( L"[GameScene] SkyDomeRenderer初期化失敗\n" );
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"SkyDomeRenderer初期化失敗" );
 		Uninit();
 		return false;
 	}
 
 	// 敵OBJと単色描画用Shaderを初期化する。
-	const bool isEnemyModelRendererInitialized = m_EnemyModelRenderer.Initialize(
-		m_GraphicsSystem,
-		ENEMY_OBJ_PATH,
-		L"" );
+	const bool isEnemyModelRendererInitialized = m_EnemyModelRenderer.Initialize( m_GraphicsSystem, ENEMY_OBJ_PATH, L"" );
 	if ( !isEnemyModelRendererInitialized )
 	{
-		OutputDebugStringW( L"[GameScene] EnemyModelRenderer初期化失敗\n" );
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"EnemyModelRenderer初期化失敗" );
 		Uninit();
 		return false;
 	}
@@ -321,7 +323,7 @@ bool GameScene::Init()
 	const bool isHudRendererInitialized = m_HudRenderer.Initialize( m_GraphicsSystem );
 	if ( !isHudRendererInitialized )
 	{
-		OutputDebugStringW( L"[GameScene] HudRenderer初期化失敗\n" );
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"HudRenderer初期化失敗" );
 		Uninit();
 		return false;
 	}
@@ -330,7 +332,7 @@ bool GameScene::Init()
 	const bool isHudTextRendererInitialized = m_HudTextRenderer.Initialize( m_GraphicsSystem );
 	if ( !isHudTextRendererInitialized )
 	{
-		OutputDebugStringW( L"[GameScene] HudTextRenderer初期化失敗\n" );
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"HudTextRenderer初期化失敗" );
 		Uninit();
 		return false;
 	}

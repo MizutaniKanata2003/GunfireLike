@@ -3,6 +3,7 @@
 //========= Framework インクルード=========
 #include "Framework/Audio/H/AudioSystem.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
+#include "Framework/Etc/H/Logger.h"
 #include "Framework/Input/H/InputSystem.h"
 
 //========= Scene インクルード=========
@@ -99,7 +100,7 @@ void SceneManager::ApplySceneChange()
 	const bool isNextSceneInitialized = nextScene->Init();
 	if ( !isNextSceneInitialized )
 	{
-		OutputDebugStringW( L"[SceneManager] 次Scene初期化失敗。現在Sceneを維持します。\n" );
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"次Scene初期化失敗。現在Sceneを維持します。" );
 		nextScene->Uninit();
 		m_FadeOverlay.StartFadeIn( SCENE_FADE_DURATION_SECONDS );
 		return;
