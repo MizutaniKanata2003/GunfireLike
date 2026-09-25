@@ -130,6 +130,16 @@ copy /Y "$(ProjectDir)Assets\Textures\Wall.png" "$(OutDir)Assets\Textures\Wall.p
 copy /Y "$(ProjectDir)Assets\Textures\Object.png" "$(OutDir)Assets\Textures\Object.png"
 xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>if not exist "$(OutDir)Shaders" mkdir "$(OutDir)Shaders"
+
+copy /Y "$(ProjectDir)Shaders\BasicColorVS.cso" "$(OutDir)Shaders\BasicColorVS.cso"
+copy /Y "$(ProjectDir)Shaders\BasicColorPS.cso" "$(OutDir)Shaders\BasicColorPS.cso"
+copy /Y "$(ProjectDir)Shaders\HudVS.cso" "$(OutDir)Shaders\HudVS.cso"
+copy /Y "$(ProjectDir)Shaders\HudPS.cso" "$(OutDir)Shaders\HudPS.cso"
+
+xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -161,6 +171,16 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"
 if not exist "$(TargetDir)Assets\Audio\" mkdir "$(TargetDir)Assets\Audio\"
 xcopy "$(ProjectDir)Assets\Audio\*.*" "$(TargetDir)Assets\Audio\" /E /I /Y /D</Command>
     </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>if not exist "$(OutDir)Shaders" mkdir "$(OutDir)Shaders"
+
+copy /Y "$(ProjectDir)Shaders\BasicColorVS.cso" "$(OutDir)Shaders\BasicColorVS.cso"
+copy /Y "$(ProjectDir)Shaders\BasicColorPS.cso" "$(OutDir)Shaders\BasicColorPS.cso"
+copy /Y "$(ProjectDir)Shaders\HudVS.cso" "$(OutDir)Shaders\HudVS.cso"
+copy /Y "$(ProjectDir)Shaders\HudPS.cso" "$(OutDir)Shaders\HudPS.cso"
+
+xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui\backends\imgui_impl_dx11.cpp" />

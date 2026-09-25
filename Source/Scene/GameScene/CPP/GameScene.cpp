@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cwchar>
+#include <filesystem>
+#include <system_error>
 
 //========= DirectX インクルード=========
 #include <DirectXCollision.h>
@@ -194,6 +196,31 @@ namespace
 	constexpr const wchar_t* SKY_OBJ_PATH = L"Assets\\Models\\Sky\\sky.obj";
 	constexpr const wchar_t* SKY_TEXTURE_PATH = L"Assets\\Models\\Sky\\sky.jpg";
 	constexpr const wchar_t* ENEMY_OBJ_PATH = L"Assets\\Models\\Enemy\\player.obj";
+
+	// 指定した必須Assetが存在するかを確認し、失敗時は対象パスを出力する。
+	bool IsRequiredAssetAvailable( const wchar_t* assetPath )
+	{
+		std::error_code errorCode{};
+		const bool isAssetAvailable = std::filesystem::exists( std::filesystem::path{ assetPath }, errorCode );
+
+		if ( errorCode )
+		{
+			OutputDebugStringW( L"[GameScene] 必須Assetの存在確認に失敗しました: " );
+			OutputDebugStringW( assetPath );
+			OutputDebugStringW( L"\n" );
+			return false;
+		}
+
+		if ( !isAssetAvailable )
+		{
+			OutputDebugStringW( L"[GameScene] 必須Assetが見つかりません: " );
+			OutputDebugStringW( assetPath );
+			OutputDebugStringW( L"\n" );
+			return false;
+		}
+
+		return true;
+	}
 }
 // GameSceneが使用するSceneManagerとFramework Systemを登録する。
 GameScene::GameScene(
@@ -249,6 +276,17 @@ void GameScene::Initialize()
 // GameSceneで使用する必須の3D・2D描画Resourceを初期化する。
 bool GameScene::Init()
 {
+	// GameSceneで必須となるモデルとTextureの存在を確認する。
+	const bool isSkyObjAvailable = IsRequiredAssetAvailable( SKY_OBJ_PATH );
+	const bool isSkyTextureAvailable = IsRequiredAssetAvailable( SKY_TEXTURE_PATH );
+	const bool isEnemyObjAvailable = IsRequiredAssetAvailable( ENEMY_OBJ_PATH );
+
+	if ( !isSkyObjAvailable || !isSkyTextureAvailable || !isEnemyObjAvailable )
+	{
+		Uninit();
+		return false;
+	}
+
 	// Cube描画に使用するRendererを初期化する。
 	const bool isBasicMeshRendererInitialized = m_BasicMeshRenderer.Initialize( m_GraphicsSystem );
 	if ( !isBasicMeshRendererInitialized )
