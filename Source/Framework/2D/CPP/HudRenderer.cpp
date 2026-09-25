@@ -52,18 +52,11 @@ namespace
 
 	//========= 補助関数=========
 	// GraphicsカテゴリでShader生成失敗を出力する。
-	void WriteHudShaderError( const wchar_t* functionName, const char* shaderPath, HRESULT result )
+	// GraphicsカテゴリでHUD描画Resource生成失敗を出力する。
+	void WriteHudGraphicsError( const wchar_t* functionName, HRESULT result )
 	{
 		std::wstring message{ functionName };
-		message += L" に失敗しました。Shader: ";
-
-		while ( *shaderPath != '\0' )
-		{
-			message += static_cast<wchar_t>( *shaderPath );
-			++shaderPath;
-		}
-
-		message += L" HRESULT: 0x";
+		message += L" に失敗しました。HRESULT: 0x";
 
 		constexpr wchar_t hexDigits[]{ L"0123456789ABCDEF" };
 		const unsigned long resultValue = static_cast<unsigned long>( result );
@@ -110,7 +103,7 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 
 	if ( FAILED( vertexShaderResult ) )
 	{
-		WriteHudShaderError( L"ID3D11Device::CreateVertexShader", HUD_VERTEX_SHADER_PATH, vertexShaderResult );
+		WriteHudGraphicsError( L"ID3D11Device::CreateVertexShader", vertexShaderResult );
 		Uninit();
 		return false;
 	}
@@ -124,7 +117,7 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 
 	if ( FAILED( pixelShaderResult ) )
 	{
-		WriteHudShaderError( L"ID3D11Device::CreatePixelShader", HUD_PIXEL_SHADER_PATH, pixelShaderResult );
+		WriteHudGraphicsError( L"ID3D11Device::CreatePixelShader", pixelShaderResult );
 		Uninit();
 		return false;
 	}
@@ -144,7 +137,7 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 
 	if ( FAILED( inputLayoutResult ) )
 	{
-		WriteHudShaderError( L"ID3D11Device::CreateInputLayout", HUD_VERTEX_SHADER_PATH, inputLayoutResult );
+		WriteHudGraphicsError( L"ID3D11Device::CreateInputLayout", inputLayoutResult );
 		Uninit();
 		return false;
 	}
@@ -167,11 +160,14 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	D3D11_SUBRESOURCE_DATA vertexData{};
 	vertexData.pSysMem = vertices.data();
 
-	if ( FAILED( device->CreateBuffer(
-		&vertexBufferDescription,
-		&vertexData,
-		m_VertexBuffer.GetAddressOf() ) ) )
+	const HRESULT vertexBufferResult = device->CreateBuffer(
+	&vertexBufferDescription,
+	&vertexData,
+	m_VertexBuffer.GetAddressOf() );
+
+	if ( FAILED( vertexBufferResult ) )
 	{
+		WriteHudGraphicsError( L"ID3D11Device::CreateBuffer(VertexBuffer)", vertexBufferResult );
 		Uninit();
 		return false;
 	}
@@ -192,11 +188,14 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	D3D11_SUBRESOURCE_DATA indexData{};
 	indexData.pSysMem = indices.data();
 
-	if ( FAILED( device->CreateBuffer(
-		&indexBufferDescription,
-		&indexData,
-		m_IndexBuffer.GetAddressOf() ) ) )
+	const HRESULT indexBufferResult = device->CreateBuffer(
+	&indexBufferDescription,
+	&indexData,
+	m_IndexBuffer.GetAddressOf() );
+
+	if ( FAILED( indexBufferResult ) )
 	{
+		WriteHudGraphicsError( L"ID3D11Device::CreateBuffer(IndexBuffer)", indexBufferResult );
 		Uninit();
 		return false;
 	}
@@ -207,11 +206,14 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	hudBufferDescription.Usage = D3D11_USAGE_DEFAULT;
 	hudBufferDescription.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 
-	if ( FAILED( device->CreateBuffer(
-		&hudBufferDescription,
-		nullptr,
-		m_HudBuffer.GetAddressOf() ) ) )
+	const HRESULT hudBufferResult = device->CreateBuffer(
+	&hudBufferDescription,
+	nullptr,
+	m_HudBuffer.GetAddressOf() );
+
+	if ( FAILED( hudBufferResult ) )
 	{
+		WriteHudGraphicsError( L"ID3D11Device::CreateBuffer(HudBuffer)", hudBufferResult );
 		Uninit();
 		return false;
 	}
