@@ -2,7 +2,7 @@
 
 //========= C++標準ライブラリ インクルード=========
 #include <filesystem>
-#include <fstream>
+#include <string>
 #include <vector>
 
 //========= Windows インクルード=========
@@ -10,11 +10,13 @@
 
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/GraphicsSystem.h"
+#include "Framework/DirectX/H/ShaderBinaryLoader.h"
+#include "Framework/Etc/H/Logger.h"
 
 namespace
 {
 	//========= Cubeメッシュ定数=========
-		// Cubeの頂点数とIndex数。
+	// Cubeの頂点数とIndex数。
 	constexpr unsigned int CUBE_VERTEX_COUNT = 24;
 	constexpr unsigned int CUBE_INDEX_COUNT = 36;
 
@@ -24,8 +26,8 @@ namespace
 
 	//========= Shaderファイルパス定数=========
 	// BasicColor描画に使用するShaderのCSOファイルパス。
-	constexpr wchar_t BASIC_COLOR_VERTEX_SHADER_CSO_PATH[] = L"Shaders/BasicColorVS.cso";
-	constexpr wchar_t BASIC_COLOR_PIXEL_SHADER_CSO_PATH[] = L"Shaders/BasicColorPS.cso";
+	constexpr char BASIC_COLOR_VERTEX_SHADER_CSO_PATH[] = "Shaders/BasicColorVS.cso";
+	constexpr char BASIC_COLOR_PIXEL_SHADER_CSO_PATH[] = "Shaders/BasicColorPS.cso";
 
 	//========= Textureファイルパス定数=========
 	// Cube描画に使用するテクスチャファイルパス。
@@ -43,19 +45,22 @@ namespace
 	constexpr UINT BYTES_PER_PIXEL = 4;
 
 	//========= 補助関数=========
-	// 指定パスのバイナリファイルを読み込み、出力配列へ格納する。
-	bool LoadBinaryFile( const wchar_t* filePath, std::vector<char>& binaryData )
+	// GraphicsカテゴリでBasicMesh描画Resource生成失敗を出力する。
+	void WriteBasicMeshGraphicsError( const wchar_t* functionName, HRESULT result )
 	{
-		std::ifstream fileStream( filePath, std::ios::binary | std::ios::ate );
-		if ( !fileStream ) return false;
+		std::wstring message{ functionName };
+		message += L" に失敗しました。HRESULT: 0x";
 
-		const std::streamsize fileSize = fileStream.tellg();
-		if ( fileSize <= 0 ) return false;
+		constexpr wchar_t hexDigits[]{ L"0123456789ABCDEF" };
+		const unsigned long resultValue = static_cast<unsigned long>( result );
 
-		binaryData.resize( static_cast<size_t>( fileSize ) );
-		fileStream.seekg( 0, std::ios::beg );
+		for ( int digitIndex = 7; digitIndex >= 0; --digitIndex )
+		{
+			const unsigned long digit = ( resultValue >> digitIndex * 4 ) & 0x0f;
+			message += hexDigits[ digit ];
+		}
 
-		return static_cast<bool>( fileStream.read( binaryData.data(), fileSize ) );
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_GRAPHICS, message );
 	}
 
 	// WICを使い、画像ファイルからShader Resource Viewを生成する。
@@ -223,11 +228,14 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	D3D11_SUBRESOURCE_DATA vertexData{};
 	vertexData.pSysMem = vertices;
 
-	if ( FAILED( device->CreateBuffer(
-		&vertexBufferDesc,
-		&vertexData,
-		m_VertexBuffer.GetAddressOf() ) ) )
+	const HRESULT vertexBufferResult = device->CreateBuffer(
+	&vertexBufferDesc,
+	&vertexData,
+	m_VertexBuffer.GetAddressOf() );
+
+	if ( FAILED( vertexBufferResult ) )
 	{
+		WriteBasicMeshGraphicsError( L"ID3D11Device::CreateBuffer(VertexBuffer)", vertexBufferResult );
 		Uninit();
 		return false;
 	}
@@ -241,11 +249,14 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	D3D11_SUBRESOURCE_DATA indexData{};
 	indexData.pSysMem = indices;
 
-	if ( FAILED( device->CreateBuffer(
-		&indexBufferDesc,
-		&indexData,
-		m_IndexBuffer.GetAddressOf() ) ) )
+	const HRESULT indexBufferResult = device->CreateBuffer(
+	&indexBufferDesc,
+	&indexData,
+	m_IndexBuffer.GetAddressOf() );
+
+	if ( FAILED( indexBufferResult ) )
 	{
+		WriteBasicMeshGraphicsError( L"ID3D11Device::CreateBuffer(IndexBuffer)", indexBufferResult );
 		Uninit();
 		return false;
 	}
@@ -253,18 +264,21 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	// Vertex ShaderのCSO読込、Shader生成、Input Layout生成を行う。
 	std::vector<char> vertexShaderBinary{};
 
-	if ( !LoadBinaryFile( BASIC_COLOR_VERTEX_SHADER_CSO_PATH, vertexShaderBinary ) )
+	if ( !ShaderBinaryLoader::Load( BASIC_COLOR_VERTEX_SHADER_CSO_PATH, vertexShaderBinary ) )
 	{
 		Uninit();
 		return false;
 	}
 
-	if ( FAILED( device->CreateVertexShader(
-		vertexShaderBinary.data(),
-		vertexShaderBinary.size(),
-		nullptr,
-		m_VertexShader.GetAddressOf() ) ) )
+	const HRESULT vertexShaderResult = device->CreateVertexShader(
+	vertexShaderBinary.data(),
+	vertexShaderBinary.size(),
+	nullptr,
+	m_VertexShader.GetAddressOf() );
+
+	if ( FAILED( vertexShaderResult ) )
 	{
+		WriteBasicMeshGraphicsError( L"ID3D11Device::CreateVertexShader", vertexShaderResult );
 		Uninit();
 		return false;
 	}
@@ -291,13 +305,16 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 		}
 	};
 
-	if ( FAILED( device->CreateInputLayout(
-		inputElements,
-		ARRAYSIZE( inputElements ),
-		vertexShaderBinary.data(),
-		vertexShaderBinary.size(),
-		m_InputLayout.GetAddressOf() ) ) )
+	const HRESULT inputLayoutResult = device->CreateInputLayout(
+	inputElements,
+	ARRAYSIZE( inputElements ),
+	vertexShaderBinary.data(),
+	vertexShaderBinary.size(),
+	m_InputLayout.GetAddressOf() );
+
+	if ( FAILED( inputLayoutResult ) )
 	{
+		WriteBasicMeshGraphicsError( L"ID3D11Device::CreateInputLayout", inputLayoutResult );
 		Uninit();
 		return false;
 	}
@@ -305,18 +322,21 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	// Pixel Shaderを読み込み、Cube描画用のPixel Shaderを生成する。
 	std::vector<char> pixelShaderBinary{};
 
-	if ( !LoadBinaryFile( BASIC_COLOR_PIXEL_SHADER_CSO_PATH, pixelShaderBinary ) )
+	if ( !ShaderBinaryLoader::Load( BASIC_COLOR_PIXEL_SHADER_CSO_PATH, pixelShaderBinary ) )
 	{
 		Uninit();
 		return false;
 	}
 
-	if ( FAILED( device->CreatePixelShader(
-		pixelShaderBinary.data(),
-		pixelShaderBinary.size(),
-		nullptr,
-		m_PixelShader.GetAddressOf() ) ) )
+	const HRESULT pixelShaderResult = device->CreatePixelShader(
+	pixelShaderBinary.data(),
+	pixelShaderBinary.size(),
+	nullptr,
+	m_PixelShader.GetAddressOf() );
+
+	if ( FAILED( pixelShaderResult ) )
 	{
+		WriteBasicMeshGraphicsError( L"ID3D11Device::CreatePixelShader", pixelShaderResult );
 		Uninit();
 		return false;
 	}
@@ -327,11 +347,14 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	transformBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 	transformBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 
-	if ( FAILED( device->CreateBuffer(
-		&transformBufferDesc,
-		nullptr,
-		m_TransformBuffer.GetAddressOf() ) ) )
+	const HRESULT transformBufferResult = device->CreateBuffer(
+	&transformBufferDesc,
+	nullptr,
+	m_TransformBuffer.GetAddressOf() );
+
+	if ( FAILED( transformBufferResult ) )
 	{
+		WriteBasicMeshGraphicsError( L"ID3D11Device::CreateBuffer(TransformBuffer)", transformBufferResult );
 		Uninit();
 		return false;
 	}
@@ -354,10 +377,13 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	samplerDescription.MinLOD = 0.0f;
 	samplerDescription.MaxLOD = D3D11_FLOAT32_MAX;
 
-	if ( FAILED( device->CreateSamplerState(
-		&samplerDescription,
-		m_TextureSampler.GetAddressOf() ) ) )
+	const HRESULT samplerStateResult = device->CreateSamplerState(
+	&samplerDescription,
+	m_TextureSampler.GetAddressOf() );
+
+	if ( FAILED( samplerStateResult ) )
 	{
+		WriteBasicMeshGraphicsError( L"ID3D11Device::CreateSamplerState", samplerStateResult );
 		Uninit();
 		return false;
 	}
