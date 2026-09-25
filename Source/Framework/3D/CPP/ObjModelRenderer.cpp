@@ -13,14 +13,14 @@
 
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/GraphicsSystem.h"
+#include "Framework/DirectX/H/ShaderBinaryLoader.h"
+#include "Framework/Etc/H/Logger.h"
 
 namespace
 {
 	//========= Shaderファイルパス定数=========
-		// OBJモデル描画に使用するVertex ShaderのCSOファイルパス。
-	constexpr wchar_t MODEL_VERTEX_SHADER_CSO_PATH[] = L"Shaders/BasicColorVS.cso";
-	// OBJモデル描画に使用するPixel ShaderのCSOファイルパス。
-	constexpr wchar_t MODEL_PIXEL_SHADER_CSO_PATH[] = L"Shaders/BasicColorPS.cso";
+	constexpr char MODEL_VERTEX_SHADER_CSO_PATH[] = "Shaders/BasicColorVS.cso";
+	constexpr char MODEL_PIXEL_SHADER_CSO_PATH[] = "Shaders/BasicColorPS.cso";
 
 	//========= OBJ形式定数=========
 	// OBJ頂点形式で使用する位置座標とUV座標のセマンティック名。
@@ -41,32 +41,32 @@ namespace
 	};
 
 	//========= 補助関数=========
-	// ShaderのCSOファイルを読み込み、バイト列として返す。
-	bool LoadBinaryFile( const wchar_t* filePath, std::vector<char>& binaryData )
+	// AssetカテゴリでOBJまたはTextureの読込失敗を出力する。
+	void WriteObjModelAssetError( const wchar_t* errorText, const std::wstring& filePath )
 	{
-		std::ifstream fileStream( filePath, std::ios::binary | std::ios::ate );
+		std::wstring message{ errorText };
+		message += L": ";
+		message += filePath;
 
-		if ( !fileStream )
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_ASSET, message );
+	}
+
+	// GraphicsカテゴリでOBJ描画Resource生成失敗を出力する。
+	void WriteObjModelGraphicsError( const wchar_t* functionName, HRESULT result )
+	{
+		std::wstring message{ functionName };
+		message += L" に失敗しました。HRESULT: 0x";
+
+		constexpr wchar_t hexDigits[]{ L"0123456789ABCDEF" };
+		const unsigned long resultValue = static_cast<unsigned long>( result );
+
+		for ( int digitIndex = 7; digitIndex >= 0; --digitIndex )
 		{
-			OutputDebugStringW( L"[Shader] ファイルを開けません: " );
-			OutputDebugStringW( filePath );
-			OutputDebugStringW( L"\n" );
-			return false;
+			const unsigned long digit = ( resultValue >> digitIndex * 4 ) & 0x0f;
+			message += hexDigits[ digit ];
 		}
 
-		const std::streamsize fileSize = fileStream.tellg();
-		if ( fileSize <= 0 )
-		{
-			OutputDebugStringW( L"[Shader] ファイルサイズが不正です: " );
-			OutputDebugStringW( filePath );
-			OutputDebugStringW( L"\n" );
-			return false;
-		}
-
-		binaryData.resize( static_cast<size_t>( fileSize ) );
-		fileStream.seekg( 0, std::ios::beg );
-
-		return static_cast<bool>( fileStream.read( binaryData.data(), fileSize ) );
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_GRAPHICS, message );
 	}
 
 	// OBJのv/vt/vn形式を位置、UV、法線のIndexへ分解する。
@@ -199,9 +199,7 @@ bool ObjModelRenderer::Initialize(
 
 	if ( !LoadObjFile( objFilePath, vertices, indices ) )
 	{
-		OutputDebugStringW( L"[ObjModelRenderer] OBJ読込失敗: " );
-		OutputDebugStringW( objFilePath.c_str() );
-		OutputDebugStringW( L"\n" );
+		WriteObjModelAssetError( L"OBJ読込失敗", objFilePath );
 		return false;
 	}
 
@@ -214,12 +212,14 @@ bool ObjModelRenderer::Initialize(
 	D3D11_SUBRESOURCE_DATA vertexData{};
 	vertexData.pSysMem = vertices.data();
 
-	if ( FAILED( device->CreateBuffer(
-		&vertexBufferDesc,
-		&vertexData,
-		m_VertexBuffer.GetAddressOf() ) ) )
+	const HRESULT vertexBufferResult = device->CreateBuffer(
+	&vertexBufferDesc,
+	&vertexData,
+	m_VertexBuffer.GetAddressOf() );
+
+	if ( FAILED( vertexBufferResult ) )
 	{
-		OutputDebugStringW( L"[ObjModelRenderer] VertexBuffer生成失敗\n" );
+		WriteObjModelGraphicsError( L"ID3D11Device::CreateBuffer(VertexBuffer)", vertexBufferResult );
 		Uninit();
 		return false;
 	}
@@ -233,11 +233,14 @@ bool ObjModelRenderer::Initialize(
 	D3D11_SUBRESOURCE_DATA indexData{};
 	indexData.pSysMem = indices.data();
 
-	if ( FAILED( device->CreateBuffer(
-		&indexBufferDesc,
-		&indexData,
-		m_IndexBuffer.GetAddressOf() ) ) )
+	const HRESULT indexBufferResult = device->CreateBuffer(
+	&indexBufferDesc,
+	&indexData,
+	m_IndexBuffer.GetAddressOf() );
+
+	if ( FAILED( indexBufferResult ) )
 	{
+		WriteObjModelGraphicsError( L"ID3D11Device::CreateBuffer(IndexBuffer)", indexBufferResult );
 		Uninit();
 		return false;
 	}
@@ -245,19 +248,21 @@ bool ObjModelRenderer::Initialize(
 	// Vertex ShaderのCSO読込、Shader生成、Input Layout生成を行う。
 	std::vector<char> vertexShaderBinary{};
 
-	if ( !LoadBinaryFile( MODEL_VERTEX_SHADER_CSO_PATH, vertexShaderBinary ) )
+	if ( !ShaderBinaryLoader::Load( MODEL_VERTEX_SHADER_CSO_PATH, vertexShaderBinary ) )
 	{
 		Uninit();
 		return false;
 	}
 
-	if ( FAILED( device->CreateVertexShader(
-		vertexShaderBinary.data(),
-		vertexShaderBinary.size(),
-		nullptr,
-		m_VertexShader.GetAddressOf() ) ) )
+	const HRESULT vertexShaderResult = device->CreateVertexShader(
+	vertexShaderBinary.data(),
+	vertexShaderBinary.size(),
+	nullptr,
+	m_VertexShader.GetAddressOf() );
+
+	if ( FAILED( vertexShaderResult ) )
 	{
-		OutputDebugStringW( L"[ObjModelRenderer] VertexShader生成失敗\n" );
+		WriteObjModelGraphicsError( L"ID3D11Device::CreateVertexShader", vertexShaderResult );
 		Uninit();
 		return false;
 	}
@@ -284,14 +289,16 @@ bool ObjModelRenderer::Initialize(
 		}
 	};
 
-	if ( FAILED( device->CreateInputLayout(
-		inputElements,
-		ARRAYSIZE( inputElements ),
-		vertexShaderBinary.data(),
-		vertexShaderBinary.size(),
-		m_InputLayout.GetAddressOf() ) ) )
+	const HRESULT inputLayoutResult = device->CreateInputLayout(
+	inputElements,
+	ARRAYSIZE( inputElements ),
+	vertexShaderBinary.data(),
+	vertexShaderBinary.size(),
+	m_InputLayout.GetAddressOf() );
+
+	if ( FAILED( inputLayoutResult ) )
 	{
-		OutputDebugStringW( L"[ObjModelRenderer] InputLayout生成失敗\n" );
+		WriteObjModelGraphicsError( L"ID3D11Device::CreateInputLayout", inputLayoutResult );
 		Uninit();
 		return false;
 	}
@@ -299,19 +306,21 @@ bool ObjModelRenderer::Initialize(
 	// Pixel Shaderを読み込み、OBJ描画用のPixel Shaderを生成する。
 	std::vector<char> pixelShaderBinary{};
 
-	if ( !LoadBinaryFile( MODEL_PIXEL_SHADER_CSO_PATH, pixelShaderBinary ) )
+	if ( !ShaderBinaryLoader::Load( MODEL_PIXEL_SHADER_CSO_PATH, pixelShaderBinary ) )
 	{
 		Uninit();
 		return false;
 	}
 
-	if ( FAILED( device->CreatePixelShader(
-		pixelShaderBinary.data(),
-		pixelShaderBinary.size(),
-		nullptr,
-		m_PixelShader.GetAddressOf() ) ) )
+	const HRESULT pixelShaderResult = device->CreatePixelShader(
+	pixelShaderBinary.data(),
+	pixelShaderBinary.size(),
+	nullptr,
+	m_PixelShader.GetAddressOf() );
+
+	if ( FAILED( pixelShaderResult ) )
 	{
-		OutputDebugStringW( L"[ObjModelRenderer] PixelShader生成失敗\n" );
+		WriteObjModelGraphicsError( L"ID3D11Device::CreatePixelShader", pixelShaderResult );
 		Uninit();
 		return false;
 	}
@@ -322,11 +331,14 @@ bool ObjModelRenderer::Initialize(
 	transformBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 	transformBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 
-	if ( FAILED( device->CreateBuffer(
-		&transformBufferDesc,
-		nullptr,
-		m_TransformBuffer.GetAddressOf() ) ) )
+	const HRESULT transformBufferResult = device->CreateBuffer(
+	&transformBufferDesc,
+	nullptr,
+	m_TransformBuffer.GetAddressOf() );
+
+	if ( FAILED( transformBufferResult ) )
 	{
+		WriteObjModelGraphicsError( L"ID3D11Device::CreateBuffer(TransformBuffer)", transformBufferResult );
 		Uninit();
 		return false;
 	}
@@ -334,9 +346,7 @@ bool ObjModelRenderer::Initialize(
 	// 空パスの場合はTextureを読み込まず、単色描画として扱う。
 	if ( !textureFilePath.empty() && !LoadTextureFromFile( device, textureFilePath ) )
 	{
-		OutputDebugStringW( L"[ObjModelRenderer] Texture読込失敗: " );
-		OutputDebugStringW( textureFilePath.c_str() );
-		OutputDebugStringW( L"\n" );
+		WriteObjModelAssetError( L"Texture読込失敗", textureFilePath );
 		Uninit();
 		return false;
 	}
@@ -350,10 +360,13 @@ bool ObjModelRenderer::Initialize(
 	samplerDesc.MinLOD = 0.0f;
 	samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
-	if ( FAILED( device->CreateSamplerState(
-		&samplerDesc,
-		m_TextureSampler.GetAddressOf() ) ) )
+	const HRESULT samplerStateResult = device->CreateSamplerState(
+	&samplerDesc,
+	m_TextureSampler.GetAddressOf() );
+
+	if ( FAILED( samplerStateResult ) )
 	{
+		WriteObjModelGraphicsError( L"ID3D11Device::CreateSamplerState", samplerStateResult );
 		Uninit();
 		return false;
 	}
