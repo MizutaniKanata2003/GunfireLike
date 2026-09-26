@@ -19,23 +19,20 @@ class GraphicsSystem;
 class ObjModelRenderer final
 {
 public:
-	//========= 初期化・終了関数=========
+	//========= ライフサイクル・描画関数=========
 	// OBJ、Shader、Buffer、必要なTexture、Samplerを初期化する。
-	bool Initialize(
-		GraphicsSystem& graphicsSystem,
-		const std::wstring& objFilePath,
-		const std::wstring& textureFilePath );
-	// OBJ描画で使用したDirect3Dリソースを解放する。
-	void Uninit();
+	bool Initialize( GraphicsSystem& graphicsSystem, const std::wstring& objFilePath, const std::wstring& textureFilePath );
 
-	//========= 描画関数=========
 	// 指定したWorld、View、Projection行列と色でOBJモデルを描画する。
 	void Draw(
-		GraphicsSystem& graphicsSystem,
-		const DirectX::XMMATRIX& worldMatrix,
-		const DirectX::XMMATRIX& viewMatrix,
-		const DirectX::XMMATRIX& projectionMatrix,
-		const DirectX::XMFLOAT4& color = DirectX::XMFLOAT4{ 1.0f, 1.0f, 1.0f, 1.0f } );
+	GraphicsSystem& graphicsSystem,
+	const DirectX::XMMATRIX& worldMatrix,
+	const DirectX::XMMATRIX& viewMatrix,
+	const DirectX::XMMATRIX& projectionMatrix,
+	const DirectX::XMFLOAT4& color = DirectX::XMFLOAT4{ 1.0f, 1.0f, 1.0f, 1.0f } );
+
+	// OBJ描画で使用したDirect3Dリソースを解放する。
+	void Uninit();
 
 private:
 	//========= 構造体=========
@@ -58,10 +55,7 @@ private:
 
 	//========= 補助関数=========
 	// OBJファイルを読み込み、頂点配列とIndex配列を生成する。
-	bool LoadObjFile(
-		const std::wstring& objFilePath,
-		std::vector<Vertex>& vertices,
-		std::vector<unsigned int>& indices );
+	bool LoadObjFile( const std::wstring& objFilePath, std::vector<Vertex>& vertices, std::vector<unsigned int>& indices );
 	// テクスチャファイルを読み込み、Shader Resource Viewを生成する。
 	bool LoadTextureFromFile( ID3D11Device* device, const std::wstring& textureFilePath );
 

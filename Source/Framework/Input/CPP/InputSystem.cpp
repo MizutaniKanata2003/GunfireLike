@@ -30,6 +30,18 @@ void InputSystem::Update()
 	ResetMousePosition();
 }
 
+// InputSystemが設定したカーソル制限とマウスキャプチャ状態を解除する。
+void InputSystem::Uninit()
+{
+	SetMouseCaptureEnabled( false );
+
+	m_WindowHandle = nullptr;
+	m_MouseDelta = {};
+	m_ScreenCenter = {};
+
+	std::memset( m_CurrentKeys, 0, sizeof( m_CurrentKeys ) );
+	std::memset( m_PreviousKeys, 0, sizeof( m_PreviousKeys ) );
+}
 // WindowProcedureから受け取ったWin32メッセージを処理する。
 void InputSystem::OnWindowMessage( UINT message, WPARAM wParam, LPARAM lParam )
 {

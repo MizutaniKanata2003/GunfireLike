@@ -18,8 +18,6 @@ public:
 	//========= 初期化・終了関数=========
 	// HUD描画に必要なShader、Buffer、Input Layoutを初期化する。
 	bool Initialize( GraphicsSystem& graphicsSystem );
-	// HUD描画に使用したDirect3Dリソースを解放する。
-	void Uninit();
 
 	//========= 描画関数=========
 	// 指定した画面座標、サイズ、色で単色Quadを描画する。
@@ -37,6 +35,9 @@ public:
 	// HPが低い場合に画面端の警告枠を描画する。
 	void DrawLowHealthWarning( GraphicsSystem& graphicsSystem, float currentHp, float maxHp );
 
+	//========= 終了関数=========
+	// HUD描画に使用したDirect3Dリソースを解放する。
+	void Uninit();
 private:
 	//========= 構造体=========
 	// HUD Quadの頂点座標。

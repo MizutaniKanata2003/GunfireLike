@@ -105,60 +105,38 @@ bool AudioSystem::Initialize()
 
 		// 各Sceneで使用するBGMを読み込む。
 		OutputDebugStringW( L"[Audio] Loading: Bgm_Title.wav\n" );
-		m_Impl->titleBgm = std::make_unique<DirectX::SoundEffect>(
-			m_Impl->audioEngine.get(),
-			TITLE_BGM_FILE_PATH );
+		m_Impl->titleBgm = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), TITLE_BGM_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Bgm_Shop.wav\n" );
-		m_Impl->shopBgm = std::make_unique<DirectX::SoundEffect>(
-			m_Impl->audioEngine.get(),
-			SHOP_BGM_FILE_PATH );
+		m_Impl->shopBgm = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), SHOP_BGM_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Bgm_Game.wav\n" );
-		m_Impl->gameBgm = std::make_unique<DirectX::SoundEffect>(
-			m_Impl->audioEngine.get(),
-			GAME_BGM_FILE_PATH );
+		m_Impl->gameBgm = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), GAME_BGM_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Bgm_Result.wav\n" );
-		m_Impl->resultBgm = std::make_unique<DirectX::SoundEffect>(
-			m_Impl->audioEngine.get(),
-			RESULT_BGM_FILE_PATH );
+		m_Impl->resultBgm = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), RESULT_BGM_FILE_PATH );
 
 		// ゲーム中に使用するSEを読み込む。
 		OutputDebugStringW( L"[Audio] Loading: Se_Gun.wav\n" );
-		m_Impl->gunSe = std::make_unique<DirectX::SoundEffect>(
-			m_Impl->audioEngine.get(),
-			GUN_SE_FILE_PATH );
+		m_Impl->gunSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), GUN_SE_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Se_Warp.wav\n" );
-		m_Impl->warpSe = std::make_unique<DirectX::SoundEffect>(
-			m_Impl->audioEngine.get(),
-			WARP_SE_FILE_PATH );
+		m_Impl->warpSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), WARP_SE_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Se_Lowhp.wav\n" );
-		m_Impl->lowHpSe = std::make_unique<DirectX::SoundEffect>(
-			m_Impl->audioEngine.get(),
-			LOW_HP_SE_FILE_PATH );
+		m_Impl->lowHpSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), LOW_HP_SE_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Se_Purchase.wav\n" );
-		m_Impl->purchaseSe = std::make_unique<DirectX::SoundEffect>(
-			m_Impl->audioEngine.get(),
-			PURCHASE_SE_FILE_PATH );
+		m_Impl->purchaseSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), PURCHASE_SE_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Se_Damage.wav\n" );
-		m_Impl->damageSe = std::make_unique<DirectX::SoundEffect>(
-			m_Impl->audioEngine.get(),
-			DAMAGE_SE_FILE_PATH );
+		m_Impl->damageSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), DAMAGE_SE_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Se_Special.wav\n" );
-		m_Impl->specialSe = std::make_unique<DirectX::SoundEffect>(
-			m_Impl->audioEngine.get(),
-			SPECIAL_SE_FILE_PATH );
+		m_Impl->specialSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), SPECIAL_SE_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] Loading: Se_EnemyDefeat.wav\n" );
-		m_Impl->enemyDefeatSe = std::make_unique<DirectX::SoundEffect>(
-			m_Impl->audioEngine.get(),
-			ENEMY_DEFEAT_SE_FILE_PATH );
+		m_Impl->enemyDefeatSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), ENEMY_DEFEAT_SE_FILE_PATH );
 
 		OutputDebugStringW( L"[Audio] All sound files loaded.\n" );
 

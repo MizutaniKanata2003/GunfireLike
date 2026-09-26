@@ -86,10 +86,7 @@ namespace
 }
 
 // OBJ、Shader、Buffer、必要なTexture、Samplerを初期化する。
-bool ObjModelRenderer::Initialize(
-	GraphicsSystem& graphicsSystem,
-	const std::wstring& objFilePath,
-	const std::wstring& textureFilePath )
+bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::wstring& objFilePath, const std::wstring& textureFilePath )
 {
 	Uninit();
 
@@ -116,10 +113,7 @@ bool ObjModelRenderer::Initialize(
 	D3D11_SUBRESOURCE_DATA vertexData{};
 	vertexData.pSysMem = vertices.data();
 
-	const HRESULT vertexBufferResult = device->CreateBuffer(
-	&vertexBufferDesc,
-	&vertexData,
-	m_VertexBuffer.GetAddressOf() );
+	const HRESULT vertexBufferResult = device->CreateBuffer( &vertexBufferDesc, &vertexData, m_VertexBuffer.GetAddressOf() );
 
 	if ( FAILED( vertexBufferResult ) )
 	{
@@ -137,10 +131,7 @@ bool ObjModelRenderer::Initialize(
 	D3D11_SUBRESOURCE_DATA indexData{};
 	indexData.pSysMem = indices.data();
 
-	const HRESULT indexBufferResult = device->CreateBuffer(
-	&indexBufferDesc,
-	&indexData,
-	m_IndexBuffer.GetAddressOf() );
+	const HRESULT indexBufferResult = device->CreateBuffer( &indexBufferDesc, &indexData, m_IndexBuffer.GetAddressOf() );
 
 	if ( FAILED( indexBufferResult ) )
 	{
@@ -256,9 +247,7 @@ bool ObjModelRenderer::Initialize(
 	samplerDesc.MinLOD = 0.0f;
 	samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
-	const HRESULT samplerStateResult = device->CreateSamplerState(
-	&samplerDesc,
-	m_TextureSampler.GetAddressOf() );
+	const HRESULT samplerStateResult = device->CreateSamplerState( &samplerDesc, m_TextureSampler.GetAddressOf() );
 
 	if ( FAILED( samplerStateResult ) )
 	{
@@ -270,26 +259,6 @@ bool ObjModelRenderer::Initialize(
 	m_IndexCount = static_cast<unsigned int>( indices.size() );
 
 	return true;
-}
-
-// OBJ描画で使用したDirect3Dリソースを解放する。
-void ObjModelRenderer::Uninit()
-{
-	// TextureとSamplerを解放する。
-	m_TextureSampler.Reset();
-	m_TextureView.Reset();
-
-	// 定数バッファとメッシュBufferを解放する。
-	m_TransformBuffer.Uninit();
-	m_IndexBuffer.Reset();
-	m_VertexBuffer.Reset();
-
-	// ShaderとInput Layoutを解放する。
-	m_InputLayout.Reset();
-	m_PixelShader.Reset();
-	m_VertexShader.Reset();
-
-	m_IndexCount = {};
 }
 
 // 指定したWorld、View、Projection行列と色でOBJモデルを描画する。
@@ -308,8 +277,7 @@ void ObjModelRenderer::Draw(
 	if ( context == nullptr ) return;
 
 	// Shaderへ渡すWorld、View、Projection、色、Texture使用有無をまとめる。
-	const DirectX::XMMATRIX worldViewProjection =
-		DirectX::XMMatrixTranspose( worldMatrix * viewMatrix * projectionMatrix );
+	const DirectX::XMMATRIX worldViewProjection = DirectX::XMMatrixTranspose( worldMatrix * viewMatrix * projectionMatrix );
 	const TransformBuffer transformBuffer
 	{
 		worldViewProjection,
@@ -348,10 +316,7 @@ void ObjModelRenderer::Draw(
 }
 
 // OBJファイルを読み込み、頂点配列とIndex配列を生成する。
-bool ObjModelRenderer::LoadObjFile(
-	const std::wstring& objFilePath,
-	std::vector<Vertex>& vertices,
-	std::vector<unsigned int>& indices )
+bool ObjModelRenderer::LoadObjFile( const std::wstring& objFilePath, std::vector<Vertex>& vertices, std::vector<unsigned int>& indices )
 {
 	std::ifstream file( objFilePath );
 	if ( !file ) return false;
@@ -448,6 +413,26 @@ bool ObjModelRenderer::LoadObjFile(
 	}
 
 	return !vertices.empty() && !indices.empty();
+}
+
+// OBJ描画で使用したDirect3Dリソースを解放する。
+void ObjModelRenderer::Uninit()
+{
+	// TextureとSamplerを解放する。
+	m_TextureSampler.Reset();
+	m_TextureView.Reset();
+
+	// 定数バッファとメッシュBufferを解放する。
+	m_TransformBuffer.Uninit();
+	m_IndexBuffer.Reset();
+	m_VertexBuffer.Reset();
+
+	// ShaderとInput Layoutを解放する。
+	m_InputLayout.Reset();
+	m_PixelShader.Reset();
+	m_VertexShader.Reset();
+
+	m_IndexCount = {};
 }
 
 // テクスチャファイルを読み込み、Shader Resource Viewを生成する。

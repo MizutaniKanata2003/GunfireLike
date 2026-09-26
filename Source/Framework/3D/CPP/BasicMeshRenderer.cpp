@@ -131,10 +131,7 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	D3D11_SUBRESOURCE_DATA vertexData{};
 	vertexData.pSysMem = vertices;
 
-	const HRESULT vertexBufferResult = device->CreateBuffer(
-	&vertexBufferDesc,
-	&vertexData,
-	m_VertexBuffer.GetAddressOf() );
+	const HRESULT vertexBufferResult = device->CreateBuffer( &vertexBufferDesc, &vertexData, m_VertexBuffer.GetAddressOf() );
 
 	if ( FAILED( vertexBufferResult ) )
 	{
@@ -152,10 +149,7 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	D3D11_SUBRESOURCE_DATA indexData{};
 	indexData.pSysMem = indices;
 
-	const HRESULT indexBufferResult = device->CreateBuffer(
-	&indexBufferDesc,
-	&indexData,
-	m_IndexBuffer.GetAddressOf() );
+	const HRESULT indexBufferResult = device->CreateBuffer( &indexBufferDesc, &indexData, m_IndexBuffer.GetAddressOf() );
 
 	if ( FAILED( indexBufferResult ) )
 	{
@@ -272,9 +266,7 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	samplerDescription.MinLOD = 0.0f;
 	samplerDescription.MaxLOD = D3D11_FLOAT32_MAX;
 
-	const HRESULT samplerStateResult = device->CreateSamplerState(
-	&samplerDescription,
-	m_TextureSampler.GetAddressOf() );
+	const HRESULT samplerStateResult = device->CreateSamplerState( &samplerDescription, m_TextureSampler.GetAddressOf() );
 
 	if ( FAILED( samplerStateResult ) )
 	{
@@ -286,28 +278,6 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	m_IndexCount = CUBE_INDEX_COUNT;
 
 	return true;
-}
-
-// 描画に使用したDirect3Dリソースを解放する。
-void BasicMeshRenderer::Uninit()
-{
-	// SamplerとTextureを解放する。
-	m_TextureSampler.Reset();
-	m_ObjectTextureView.Reset();
-	m_WallTextureView.Reset();
-	m_FloorTextureView.Reset();
-
-	// 定数バッファとメッシュBufferを解放する。
-	m_TransformBuffer.Uninit();
-	m_IndexBuffer.Reset();
-	m_VertexBuffer.Reset();
-
-	// ShaderとInput Layoutを解放する。
-	m_InputLayout.Reset();
-	m_PixelShader.Reset();
-	m_VertexShader.Reset();
-
-	m_IndexCount = {};
 }
 
 // 指定した行列、色、UVタイリング、テクスチャ種別でCubeを描画する。
@@ -389,4 +359,26 @@ void BasicMeshRenderer::DrawCube(
 	context->PSSetShaderResources( 0, 1, &textureView );
 	context->PSSetSamplers( 0, 1, samplers );
 	context->DrawIndexed( m_IndexCount, 0, 0 );
+}
+
+// 描画に使用したDirect3Dリソースを解放する。
+void BasicMeshRenderer::Uninit()
+{
+	// SamplerとTextureを解放する。
+	m_TextureSampler.Reset();
+	m_ObjectTextureView.Reset();
+	m_WallTextureView.Reset();
+	m_FloorTextureView.Reset();
+
+	// 定数バッファとメッシュBufferを解放する。
+	m_TransformBuffer.Uninit();
+	m_IndexBuffer.Reset();
+	m_VertexBuffer.Reset();
+
+	// ShaderとInput Layoutを解放する。
+	m_InputLayout.Reset();
+	m_PixelShader.Reset();
+	m_VertexShader.Reset();
+
+	m_IndexCount = {};
 }

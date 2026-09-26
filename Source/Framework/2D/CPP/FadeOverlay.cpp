@@ -56,10 +56,7 @@ void FadeOverlay::Update( float deltaTime )
 
 	// 経過時間から0.0から1.0のフェード進行率を計算する。
 	m_ElapsedTime += deltaTime;
-	const float progress = std::clamp(
-		m_ElapsedTime / m_Duration,
-		FADE_PROGRESS_MIN,
-		FADE_PROGRESS_MAX );
+	const float progress = std::clamp( m_ElapsedTime / m_Duration, FADE_PROGRESS_MIN, FADE_PROGRESS_MAX );
 
 	if ( m_Mode == FadeMode::e_FADE_OUT )
 	{
@@ -104,9 +101,7 @@ void FadeOverlay::Draw() const
 		ImGuiWindowFlags_NoBringToFrontOnFocus;
 
 	// 黒色と現在のAlpha値で背景を描画する。
-	ImGui::PushStyleColor(
-		ImGuiCol_WindowBg,
-		ImVec4( FADE_COLOR_RED, FADE_COLOR_GREEN, FADE_COLOR_BLUE, m_Alpha ) );
+	ImGui::PushStyleColor( ImGuiCol_WindowBg, ImVec4( FADE_COLOR_RED, FADE_COLOR_GREEN, FADE_COLOR_BLUE, m_Alpha ) );
 	ImGui::PushStyleVar( ImGuiStyleVar_WindowRounding, 0.0f );
 	ImGui::PushStyleVar( ImGuiStyleVar_WindowBorderSize, 0.0f );
 

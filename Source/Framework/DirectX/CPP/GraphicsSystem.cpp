@@ -257,28 +257,6 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 	return true;
 }
 
-// DirectX 11で生成したリソースを解放する。
-void GraphicsSystem::Uninit()
-{
-	// RenderTargetとDepthStencilを先に解放する。
-	ReleaseRenderTargets();
-
-	// Contextに設定されている描画Stateと参照を解除する。
-	if ( m_Context ) m_Context->ClearState();
-
-	// 描画Stateを解放する。
-	m_CullNoneRasterizerState.Reset();
-	m_CullBackRasterizerState.Reset();
-	m_AlphaBlendState.Reset();
-	m_DepthReadOnlyState.Reset();
-	m_DepthDisabledState.Reset();
-
-	// DirectX 11の主要リソースを解放する。
-	m_SwapChain.Reset();
-	m_Context.Reset();
-	m_Device.Reset();
-}
-
 // RenderTargetとDepthStencilをクリアし、フレーム描画を開始する。
 void GraphicsSystem::BeginFrame( const float clearColor[ 4 ] )
 {
@@ -326,6 +304,27 @@ void GraphicsSystem::Resize( unsigned int width, unsigned int height )
 	if ( !CreateRenderTargets( width, height ) ) ReleaseRenderTargets();
 }
 
+// DirectX 11で生成したリソースを解放する。
+void GraphicsSystem::Uninit()
+{
+	// RenderTargetとDepthStencilを先に解放する。
+	ReleaseRenderTargets();
+
+	// Contextに設定されている描画Stateと参照を解除する。
+	if ( m_Context ) m_Context->ClearState();
+
+	// 描画Stateを解放する。
+	m_CullNoneRasterizerState.Reset();
+	m_CullBackRasterizerState.Reset();
+	m_AlphaBlendState.Reset();
+	m_DepthReadOnlyState.Reset();
+	m_DepthDisabledState.Reset();
+
+	// DirectX 11の主要リソースを解放する。
+	m_SwapChain.Reset();
+	m_Context.Reset();
+	m_Device.Reset();
+}
 // BackBuffer、RenderTargetView、DepthStencilView、Viewportを生成する。
 bool GraphicsSystem::CreateRenderTargets( unsigned int width, unsigned int height )
 {

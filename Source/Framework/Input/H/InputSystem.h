@@ -13,6 +13,8 @@ public:
 	void Initialize( HWND windowHandle );
 	// キー状態、マウスキャプチャ、カーソル位置をフレームごとに更新する。
 	void Update();
+	// InputSystemが設定したカーソル制限とマウスキャプチャ状態を解除する。
+	void Uninit();
 	// WindowProcedureから受け取ったWin32メッセージを処理する。
 	void OnWindowMessage( UINT message, WPARAM wParam, LPARAM lParam );
 

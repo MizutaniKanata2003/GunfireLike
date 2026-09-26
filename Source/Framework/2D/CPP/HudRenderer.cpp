@@ -95,8 +95,7 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	}
 
 	// HUD Quadの描画に使用するVertex Shaderを生成する。
-	const HRESULT vertexShaderResult = device->CreateVertexShader(
-	vertexShaderData.data(),
+	const HRESULT vertexShaderResult = device->CreateVertexShader( vertexShaderData.data(),
 	vertexShaderData.size(),
 	nullptr,
 	m_VertexShader.GetAddressOf() );
@@ -160,10 +159,7 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	D3D11_SUBRESOURCE_DATA vertexData{};
 	vertexData.pSysMem = vertices.data();
 
-	const HRESULT vertexBufferResult = device->CreateBuffer(
-	&vertexBufferDescription,
-	&vertexData,
-	m_VertexBuffer.GetAddressOf() );
+	const HRESULT vertexBufferResult = device->CreateBuffer( &vertexBufferDescription, &vertexData, m_VertexBuffer.GetAddressOf() );
 
 	if ( FAILED( vertexBufferResult ) )
 	{
@@ -188,10 +184,7 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	D3D11_SUBRESOURCE_DATA indexData{};
 	indexData.pSysMem = indices.data();
 
-	const HRESULT indexBufferResult = device->CreateBuffer(
-	&indexBufferDescription,
-	&indexData,
-	m_IndexBuffer.GetAddressOf() );
+	const HRESULT indexBufferResult = device->CreateBuffer( &indexBufferDescription, &indexData, m_IndexBuffer.GetAddressOf() );
 
 	if ( FAILED( indexBufferResult ) )
 	{
@@ -213,22 +206,6 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	m_IndexCount = static_cast<unsigned int>( indices.size() );
 
 	return true;
-}
-
-// HUD描画に使用したDirect3Dリソースを解放する。
-void HudRenderer::Uninit()
-{
-	// HUD描画に使用したGPU Bufferを解放する。
-	m_HudBuffer.Uninit();
-	m_IndexBuffer.Reset();
-	m_VertexBuffer.Reset();
-
-	// HUD描画に使用したShaderとInput Layoutを解放する。
-	m_InputLayout.Reset();
-	m_PixelShader.Reset();
-	m_VertexShader.Reset();
-
-	m_IndexCount = {};
 }
 
 // 指定した画面座標、サイズ、色で単色Quadを描画する。
@@ -294,6 +271,7 @@ void HudRenderer::DrawCrosshair( GraphicsSystem& graphicsSystem )
 		CROSSHAIR_LINE_LENGTH,
 		CROSSHAIR_LINE_THICKNESS,
 		crosshairColor );
+
 	DrawQuad(
 		graphicsSystem,
 		CROSSHAIR_CENTER_X - CROSSHAIR_LINE_THICKNESS * 0.5f,
@@ -361,4 +339,20 @@ void HudRenderer::DrawLowHealthWarning( GraphicsSystem& graphicsSystem, float cu
 		LOW_HP_BORDER_THICKNESS,
 		SCREEN_HEIGHT,
 		warningColor );
+}
+
+// HUD描画に使用したDirect3Dリソースを解放する。
+void HudRenderer::Uninit()
+{
+	// HUD描画に使用したGPU Bufferを解放する。
+	m_HudBuffer.Uninit();
+	m_IndexBuffer.Reset();
+	m_VertexBuffer.Reset();
+
+	// HUD描画に使用したShaderとInput Layoutを解放する。
+	m_InputLayout.Reset();
+	m_PixelShader.Reset();
+	m_VertexShader.Reset();
+
+	m_IndexCount = {};
 }

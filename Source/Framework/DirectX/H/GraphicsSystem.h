@@ -21,19 +21,18 @@ enum class e_RenderPass
 class GraphicsSystem final
 {
 public:
-	//========= 初期化・終了関数=========
+public:
+	//========= ライフサイクル・フレーム制御関数=========
 	// DirectX 11のDevice、Context、SwapChain、RenderTargetを初期化する。
 	bool Init( HWND windowHandle, unsigned int width, unsigned int height );
-	// DirectX 11で生成したリソースを解放する。
-	void Uninit();
-
-	//========= フレーム制御関数=========
 	// RenderTargetとDepthStencilをクリアし、フレーム描画を開始する。
 	void BeginFrame( const float clearColor[ 4 ] );
 	// 描画済みフレームをSwapChainへ表示する。
 	void EndFrame();
 	// ウィンドウサイズに合わせてRenderTarget、DepthStencil、Viewportを再生成する。
 	void Resize( unsigned int width, unsigned int height );
+	// DirectX 11で生成したリソースを解放する。
+	void Uninit();
 
 	//========= Getter関数=========
 	// DirectX 11 Deviceを返す。
