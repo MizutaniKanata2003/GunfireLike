@@ -7,6 +7,7 @@
 
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/ConstantBuffer.h"
+#include "Framework/DirectX/H/GraphicsConstants.h"
 
 //========= 前方宣言=========
 class GraphicsSystem;
@@ -19,13 +20,9 @@ public:
 	// Cube描画に使用するテクスチャの種類。
 	enum class TextureType
 	{
-		// Floor.pngを貼り付ける。
 		Floor,
-		// Wall.pngを貼り付ける。
 		Wall,
-		// Object.pngを貼り付ける。
 		Object,
-		// テクスチャを使わず、指定した色だけで描画する。
 		Color
 	};
 
@@ -55,16 +52,6 @@ private:
 		DirectX::XMFLOAT2 uv{};
 	};
 
-	// BasicColorVS.hlslとBasicColorPS.hlslの定数バッファ定義に合わせる。
-	struct TransformBuffer
-	{
-		DirectX::XMMATRIX worldViewProjection{};
-		DirectX::XMFLOAT4 color{};
-		DirectX::XMFLOAT2 uvTiling{};
-		float useTexture{};
-		float padding{};
-	};
-
 	//========= Shader関連=========
 	// Cube描画に使用するVertex Shader。
 	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_VertexShader{};
@@ -88,8 +75,12 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_VertexBuffer{};
 	// Cubeの三角形順序を保持するIndex Buffer。
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_IndexBuffer{};
-	// World、View、Projection、色、UV情報をShaderへ渡す定数バッファ。
-	ConstantBuffer<TransformBuffer> m_TransformBuffer{};
+	// ViewProjection行列をShaderへ渡す定数バッファ。
+	ConstantBuffer<CameraConstants> m_CameraBuffer{};
+	// World行列と色をShaderへ渡す定数バッファ。
+	ConstantBuffer<ObjectConstants> m_ObjectBuffer{};
+	// UVタイリングとTexture使用有無をShaderへ渡す定数バッファ。
+	ConstantBuffer<MaterialConstants> m_MaterialBuffer{};
 
 	//========= 描画情報=========
 	// DrawIndexedに渡すCubeのIndex数。

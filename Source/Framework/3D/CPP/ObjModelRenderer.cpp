@@ -220,12 +220,29 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 		return false;
 	}
 
-	// World、View、Projection、色、Texture使用有無を渡す定数バッファを生成する。
-	HRESULT transformBufferResult{};
+	HRESULT cameraBufferResult{};
 
-	if ( !m_TransformBuffer.Init( device, transformBufferResult ) )
+	if ( !m_CameraBuffer.Init( device, cameraBufferResult ) )
 	{
-		WriteObjModelGraphicsError( L"ID3D11Device::CreateBuffer(TransformBuffer)", transformBufferResult );
+		WriteObjModelGraphicsError( L"ID3D11Device::CreateBuffer(CameraConstants)", cameraBufferResult );
+		Uninit();
+		return false;
+	}
+
+	HRESULT objectBufferResult{};
+
+	if ( !m_ObjectBuffer.Init( device, objectBufferResult ) )
+	{
+		WriteObjModelGraphicsError( L"ID3D11Device::CreateBuffer(ObjectConstants)", objectBufferResult );
+		Uninit();
+		return false;
+	}
+
+	HRESULT materialBufferResult{};
+
+	if ( !m_MaterialBuffer.Init( device, materialBufferResult ) )
+	{
+		WriteObjModelGraphicsError( L"ID3D11Device::CreateBuffer(MaterialConstants)", materialBufferResult );
 		Uninit();
 		return false;
 	}
@@ -263,29 +280,34 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 
 // 指定したWorld、View、Projection行列と色でOBJモデルを描画する。
 void ObjModelRenderer::Draw(
-	GraphicsSystem& graphicsSystem,
-	const DirectX::XMMATRIX& worldMatrix,
-	const DirectX::XMMATRIX& viewMatrix,
-	const DirectX::XMMATRIX& projectionMatrix,
-	const DirectX::XMFLOAT4& color )
+GraphicsSystem& graphicsSystem,
+const DirectX::XMMATRIX& worldMatrix,
+const DirectX::XMMATRIX& viewMatrix,
+const DirectX::XMMATRIX& projectionMatrix,
+const DirectX::XMFLOAT4& color )
 {
-	if ( !m_VertexBuffer || !m_IndexBuffer || !m_TransformBuffer.IsValid() || !m_VertexShader ||
-			!m_PixelShader || !m_InputLayout || !m_TextureSampler || m_IndexCount == 0 ) return;
+	if ( !m_VertexBuffer || !m_IndexBuffer || !m_CameraBuffer.IsValid() || !m_ObjectBuffer.IsValid() ||
+	!m_MaterialBuffer.IsValid() || !m_VertexShader || !m_PixelShader || !m_InputLayout ||
+	!m_TextureSampler || m_IndexCount == 0 ) return;
 
 	// 描画に使用するDirect3D Contextを取得する。
 	ID3D11DeviceContext* context = graphicsSystem.GetContext();
 	if ( context == nullptr ) return;
 
-	// Shaderへ渡すWorld、View、Projection、色、Texture使用有無をまとめる。
-	const DirectX::XMMATRIX worldViewProjection = DirectX::XMMatrixTranspose( worldMatrix * viewMatrix * projectionMatrix );
-	const TransformBuffer transformBuffer
-	{
-		worldViewProjection,
-		color,
-		DirectX::XMFLOAT2{ 1.0f, 1.0f },
-		m_TextureView ? 1.0f : 0.0f,
-		0.0f
-	};
+	// Shaderへ渡すCamera、Object、Material定数を作成する。
+	const DirectX::XMMATRIX viewProjectionMatrix = DirectX::XMMatrixTranspose( viewMatrix * projectionMatrix );
+	const DirectX::XMMATRIX transposedWorldMatrix = DirectX::XMMatrixTranspose( worldMatrix );
+
+	CameraConstants cameraConstants{};
+	DirectX::XMStoreFloat4x4( &cameraConstants.viewProjectionMatrix, viewProjectionMatrix );
+
+	ObjectConstants objectConstants{};
+	DirectX::XMStoreFloat4x4( &objectConstants.worldMatrix, transposedWorldMatrix );
+	objectConstants.color = color;
+
+	MaterialConstants materialConstants{};
+	materialConstants.uvTiling = DirectX::XMFLOAT2{ 1.0f, 1.0f };
+	materialConstants.useTexture = m_TextureView ? 1.0f : 0.0f;
 
 	// Input Assemblerへ設定する頂点Buffer情報をまとめる。
 	const UINT vertexStride = sizeof( Vertex );
@@ -293,11 +315,15 @@ void ObjModelRenderer::Draw(
 	ID3D11Buffer* vertexBuffers[]{ m_VertexBuffer.Get() };
 
 	// Shaderへ設定する定数Buffer、Texture、Samplerをまとめる。
-	ID3D11Buffer* transformBuffers[]{ m_TransformBuffer.Get() };
+	ID3D11Buffer* cameraBuffers[]{ m_CameraBuffer.Get() };
+	ID3D11Buffer* objectBuffers[]{ m_ObjectBuffer.Get() };
+	ID3D11Buffer* materialBuffers[]{ m_MaterialBuffer.Get() };
 	ID3D11ShaderResourceView* textureViews[]{ m_TextureView.Get() };
 	ID3D11SamplerState* samplers[]{ m_TextureSampler.Get() };
 
-	m_TransformBuffer.Update( context, transformBuffer );
+	m_CameraBuffer.Update( context, cameraConstants );
+	m_ObjectBuffer.Update( context, objectConstants );
+	m_MaterialBuffer.Update( context, materialConstants );
 
 	context->IASetVertexBuffers( 0, 1, vertexBuffers, &vertexStride, &vertexOffset );
 	context->IASetIndexBuffer( m_IndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0 );
@@ -306,15 +332,38 @@ void ObjModelRenderer::Draw(
 
 	context->VSSetShader( m_VertexShader.Get(), nullptr, 0 );
 	context->PSSetShader( m_PixelShader.Get(), nullptr, 0 );
-	context->VSSetConstantBuffers( 0, 1, transformBuffers );
-	context->PSSetConstantBuffers( 0, 1, transformBuffers );
+	context->VSSetConstantBuffers( 0, 1, cameraBuffers );
+	context->VSSetConstantBuffers( 1, 1, objectBuffers );
+	context->VSSetConstantBuffers( 2, 1, materialBuffers );
+	context->PSSetConstantBuffers( 1, 1, objectBuffers );
+	context->PSSetConstantBuffers( 2, 1, materialBuffers );
 
 	// Textureなしの場合もnullptrを設定し、直前のSRV参照を残さない。
 	context->PSSetShaderResources( 0, 1, textureViews );
 	context->PSSetSamplers( 0, 1, samplers );
 	context->DrawIndexed( m_IndexCount, 0, 0 );
 }
+// OBJ描画で使用したDirect3Dリソースを解放する。
+void ObjModelRenderer::Uninit()
+{
+	// TextureとSamplerを解放する。
+	m_TextureSampler.Reset();
+	m_TextureView.Reset();
 
+	// 定数バッファとメッシュBufferを解放する。
+	m_MaterialBuffer.Uninit();
+	m_ObjectBuffer.Uninit();
+	m_CameraBuffer.Uninit();
+	m_IndexBuffer.Reset();
+	m_VertexBuffer.Reset();
+
+	// ShaderとInput Layoutを解放する。
+	m_InputLayout.Reset();
+	m_PixelShader.Reset();
+	m_VertexShader.Reset();
+
+	m_IndexCount = {};
+}
 // OBJファイルを読み込み、頂点配列とIndex配列を生成する。
 bool ObjModelRenderer::LoadObjFile( const std::wstring& objFilePath, std::vector<Vertex>& vertices, std::vector<unsigned int>& indices )
 {
@@ -413,26 +462,6 @@ bool ObjModelRenderer::LoadObjFile( const std::wstring& objFilePath, std::vector
 	}
 
 	return !vertices.empty() && !indices.empty();
-}
-
-// OBJ描画で使用したDirect3Dリソースを解放する。
-void ObjModelRenderer::Uninit()
-{
-	// TextureとSamplerを解放する。
-	m_TextureSampler.Reset();
-	m_TextureView.Reset();
-
-	// 定数バッファとメッシュBufferを解放する。
-	m_TransformBuffer.Uninit();
-	m_IndexBuffer.Reset();
-	m_VertexBuffer.Reset();
-
-	// ShaderとInput Layoutを解放する。
-	m_InputLayout.Reset();
-	m_PixelShader.Reset();
-	m_VertexShader.Reset();
-
-	m_IndexCount = {};
 }
 
 // テクスチャファイルを読み込み、Shader Resource Viewを生成する。

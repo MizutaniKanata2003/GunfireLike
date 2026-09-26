@@ -15,6 +15,7 @@ public:
 	// Constant Bufferの構造体サイズが16バイト単位であることを検証する。
 	static_assert( sizeof( T ) % 16 == 0, "Constant Bufferの構造体サイズは16バイト単位である必要があります。" );
 
+	//========= ライフサイクル関数=========
 	// Constant Bufferを生成し、失敗時はHRESULTを返す。
 	bool Init( ID3D11Device* device, HRESULT& result )
 	{
@@ -40,6 +41,13 @@ public:
 		context->UpdateSubresource( m_Buffer.Get(), 0, nullptr, &data, 0, 0 );
 	}
 
+	// Constant Bufferを解放する。
+	void Uninit()
+	{
+		m_Buffer.Reset();
+	}
+
+	//========= Getter・状態取得関数=========
 	// Constant Bufferが使用可能かを返す。
 	[[nodiscard]] bool IsValid() const
 	{
@@ -50,12 +58,6 @@ public:
 	[[nodiscard]] ID3D11Buffer* Get() const
 	{
 		return m_Buffer.Get();
-	}
-
-	// Constant Bufferを解放する。
-	void Uninit()
-	{
-		m_Buffer.Reset();
 	}
 
 private:

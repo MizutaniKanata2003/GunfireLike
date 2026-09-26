@@ -11,6 +11,7 @@
 
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/ConstantBuffer.h"
+#include "Framework/DirectX/H/GraphicsConstants.h"
 
 //========= 前方宣言=========
 class GraphicsSystem;
@@ -43,16 +44,6 @@ private:
 		DirectX::XMFLOAT2 uv{};
 	};
 
-	// BasicColorVS.hlslとBasicColorPS.hlslの定数バッファ定義に合わせる。
-	struct TransformBuffer
-	{
-		DirectX::XMMATRIX worldViewProjection{};
-		DirectX::XMFLOAT4 color{};
-		DirectX::XMFLOAT2 uvTiling{};
-		float useTexture{};
-		float padding{};
-	};
-
 	//========= 補助関数=========
 	// OBJファイルを読み込み、頂点配列とIndex配列を生成する。
 	bool LoadObjFile( const std::wstring& objFilePath, std::vector<Vertex>& vertices, std::vector<unsigned int>& indices );
@@ -72,8 +63,12 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_VertexBuffer{};
 	// OBJ三角形のIndex情報を保持するIndex Buffer。
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_IndexBuffer{};
-	// World、View、Projection、色、Texture使用有無をShaderへ渡す定数バッファ。
-	ConstantBuffer<TransformBuffer> m_TransformBuffer{};
+	// ViewProjection行列をShaderへ渡す定数バッファ。
+	ConstantBuffer<CameraConstants> m_CameraBuffer{};
+	// World行列と色をShaderへ渡す定数バッファ。
+	ConstantBuffer<ObjectConstants> m_ObjectBuffer{};
+	// UVタイリングとTexture使用有無をShaderへ渡す定数バッファ。
+	ConstantBuffer<MaterialConstants> m_MaterialBuffer{};
 
 	//========= Texture関連=========
 	// OBJに貼り付けるテクスチャ。

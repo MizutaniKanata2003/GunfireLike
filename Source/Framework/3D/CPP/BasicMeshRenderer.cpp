@@ -182,24 +182,24 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 
 	const D3D11_INPUT_ELEMENT_DESC inputElements[]
 	{
-		{
-			POSITION_SEMANTIC_NAME,
-			0,
-			DXGI_FORMAT_R32G32B32_FLOAT,
-			0,
-			offsetof( Vertex, position ),
-			D3D11_INPUT_PER_VERTEX_DATA,
-			0
-		},
-		{
-			TEXCOORD_SEMANTIC_NAME,
-			0,
-			DXGI_FORMAT_R32G32_FLOAT,
-			0,
-			offsetof( Vertex, uv ),
-			D3D11_INPUT_PER_VERTEX_DATA,
-			0
-		}
+	{
+	POSITION_SEMANTIC_NAME,
+	0,
+	DXGI_FORMAT_R32G32B32_FLOAT,
+	0,
+	offsetof( Vertex, position ),
+	D3D11_INPUT_PER_VERTEX_DATA,
+	0
+	},
+	{
+	TEXCOORD_SEMANTIC_NAME,
+	0,
+	DXGI_FORMAT_R32G32_FLOAT,
+	0,
+	offsetof( Vertex, uv ),
+	D3D11_INPUT_PER_VERTEX_DATA,
+	0
+	}
 	};
 
 	const HRESULT inputLayoutResult = device->CreateInputLayout(
@@ -238,12 +238,30 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 		return false;
 	}
 
-	// World、View、Projection、色、UV情報を渡す定数バッファを生成する。
-	HRESULT transformBufferResult{};
+	// Camera、Object、Material用の定数バッファを生成する。
+	HRESULT cameraBufferResult{};
 
-	if ( !m_TransformBuffer.Init( device, transformBufferResult ) )
+	if ( !m_CameraBuffer.Init( device, cameraBufferResult ) )
 	{
-		WriteBasicMeshGraphicsError( L"ID3D11Device::CreateBuffer(TransformBuffer)", transformBufferResult );
+		WriteBasicMeshGraphicsError( L"ID3D11Device::CreateBuffer(CameraConstants)", cameraBufferResult );
+		Uninit();
+		return false;
+	}
+
+	HRESULT objectBufferResult{};
+
+	if ( !m_ObjectBuffer.Init( device, objectBufferResult ) )
+	{
+		WriteBasicMeshGraphicsError( L"ID3D11Device::CreateBuffer(ObjectConstants)", objectBufferResult );
+		Uninit();
+		return false;
+	}
+
+	HRESULT materialBufferResult{};
+
+	if ( !m_MaterialBuffer.Init( device, materialBufferResult ) )
+	{
+		WriteBasicMeshGraphicsError( L"ID3D11Device::CreateBuffer(MaterialConstants)", materialBufferResult );
 		Uninit();
 		return false;
 	}
@@ -282,16 +300,17 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 
 // 指定した行列、色、UVタイリング、テクスチャ種別でCubeを描画する。
 void BasicMeshRenderer::DrawCube(
-	GraphicsSystem& graphicsSystem,
-	const DirectX::XMMATRIX& worldMatrix,
-	const DirectX::XMMATRIX& viewMatrix,
-	const DirectX::XMMATRIX& projectionMatrix,
-	const DirectX::XMFLOAT4& color,
-	const DirectX::XMFLOAT2& uvTiling,
-	TextureType textureType )
+GraphicsSystem& graphicsSystem,
+const DirectX::XMMATRIX& worldMatrix,
+const DirectX::XMMATRIX& viewMatrix,
+const DirectX::XMMATRIX& projectionMatrix,
+const DirectX::XMFLOAT4& color,
+const DirectX::XMFLOAT2& uvTiling,
+TextureType textureType )
 {
-	if ( !m_VertexBuffer || !m_IndexBuffer || !m_TransformBuffer.IsValid() || !m_VertexShader ||
-	!m_PixelShader || !m_InputLayout || !m_TextureSampler || m_IndexCount == 0 ) return;
+	if ( !m_VertexBuffer || !m_IndexBuffer || !m_CameraBuffer.IsValid() || !m_ObjectBuffer.IsValid() ||
+	!m_MaterialBuffer.IsValid() || !m_VertexShader || !m_PixelShader || !m_InputLayout ||
+	!m_TextureSampler || m_IndexCount == 0 ) return;
 
 	// 描画に使用するDirect3D Contextを取得する。
 	ID3D11DeviceContext* context = graphicsSystem.GetContext();
@@ -323,16 +342,20 @@ void BasicMeshRenderer::DrawCube(
 		break;
 	}
 
-	// Shaderへ渡すWorld、View、Projection、色、UV情報をまとめる。
-	const DirectX::XMMATRIX worldViewProjection = DirectX::XMMatrixTranspose( worldMatrix * viewMatrix * projectionMatrix );
-	const TransformBuffer transformBuffer
-	{
-		worldViewProjection,
-		color,
-		uvTiling,
-		useTexture,
-		0.0f
-	};
+	// Shaderへ渡すCamera、Object、Material定数を作成する。
+	const DirectX::XMMATRIX viewProjectionMatrix = DirectX::XMMatrixTranspose( viewMatrix * projectionMatrix );
+	const DirectX::XMMATRIX transposedWorldMatrix = DirectX::XMMatrixTranspose( worldMatrix );
+
+	CameraConstants cameraConstants{};
+	DirectX::XMStoreFloat4x4( &cameraConstants.viewProjectionMatrix, viewProjectionMatrix );
+
+	ObjectConstants objectConstants{};
+	DirectX::XMStoreFloat4x4( &objectConstants.worldMatrix, transposedWorldMatrix );
+	objectConstants.color = color;
+
+	MaterialConstants materialConstants{};
+	materialConstants.uvTiling = uvTiling;
+	materialConstants.useTexture = useTexture;
 
 	// Input Assemblerへ設定する頂点Buffer情報をまとめる。
 	const UINT vertexStride = sizeof( Vertex );
@@ -340,10 +363,14 @@ void BasicMeshRenderer::DrawCube(
 	ID3D11Buffer* vertexBuffers[]{ m_VertexBuffer.Get() };
 
 	// Shaderへ設定する定数Buffer、Texture、Samplerをまとめる。
-	ID3D11Buffer* constantBuffers[]{ m_TransformBuffer.Get() };
+	ID3D11Buffer* cameraBuffers[]{ m_CameraBuffer.Get() };
+	ID3D11Buffer* objectBuffers[]{ m_ObjectBuffer.Get() };
+	ID3D11Buffer* materialBuffers[]{ m_MaterialBuffer.Get() };
 	ID3D11SamplerState* samplers[]{ m_TextureSampler.Get() };
 
-	m_TransformBuffer.Update( context, transformBuffer );
+	m_CameraBuffer.Update( context, cameraConstants );
+	m_ObjectBuffer.Update( context, objectConstants );
+	m_MaterialBuffer.Update( context, materialConstants );
 
 	context->IASetVertexBuffers( 0, 1, vertexBuffers, &vertexStride, &vertexOffset );
 	context->IASetIndexBuffer( m_IndexBuffer.Get(), DXGI_FORMAT_R16_UINT, 0 );
@@ -352,15 +379,17 @@ void BasicMeshRenderer::DrawCube(
 
 	context->VSSetShader( m_VertexShader.Get(), nullptr, 0 );
 	context->PSSetShader( m_PixelShader.Get(), nullptr, 0 );
-	context->VSSetConstantBuffers( 0, 1, constantBuffers );
-	context->PSSetConstantBuffers( 0, 1, constantBuffers );
+	context->VSSetConstantBuffers( 0, 1, cameraBuffers );
+	context->VSSetConstantBuffers( 1, 1, objectBuffers );
+	context->VSSetConstantBuffers( 2, 1, materialBuffers );
+	context->PSSetConstantBuffers( 1, 1, objectBuffers );
+	context->PSSetConstantBuffers( 2, 1, materialBuffers );
 
 	// 単色描画時もnullptrを設定し、直前のテクスチャ参照を残さない。
 	context->PSSetShaderResources( 0, 1, &textureView );
 	context->PSSetSamplers( 0, 1, samplers );
 	context->DrawIndexed( m_IndexCount, 0, 0 );
 }
-
 // 描画に使用したDirect3Dリソースを解放する。
 void BasicMeshRenderer::Uninit()
 {
@@ -371,7 +400,9 @@ void BasicMeshRenderer::Uninit()
 	m_FloorTextureView.Reset();
 
 	// 定数バッファとメッシュBufferを解放する。
-	m_TransformBuffer.Uninit();
+	m_MaterialBuffer.Uninit();
+	m_ObjectBuffer.Uninit();
+	m_CameraBuffer.Uninit();
 	m_IndexBuffer.Reset();
 	m_VertexBuffer.Reset();
 
