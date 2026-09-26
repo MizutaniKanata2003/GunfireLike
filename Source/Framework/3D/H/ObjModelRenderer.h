@@ -9,6 +9,9 @@
 #include <d3d11.h>
 #include <wrl/client.h>
 
+//========= Framework インクルード=========
+#include "Framework/DirectX/H/ConstantBuffer.h"
+
 //========= 前方宣言=========
 class GraphicsSystem;
 
@@ -76,7 +79,7 @@ private:
 	// OBJ三角形のIndex情報を保持するIndex Buffer。
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_IndexBuffer{};
 	// World、View、Projection、色、Texture使用有無をShaderへ渡す定数バッファ。
-	Microsoft::WRL::ComPtr<ID3D11Buffer> m_TransformBuffer{};
+	ConstantBuffer<TransformBuffer> m_TransformBuffer{};
 
 	//========= Texture関連=========
 	// OBJに貼り付けるテクスチャ。

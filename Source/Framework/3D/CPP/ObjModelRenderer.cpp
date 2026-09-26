@@ -230,17 +230,9 @@ bool ObjModelRenderer::Initialize(
 	}
 
 	// World、View、Projection、色、Texture使用有無を渡す定数バッファを生成する。
-	D3D11_BUFFER_DESC transformBufferDesc{};
-	transformBufferDesc.ByteWidth = static_cast<UINT>( sizeof( TransformBuffer ) );
-	transformBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-	transformBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	HRESULT transformBufferResult{};
 
-	const HRESULT transformBufferResult = device->CreateBuffer(
-	&transformBufferDesc,
-	nullptr,
-	m_TransformBuffer.GetAddressOf() );
-
-	if ( FAILED( transformBufferResult ) )
+	if ( !m_TransformBuffer.Init( device, transformBufferResult ) )
 	{
 		WriteObjModelGraphicsError( L"ID3D11Device::CreateBuffer(TransformBuffer)", transformBufferResult );
 		Uninit();
@@ -288,7 +280,7 @@ void ObjModelRenderer::Uninit()
 	m_TextureView.Reset();
 
 	// 定数バッファとメッシュBufferを解放する。
-	m_TransformBuffer.Reset();
+	m_TransformBuffer.Uninit();
 	m_IndexBuffer.Reset();
 	m_VertexBuffer.Reset();
 
@@ -308,8 +300,8 @@ void ObjModelRenderer::Draw(
 	const DirectX::XMMATRIX& projectionMatrix,
 	const DirectX::XMFLOAT4& color )
 {
-	if ( !m_VertexBuffer || !m_IndexBuffer || !m_TransformBuffer || !m_VertexShader ||
-		!m_PixelShader || !m_InputLayout || !m_TextureSampler || m_IndexCount == 0 ) return;
+	if ( !m_VertexBuffer || !m_IndexBuffer || !m_TransformBuffer.IsValid() || !m_VertexShader ||
+			!m_PixelShader || !m_InputLayout || !m_TextureSampler || m_IndexCount == 0 ) return;
 
 	// 描画に使用するDirect3D Contextを取得する。
 	ID3D11DeviceContext* context = graphicsSystem.GetContext();
@@ -337,7 +329,7 @@ void ObjModelRenderer::Draw(
 	ID3D11ShaderResourceView* textureViews[]{ m_TextureView.Get() };
 	ID3D11SamplerState* samplers[]{ m_TextureSampler.Get() };
 
-	context->UpdateSubresource( m_TransformBuffer.Get(), 0, nullptr, &transformBuffer, 0, 0 );
+	m_TransformBuffer.Update( context, transformBuffer );
 
 	context->IASetVertexBuffers( 0, 1, vertexBuffers, &vertexStride, &vertexOffset );
 	context->IASetIndexBuffer( m_IndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0 );
