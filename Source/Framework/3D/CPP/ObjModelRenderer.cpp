@@ -101,6 +101,7 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 	if ( !LoadObjFile( objFilePath, vertices, indices ) )
 	{
 		WriteObjModelAssetError( L"OBJ読込失敗", objFilePath );
+		Uninit();
 		return false;
 	}
 
@@ -286,9 +287,9 @@ const DirectX::XMMATRIX& viewMatrix,
 const DirectX::XMMATRIX& projectionMatrix,
 const DirectX::XMFLOAT4& color )
 {
-	if ( !m_VertexBuffer || !m_IndexBuffer || !m_CameraBuffer.IsValid() || !m_ObjectBuffer.IsValid() ||
-	!m_MaterialBuffer.IsValid() || !m_VertexShader || !m_PixelShader || !m_InputLayout ||
-	!m_TextureSampler || m_IndexCount == 0 ) return;
+	if ( !m_VertexBuffer || !m_IndexBuffer || !m_CameraBuffer.IsValid() ||
+	!m_ObjectBuffer.IsValid() || !m_MaterialBuffer.IsValid() || !m_VertexShader ||
+	!m_PixelShader || !m_InputLayout || !m_TextureSampler || m_IndexCount == 0 ) return;
 
 	// 描画に使用するDirect3D Contextを取得する。
 	ID3D11DeviceContext* context = graphicsSystem.GetContext();
@@ -343,6 +344,7 @@ const DirectX::XMFLOAT4& color )
 	context->PSSetSamplers( 0, 1, samplers );
 	context->DrawIndexed( m_IndexCount, 0, 0 );
 }
+
 // OBJ描画で使用したDirect3Dリソースを解放する。
 void ObjModelRenderer::Uninit()
 {
@@ -364,6 +366,7 @@ void ObjModelRenderer::Uninit()
 
 	m_IndexCount = {};
 }
+
 // OBJファイルを読み込み、頂点配列とIndex配列を生成する。
 bool ObjModelRenderer::LoadObjFile( const std::wstring& objFilePath, std::vector<Vertex>& vertices, std::vector<unsigned int>& indices )
 {

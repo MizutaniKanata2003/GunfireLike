@@ -308,9 +308,9 @@ const DirectX::XMFLOAT4& color,
 const DirectX::XMFLOAT2& uvTiling,
 TextureType textureType )
 {
-	if ( !m_VertexBuffer || !m_IndexBuffer || !m_CameraBuffer.IsValid() || !m_ObjectBuffer.IsValid() ||
-	!m_MaterialBuffer.IsValid() || !m_VertexShader || !m_PixelShader || !m_InputLayout ||
-	!m_TextureSampler || m_IndexCount == 0 ) return;
+	if ( !m_VertexBuffer || !m_IndexBuffer || !m_CameraBuffer.IsValid() ||
+	!m_ObjectBuffer.IsValid() || !m_MaterialBuffer.IsValid() || !m_VertexShader ||
+	!m_PixelShader || !m_InputLayout || !m_TextureSampler || m_IndexCount == 0 ) return;
 
 	// 描画に使用するDirect3D Contextを取得する。
 	ID3D11DeviceContext* context = graphicsSystem.GetContext();
@@ -390,6 +390,7 @@ TextureType textureType )
 	context->PSSetSamplers( 0, 1, samplers );
 	context->DrawIndexed( m_IndexCount, 0, 0 );
 }
+
 // 描画に使用したDirect3Dリソースを解放する。
 void BasicMeshRenderer::Uninit()
 {
