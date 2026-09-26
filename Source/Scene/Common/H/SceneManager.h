@@ -20,34 +20,25 @@ class SceneManager final
 {
 public:
 	//========= 生成・破棄関数=========
-	// SceneManagerが保持するSceneを安全に破棄する。
+	// SceneManagerが保持するSceneを安全に終了する。
 	~SceneManager();
 
-	//========= 初期化・終了関数=========
+	//========= ライフサイクル関数=========
 	// SceneManagerが使用するFramework Systemを登録し、TitleSceneを開始する。
-	void Initialize(
-		InputSystem& inputSystem,
-		GraphicsSystem& graphicsSystem,
-		AudioSystem& audioSystem );
-	// 現在Sceneと予約済みSceneを終了し、参照先を解除する。
-	void Uninit();
-
-	//========= 更新・描画関数=========
+	void Initialize( InputSystem& inputSystem, GraphicsSystem& graphicsSystem, AudioSystem& audioSystem );
 	// Scene更新、フェード更新、予約済みSceneの切替を行う。
 	void Update( float deltaTime );
 	// 現在Sceneとフェードを描画する。
 	void Draw();
+	// 現在Sceneと予約済みSceneを終了し、参照先を解除する。
+	void Finalize();
 
 	//========= Scene遷移関数=========
 	// 指定したSceneを次の遷移先として予約する。
 	template<class TScene>
 	void RequestSceneChange()
 	{
-		m_NextScene = std::make_unique<TScene>(
-			*this,
-			*m_InputSystem,
-			*m_GraphicsSystem,
-			*m_AudioSystem );
+		m_NextScene = std::make_unique<TScene>( *this, *m_InputSystem, *m_GraphicsSystem, *m_AudioSystem );
 	}
 
 	//========= ゲーム進捗操作関数=========
