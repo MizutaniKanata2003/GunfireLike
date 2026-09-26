@@ -6,6 +6,7 @@ cbuffer HudBuffer : register(b0)
 };
 
 //========= Vertex Shader入力=========
+// HudRendererのe_POSITIONに対応する。
 struct VertexInput
 {
     float2 position : POSITION;

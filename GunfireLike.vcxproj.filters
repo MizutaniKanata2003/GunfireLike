@@ -194,6 +194,9 @@
     <ClInclude Include="Source\Framework\DirectX\H\TextureLoader.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Framework\DirectX\H\VertexFormat.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Source\Framework\Shaders\BasicColorVS.hlsl" />

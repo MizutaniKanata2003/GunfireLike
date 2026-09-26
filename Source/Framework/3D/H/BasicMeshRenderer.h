@@ -8,6 +8,7 @@
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/ConstantBuffer.h"
 #include "Framework/DirectX/H/GraphicsConstants.h"
+#include "Framework/DirectX/H/VertexFormat.h"
 
 //========= 前方宣言=========
 class GraphicsSystem;
@@ -26,6 +27,9 @@ public:
 		Color
 	};
 
+	//========= Getter関数=========
+	// Cube描画で使用する頂点形式を返す。
+	[[nodiscard]] e_VertexFormat GetVertexFormat() const { return e_VertexFormat::e_POSITION_TEXTURE; }
 	//========= ライフサイクル・描画関数=========
 	// Cubeメッシュ、Shader、Texture、Sampler、定数バッファを初期化する。
 	bool Initialize( GraphicsSystem& graphicsSystem );

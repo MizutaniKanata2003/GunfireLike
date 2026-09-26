@@ -27,6 +27,8 @@ cbuffer MaterialConstants : register(b2)
     float padding;
 };
 
+//========= Vertex Shader入力=========
+// BasicMeshRendererとObjModelRendererのe_POSITION_TEXTUREに対応する。
 struct VSInput
 {
     float3 position : POSITION;

@@ -12,6 +12,7 @@
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/ConstantBuffer.h"
 #include "Framework/DirectX/H/GraphicsConstants.h"
+#include "Framework/DirectX/H/VertexFormat.h"
 
 //========= 前方宣言=========
 class GraphicsSystem;
@@ -20,6 +21,9 @@ class GraphicsSystem;
 class ObjModelRenderer final
 {
 public:
+	//========= Getter関数=========
+	// OBJモデル描画で使用する頂点形式を返す。
+	[[nodiscard]] e_VertexFormat GetVertexFormat() const { return e_VertexFormat::e_POSITION_TEXTURE; }
 	//========= ライフサイクル・描画関数=========
 	// OBJ、Shader、Buffer、必要なTexture、Samplerを初期化する。
 	bool Initialize( GraphicsSystem& graphicsSystem, const std::wstring& objFilePath, const std::wstring& textureFilePath );

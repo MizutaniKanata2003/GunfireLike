@@ -7,6 +7,7 @@
 
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/ConstantBuffer.h"
+#include "Framework/DirectX/H/VertexFormat.h"
 
 //========= 前方宣言=========
 class GraphicsSystem;
@@ -15,6 +16,9 @@ class GraphicsSystem;
 class HudRenderer final
 {
 public:
+	//========= Getter関数=========
+	// HUD Quad描画で使用する頂点形式を返す。
+	[[nodiscard]] e_VertexFormat GetVertexFormat() const { return e_VertexFormat::e_POSITION; }
 	//========= 初期化・終了関数=========
 	// HUD描画に必要なShader、Buffer、Input Layoutを初期化する。
 	bool Initialize( GraphicsSystem& graphicsSystem );

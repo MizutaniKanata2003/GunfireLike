@@ -224,6 +224,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\DirectX\H\GraphicsConstants.h" />
     <ClInclude Include="Source\Framework\DirectX\H\ShaderBinaryLoader.h" />
     <ClInclude Include="Source\Framework\DirectX\H\TextureLoader.h" />
+    <ClInclude Include="Source\Framework\DirectX\H\VertexFormat.h" />
     <ClInclude Include="Source\Framework\Etc\H\Logger.h" />
     <ClInclude Include="Source\Scene\Common\H\EnemyHealth.h" />
     <ClInclude Include="Source\Scene\Common\H\GameProgress.h">
