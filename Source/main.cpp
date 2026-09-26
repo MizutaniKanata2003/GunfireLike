@@ -208,6 +208,9 @@ int WINAPI WinMain( HINSTANCE instance, HINSTANCE, LPSTR, int showCommand )
 
 	sceneManager.Finalize();
 	imguiManager.Uninit();
+
+	SetWindowLongPtrW( windowHandle, GWLP_USERDATA, 0 );
+
 	inputSystem.Uninit();
 	audioSystem.Uninit();
 	graphicsSystem.Uninit();

@@ -77,10 +77,6 @@ void SceneManager::Finalize()
 		m_CurrentScene->Finalize();
 		m_CurrentScene.reset();
 	}
-
-	// SceneManagerが所有するフェード描画Resourceを終了する。
-	m_FadeOverlay.Uninit();
-
 	// 所有しないFramework Systemへの参照を解除する。
 	m_InputSystem = nullptr;
 	m_GraphicsSystem = nullptr;
@@ -91,6 +87,7 @@ void SceneManager::Finalize()
 void SceneManager::ApplySceneChange()
 {
 	if ( !m_NextScene )return;
+
 
 	// 予約済みSceneを一時保持し、初期化成功まで現在Sceneを維持する。
 	std::unique_ptr<IScene> nextScene = std::move( m_NextScene );
