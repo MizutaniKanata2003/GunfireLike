@@ -1,5 +1,6 @@
 #include "../H/HudTextRenderer.h"
 
+//========= Framework インクルード=========
 #include "Framework/DirectX/H/GraphicsSystem.h"
 
 namespace

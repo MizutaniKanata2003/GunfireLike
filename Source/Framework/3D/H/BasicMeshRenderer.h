@@ -5,6 +5,9 @@
 #include <d3d11.h>
 #include <wrl/client.h>
 
+//========= Framework インクルード=========
+#include "Framework/DirectX/H/ConstantBuffer.h"
+
 //========= 前方宣言=========
 class GraphicsSystem;
 
@@ -86,7 +89,7 @@ private:
 	// Cubeの三角形順序を保持するIndex Buffer。
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_IndexBuffer{};
 	// World、View、Projection、色、UV情報をShaderへ渡す定数バッファ。
-	Microsoft::WRL::ComPtr<ID3D11Buffer> m_TransformBuffer{};
+	ConstantBuffer<TransformBuffer> m_TransformBuffer{};
 
 	//========= 描画情報=========
 	// DrawIndexedに渡すCubeのIndex数。

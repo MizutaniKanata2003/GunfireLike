@@ -201,17 +201,9 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	}
 
 	// Quadの画面座標、サイズ、色を渡す定数バッファを生成する。
-	D3D11_BUFFER_DESC hudBufferDescription{};
-	hudBufferDescription.ByteWidth = sizeof( HudBuffer );
-	hudBufferDescription.Usage = D3D11_USAGE_DEFAULT;
-	hudBufferDescription.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	HRESULT hudBufferResult{};
 
-	const HRESULT hudBufferResult = device->CreateBuffer(
-	&hudBufferDescription,
-	nullptr,
-	m_HudBuffer.GetAddressOf() );
-
-	if ( FAILED( hudBufferResult ) )
+	if ( !m_HudBuffer.Init( device, hudBufferResult ) )
 	{
 		WriteHudGraphicsError( L"ID3D11Device::CreateBuffer(HudBuffer)", hudBufferResult );
 		Uninit();
@@ -227,7 +219,7 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 void HudRenderer::Uninit()
 {
 	// HUD描画に使用したGPU Bufferを解放する。
-	m_HudBuffer.Reset();
+	m_HudBuffer.Uninit();
 	m_IndexBuffer.Reset();
 	m_VertexBuffer.Reset();
 
@@ -253,7 +245,7 @@ void HudRenderer::DrawQuad(
 	// 描画に使用するDirect3D ContextとGPUリソースを確認する。
 	ID3D11DeviceContext* context = graphicsSystem.GetContext();
 	if ( context == nullptr || !m_VertexShader || !m_PixelShader || !m_InputLayout ||
-		!m_VertexBuffer || !m_IndexBuffer || !m_HudBuffer ) return;
+	!m_VertexBuffer || !m_IndexBuffer || !m_HudBuffer.IsValid() ) return;
 
 	// Shaderへ渡すQuadの画面座標、サイズ、色をまとめる。
 	const HudBuffer hudBuffer
@@ -270,7 +262,7 @@ void HudRenderer::DrawQuad(
 	// Shaderへ設定する定数Bufferをまとめる。
 	ID3D11Buffer* constantBuffers[]{ m_HudBuffer.Get() };
 
-	context->UpdateSubresource( m_HudBuffer.Get(), 0, nullptr, &hudBuffer, 0, 0 );
+	m_HudBuffer.Update( context, hudBuffer );
 
 	context->IASetInputLayout( m_InputLayout.Get() );
 	context->IASetVertexBuffers( 0, 1, vertexBuffers, &stride, &offset );

@@ -245,17 +245,9 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	}
 
 	// World、View、Projection、色、UV情報を渡す定数バッファを生成する。
-	D3D11_BUFFER_DESC transformBufferDesc{};
-	transformBufferDesc.ByteWidth = static_cast<UINT>( sizeof( TransformBuffer ) );
-	transformBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-	transformBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	HRESULT transformBufferResult{};
 
-	const HRESULT transformBufferResult = device->CreateBuffer(
-	&transformBufferDesc,
-	nullptr,
-	m_TransformBuffer.GetAddressOf() );
-
-	if ( FAILED( transformBufferResult ) )
+	if ( !m_TransformBuffer.Init( device, transformBufferResult ) )
 	{
 		WriteBasicMeshGraphicsError( L"ID3D11Device::CreateBuffer(TransformBuffer)", transformBufferResult );
 		Uninit();
@@ -306,7 +298,7 @@ void BasicMeshRenderer::Uninit()
 	m_FloorTextureView.Reset();
 
 	// 定数バッファとメッシュBufferを解放する。
-	m_TransformBuffer.Reset();
+	m_TransformBuffer.Uninit();
 	m_IndexBuffer.Reset();
 	m_VertexBuffer.Reset();
 
@@ -328,8 +320,8 @@ void BasicMeshRenderer::DrawCube(
 	const DirectX::XMFLOAT2& uvTiling,
 	TextureType textureType )
 {
-	if ( !m_VertexBuffer || !m_IndexBuffer || !m_TransformBuffer || !m_VertexShader ||
-		!m_PixelShader || !m_InputLayout || !m_TextureSampler || m_IndexCount == 0 ) return;
+	if ( !m_VertexBuffer || !m_IndexBuffer || !m_TransformBuffer.IsValid() || !m_VertexShader ||
+	!m_PixelShader || !m_InputLayout || !m_TextureSampler || m_IndexCount == 0 ) return;
 
 	// 描画に使用するDirect3D Contextを取得する。
 	ID3D11DeviceContext* context = graphicsSystem.GetContext();
@@ -362,8 +354,7 @@ void BasicMeshRenderer::DrawCube(
 	}
 
 	// Shaderへ渡すWorld、View、Projection、色、UV情報をまとめる。
-	const DirectX::XMMATRIX worldViewProjection =
-		DirectX::XMMatrixTranspose( worldMatrix * viewMatrix * projectionMatrix );
+	const DirectX::XMMATRIX worldViewProjection = DirectX::XMMatrixTranspose( worldMatrix * viewMatrix * projectionMatrix );
 	const TransformBuffer transformBuffer
 	{
 		worldViewProjection,
@@ -382,7 +373,7 @@ void BasicMeshRenderer::DrawCube(
 	ID3D11Buffer* constantBuffers[]{ m_TransformBuffer.Get() };
 	ID3D11SamplerState* samplers[]{ m_TextureSampler.Get() };
 
-	context->UpdateSubresource( m_TransformBuffer.Get(), 0, nullptr, &transformBuffer, 0, 0 );
+	m_TransformBuffer.Update( context, transformBuffer );
 
 	context->IASetVertexBuffers( 0, 1, vertexBuffers, &vertexStride, &vertexOffset );
 	context->IASetIndexBuffer( m_IndexBuffer.Get(), DXGI_FORMAT_R16_UINT, 0 );

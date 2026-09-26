@@ -5,6 +5,9 @@
 #include <d3d11.h>
 #include <wrl/client.h>
 
+//========= Framework インクルード=========
+#include "Framework/DirectX/H/ConstantBuffer.h"
+
 //========= 前方宣言=========
 class GraphicsSystem;
 
@@ -63,7 +66,7 @@ private:
 	// HUD Quadの三角形順序を保持するIndex Buffer。
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_IndexBuffer{};
 	// Quadの矩形情報と色をShaderへ渡す定数バッファ。
-	Microsoft::WRL::ComPtr<ID3D11Buffer> m_HudBuffer{};
+	ConstantBuffer<HudBuffer> m_HudBuffer{};
 
 	//========= 描画情報=========
 	// DrawIndexedに渡すHUD QuadのIndex数。

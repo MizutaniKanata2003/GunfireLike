@@ -15,9 +15,11 @@ public:
 	// Constant Bufferの構造体サイズが16バイト単位であることを検証する。
 	static_assert( sizeof( T ) % 16 == 0, "Constant Bufferの構造体サイズは16バイト単位である必要があります。" );
 
-	// Constant Bufferを生成する。
-	bool Init( ID3D11Device* device )
+	// Constant Bufferを生成し、失敗時はHRESULTを返す。
+	bool Init( ID3D11Device* device, HRESULT& result )
 	{
+		result = E_POINTER;
+
 		if ( !device ) return false;
 
 		D3D11_BUFFER_DESC bufferDesc{};
@@ -25,7 +27,9 @@ public:
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 
-		return SUCCEEDED( device->CreateBuffer( &bufferDesc, nullptr, m_Buffer.GetAddressOf() ) );
+		result = device->CreateBuffer( &bufferDesc, nullptr, m_Buffer.GetAddressOf() );
+
+		return SUCCEEDED( result );
 	}
 
 	// Constant Bufferへ最新データを書き込む。
@@ -36,10 +40,22 @@ public:
 		context->UpdateSubresource( m_Buffer.Get(), 0, nullptr, &data, 0, 0 );
 	}
 
+	// Constant Bufferが使用可能かを返す。
+	[[nodiscard]] bool IsValid() const
+	{
+		return m_Buffer != nullptr;
+	}
+
 	// Direct3DのConstant Bufferを返す。
 	[[nodiscard]] ID3D11Buffer* Get() const
 	{
 		return m_Buffer.Get();
+	}
+
+	// Constant Bufferを解放する。
+	void Uninit()
+	{
+		m_Buffer.Reset();
 	}
 
 private:
