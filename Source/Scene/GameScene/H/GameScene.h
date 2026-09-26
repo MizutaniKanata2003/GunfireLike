@@ -45,8 +45,8 @@ public:
 	void Update( float deltaTime ) override;
 	// 3D Stage、敵、弾、ゲート、HUD、Debug UIを描画する。
 	void Draw() override;
-	// GameSceneで使用した描画リソースを解放する。
-	void Uninit() override;
+	// GameSceneで使用した描画リソースを終了する。
+	void Finalize() override;
 
 private:
 	//========= 構造体=========

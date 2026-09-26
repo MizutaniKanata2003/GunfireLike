@@ -147,10 +147,7 @@ void ShopScene::Initialize()
 void ShopScene::Update( float deltaTime )
 {
 	// F1キーでFPSマウスキャプチャの有効・無効を切り替える。
-	if ( m_InputSystem.IsKeyTriggered( SHOP_TOGGLE_MOUSE_CAPTURE_KEY ) )
-	{
-		m_InputSystem.SetMouseCaptureEnabled( !m_InputSystem.IsMouseCaptureEnabled() );
-	}
+	if ( m_InputSystem.IsKeyTriggered( SHOP_TOGGLE_MOUSE_CAPTURE_KEY ) )m_InputSystem.SetMouseCaptureEnabled( !m_InputSystem.IsMouseCaptureEnabled() );
 
 	// 強化Objectとゲートのアニメーション時間を進める。
 	m_AnimationTime += deltaTime;
@@ -176,10 +173,7 @@ void ShopScene::Update( float deltaTime )
 	m_AimedTarget = GetAimedInteractionTarget();
 
 	// Eキーが押された場合、現在照準している対象と相互作用する。
-	if ( m_InputSystem.IsKeyTriggered( SHOP_USE_INTERACTION_KEY ) )
-	{
-		TryInteractWithTarget( m_AimedTarget );
-	}
+	if ( m_InputSystem.IsKeyTriggered( SHOP_USE_INTERACTION_KEY ) )TryInteractWithTarget( m_AimedTarget );
 }
 
 // Shopの3D空間、強化Object、ゲート、HUDを描画する。
@@ -195,6 +189,7 @@ void ShopScene::Draw()
 		SHOP_ASPECT_RATIO,
 		SHOP_NEAR_CLIP,
 		SHOP_FAR_CLIP );
+
 	const DirectX::XMMATRIX viewMatrix = m_FpsCamera.GetViewMatrix();
 	const DirectX::XMFLOAT3 cameraPosition = m_FpsCamera.GetPosition();
 
@@ -209,22 +204,15 @@ void ShopScene::Draw()
 		skyboxWorldMatrix,
 		viewMatrix,
 		projectionMatrix,
-		DirectX::XMFLOAT4{
-			SHOP_SKY_COLOR_RED,
-			SHOP_SKY_COLOR_GREEN,
-			SHOP_SKY_COLOR_BLUE,
-			SHOP_SKY_COLOR_ALPHA },
-			DirectX::XMFLOAT2{ 1.0f, 1.0f },
-			BasicMeshRenderer::TextureType::Color );
+		DirectX::XMFLOAT4{ SHOP_SKY_COLOR_RED,SHOP_SKY_COLOR_GREEN,SHOP_SKY_COLOR_BLUE,SHOP_SKY_COLOR_ALPHA },
+		DirectX::XMFLOAT2{ 1.0f, 1.0f },
+		BasicMeshRenderer::TextureType::Color );
 	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_OPAQUE );
 
 	// 床のWorld行列を作成してFloor Textureで描画する。
 	const DirectX::XMMATRIX floorWorldMatrix =
 		DirectX::XMMatrixScaling( SHOP_FLOOR_SCALE_X, SHOP_FLOOR_SCALE_Y, SHOP_FLOOR_SCALE_Z ) *
-		DirectX::XMMatrixTranslation(
-			SHOP_FLOOR_POSITION_X,
-			SHOP_FLOOR_POSITION_Y,
-			SHOP_FLOOR_POSITION_Z );
+		DirectX::XMMatrixTranslation( SHOP_FLOOR_POSITION_X, SHOP_FLOOR_POSITION_Y, SHOP_FLOOR_POSITION_Z );
 
 	m_BasicMeshRenderer.DrawCube(
 		m_GraphicsSystem,
@@ -260,6 +248,7 @@ void ShopScene::Draw()
 		wallColor,
 		DirectX::XMFLOAT2{ 1.0f, 1.0f },
 		BasicMeshRenderer::TextureType::Wall );
+
 	m_BasicMeshRenderer.DrawCube(
 		m_GraphicsSystem,
 		rightWallWorldMatrix,
@@ -268,6 +257,7 @@ void ShopScene::Draw()
 		wallColor,
 		DirectX::XMFLOAT2{ 1.0f, 1.0f },
 		BasicMeshRenderer::TextureType::Wall );
+
 	m_BasicMeshRenderer.DrawCube(
 		m_GraphicsSystem,
 		nearWallWorldMatrix,
@@ -276,6 +266,7 @@ void ShopScene::Draw()
 		wallColor,
 		DirectX::XMFLOAT2{ 1.0f, 1.0f },
 		BasicMeshRenderer::TextureType::Wall );
+
 	m_BasicMeshRenderer.DrawCube(
 		m_GraphicsSystem,
 		farWallWorldMatrix,
@@ -298,13 +289,9 @@ void ShopScene::Draw()
 	for ( const InteractionTarget target : upgradeTargets )
 	{
 		const DirectX::XMFLOAT3 basePosition = GetUpgradeObjectPosition( target );
-		const float floatingOffset = std::sinf(
-			m_AnimationTime * SHOP_UPGRADE_ORB_FLOAT_SPEED + basePosition.x ) *
-			SHOP_UPGRADE_ORB_FLOAT_HEIGHT;
+		const float floatingOffset = std::sinf( m_AnimationTime * SHOP_UPGRADE_ORB_FLOAT_SPEED + basePosition.x ) * SHOP_UPGRADE_ORB_FLOAT_HEIGHT;
 		const bool isAimed = target == m_AimedTarget;
-		const float scale = isAimed ?
-			SHOP_UPGRADE_ORB_SCALE * 1.20f :
-			SHOP_UPGRADE_ORB_SCALE;
+		const float scale = isAimed ? SHOP_UPGRADE_ORB_SCALE * 1.20f : SHOP_UPGRADE_ORB_SCALE;
 
 		DirectX::XMFLOAT4 color = GetUpgradeObjectColor( target );
 
@@ -321,10 +308,7 @@ void ShopScene::Draw()
 			DirectX::XMMatrixScaling( scale, scale, scale ) *
 			DirectX::XMMatrixRotationY( m_AnimationTime * SHOP_UPGRADE_ORB_ROTATION_SPEED ) *
 			DirectX::XMMatrixRotationX( m_AnimationTime * 0.7f ) *
-			DirectX::XMMatrixTranslation(
-				basePosition.x,
-				basePosition.y + floatingOffset,
-				basePosition.z );
+			DirectX::XMMatrixTranslation( basePosition.x, basePosition.y + floatingOffset, basePosition.z );
 
 		m_BasicMeshRenderer.DrawCube(
 			m_GraphicsSystem,
@@ -350,20 +334,15 @@ void ShopScene::Draw()
 			SHOP_GATE_SCALE_Y * challengeGateScale,
 			SHOP_GATE_SCALE_Z * challengeGateScale ) *
 		DirectX::XMMatrixRotationY( gateRotation ) *
-		DirectX::XMMatrixTranslation(
-			SHOP_CHALLENGE_GATE_X,
-			SHOP_CHALLENGE_GATE_Y,
-			SHOP_CHALLENGE_GATE_Z );
+		DirectX::XMMatrixTranslation( SHOP_CHALLENGE_GATE_X, SHOP_CHALLENGE_GATE_Y, SHOP_CHALLENGE_GATE_Z );
+
 	const DirectX::XMMATRIX titleGateWorldMatrix =
 		DirectX::XMMatrixScaling(
 			SHOP_GATE_SCALE_X * titleGateScale,
 			SHOP_GATE_SCALE_Y * titleGateScale,
 			SHOP_GATE_SCALE_Z * titleGateScale ) *
 		DirectX::XMMatrixRotationY( gateRotation ) *
-		DirectX::XMMatrixTranslation(
-			SHOP_TITLE_GATE_X,
-			SHOP_TITLE_GATE_Y,
-			SHOP_TITLE_GATE_Z );
+		DirectX::XMMatrixTranslation( SHOP_TITLE_GATE_X, SHOP_TITLE_GATE_Y, SHOP_TITLE_GATE_Z );
 
 	// Challenge用とTitle用の単色ゲートを描画する。
 	m_BasicMeshRenderer.DrawCube(
@@ -374,6 +353,7 @@ void ShopScene::Draw()
 		DirectX::XMFLOAT4{ 0.10f, 0.85f, 1.0f, 1.0f },
 		DirectX::XMFLOAT2{ 1.0f, 1.0f },
 		BasicMeshRenderer::TextureType::Color );
+
 	m_BasicMeshRenderer.DrawCube(
 		m_GraphicsSystem,
 		titleGateWorldMatrix,
@@ -533,14 +513,13 @@ void ShopScene::Draw()
 	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_OPAQUE );
 }
 
-// Shopで使用した描画リソースを解放する。
-void ShopScene::Uninit()
+// Shopで使用した描画リソースを終了する。
+void ShopScene::Finalize()
 {
 	m_HudTextRenderer.Uninit();
 	m_HudRenderer.Uninit();
 	m_BasicMeshRenderer.Uninit();
 }
-
 // カメラ中央のRayが当たる最も近い操作対象を返す。
 ShopScene::InteractionTarget ShopScene::GetAimedInteractionTarget() const
 {
@@ -548,8 +527,7 @@ ShopScene::InteractionTarget ShopScene::GetAimedInteractionTarget() const
 	const DirectX::XMFLOAT3 rayOrigin = m_FpsCamera.GetPosition();
 	const DirectX::XMFLOAT3 forward = m_FpsCamera.GetForward();
 	const DirectX::XMVECTOR rayOriginVector = DirectX::XMLoadFloat3( &rayOrigin );
-	const DirectX::XMVECTOR rayDirection = DirectX::XMVector3Normalize(
-		DirectX::XMLoadFloat3( &forward ) );
+	const DirectX::XMVECTOR rayDirection = DirectX::XMVector3Normalize( DirectX::XMLoadFloat3( &forward ) );
 
 	// 現在見つかっている最も近い対象と距離を保持する。
 	InteractionTarget nearestTarget = InteractionTarget::e_NONE;
@@ -568,9 +546,7 @@ ShopScene::InteractionTarget ShopScene::GetAimedInteractionTarget() const
 	for ( const InteractionTarget target : upgradeTargets )
 	{
 		const DirectX::XMFLOAT3 basePosition = GetUpgradeObjectPosition( target );
-		const float floatingOffset = std::sinf(
-			m_AnimationTime * SHOP_UPGRADE_ORB_FLOAT_SPEED + basePosition.x ) *
-			SHOP_UPGRADE_ORB_FLOAT_HEIGHT;
+		const float floatingOffset = std::sinf( m_AnimationTime * SHOP_UPGRADE_ORB_FLOAT_SPEED + basePosition.x ) * SHOP_UPGRADE_ORB_FLOAT_HEIGHT;
 		const DirectX::XMFLOAT3 sphereCenter
 		{
 			basePosition.x,
@@ -592,11 +568,7 @@ ShopScene::InteractionTarget ShopScene::GetAimedInteractionTarget() const
 
 	// チャレンジゲートへのRayとSphereの交差判定を行う。
 	const DirectX::BoundingSphere challengeGateSphere(
-		DirectX::XMFLOAT3{
-			SHOP_CHALLENGE_GATE_X,
-			SHOP_CHALLENGE_GATE_Y,
-			SHOP_CHALLENGE_GATE_Z },
-			SHOP_GATE_HIT_SPHERE_RADIUS );
+		DirectX::XMFLOAT3{ SHOP_CHALLENGE_GATE_X,SHOP_CHALLENGE_GATE_Y,SHOP_CHALLENGE_GATE_Z }, SHOP_GATE_HIT_SPHERE_RADIUS );
 	float challengeGateDistance{};
 
 	if ( challengeGateSphere.Intersects( rayOriginVector, rayDirection, challengeGateDistance ) &&
@@ -609,11 +581,7 @@ ShopScene::InteractionTarget ShopScene::GetAimedInteractionTarget() const
 
 	// タイトルゲートへのRayとSphereの交差判定を行う。
 	const DirectX::BoundingSphere titleGateSphere(
-		DirectX::XMFLOAT3{
-			SHOP_TITLE_GATE_X,
-			SHOP_TITLE_GATE_Y,
-			SHOP_TITLE_GATE_Z },
-			SHOP_GATE_HIT_SPHERE_RADIUS );
+		DirectX::XMFLOAT3{ SHOP_TITLE_GATE_X,SHOP_TITLE_GATE_Y,SHOP_TITLE_GATE_Z }, SHOP_GATE_HIT_SPHERE_RADIUS );
 	float titleGateDistance{};
 
 	if ( titleGateSphere.Intersects( rayOriginVector, rayDirection, titleGateDistance ) &&
@@ -701,28 +669,16 @@ DirectX::XMFLOAT3 ShopScene::GetUpgradeObjectPosition( InteractionTarget target 
 	switch ( target )
 	{
 		case InteractionTarget::e_MAX_HP_UPGRADE:
-		return DirectX::XMFLOAT3{
-			SHOP_MAX_HP_ORB_X,
-			SHOP_UPGRADE_ORB_BASE_Y,
-			SHOP_UPGRADE_ORB_Z };
+		return DirectX::XMFLOAT3{ SHOP_MAX_HP_ORB_X,SHOP_UPGRADE_ORB_BASE_Y,SHOP_UPGRADE_ORB_Z };
 
 		case InteractionTarget::e_GUN_DAMAGE_UPGRADE:
-		return DirectX::XMFLOAT3{
-			SHOP_GUN_DAMAGE_ORB_X,
-			SHOP_UPGRADE_ORB_BASE_Y,
-			SHOP_UPGRADE_ORB_Z };
+		return DirectX::XMFLOAT3{ SHOP_GUN_DAMAGE_ORB_X,SHOP_UPGRADE_ORB_BASE_Y,SHOP_UPGRADE_ORB_Z };
 
 		case InteractionTarget::e_SPECIAL_UNLOCK_UPGRADE:
-		return DirectX::XMFLOAT3{
-			SHOP_SPECIAL_UNLOCK_ORB_X,
-			SHOP_UPGRADE_ORB_BASE_Y,
-			SHOP_UPGRADE_ORB_Z };
+		return DirectX::XMFLOAT3{ SHOP_SPECIAL_UNLOCK_ORB_X,SHOP_UPGRADE_ORB_BASE_Y,SHOP_UPGRADE_ORB_Z };
 
 		case InteractionTarget::e_SPECIAL_COOLDOWN_UPGRADE:
-		return DirectX::XMFLOAT3{
-			SHOP_SPECIAL_COOLDOWN_ORB_X,
-			SHOP_UPGRADE_ORB_BASE_Y,
-			SHOP_UPGRADE_ORB_Z };
+		return DirectX::XMFLOAT3{ SHOP_SPECIAL_COOLDOWN_ORB_X,SHOP_UPGRADE_ORB_BASE_Y,SHOP_UPGRADE_ORB_Z };
 
 		case InteractionTarget::e_NONE:
 		case InteractionTarget::e_CHALLENGE_GATE:

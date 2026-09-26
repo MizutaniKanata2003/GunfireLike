@@ -19,11 +19,7 @@ class TitleScene final : public IScene
 public:
 	//========= 生成関数=========
 	// TitleSceneが使用するSceneManagerとFramework Systemを登録する。
-	TitleScene(
-		SceneManager& sceneManager,
-		InputSystem& inputSystem,
-		GraphicsSystem& graphicsSystem,
-		AudioSystem& audioSystem );
+	TitleScene( SceneManager& sceneManager, InputSystem& inputSystem, GraphicsSystem& graphicsSystem, AudioSystem& audioSystem );
 
 	//========= Sceneライフサイクル関数=========
 	// タイトル画面の入力設定、HUD、文字、BGMを初期化する。
@@ -37,8 +33,8 @@ public:
 	void Update( float deltaTime ) override;
 	// タイトル画面の背景、操作説明、ボタンを描画する。
 	void Draw() override;
-	// タイトル画面で使用したHUDと文字描画リソースを解放する。
-	void Uninit() override;
+	// タイトル画面で使用したHUDと文字描画リソースを終了する。
+	void Finalize() override;
 
 private:
 	//========= 補助関数=========

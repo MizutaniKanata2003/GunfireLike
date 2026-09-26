@@ -48,8 +48,8 @@ public:
 	void Update( float deltaTime ) override;
 	// Shopの3D空間、強化Object、ゲート、HUDを描画する。
 	void Draw() override;
-	// Shopで使用した描画リソースを解放する。
-	void Uninit() override;
+	// Shopで使用した描画リソースを終了する。
+	void Finalize() override;
 
 private:
 	//========= 列挙型=========

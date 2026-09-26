@@ -85,8 +85,7 @@ namespace
 	//========= Player特殊攻撃定数=========
 	// Player特殊攻撃の射程とダメージ倍率。
 	constexpr float PLAYER_SPECIAL_ATTACK_RANGE = 8.0f;
-	constexpr float PLAYER_SPECIAL_ATTACK_RANGE_SQUARED =
-		PLAYER_SPECIAL_ATTACK_RANGE * PLAYER_SPECIAL_ATTACK_RANGE;
+	constexpr float PLAYER_SPECIAL_ATTACK_RANGE_SQUARED = PLAYER_SPECIAL_ATTACK_RANGE * PLAYER_SPECIAL_ATTACK_RANGE;
 	constexpr float PLAYER_SPECIAL_ATTACK_DAMAGE_MULTIPLIER = 3.0f;
 
 	//========= 敵HPバー定数=========
@@ -109,8 +108,7 @@ namespace
 	constexpr float GATE_DEPTH = 0.35f;
 	constexpr float GATE_ROTATION_SPEED = 1.4f;
 	constexpr float GATE_INTERACTION_RADIUS = 2.0f;
-	constexpr float GATE_INTERACTION_RADIUS_SQUARED =
-		GATE_INTERACTION_RADIUS * GATE_INTERACTION_RADIUS;
+	constexpr float GATE_INTERACTION_RADIUS_SQUARED = GATE_INTERACTION_RADIUS * GATE_INTERACTION_RADIUS;
 
 	// 前Stage、次Stage、Shopへ移動するGateの位置。
 	constexpr float PREVIOUS_GATE_POSITION_X = -6.5f;
@@ -288,7 +286,7 @@ bool GameScene::Init()
 
 	if ( !isSkyObjAvailable || !isSkyTextureAvailable || !isEnemyObjAvailable )
 	{
-		Uninit();
+		Finalize();
 		return false;
 	}
 
@@ -297,7 +295,7 @@ bool GameScene::Init()
 	if ( !isBasicMeshRendererInitialized )
 	{
 		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"BasicMeshRenderer初期化失敗" );
-		Uninit();
+		Finalize();
 		return false;
 	}
 
@@ -306,7 +304,7 @@ bool GameScene::Init()
 	if ( !isSkyDomeRendererInitialized )
 	{
 		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"SkyDomeRenderer初期化失敗" );
-		Uninit();
+		Finalize();
 		return false;
 	}
 
@@ -315,7 +313,7 @@ bool GameScene::Init()
 	if ( !isEnemyModelRendererInitialized )
 	{
 		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"EnemyModelRenderer初期化失敗" );
-		Uninit();
+		Finalize();
 		return false;
 	}
 
@@ -324,7 +322,7 @@ bool GameScene::Init()
 	if ( !isHudRendererInitialized )
 	{
 		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"HudRenderer初期化失敗" );
-		Uninit();
+		Finalize();
 		return false;
 	}
 
@@ -333,7 +331,7 @@ bool GameScene::Init()
 	if ( !isHudTextRendererInitialized )
 	{
 		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"HudTextRenderer初期化失敗" );
-		Uninit();
+		Finalize();
 		return false;
 	}
 
@@ -373,18 +371,13 @@ void GameScene::Update( float deltaTime )
 
 	// ゲーム進行時間と攻撃・Flash用Timerを更新する。
 	progress.Update( deltaTime );
-	m_SpecialAttackCooldownTimer = std::max(
-		0.0f,
-		m_SpecialAttackCooldownTimer - deltaTime );
-	m_MuzzleFlashTimer = std::max(
-		0.0f,
-		m_MuzzleFlashTimer - deltaTime );
+	m_SpecialAttackCooldownTimer = std::max( 0.0f, m_SpecialAttackCooldownTimer - deltaTime );
+	m_MuzzleFlashTimer = std::max( 0.0f, m_MuzzleFlashTimer - deltaTime );
 
 	// 低HP状態に入ったときだけ警告SEを再生する。
 	const float playerMaxHp = m_PlayerHealth.GetMaxHp();
 	const float playerCurrentHp = m_PlayerHealth.GetCurrentHp();
-	const bool isLowHealth = playerMaxHp > 0.0f &&
-		playerCurrentHp <= playerMaxHp * LOW_HP_RATIO_THRESHOLD;
+	const bool isLowHealth = playerMaxHp > 0.0f && playerCurrentHp <= playerMaxHp * LOW_HP_RATIO_THRESHOLD;
 
 	if ( isLowHealth && !m_HasPlayedLowHpSe )
 	{
@@ -411,8 +404,7 @@ void GameScene::Update( float deltaTime )
 		{
 			m_EnemyNormalAttackTimer = {};
 
-			m_IsLastNormalAttackHit =
-				playerToEnemyDistanceSquared <= ENEMY_NORMAL_ATTACK_RANGE_SQUARED;
+			m_IsLastNormalAttackHit = playerToEnemyDistanceSquared <= ENEMY_NORMAL_ATTACK_RANGE_SQUARED;
 
 			if ( m_IsLastNormalAttackHit )
 			{
@@ -427,16 +419,13 @@ void GameScene::Update( float deltaTime )
 		{
 			m_EnemySpecialAttackTimer = {};
 
-			const float specialAttackRangeSquared =
-				stageData.specialAttackHitboxRadius * stageData.specialAttackHitboxRadius;
+			const float specialAttackRangeSquared = stageData.specialAttackHitboxRadius * stageData.specialAttackHitboxRadius;
 
-			m_IsLastSpecialAttackHit =
-				playerToEnemyDistanceSquared <= specialAttackRangeSquared;
+			m_IsLastSpecialAttackHit = playerToEnemyDistanceSquared <= specialAttackRangeSquared;
 
 			if ( m_IsLastSpecialAttackHit )
 			{
-				m_PlayerHealth.TakeDamage(
-					stageData.enemyDamage * ENEMY_SPECIAL_ATTACK_DAMAGE_MULTIPLIER );
+				m_PlayerHealth.TakeDamage( stageData.enemyDamage * ENEMY_SPECIAL_ATTACK_DAMAGE_MULTIPLIER );
 				m_AudioSystem.PlayDamageSe();
 			}
 		}
@@ -451,17 +440,13 @@ void GameScene::Update( float deltaTime )
 		m_MuzzleFlashTimer = MUZZLE_FLASH_DURATION;
 
 		// Camera空間の銃口座標をWorld座標へ変換して弾の生成位置にする。
-		const DirectX::XMMATRIX inverseViewMatrix = DirectX::XMMatrixInverse(
-			nullptr,
-			m_FpsCamera.GetViewMatrix() );
+		const DirectX::XMMATRIX inverseViewMatrix = DirectX::XMMatrixInverse( nullptr, m_FpsCamera.GetViewMatrix() );
 		const DirectX::XMVECTOR bulletSpawnCameraSpace = DirectX::XMVectorSet(
 			BULLET_SPAWN_OFFSET_X,
 			BULLET_SPAWN_OFFSET_Y,
 			BULLET_SPAWN_OFFSET_Z,
 			1.0f );
-		const DirectX::XMVECTOR bulletSpawnWorldSpace = DirectX::XMVector3TransformCoord(
-			bulletSpawnCameraSpace,
-			inverseViewMatrix );
+		const DirectX::XMVECTOR bulletSpawnWorldSpace = DirectX::XMVector3TransformCoord( bulletSpawnCameraSpace, inverseViewMatrix );
 
 		DirectX::XMFLOAT3 bulletSpawnPosition{};
 		DirectX::XMStoreFloat3( &bulletSpawnPosition, bulletSpawnWorldSpace );
@@ -483,10 +468,8 @@ void GameScene::Update( float deltaTime )
 		// Camera中央Rayと敵のSphereによる命中判定を行う。
 		const DirectX::XMFLOAT3 rayOrigin = m_FpsCamera.GetPosition();
 		const DirectX::XMVECTOR rayOriginVector = DirectX::XMLoadFloat3( &rayOrigin );
-		const DirectX::XMVECTOR rayDirection = DirectX::XMVector3Normalize(
-			DirectX::XMLoadFloat3( &bulletDirection ) );
-		const float enemyFloatOffset = std::sinf(
-			m_EnemyAnimationTime * ENEMY_FLOAT_SPEED ) * ENEMY_FLOAT_HEIGHT;
+		const DirectX::XMVECTOR rayDirection = DirectX::XMVector3Normalize( DirectX::XMLoadFloat3( &bulletDirection ) );
+		const float enemyFloatOffset = std::sinf( m_EnemyAnimationTime * ENEMY_FLOAT_SPEED ) * ENEMY_FLOAT_HEIGHT;
 		const DirectX::XMFLOAT3 enemyHitPosition
 		{
 			ENEMY_BASE_X,
@@ -494,15 +477,10 @@ void GameScene::Update( float deltaTime )
 			ENEMY_BASE_Z
 		};
 
-		const DirectX::BoundingSphere enemyHitSphere(
-			enemyHitPosition,
-			ENEMY_HIT_SPHERE_RADIUS );
+		const DirectX::BoundingSphere enemyHitSphere( enemyHitPosition, ENEMY_HIT_SPHERE_RADIUS );
 		float hitDistance{};
 
-		m_IsLastShotHit = enemyHitSphere.Intersects(
-			rayOriginVector,
-			rayDirection,
-			hitDistance ) && hitDistance <= SHOOT_MAX_DISTANCE;
+		m_IsLastShotHit = enemyHitSphere.Intersects( rayOriginVector, rayDirection, hitDistance ) && hitDistance <= SHOOT_MAX_DISTANCE;
 
 		if ( m_IsLastShotHit )
 		{
@@ -520,14 +498,12 @@ void GameScene::Update( float deltaTime )
 	{
 		m_AudioSystem.PlaySpecialSe();
 
-		m_IsLastPlayerSpecialAttackHit =
-			playerToEnemyDistanceSquared <= PLAYER_SPECIAL_ATTACK_RANGE_SQUARED;
+		m_IsLastPlayerSpecialAttackHit = playerToEnemyDistanceSquared <= PLAYER_SPECIAL_ATTACK_RANGE_SQUARED;
 		m_SpecialAttackCooldownTimer = playerStats.specialAttackCooldown;
 
 		if ( m_IsLastPlayerSpecialAttackHit )
 		{
-			const float actualDamage = m_EnemyHealth.TakeDamage(
-				playerStats.gunDamage * PLAYER_SPECIAL_ATTACK_DAMAGE_MULTIPLIER );
+			const float actualDamage = m_EnemyHealth.TakeDamage( playerStats.gunDamage * PLAYER_SPECIAL_ATTACK_DAMAGE_MULTIPLIER );
 			progress.AddDamageReward( actualDamage );
 		}
 	}
@@ -583,11 +559,8 @@ void GameScene::Update( float deltaTime )
 
 	// 現在Stageに応じた前後Gateの使用可否を判定する。
 	const int currentStage = progress.GetCurrentStage();
-	const bool isPreviousGateAvailable =
-		currentStage > StageConstants::FIRST_STAGE_NUMBER;
-	const bool isNextGateAvailable =
-		currentStage < StageConstants::MAX_STAGE_COUNT &&
-		progress.IsStageCleared( currentStage );
+	const bool isPreviousGateAvailable = currentStage > StageConstants::FIRST_STAGE_NUMBER;
+	const bool isNextGateAvailable = currentStage < StageConstants::MAX_STAGE_COUNT && progress.IsStageCleared( currentStage );
 
 	// Eキーで近くにあるGateを使用し、必要ならStage番号を更新してScene遷移する。
 	if ( m_InputSystem.IsKeyTriggered( USE_GATE_KEY ) )
@@ -637,11 +610,8 @@ void GameScene::Draw()
 
 	// 現在Stageに応じたGateの表示可否を判定する。
 	const int currentStage = progress.GetCurrentStage();
-	const bool isPreviousGateAvailable =
-		currentStage > StageConstants::FIRST_STAGE_NUMBER;
-	const bool isNextGateAvailable =
-		currentStage < StageConstants::MAX_STAGE_COUNT &&
-		progress.IsStageCleared( currentStage );
+	const bool isPreviousGateAvailable = currentStage > StageConstants::FIRST_STAGE_NUMBER;
+	const bool isNextGateAvailable = currentStage < StageConstants::MAX_STAGE_COUNT && progress.IsStageCleared( currentStage );
 
 	// 3D描画に使用するProjection、View、Camera座標を取得する。
 	const DirectX::XMMATRIX projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(
@@ -653,17 +623,13 @@ void GameScene::Draw()
 	const DirectX::XMFLOAT3 cameraPosition = m_FpsCamera.GetPosition();
 
 	// 敵の浮遊量と描画時のY座標を計算する。
-	const float enemyFloatOffset = std::sinf(
-		m_EnemyAnimationTime * ENEMY_FLOAT_SPEED ) * ENEMY_FLOAT_HEIGHT;
+	const float enemyFloatOffset = std::sinf( m_EnemyAnimationTime * ENEMY_FLOAT_SPEED ) * ENEMY_FLOAT_HEIGHT;
 	const float enemyY = ENEMY_BASE_Y + enemyFloatOffset;
 
 	// Camera位置に追従するSky DomeのWorld行列を作成する。
 	const DirectX::XMMATRIX skyDomeWorldMatrix =
 		DirectX::XMMatrixScaling( SKY_DOME_SCALE, SKY_DOME_SCALE, SKY_DOME_SCALE ) *
-		DirectX::XMMatrixTranslation(
-			cameraPosition.x,
-			cameraPosition.y + SKY_DOME_Y_OFFSET,
-			cameraPosition.z );
+		DirectX::XMMatrixTranslation( cameraPosition.x, cameraPosition.y + SKY_DOME_Y_OFFSET, cameraPosition.z );
 
 	// Sky DomeはDepth Testを無効にして最初に描画する。
 	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_SKY );
@@ -679,10 +645,7 @@ void GameScene::Draw()
 	if ( !m_EnemyHealth.IsDead() )
 	{
 		const DirectX::XMMATRIX enemyWorldMatrix =
-			DirectX::XMMatrixScaling(
-				ENEMY_MODEL_SCALE,
-				ENEMY_MODEL_SCALE,
-				ENEMY_MODEL_SCALE ) *
+			DirectX::XMMatrixScaling( ENEMY_MODEL_SCALE, ENEMY_MODEL_SCALE, ENEMY_MODEL_SCALE ) *
 			DirectX::XMMatrixRotationY( m_EnemyAnimationTime * ENEMY_ROTATION_SPEED ) *
 			DirectX::XMMatrixTranslation( ENEMY_BASE_X, enemyY, ENEMY_BASE_Z );
 
@@ -695,9 +658,7 @@ void GameScene::Draw()
 	}
 
 	// 床のWorld行列を作成してFloor Textureで描画する。
-	const DirectX::XMMATRIX floorWorldMatrix =
-		DirectX::XMMatrixScaling( 20.0f, 0.2f, 20.0f ) *
-		DirectX::XMMatrixTranslation( 0.0f, -0.6f, 8.0f );
+	const DirectX::XMMATRIX floorWorldMatrix = DirectX::XMMatrixScaling( 20.0f, 0.2f, 20.0f ) * DirectX::XMMatrixTranslation( 0.0f, -0.6f, 8.0f );
 
 	m_BasicMeshRenderer.DrawCube(
 		m_GraphicsSystem,
@@ -733,6 +694,7 @@ void GameScene::Draw()
 		wallColor,
 		DirectX::XMFLOAT2{ 1.0f, 1.0f },
 		BasicMeshRenderer::TextureType::Wall );
+
 	m_BasicMeshRenderer.DrawCube(
 		m_GraphicsSystem,
 		rightWallWorldMatrix,
@@ -741,6 +703,7 @@ void GameScene::Draw()
 		wallColor,
 		DirectX::XMFLOAT2{ 1.0f, 1.0f },
 		BasicMeshRenderer::TextureType::Wall );
+
 	m_BasicMeshRenderer.DrawCube(
 		m_GraphicsSystem,
 		nearWallWorldMatrix,
@@ -749,6 +712,7 @@ void GameScene::Draw()
 		wallColor,
 		DirectX::XMFLOAT2{ 1.0f, 1.0f },
 		BasicMeshRenderer::TextureType::Wall );
+
 	m_BasicMeshRenderer.DrawCube(
 		m_GraphicsSystem,
 		farWallWorldMatrix,
@@ -764,24 +728,17 @@ void GameScene::Draw()
 	const DirectX::XMMATRIX previousGateWorldMatrix =
 		DirectX::XMMatrixScaling( GATE_WIDTH, GATE_HEIGHT, GATE_DEPTH ) *
 		DirectX::XMMatrixRotationY( gateRotationAngle ) *
-		DirectX::XMMatrixTranslation(
-			PREVIOUS_GATE_POSITION_X,
-			PREVIOUS_GATE_POSITION_Y,
-			PREVIOUS_GATE_POSITION_Z );
+		DirectX::XMMatrixTranslation( PREVIOUS_GATE_POSITION_X, PREVIOUS_GATE_POSITION_Y, PREVIOUS_GATE_POSITION_Z );
+
 	const DirectX::XMMATRIX nextGateWorldMatrix =
 		DirectX::XMMatrixScaling( GATE_WIDTH, GATE_HEIGHT, GATE_DEPTH ) *
 		DirectX::XMMatrixRotationY( gateRotationAngle ) *
-		DirectX::XMMatrixTranslation(
-			NEXT_GATE_POSITION_X,
-			NEXT_GATE_POSITION_Y,
-			NEXT_GATE_POSITION_Z );
+		DirectX::XMMatrixTranslation( NEXT_GATE_POSITION_X, NEXT_GATE_POSITION_Y, NEXT_GATE_POSITION_Z );
+
 	const DirectX::XMMATRIX shopGateWorldMatrix =
 		DirectX::XMMatrixScaling( GATE_WIDTH, GATE_HEIGHT, GATE_DEPTH ) *
 		DirectX::XMMatrixRotationY( gateRotationAngle ) *
-		DirectX::XMMatrixTranslation(
-			SHOP_GATE_POSITION_X,
-			SHOP_GATE_POSITION_Y,
-			SHOP_GATE_POSITION_Z );
+		DirectX::XMMatrixTranslation( SHOP_GATE_POSITION_X, SHOP_GATE_POSITION_Y, SHOP_GATE_POSITION_Z );
 
 	// 使用可能な前後Gateと常時使用可能なShop Gateを描画する。
 	if ( isPreviousGateAvailable )
@@ -821,24 +778,13 @@ void GameScene::Draw()
 	const DirectX::XMMATRIX inverseViewMatrix = DirectX::XMMatrixInverse( nullptr, viewMatrix );
 
 	const DirectX::XMMATRIX gunBodyWorldMatrix =
-		DirectX::XMMatrixScaling(
-			GUN_BODY_SCALE_X,
-			GUN_BODY_SCALE_Y,
-			GUN_BODY_SCALE_Z ) *
-		DirectX::XMMatrixTranslation(
-			GUN_POSITION_X,
-			GUN_POSITION_Y,
-			GUN_POSITION_Z ) *
+		DirectX::XMMatrixScaling( GUN_BODY_SCALE_X, GUN_BODY_SCALE_Y, GUN_BODY_SCALE_Z ) *
+		DirectX::XMMatrixTranslation( GUN_POSITION_X, GUN_POSITION_Y, GUN_POSITION_Z ) *
 		inverseViewMatrix;
+
 	const DirectX::XMMATRIX gunBarrelWorldMatrix =
-		DirectX::XMMatrixScaling(
-			GUN_BARREL_SCALE_X,
-			GUN_BARREL_SCALE_Y,
-			GUN_BARREL_SCALE_Z ) *
-		DirectX::XMMatrixTranslation(
-			GUN_POSITION_X,
-			GUN_POSITION_Y + GUN_BARREL_OFFSET_Y,
-			GUN_POSITION_Z + GUN_BARREL_OFFSET_Z ) *
+		DirectX::XMMatrixScaling( GUN_BARREL_SCALE_X, GUN_BARREL_SCALE_Y, GUN_BARREL_SCALE_Z ) *
+		DirectX::XMMatrixTranslation( GUN_POSITION_X, GUN_POSITION_Y + GUN_BARREL_OFFSET_Y, GUN_POSITION_Z + GUN_BARREL_OFFSET_Z ) *
 		inverseViewMatrix;
 
 	// 銃本体と銃身を単色Cubeで描画する。
@@ -850,6 +796,7 @@ void GameScene::Draw()
 		DirectX::XMFLOAT4{ 0.12f, 0.12f, 0.14f, 1.0f },
 		DirectX::XMFLOAT2{ 1.0f, 1.0f },
 		BasicMeshRenderer::TextureType::Color );
+
 	m_BasicMeshRenderer.DrawCube(
 		m_GraphicsSystem,
 		gunBarrelWorldMatrix,
@@ -865,14 +812,8 @@ void GameScene::Draw()
 		const float muzzleFlashAlpha = m_MuzzleFlashTimer / MUZZLE_FLASH_DURATION;
 
 		const DirectX::XMMATRIX muzzleFlashWorldMatrix =
-			DirectX::XMMatrixScaling(
-				MUZZLE_FLASH_SCALE,
-				MUZZLE_FLASH_SCALE,
-				MUZZLE_FLASH_SCALE ) *
-			DirectX::XMMatrixTranslation(
-				GUN_POSITION_X,
-				GUN_POSITION_Y + GUN_BARREL_OFFSET_Y,
-				GUN_POSITION_Z + MUZZLE_FLASH_OFFSET_Z ) *
+			DirectX::XMMatrixScaling( MUZZLE_FLASH_SCALE, MUZZLE_FLASH_SCALE, MUZZLE_FLASH_SCALE ) *
+			DirectX::XMMatrixTranslation( GUN_POSITION_X, GUN_POSITION_Y + GUN_BARREL_OFFSET_Y, GUN_POSITION_Z + MUZZLE_FLASH_OFFSET_Z ) *
 			inverseViewMatrix;
 
 		m_GraphicsSystem.SetRenderPass( e_RenderPass::e_TRANSPARENT );
@@ -894,16 +835,10 @@ void GameScene::Draw()
 	{
 		if ( !bullet.isActive ) continue;
 
-		const float bulletAlpha = std::clamp(
-			bullet.remainingLifetime / BULLET_LIFETIME,
-			0.0f,
-			1.0f );
+		const float bulletAlpha = std::clamp( bullet.remainingLifetime / BULLET_LIFETIME, 0.0f, 1.0f );
 		const DirectX::XMMATRIX bulletWorldMatrix =
 			DirectX::XMMatrixScaling( BULLET_SCALE, BULLET_SCALE, BULLET_SCALE ) *
-			DirectX::XMMatrixTranslation(
-				bullet.position.x,
-				bullet.position.y,
-				bullet.position.z );
+			DirectX::XMMatrixTranslation( bullet.position.x, bullet.position.y, bullet.position.z );
 
 		m_BasicMeshRenderer.DrawCube(
 			m_GraphicsSystem,
@@ -917,12 +852,8 @@ void GameScene::Draw()
 
 
 	// 敵が生存中なら、Camera方向を向くHPバーを敵の頭上へ描画する。
-	const float enemyHpRatio = std::clamp(
-		m_EnemyHealth.GetCurrentHp() / m_EnemyHealth.GetMaxHp(),
-		0.0f,
-		1.0f );
-	const bool isHpBarVisible =
-		!m_EnemyHealth.IsDead() && enemyHpRatio > HP_BAR_VISIBLE_RATIO_THRESHOLD;
+	const float enemyHpRatio = std::clamp( m_EnemyHealth.GetCurrentHp() / m_EnemyHealth.GetMaxHp(), 0.0f, 1.0f );
+	const bool isHpBarVisible = !m_EnemyHealth.IsDead() && enemyHpRatio > HP_BAR_VISIBLE_RATIO_THRESHOLD;
 	const DirectX::XMFLOAT3 hpBarPosition
 	{
 		ENEMY_BASE_X,
@@ -930,9 +861,7 @@ void GameScene::Draw()
 		ENEMY_BASE_Z
 	};
 
-	DirectX::XMVECTOR toCameraVector = DirectX::XMVectorSubtract(
-		DirectX::XMLoadFloat3( &cameraPosition ),
-		DirectX::XMLoadFloat3( &hpBarPosition ) );
+	DirectX::XMVECTOR toCameraVector = DirectX::XMVectorSubtract( DirectX::XMLoadFloat3( &cameraPosition ), DirectX::XMLoadFloat3( &hpBarPosition ) );
 	toCameraVector = DirectX::XMVectorSetY( toCameraVector, 0.0f );
 
 	const float toCameraLengthSquared = DirectX::XMVectorGetX( DirectX::XMVector3LengthSq( toCameraVector ) );
@@ -944,15 +873,9 @@ void GameScene::Draw()
 		// Billboardの右・前方向を作り、HPバー用の回転行列を構成する。
 		toCameraVector = DirectX::XMVector3Normalize( toCameraVector );
 
-		const DirectX::XMVECTOR worldUpVector = DirectX::XMVectorSet(
-			0.0f,
-			1.0f,
-			0.0f,
-			0.0f );
-		const DirectX::XMVECTOR billboardRightVector = DirectX::XMVector3Normalize(
-			DirectX::XMVector3Cross( worldUpVector, toCameraVector ) );
-		const DirectX::XMVECTOR billboardForwardVector = DirectX::XMVector3Normalize(
-			DirectX::XMVector3Cross( billboardRightVector, worldUpVector ) );
+		const DirectX::XMVECTOR worldUpVector = DirectX::XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
+		const DirectX::XMVECTOR billboardRightVector = DirectX::XMVector3Normalize( DirectX::XMVector3Cross( worldUpVector, toCameraVector ) );
+		const DirectX::XMVECTOR billboardForwardVector = DirectX::XMVector3Normalize( DirectX::XMVector3Cross( billboardRightVector, worldUpVector ) );
 
 		DirectX::XMMATRIX billboardRotationMatrix = DirectX::XMMatrixIdentity();
 		billboardRotationMatrix.r[ 0 ] = DirectX::XMVectorSetW( billboardRightVector, 0.0f );
@@ -961,19 +884,11 @@ void GameScene::Draw()
 
 		// 現在HPの割合に合わせてHPバー前景の幅と左寄せ補正を計算する。
 		const float hpBarForegroundWidth = HP_BAR_WIDTH * enemyHpRatio;
-		const float hpBarForegroundXOffset =
-			-( HP_BAR_WIDTH - hpBarForegroundWidth ) * 0.5f;
+		const float hpBarForegroundXOffset = -( HP_BAR_WIDTH - hpBarForegroundWidth ) * 0.5f;
 
 		const DirectX::XMMATRIX hpBarBackgroundWorldMatrix =
-			DirectX::XMMatrixScaling(
-				HP_BAR_WIDTH,
-				HP_BAR_HEIGHT,
-				HP_BAR_BACKGROUND_DEPTH ) *
-			billboardRotationMatrix *
-			DirectX::XMMatrixTranslation(
-				hpBarPosition.x,
-				hpBarPosition.y,
-				hpBarPosition.z );
+			DirectX::XMMatrixScaling( HP_BAR_WIDTH, HP_BAR_HEIGHT, HP_BAR_BACKGROUND_DEPTH ) *
+			billboardRotationMatrix * DirectX::XMMatrixTranslation( hpBarPosition.x, hpBarPosition.y, hpBarPosition.z );
 
 		const DirectX::XMVECTOR foregroundPositionVector = DirectX::XMVectorAdd(
 			DirectX::XMVectorSet(
@@ -981,23 +896,15 @@ void GameScene::Draw()
 			hpBarPosition.y,
 			hpBarPosition.z,
 			1.0f ),
-			DirectX::XMVectorScale(
-			toCameraVector,
-			HP_BAR_FOREGROUND_CAMERA_OFFSET ) );
+			DirectX::XMVectorScale( toCameraVector, HP_BAR_FOREGROUND_CAMERA_OFFSET ) );
 
 		DirectX::XMFLOAT3 foregroundPosition{};
 		DirectX::XMStoreFloat3( &foregroundPosition, foregroundPositionVector );
 
 		const DirectX::XMMATRIX hpBarForegroundWorldMatrix =
-			DirectX::XMMatrixScaling(
-				hpBarForegroundWidth,
-				HP_BAR_HEIGHT,
-				HP_BAR_FOREGROUND_DEPTH ) *
+			DirectX::XMMatrixScaling( hpBarForegroundWidth, HP_BAR_HEIGHT, HP_BAR_FOREGROUND_DEPTH ) *
 			billboardRotationMatrix *
-			DirectX::XMMatrixTranslation(
-				foregroundPosition.x,
-				foregroundPosition.y,
-				foregroundPosition.z );
+			DirectX::XMMatrixTranslation( foregroundPosition.x, foregroundPosition.y, foregroundPosition.z );
 
 		// HPバーの背景と現在HPを単色Cubeとして描画する。
 		m_BasicMeshRenderer.DrawCube(
@@ -1008,6 +915,7 @@ void GameScene::Draw()
 			DirectX::XMFLOAT4{ 0.0f, 0.0f, 0.0f, 0.70f },
 			DirectX::XMFLOAT2{ 1.0f, 1.0f },
 			BasicMeshRenderer::TextureType::Color );
+
 		m_BasicMeshRenderer.DrawCube(
 			m_GraphicsSystem,
 			hpBarForegroundWorldMatrix,
@@ -1021,14 +929,8 @@ void GameScene::Draw()
 	// HUDを画面固定で描画するためDepth Testを無効化する。
 	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_SCREEN_UI );
 	m_HudRenderer.DrawCrosshair( m_GraphicsSystem );
-	m_HudRenderer.DrawPlayerHealthBar(
-		m_GraphicsSystem,
-		m_PlayerHealth.GetCurrentHp(),
-		m_PlayerHealth.GetMaxHp() );
-	m_HudRenderer.DrawLowHealthWarning(
-		m_GraphicsSystem,
-		m_PlayerHealth.GetCurrentHp(),
-		m_PlayerHealth.GetMaxHp() );
+	m_HudRenderer.DrawPlayerHealthBar( m_GraphicsSystem, m_PlayerHealth.GetCurrentHp(), m_PlayerHealth.GetMaxHp() );
+	m_HudRenderer.DrawLowHealthWarning( m_GraphicsSystem, m_PlayerHealth.GetCurrentHp(), m_PlayerHealth.GetMaxHp() );
 
 	// Stage、通貨、HP、特殊攻撃、Gate案内、Tutorialを文字で描画する。
 	m_HudTextRenderer.Begin();
@@ -1043,6 +945,7 @@ void GameScene::Draw()
 		currentStage,
 		StageConstants::MAX_STAGE_COUNT );
 	swprintf_s( currencyText, L"所持金: %d G", progress.GetCurrency() );
+
 	swprintf_s(
 		healthText,
 		L"HP: %.0f / %.0f",
@@ -1054,11 +957,13 @@ void GameScene::Draw()
 		DirectX::XMFLOAT2{ HUD_STAGE_TEXT_X, HUD_STAGE_TEXT_Y },
 		DirectX::Colors::White,
 		0.90f );
+
 	m_HudTextRenderer.DrawText(
 		currencyText,
 		DirectX::XMFLOAT2{ HUD_CURRENCY_TEXT_X, HUD_CURRENCY_TEXT_Y },
 		DirectX::Colors::Gold,
 		HUD_TEXT_SCALE );
+
 	m_HudTextRenderer.DrawText(
 		healthText,
 		DirectX::XMFLOAT2{ HUD_HP_TEXT_X, HUD_HP_TEXT_Y },
@@ -1090,9 +995,7 @@ void GameScene::Draw()
 
 	m_HudTextRenderer.DrawText(
 		specialAttackText,
-		DirectX::XMFLOAT2{
-			HUD_SPECIAL_ATTACK_TEXT_X,
-			HUD_SPECIAL_ATTACK_TEXT_Y },
+		DirectX::XMFLOAT2{ HUD_SPECIAL_ATTACK_TEXT_X,HUD_SPECIAL_ATTACK_TEXT_Y },
 			specialAttackColor,
 			HUD_TEXT_SCALE );
 
@@ -1107,16 +1010,13 @@ void GameScene::Draw()
 
 		m_HudTextRenderer.DrawText(
 			cooldownText,
-			DirectX::XMFLOAT2{
-				HUD_COOLDOWN_TEXT_X,
-				HUD_COOLDOWN_TEXT_Y },
+			DirectX::XMFLOAT2{ HUD_COOLDOWN_TEXT_X,HUD_COOLDOWN_TEXT_Y },
 				DirectX::Colors::White,
 				HUD_COOLDOWN_TEXT_SCALE );
 	}
 
 	// PlayerがGateの操作範囲内にいる場合、対象に応じた操作案内を表示する。
-	if ( isNextGateAvailable &&
-		IsPlayerNearGate( NEXT_GATE_POSITION_X, NEXT_GATE_POSITION_Z ) )
+	if ( isNextGateAvailable && IsPlayerNearGate( NEXT_GATE_POSITION_X, NEXT_GATE_POSITION_Z ) )
 	{
 		m_HudTextRenderer.DrawText(
 			L"E: 次のステージへ",
@@ -1124,8 +1024,7 @@ void GameScene::Draw()
 			DirectX::Colors::Cyan,
 			HUD_MESSAGE_SCALE );
 	}
-	else if ( isPreviousGateAvailable &&
-		IsPlayerNearGate( PREVIOUS_GATE_POSITION_X, PREVIOUS_GATE_POSITION_Z ) )
+	else if ( isPreviousGateAvailable && IsPlayerNearGate( PREVIOUS_GATE_POSITION_X, PREVIOUS_GATE_POSITION_Z ) )
 	{
 		m_HudTextRenderer.DrawText(
 			L"E: 前のステージへ",
@@ -1150,39 +1049,34 @@ void GameScene::Draw()
 			DirectX::XMFLOAT2{ HUD_TUTORIAL_X, HUD_TUTORIAL_Y },
 			DirectX::Colors::White,
 			HUD_TUTORIAL_SCALE );
+
 		m_HudTextRenderer.DrawText(
 			L"マウス: 視点移動",
-			DirectX::XMFLOAT2{
-				HUD_TUTORIAL_X,
-				HUD_TUTORIAL_Y + HUD_TUTORIAL_LINE_HEIGHT },
+			DirectX::XMFLOAT2{ HUD_TUTORIAL_X,HUD_TUTORIAL_Y + HUD_TUTORIAL_LINE_HEIGHT },
 				DirectX::Colors::White,
 				HUD_TUTORIAL_SCALE );
+
 		m_HudTextRenderer.DrawText(
 			L"左クリック: 射撃",
-			DirectX::XMFLOAT2{
-				HUD_TUTORIAL_X,
-				HUD_TUTORIAL_Y + HUD_TUTORIAL_LINE_HEIGHT * 2.0f },
+			DirectX::XMFLOAT2{ HUD_TUTORIAL_X,HUD_TUTORIAL_Y + HUD_TUTORIAL_LINE_HEIGHT * 2.0f },
 				DirectX::Colors::White,
 				HUD_TUTORIAL_SCALE );
+
 		m_HudTextRenderer.DrawText(
 			L"Q: 範囲攻撃",
-			DirectX::XMFLOAT2{
-				HUD_TUTORIAL_X,
-				HUD_TUTORIAL_Y + HUD_TUTORIAL_LINE_HEIGHT * 3.0f },
+			DirectX::XMFLOAT2{ HUD_TUTORIAL_X,HUD_TUTORIAL_Y + HUD_TUTORIAL_LINE_HEIGHT * 3.0f },
 				DirectX::Colors::White,
 				HUD_TUTORIAL_SCALE );
+
 		m_HudTextRenderer.DrawText(
 			L"ゲートに近づいてEキー",
-			DirectX::XMFLOAT2{
-				HUD_TUTORIAL_X,
-				HUD_TUTORIAL_Y + HUD_TUTORIAL_LINE_HEIGHT * 4.0f },
+			DirectX::XMFLOAT2{ HUD_TUTORIAL_X,HUD_TUTORIAL_Y + HUD_TUTORIAL_LINE_HEIGHT * 4.0f },
 				DirectX::Colors::White,
 				HUD_TUTORIAL_SCALE );
+
 		m_HudTextRenderer.DrawText(
 			L"死亡時: 所持金の25%を失う",
-			DirectX::XMFLOAT2{
-				HUD_TUTORIAL_X,
-				HUD_TUTORIAL_Y + HUD_TUTORIAL_LINE_HEIGHT * 5.0f },
+			DirectX::XMFLOAT2{ HUD_TUTORIAL_X,HUD_TUTORIAL_Y + HUD_TUTORIAL_LINE_HEIGHT * 5.0f },
 				DirectX::Colors::Orange,
 				HUD_TUTORIAL_SCALE );
 
@@ -1190,9 +1084,7 @@ void GameScene::Draw()
 		{
 			m_HudTextRenderer.DrawText(
 				L"Qは未解放です - ショップで解放できます",
-				DirectX::XMFLOAT2{
-					HUD_TUTORIAL_X,
-					HUD_TUTORIAL_Y + HUD_TUTORIAL_LINE_HEIGHT * 6.0f },
+				DirectX::XMFLOAT2{ HUD_TUTORIAL_X,HUD_TUTORIAL_Y + HUD_TUTORIAL_LINE_HEIGHT * 6.0f },
 					DirectX::Colors::Yellow,
 					HUD_TUTORIAL_SCALE );
 		}
@@ -1219,16 +1111,10 @@ void GameScene::Draw()
 	ImGui::Text( "Enemy: %s", stageData.enemyName );
 	ImGui::Text( "Clear Reward: %d", stageData.clearReward );
 
-	if ( ImGui::Button( "Test: Take 10 Damage" ) )
-	{
-		m_PlayerHealth.TakeDamage( TEST_PLAYER_DAMAGE );
-	}
+	if ( ImGui::Button( "Test: Take 10 Damage" ) )m_PlayerHealth.TakeDamage( TEST_PLAYER_DAMAGE );
 
 	ImGui::Separator();
-	ImGui::Text(
-		"Enemy HP: %.0f / %.0f",
-		m_EnemyHealth.GetCurrentHp(),
-		m_EnemyHealth.GetMaxHp() );
+	ImGui::Text( "Enemy HP: %.0f / %.0f", m_EnemyHealth.GetCurrentHp(), m_EnemyHealth.GetMaxHp() );
 	ImGui::Text( "Last Shot: %s", m_IsLastShotHit ? "HIT" : "MISS" );
 	ImGui::Text( "Currency: %d", progress.GetCurrency() );
 	ImGui::Text( "Deaths: %d", progress.GetTotalDeaths() );
@@ -1247,10 +1133,7 @@ void GameScene::Draw()
 
 	GateDestination gateDestination{};
 
-	if ( isPreviousGateAvailable &&
-		ImGui::Button(
-		 PREVIOUS_STAGE_GATE_LABEL,
-		 ImVec2( GATE_BUTTON_WIDTH, GATE_BUTTON_HEIGHT ) ) )
+	if ( isPreviousGateAvailable && ImGui::Button( PREVIOUS_STAGE_GATE_LABEL, ImVec2( GATE_BUTTON_WIDTH, GATE_BUTTON_HEIGHT ) ) )
 	{
 		gateDestination = GateDestination::e_PREVIOUS_STAGE;
 	}
@@ -1259,9 +1142,7 @@ void GameScene::Draw()
 	{
 		if ( !isNextGateAvailable ) ImGui::BeginDisabled();
 
-		if ( ImGui::Button(
-			NEXT_STAGE_GATE_LABEL,
-			ImVec2( GATE_BUTTON_WIDTH, GATE_BUTTON_HEIGHT ) ) )
+		if ( ImGui::Button( NEXT_STAGE_GATE_LABEL, ImVec2( GATE_BUTTON_WIDTH, GATE_BUTTON_HEIGHT ) ) )
 		{
 			gateDestination = GateDestination::e_NEXT_STAGE;
 		}
@@ -1269,9 +1150,7 @@ void GameScene::Draw()
 		if ( !isNextGateAvailable ) ImGui::EndDisabled();
 	}
 
-	if ( ImGui::Button(
-		SHOP_GATE_LABEL,
-		ImVec2( GATE_BUTTON_WIDTH, GATE_BUTTON_HEIGHT ) ) )
+	if ( ImGui::Button( SHOP_GATE_LABEL, ImVec2( GATE_BUTTON_WIDTH, GATE_BUTTON_HEIGHT ) ) )
 	{
 		gateDestination = GateDestination::e_SHOP;
 	}
@@ -1288,15 +1167,13 @@ void GameScene::Draw()
 	}
 
 	// ImGui Debug UIで選択されたGateに応じてScene遷移する。
-	if ( gateDestination == GateDestination::e_PREVIOUS_STAGE &&
-		progress.TrySetCurrentStage( currentStage - PREVIOUS_STAGE_OFFSET ) )
+	if ( gateDestination == GateDestination::e_PREVIOUS_STAGE && progress.TrySetCurrentStage( currentStage - PREVIOUS_STAGE_OFFSET ) )
 	{
 		m_AudioSystem.PlayWarpSe();
 		m_InputSystem.SetMouseCaptureEnabled( false );
 		m_SceneManager.RequestSceneChange<GameScene>();
 	}
-	else if ( gateDestination == GateDestination::e_NEXT_STAGE &&
-		progress.TrySetCurrentStage( currentStage + NEXT_STAGE_OFFSET ) )
+	else if ( gateDestination == GateDestination::e_NEXT_STAGE && progress.TrySetCurrentStage( currentStage + NEXT_STAGE_OFFSET ) )
 	{
 		m_AudioSystem.PlayWarpSe();
 		m_InputSystem.SetMouseCaptureEnabled( false );
@@ -1310,6 +1187,21 @@ void GameScene::Draw()
 	}
 }
 
+// GameSceneで使用した描画リソースを終了する。
+void GameScene::Finalize()
+{
+	// HUD描画リソースを終了する。
+	m_HudTextRenderer.Uninit();
+	m_HudRenderer.Uninit();
+
+	// OBJモデル描画リソースを終了する。
+	m_EnemyModelRenderer.Uninit();
+	m_SkyDomeRenderer.Uninit();
+
+	// Cube描画リソースを終了する。
+	m_BasicMeshRenderer.Uninit();
+}
+
 // Playerが指定したGateの操作範囲内にいるかを返す。
 bool GameScene::IsPlayerNearGate( float gatePositionX, float gatePositionZ ) const
 {
@@ -1320,19 +1212,4 @@ bool GameScene::IsPlayerNearGate( float gatePositionX, float gatePositionZ ) con
 	const float distanceSquared = deltaX * deltaX + deltaZ * deltaZ;
 
 	return distanceSquared <= GATE_INTERACTION_RADIUS_SQUARED;
-}
-
-// GameSceneで使用した描画リソースを解放する。
-void GameScene::Uninit()
-{
-	// HUD描画リソースを解放する。
-	m_HudTextRenderer.Uninit();
-	m_HudRenderer.Uninit();
-
-	// OBJモデル描画リソースを解放する。
-	m_EnemyModelRenderer.Uninit();
-	m_SkyDomeRenderer.Uninit();
-
-	// Cube描画リソースを解放する。
-	m_BasicMeshRenderer.Uninit();
 }
