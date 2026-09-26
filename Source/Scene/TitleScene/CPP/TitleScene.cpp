@@ -132,8 +132,8 @@ void TitleScene::Update( float deltaTime )
 // タイトル画面の背景、操作説明、ボタンを描画する。
 void TitleScene::Draw()
 {
-	// タイトル画面のQuadと文字を画面固定で描画する。
-	m_GraphicsSystem.SetDepthTestEnabled( false );
+	// タイトル画面のQuadと文字をScreen UI Passで描画する。
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_SCREEN_UI );
 
 	// 背景、上部発光、メインパネルを描画する。
 	m_HudRenderer.DrawQuad(
@@ -142,7 +142,7 @@ void TitleScene::Draw()
 	0.0f,
 	TITLE_SCREEN_WIDTH,
 	TITLE_SCREEN_HEIGHT,
-	DirectX::XMFLOAT4{ TITLE_BACKGROUND_RED,TITLE_BACKGROUND_GREEN,TITLE_BACKGROUND_BLUE,FULLY_OPAQUE_ALPHA } );
+	DirectX::XMFLOAT4{ TITLE_BACKGROUND_RED, TITLE_BACKGROUND_GREEN, TITLE_BACKGROUND_BLUE, FULLY_OPAQUE_ALPHA } );
 
 	m_HudRenderer.DrawQuad(
 	m_GraphicsSystem,
@@ -150,7 +150,7 @@ void TitleScene::Draw()
 	0.0f,
 	TITLE_SCREEN_WIDTH,
 	180.0f,
-	DirectX::XMFLOAT4{ TITLE_TOP_GLOW_RED,TITLE_TOP_GLOW_GREEN,TITLE_TOP_GLOW_BLUE,TITLE_TOP_GLOW_ALPHA } );
+	DirectX::XMFLOAT4{ TITLE_TOP_GLOW_RED, TITLE_TOP_GLOW_GREEN, TITLE_TOP_GLOW_BLUE, TITLE_TOP_GLOW_ALPHA } );
 
 	m_HudRenderer.DrawQuad(
 	m_GraphicsSystem,
@@ -158,7 +158,7 @@ void TitleScene::Draw()
 	TITLE_MAIN_PANEL_Y - 4.0f,
 	TITLE_MAIN_PANEL_WIDTH + 8.0f,
 	TITLE_MAIN_PANEL_HEIGHT + 8.0f,
-	DirectX::XMFLOAT4{ TITLE_BORDER_RED,TITLE_BORDER_GREEN,TITLE_BORDER_BLUE,TITLE_BORDER_ALPHA } );
+	DirectX::XMFLOAT4{ TITLE_BORDER_RED, TITLE_BORDER_GREEN, TITLE_BORDER_BLUE, TITLE_BORDER_ALPHA } );
 
 	m_HudRenderer.DrawQuad(
 	m_GraphicsSystem,
@@ -166,7 +166,7 @@ void TitleScene::Draw()
 	TITLE_MAIN_PANEL_Y,
 	TITLE_MAIN_PANEL_WIDTH,
 	TITLE_MAIN_PANEL_HEIGHT,
-	DirectX::XMFLOAT4{ TITLE_PANEL_RED,TITLE_PANEL_GREEN,TITLE_PANEL_BLUE,TITLE_PANEL_ALPHA } );
+	DirectX::XMFLOAT4{ TITLE_PANEL_RED, TITLE_PANEL_GREEN, TITLE_PANEL_BLUE, TITLE_PANEL_ALPHA } );
 
 	// ゲーム開始ボタンと終了ボタンを描画する。
 	m_HudRenderer.DrawQuad(
@@ -183,7 +183,7 @@ void TitleScene::Draw()
 	TITLE_START_BUTTON_Y,
 	TITLE_START_BUTTON_WIDTH,
 	TITLE_START_BUTTON_HEIGHT,
-	DirectX::XMFLOAT4{ TITLE_START_BUTTON_RED,TITLE_START_BUTTON_GREEN,TITLE_START_BUTTON_BLUE,FULLY_OPAQUE_ALPHA } );
+	DirectX::XMFLOAT4{ TITLE_START_BUTTON_RED, TITLE_START_BUTTON_GREEN, TITLE_START_BUTTON_BLUE, FULLY_OPAQUE_ALPHA } );
 
 	m_HudRenderer.DrawQuad(
 	m_GraphicsSystem,
@@ -199,7 +199,7 @@ void TitleScene::Draw()
 	TITLE_EXIT_BUTTON_Y,
 	TITLE_EXIT_BUTTON_WIDTH,
 	TITLE_EXIT_BUTTON_HEIGHT,
-	DirectX::XMFLOAT4{ TITLE_EXIT_BUTTON_RED,TITLE_EXIT_BUTTON_GREEN,TITLE_EXIT_BUTTON_BLUE,FULLY_OPAQUE_ALPHA } );
+	DirectX::XMFLOAT4{ TITLE_EXIT_BUTTON_RED, TITLE_EXIT_BUTTON_GREEN, TITLE_EXIT_BUTTON_BLUE, FULLY_OPAQUE_ALPHA } );
 
 	// ボタン内文字の位置計算に使用する文字列と描画サイズを取得する。
 	const std::wstring startButtonText{ L"ゲーム開始" };
@@ -214,6 +214,7 @@ void TitleScene::Draw()
 	TITLE_START_BUTTON_X + ( TITLE_START_BUTTON_WIDTH - startTextSize.x ) * 0.5f,
 	TITLE_START_BUTTON_Y + ( TITLE_START_BUTTON_HEIGHT - startTextSize.y ) * 0.5f
 	};
+
 	const DirectX::XMFLOAT2 exitTextPosition
 	{
 	TITLE_EXIT_BUTTON_X + ( TITLE_EXIT_BUTTON_WIDTH - exitTextSize.x ) * 0.5f,
@@ -273,9 +274,8 @@ void TitleScene::Draw()
 
 	m_HudTextRenderer.End();
 
-	// 次の3D描画へ影響を残さないようDepth TestとAlpha Blendを戻す。
-	m_GraphicsSystem.SetDepthTestEnabled( true );
-	m_GraphicsSystem.SetAlphaBlendEnabled( false );
+	// 次の描画へScreen UI PassのStateを残さない。
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_OPAQUE );
 }
 
 // タイトル画面で使用したHUDと文字描画リソースを終了する。

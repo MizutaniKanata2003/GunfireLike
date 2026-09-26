@@ -122,8 +122,8 @@ void ResultScene::Draw()
 	const GameProgress& progress = m_SceneManager.GetGameProgress();
 	const PlayerStats& playerStats = progress.GetPlayerStats();
 
-	// Result画面のQuadと文字を画面固定で描画する。
-	m_GraphicsSystem.SetDepthTestEnabled( false );
+	// Result画面のQuadと文字をScreen UI Passで描画する。
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_SCREEN_UI );
 
 	// 背景、上部発光、メインパネルを描画する。
 	m_HudRenderer.DrawQuad(
@@ -132,7 +132,7 @@ void ResultScene::Draw()
 	0.0f,
 	RESULT_SCREEN_WIDTH,
 	RESULT_SCREEN_HEIGHT,
-	DirectX::XMFLOAT4{ RESULT_BACKGROUND_RED,RESULT_BACKGROUND_GREEN,RESULT_BACKGROUND_BLUE,FULLY_OPAQUE_ALPHA } );
+	DirectX::XMFLOAT4{ RESULT_BACKGROUND_RED, RESULT_BACKGROUND_GREEN, RESULT_BACKGROUND_BLUE, FULLY_OPAQUE_ALPHA } );
 
 	m_HudRenderer.DrawQuad(
 	m_GraphicsSystem,
@@ -140,7 +140,7 @@ void ResultScene::Draw()
 	0.0f,
 	RESULT_SCREEN_WIDTH,
 	170.0f,
-	DirectX::XMFLOAT4{ RESULT_TOP_GLOW_RED,RESULT_TOP_GLOW_GREEN,RESULT_TOP_GLOW_BLUE,RESULT_TOP_GLOW_ALPHA } );
+	DirectX::XMFLOAT4{ RESULT_TOP_GLOW_RED, RESULT_TOP_GLOW_GREEN, RESULT_TOP_GLOW_BLUE, RESULT_TOP_GLOW_ALPHA } );
 
 	m_HudRenderer.DrawQuad(
 	m_GraphicsSystem,
@@ -156,7 +156,7 @@ void ResultScene::Draw()
 	RESULT_PANEL_Y,
 	RESULT_PANEL_WIDTH,
 	RESULT_PANEL_HEIGHT,
-	DirectX::XMFLOAT4{ RESULT_PANEL_RED,RESULT_PANEL_GREEN,RESULT_PANEL_BLUE,RESULT_PANEL_ALPHA } );
+	DirectX::XMFLOAT4{ RESULT_PANEL_RED, RESULT_PANEL_GREEN, RESULT_PANEL_BLUE, RESULT_PANEL_ALPHA } );
 
 	// タイトルへ戻るボタンの外枠と本体を描画する。
 	m_HudRenderer.DrawQuad(
@@ -173,7 +173,7 @@ void ResultScene::Draw()
 	RESULT_RETURN_BUTTON_Y,
 	RESULT_RETURN_BUTTON_WIDTH,
 	RESULT_RETURN_BUTTON_HEIGHT,
-	DirectX::XMFLOAT4{ RESULT_BUTTON_RED,RESULT_BUTTON_GREEN,RESULT_BUTTON_BLUE,FULLY_OPAQUE_ALPHA } );
+	DirectX::XMFLOAT4{ RESULT_BUTTON_RED, RESULT_BUTTON_GREEN, RESULT_BUTTON_BLUE, FULLY_OPAQUE_ALPHA } );
 
 	// ボタン内文字の位置計算に使用する文字列と描画サイズを取得する。
 	const std::wstring returnButtonText{ L"タイトルへ戻る" };
@@ -266,9 +266,8 @@ void ResultScene::Draw()
 
 	m_HudTextRenderer.End();
 
-	// 次の3D描画へ影響を残さないようDepth TestとAlpha Blendを戻す。
-	m_GraphicsSystem.SetDepthTestEnabled( true );
-	m_GraphicsSystem.SetAlphaBlendEnabled( false );
+	// 次の描画へScreen UI PassのStateを残さない。
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_OPAQUE );
 }
 
 // Result画面で使用したHUDと文字描画リソースを終了する。
