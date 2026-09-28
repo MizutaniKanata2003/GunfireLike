@@ -26,7 +26,6 @@ public:
 		m_MaxHp = std::max( EnemyHealthConstants::MIN_MAX_HP, maxHp );
 		m_CurrentHp = m_MaxHp;
 	}
-
 	// 指定した最大HPで現在HPを最大まで回復する。
 	void ResetToMaxHp( float maxHp )
 	{
@@ -48,23 +47,11 @@ public:
 
 	//========= Getter関数=========
 	// 現在HPが0以下かを返す。
-	[[nodiscard]] bool IsDead() const
-	{
-		return m_CurrentHp <= EnemyHealthConstants::DEAD_HP;
-	}
-
+	[[nodiscard]] bool IsDead() const { return m_CurrentHp <= EnemyHealthConstants::DEAD_HP; }
 	// 現在HPを返す。
-	[[nodiscard]] float GetCurrentHp() const
-	{
-		return m_CurrentHp;
-	}
-
+	[[nodiscard]] float GetCurrentHp() const { return m_CurrentHp; }
 	// 最大HPを返す。
-	[[nodiscard]] float GetMaxHp() const
-	{
-		return m_MaxHp;
-	}
-
+	[[nodiscard]] float GetMaxHp() const { return m_MaxHp; }
 private:
 	//========= HP状態=========
 	// 現在HPと最大HPを保持する。

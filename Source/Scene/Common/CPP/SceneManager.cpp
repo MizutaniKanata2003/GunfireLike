@@ -54,7 +54,6 @@ void SceneManager::Update( float deltaTime )
 
 	// 画面が黒くなった瞬間にだけ予約済みSceneを現在Sceneへ反映する。
 	if ( m_NextScene && m_FadeOverlay.IsFadeOutFinished() )ApplySceneChange();
-
 }
 
 // 現在Sceneとフェードを描画する。

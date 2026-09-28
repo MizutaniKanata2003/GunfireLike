@@ -171,96 +171,22 @@ GameScene::GameScene(
 // Stageの敵、Player、HUD、BGMに使用するゲーム状態を初期化する。
 void GameScene::Initialize()
 {
-	// SceneManagerが所有する現在Stageの設定とPlayer強化後能力を取得する。
 	const GameProgress& progress = m_SceneManager.GetGameProgress();
+
 	const StageData& stageData = progress.GetCurrentStageData();
+
 	const PlayerStats& playerStats = progress.GetPlayerStats();
 
-	// Playerと敵のHPを現在Stageの設定で初期化する。
-	m_PlayerHealth.Initialize( playerStats.maxHp );
+	InitializeCombatState( stageData, playerStats );
 
-	const float specialAttackRangeSquared =
-		stageData.specialAttackHitboxRadius *
-		stageData.specialAttackHitboxRadius;
+	InitializeWorldObjects();
 
-	m_EnemyController.Initialize(
-	stageData.enemyMaxHp,
-	ENEMY_NORMAL_ATTACK_INTERVAL,
-	ENEMY_NORMAL_ATTACK_RANGE_SQUARED,
-	stageData.enemyDamage,
-	stageData.specialAttackInterval,
-	specialAttackRangeSquared,
-	stageData.enemyDamage *
-	ENEMY_SPECIAL_ATTACK_DAMAGE_MULTIPLIER );
-	// EnemyのVisual、Transform、Animation状態を初期化する。
-	m_EnemyVisual.Initialize(
-	DirectX::XMFLOAT3{ ENEMY_BASE_X,ENEMY_BASE_Y,ENEMY_BASE_Z },
-	DirectX::XMFLOAT3{ ENEMY_MODEL_SCALE,ENEMY_MODEL_SCALE,ENEMY_MODEL_SCALE } );
-	// Projectileの使用状態を初期化する。
-	m_ProjectileSystem.Initialize();
-	// Stage FieldのTransformを初期化する。
-	m_StageField.Initialize();
-	// Gun View ModelのMuzzle Flash状態を初期化する。
-	m_GunViewModel.Initialize();
+	InitializeGates();
 
-	// 前後StageとShopのGateを初期化する。
-	const DirectX::XMFLOAT3 gateScale
-	{
-	GATE_WIDTH,
-	GATE_HEIGHT,
-	GATE_DEPTH
-	};
+	InitializeSceneState();
 
-	m_PreviousStageGate.Initialize(
-	StageGate::GateType::e_PREVIOUS_STAGE,
-	DirectX::XMFLOAT3{
-	PREVIOUS_GATE_POSITION_X,
-	PREVIOUS_GATE_POSITION_Y,
-	PREVIOUS_GATE_POSITION_Z },
-	gateScale,
-	DirectX::XMFLOAT4{ 0.85f, 0.30f, 1.0f, 1.0f } );
-
-	m_NextStageGate.Initialize(
-	StageGate::GateType::e_NEXT_STAGE,
-	DirectX::XMFLOAT3{
-	NEXT_GATE_POSITION_X,
-	NEXT_GATE_POSITION_Y,
-	NEXT_GATE_POSITION_Z },
-	gateScale,
-	DirectX::XMFLOAT4{ 0.10f, 0.85f, 1.0f, 1.0f } );
-
-	m_ShopGate.Initialize(
-	StageGate::GateType::e_SHOP,
-	DirectX::XMFLOAT3{
-	SHOP_GATE_POSITION_X,
-	SHOP_GATE_POSITION_Y,
-	SHOP_GATE_POSITION_Z },
-	gateScale,
-	DirectX::XMFLOAT4{ 1.0f, 0.75f, 0.10f, 1.0f } );
-
-	// Sky DomeのTransformを初期化する。
-	m_SkyDome.Initialize();
-
-	// 戦闘、Scene進行、SE再生の状態を初期化する。
-	m_IsLastShotHit = {};
-	m_IsLastNormalAttackHit = {};
-	m_IsLastSpecialAttackHit = {};
-	m_IsLastPlayerSpecialAttackHit = {};
-	m_HasPlayedLowHpSe = {};
-	m_HasPlayedEnemyDefeatSe = {};
-	m_GamePhase = GamePhase::e_PLAYING;
-	m_SceneChangeRequest = {};
-	m_DebugUiRequest = {};
-
-	// 敵・Gate・特殊攻撃・銃口FlashのTimerを初期化する。
-	m_EnemyAnimationTime = {};
-	m_SpecialAttackCooldownTimer = {};
-
-	// GameSceneではFPS操作を有効にし、Game用BGMを再生する。
-	m_InputSystem.SetMouseCaptureEnabled( true );
-	m_AudioSystem.PlayGameBgm();
+	InitializePlayerAndCamera();
 }
-
 // GameSceneで使用する必須の3D・2D描画Resourceを初期化する。
 bool GameScene::Init()
 {
@@ -329,7 +255,12 @@ void GameScene::Update( float deltaTime )
 	if ( UpdateSceneChangeRequest() ) return;
 	if ( UpdateDebugUiRequest() ) return;
 	if ( UpdateDebugSceneChange() ) return;
+
+	UpdatePlayerHealthState();
+
 	if ( UpdatePlayerDeath() ) return;
+
+	UpdateLowHealthWarning();
 
 	// SceneManagerが所有するゲーム進捗と現在Stage設定を取得する。
 	GameProgress& progress = m_SceneManager.GetGameProgress();
@@ -360,32 +291,25 @@ void GameScene::Draw()
 
 	// 現在Stageに応じたGateの表示可否を判定する。
 	const int currentStage = progress.GetCurrentStage();
-	const bool isPreviousGateAvailable = currentStage > StageConstants::FIRST_STAGE_NUMBER;
-	const bool isNextGateAvailable =
-		currentStage < StageConstants::MAX_STAGE_COUNT && progress.IsStageCleared( currentStage );
+
+	const StageGateAvailability gateAvailability = m_StageGateController.GetAvailability( currentStage,
+		StageConstants::FIRST_STAGE_NUMBER, StageConstants::MAX_STAGE_COUNT, progress.IsStageCleared( currentStage ) );
+
+	const bool isPreviousGateAvailable = gateAvailability.isPreviousGateAvailable;
+
+	const bool isNextGateAvailable = gateAvailability.isNextGateAvailable;
 
 	// 3D描画に使用するProjection、View、Camera座標を取得する。
-	const DirectX::XMMATRIX projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(
-	DirectX::XMConvertToRadians( PROJECTION_FOV_DEGREES ),
-	PROJECTION_ASPECT_RATIO,
-	PROJECTION_NEAR_Z,
-	PROJECTION_FAR_Z );
+	const DirectX::XMMATRIX projectionMatrix = DirectX::XMMatrixPerspectiveFovLH( DirectX::XMConvertToRadians( PROJECTION_FOV_DEGREES ),
+	PROJECTION_ASPECT_RATIO, PROJECTION_NEAR_Z, PROJECTION_FAR_Z );
 	const DirectX::XMMATRIX viewMatrix = m_FpsCamera.GetViewMatrix();
 	const DirectX::XMFLOAT3 cameraPosition = m_FpsCamera.GetPosition();
 
 	DrawSky( viewMatrix, projectionMatrix, cameraPosition );
 	DrawOpaqueWorld( viewMatrix, projectionMatrix, isPreviousGateAvailable, isNextGateAvailable );
 	DrawTransparentWorld( viewMatrix, projectionMatrix );
-	m_EnemyHealthBar.Draw(
-	m_BasicMeshRenderer,
-	m_GraphicsSystem,
-	viewMatrix,
-	projectionMatrix,
-	cameraPosition,
-	m_EnemyVisual.GetPosition(),
-	m_EnemyController.GetCurrentHp(),
-	m_EnemyController.GetMaxHp(),
-	m_EnemyController.IsDead() );
+	m_EnemyHealthBar.Draw( m_BasicMeshRenderer, m_GraphicsSystem, viewMatrix, projectionMatrix, cameraPosition,
+	m_EnemyVisual.GetPosition(), m_EnemyController.GetCurrentHp(), m_EnemyController.GetMaxHp(), m_EnemyController.IsDead() );
 
 	const DirectX::XMFLOAT3 playerPosition = m_DebugPlayer.GetPosition();
 	const bool isNearPreviousGate = isPreviousGateAvailable && m_PreviousStageGate.IsPlayerNear( playerPosition, GATE_INTERACTION_RADIUS_SQUARED );
@@ -394,17 +318,19 @@ void GameScene::Draw()
 	const bool isSpecialAttackUnlocked = playerStats.isSpecialAttackUnlocked;
 
 	GameHudState hudState{};
+
 	hudState.currentStage = currentStage;
 	hudState.maxStageCount = StageConstants::MAX_STAGE_COUNT;
 	hudState.currency = progress.GetCurrency();
 	hudState.playerCurrentHp = m_PlayerHealth.GetCurrentHp();
 	hudState.playerMaxHp = m_PlayerHealth.GetMaxHp();
 	hudState.isSpecialAttackUnlocked = isSpecialAttackUnlocked;
-	hudState.isSpecialAttackReady = m_SpecialAttackCooldownTimer <= 0.0f;
-	hudState.specialAttackCooldownTimer = m_SpecialAttackCooldownTimer;
+	hudState.isSpecialAttackReady = m_PlayerCombatController.IsSpecialAttackReady();
+	hudState.specialAttackCooldownTimer = m_PlayerCombatController.GetSpecialAttackCooldownRemainingTime();
 	hudState.isNearPreviousGate = isNearPreviousGate;
 	hudState.isNearNextGate = isNearNextGate;
 	hudState.isNearShopGate = isNearShopGate;
+
 	if ( !m_EnemyController.IsDead() )
 	{
 		m_EnemyVisual.Draw(
@@ -417,7 +343,26 @@ void GameScene::Draw()
 	hudState.showStageClearMessage = m_GamePhase == GamePhase::e_STAGE_CLEAR;
 
 	m_GameHud.Draw( m_HudRenderer, m_HudTextRenderer, m_GraphicsSystem, hudState );
-	DrawDebugUi( progress, stageData, currentStage, isPreviousGateAvailable, isNextGateAvailable );
+	GameDebugState gameDebugState{};
+
+	gameDebugState.currentStage = currentStage;
+	gameDebugState.maxStageCount = StageConstants::MAX_STAGE_COUNT;
+	gameDebugState.enemyName = stageData.enemyName;
+	gameDebugState.clearReward = stageData.clearReward;
+	gameDebugState.enemyCurrentHp = m_EnemyController.GetCurrentHp();
+	gameDebugState.enemyMaxHp = m_EnemyController.GetMaxHp();
+	gameDebugState.currency = progress.GetCurrency();
+	gameDebugState.totalDeaths = progress.GetTotalDeaths();
+	gameDebugState.totalPlayTime = progress.GetTotalPlayTime();
+	gameDebugState.isLastShotHit = m_IsLastShotHit;
+	gameDebugState.isLastNormalAttackHit = m_IsLastNormalAttackHit;
+	gameDebugState.isLastSpecialAttackHit = m_IsLastSpecialAttackHit;
+	gameDebugState.isLastPlayerSpecialAttackHit = m_IsLastPlayerSpecialAttackHit;
+	gameDebugState.isPreviousGateAvailable = isPreviousGateAvailable;
+	gameDebugState.isNextGateAvailable = isNextGateAvailable;
+	gameDebugState.gamePhase = m_GamePhase;
+
+	DrawDebugUi( gameDebugState );
 }
 
 // GameSceneで使用した描画リソースを終了する。
@@ -433,6 +378,347 @@ void GameScene::Finalize()
 
 	// Cube描画リソースを終了する。
 	m_BasicMeshRenderer.Uninit();
+}
+
+
+// Player HP、EnemyController、Projectile、特殊攻撃状態を初期化する。
+void GameScene::InitializeCombatState( const StageData& stageData, const PlayerStats& playerStats )
+{
+	m_PlayerHealth.Initialize( playerStats.maxHp );
+
+	m_PlayerHealthStateController.Initialize( m_PlayerHealth.GetCurrentHp(), m_PlayerHealth.GetMaxHp(), LOW_HP_RATIO_THRESHOLD );
+
+	const float specialAttackRangeSquared = stageData.specialAttackHitboxRadius * stageData.specialAttackHitboxRadius;
+
+	m_EnemyController.Initialize( stageData.enemyMaxHp, ENEMY_NORMAL_ATTACK_INTERVAL, ENEMY_NORMAL_ATTACK_RANGE_SQUARED,
+	stageData.enemyDamage, stageData.specialAttackInterval, specialAttackRangeSquared, stageData.enemyDamage * ENEMY_SPECIAL_ATTACK_DAMAGE_MULTIPLIER );
+
+	m_ProjectileSystem.Initialize();
+
+	m_PlayerCombatController.Initialize();
+}
+
+// Enemy、Stage Field、Gun、Sky DomeのWorld Objectを初期化する。
+void GameScene::InitializeWorldObjects()
+{
+	m_EnemyVisual.Initialize(
+	DirectX::XMFLOAT3{ ENEMY_BASE_X,ENEMY_BASE_Y,ENEMY_BASE_Z },
+	DirectX::XMFLOAT3{ ENEMY_MODEL_SCALE,ENEMY_MODEL_SCALE,ENEMY_MODEL_SCALE } );
+
+	m_StageField.Initialize();
+
+	m_GunViewModel.Initialize();
+
+	m_SkyDome.Initialize();
+}
+
+// 前後StageとShopへ移動するGateを初期化する。
+void GameScene::InitializeGates()
+{
+	const DirectX::XMFLOAT3 gateScale
+	{
+	GATE_WIDTH,
+	GATE_HEIGHT,
+	GATE_DEPTH
+	};
+
+	m_PreviousStageGate.Initialize( StageGate::GateType::e_PREVIOUS_STAGE, DirectX::XMFLOAT3{ PREVIOUS_GATE_POSITION_X,PREVIOUS_GATE_POSITION_Y,PREVIOUS_GATE_POSITION_Z },
+	gateScale, DirectX::XMFLOAT4{ 0.85f,0.30f,1.0f,1.0f } );
+
+	m_NextStageGate.Initialize( StageGate::GateType::e_NEXT_STAGE, DirectX::XMFLOAT3{ NEXT_GATE_POSITION_X,NEXT_GATE_POSITION_Y,NEXT_GATE_POSITION_Z },
+	gateScale, DirectX::XMFLOAT4{ 0.10f,0.85f,1.0f,1.0f } );
+
+	m_ShopGate.Initialize( StageGate::GateType::e_SHOP, DirectX::XMFLOAT3{ SHOP_GATE_POSITION_X,SHOP_GATE_POSITION_Y,SHOP_GATE_POSITION_Z },
+	gateScale, DirectX::XMFLOAT4{ 1.0f,0.75f,0.10f,1.0f } );
+}
+
+// GamePhase、Scene遷移要求、Debug要求、戦闘結果、SE再生状態を初期化する。
+void GameScene::InitializeSceneState()
+{
+	m_IsLastShotHit = false;
+	m_IsLastNormalAttackHit = false;
+	m_IsLastSpecialAttackHit = false;
+	m_IsLastPlayerSpecialAttackHit = false;
+
+	m_PlayerHealthStateResult = {};
+	m_HasPlayedEnemyDefeatSe = false;
+
+	m_GamePhase = GamePhase::e_PLAYING;
+	m_SceneChangeRequest = SceneChangeRequest::e_NONE;
+	m_DebugUiRequest = DebugUiRequest::e_NONE;
+
+	m_EnemyAnimationTime = 0.0f;
+}
+
+// FPS操作、Mouse Capture、Game BGMを初期化する。
+void GameScene::InitializePlayerAndCamera()
+{
+	m_InputSystem.SetMouseCaptureEnabled( true );
+
+	m_AudioSystem.PlayGameBgm();
+}
+
+// DrawDebugUiで予約されたDebug操作をUpdate開始時に実行する。
+bool GameScene::UpdateDebugUiRequest()
+{
+	switch ( m_DebugUiRequest )
+	{
+		case DebugUiRequest::e_TAKE_DAMAGE:
+		m_PlayerHealth.TakeDamage( TEST_PLAYER_DAMAGE );
+		m_DebugUiRequest = {};
+		return false;
+
+		case DebugUiRequest::e_PREVIOUS_STAGE:
+		{
+			GameProgress& progress = m_SceneManager.GetGameProgress();
+			const int currentStage = progress.GetCurrentStage();
+
+			if ( progress.TrySetCurrentStage( currentStage - PREVIOUS_STAGE_OFFSET ) )m_SceneChangeRequest = SceneChangeRequest::e_RELOAD_GAME;
+
+			m_DebugUiRequest = {};
+			return false;
+		}
+
+		case DebugUiRequest::e_NEXT_STAGE:
+		{
+			GameProgress& progress = m_SceneManager.GetGameProgress();
+			const int currentStage = progress.GetCurrentStage();
+
+			if ( progress.TrySetCurrentStage( currentStage + NEXT_STAGE_OFFSET ) )m_SceneChangeRequest = SceneChangeRequest::e_RELOAD_GAME;
+
+			m_DebugUiRequest = {};
+			return false;
+		}
+
+		case DebugUiRequest::e_NONE:
+		default:
+		return false;
+	}
+}
+
+// F2キーによるShopSceneへの遷移を処理する。
+bool GameScene::UpdateDebugSceneChange()
+{
+	if ( !m_InputSystem.IsKeyTriggered( RETURN_TO_SHOP_KEY ) ) return false;
+
+	m_AudioSystem.PlayWarpSe();
+	m_InputSystem.SetMouseCaptureEnabled( false );
+	m_SceneManager.RequestSceneChange<ShopScene>();
+
+	return true;
+}
+
+// Player死亡時のペナルティとShopScene遷移を処理する。
+bool GameScene::UpdatePlayerDeath()
+{
+	if ( !m_PlayerHealthStateResult.isPlayerDead )return false;
+
+
+	GameProgress& progress = m_SceneManager.GetGameProgress();
+
+	progress.AddDeath();
+
+	static_cast<void>( progress.ApplyDeathCurrencyPenalty() );
+
+	m_AudioSystem.PlayWarpSe();
+
+	m_InputSystem.SetMouseCaptureEnabled( false );
+
+	m_SceneManager.RequestSceneChange<ShopScene>();
+
+	return true;
+}
+
+// ゲーム進行時間、特殊攻撃、銃口FlashのTimerを更新する。
+void GameScene::UpdateGameProgressAndTimers( float deltaTime, GameProgress& progress )
+{
+	// ゲーム進行時間と攻撃・Flash用Timerを更新する。
+	m_PlayerCombatController.Update( deltaTime );
+	m_GunViewModel.Update( deltaTime );
+}
+// 現フレームのPlayer HP状態を更新する。
+void GameScene::UpdatePlayerHealthState()
+{
+	m_PlayerHealthStateResult = m_PlayerHealthStateController.Update( m_PlayerHealth.GetCurrentHp(), m_PlayerHealth.GetMaxHp(), LOW_HP_RATIO_THRESHOLD );
+}
+// 低HP状態の警告SEを更新する。
+void GameScene::UpdateLowHealthWarning()
+{
+	if ( m_PlayerHealthStateResult.didEnterLowHealth )m_AudioSystem.PlayLowHpSe();
+}
+// 敵通常攻撃と特殊攻撃を更新する。
+void GameScene::UpdateEnemyCombat( float deltaTime, float playerToEnemyDistanceSquared )
+{
+	const bool isCombatActive = m_GamePhase == GamePhase::e_PLAYING && !m_EnemyController.IsDead();
+
+	const EnemyAttackResult attackResult = m_EnemyController.UpdateCombat( deltaTime, isCombatActive, playerToEnemyDistanceSquared );
+
+	m_IsLastNormalAttackHit = false;
+	m_IsLastSpecialAttackHit = false;
+
+	if ( !attackResult.didAttack )return;
+
+	if ( attackResult.isSpecialAttack )
+	{
+		m_IsLastSpecialAttackHit = attackResult.didHitPlayer;
+	}
+	else
+	{
+		m_IsLastNormalAttackHit = attackResult.didHitPlayer;
+	}
+
+	if ( !attackResult.didHitPlayer )return;
+
+	m_PlayerHealth.TakeDamage( attackResult.playerDamage );
+
+	m_AudioSystem.PlayDamageSe();
+}
+
+// Playerの通常射撃と特殊攻撃を更新する。
+void GameScene::UpdatePlayerAttack( GameProgress& progress, const PlayerStats& playerStats, float playerToEnemyDistanceSquared )
+{
+	const bool isCombatActive = m_GamePhase == GamePhase::e_PLAYING;
+
+	const bool isEnemyDead = m_EnemyController.IsDead();
+
+	const PlayerAttackRequest normalShotRequest = m_PlayerCombatController.RequestNormalShot( m_InputSystem.IsKeyTriggered( SHOOT_ENEMY_KEY ),
+		isCombatActive, isEnemyDead );
+
+	switch ( normalShotRequest.attackType )
+	{
+		case PlayerAttackType::e_NORMAL_SHOT:
+		ExecuteNormalShot( progress, playerStats );
+		break;
+
+		case PlayerAttackType::e_NONE:
+		default:
+		break;
+	}
+
+	const PlayerAttackRequest specialAttackRequest = m_PlayerCombatController.RequestSpecialAttack( m_InputSystem.IsKeyTriggered( SPECIAL_ATTACK_KEY ),
+		isCombatActive, isEnemyDead, playerStats.isSpecialAttackUnlocked, playerStats.specialAttackCooldown );
+
+	switch ( specialAttackRequest.attackType )
+	{
+		case PlayerAttackType::e_SPECIAL_ATTACK:
+		ExecuteSpecialAttack( progress, playerStats, playerToEnemyDistanceSquared );
+		break;
+
+		case PlayerAttackType::e_NONE:
+		default:
+		break;
+	}
+}
+// Projectileの移動と寿命を更新する。
+void GameScene::UpdateProjectiles( float deltaTime )
+{
+	m_ProjectileSystem.Update( deltaTime, BULLET_SPEED );
+}
+
+// EnemyとGateのアニメーションを更新する。
+void GameScene::UpdateAnimations( float deltaTime )
+{
+	if ( !m_EnemyController.IsDead() )m_EnemyVisual.Update( deltaTime );
+
+	m_PreviousStageGate.Update( deltaTime );
+	m_NextStageGate.Update( deltaTime );
+	m_ShopGate.Update( deltaTime );
+}
+
+// Enemy撃破報酬、Stage Clear、Result遷移予約を更新する。
+void GameScene::UpdateEnemyDefeat( GameProgress& progress )
+{
+	if ( !m_EnemyController.IsDead() || m_HasPlayedEnemyDefeatSe || m_GamePhase != GamePhase::e_PLAYING )return;
+
+	m_AudioSystem.PlayEnemyDefeatSe();
+	m_HasPlayedEnemyDefeatSe = true;
+
+	progress.AddEnemyDefeat();
+
+	const int currentStage = progress.GetCurrentStage();
+
+	const bool isCurrentStageAlreadyCleared = progress.IsStageCleared( currentStage );
+
+	const StageClearResult stageClearResult = m_StageProgressController.EvaluateEnemyDefeat( isCurrentStageAlreadyCleared, currentStage, StageConstants::MAX_STAGE_COUNT );
+
+	if ( stageClearResult.shouldMarkStageCleared )
+	{
+		const bool isFirstClear = progress.MarkCurrentStageCleared();
+
+		if ( !isFirstClear )
+		{
+			return;
+		}
+	}
+
+	if ( stageClearResult.shouldAddStageClearReward )progress.AddStageClearReward();
+
+	if ( stageClearResult.shouldRequestResult )
+	{
+		m_GamePhase = GamePhase::e_RESULT_TRANSITION;
+
+		m_SceneChangeRequest = SceneChangeRequest::e_RESULT;
+
+		return;
+	}
+
+	if ( stageClearResult.shouldEnterStageClear )m_GamePhase = GamePhase::e_STAGE_CLEAR;
+}
+
+// F1キーによるMouse Capture切替を処理する。
+void GameScene::UpdateMouseCapture()
+{
+	// F1キーでFPSマウスキャプチャの有効・無効を切り替える。
+	if ( m_InputSystem.IsKeyTriggered( TOGGLE_MOUSE_CAPTURE_KEY ) )m_InputSystem.SetMouseCaptureEnabled( !m_InputSystem.IsMouseCaptureEnabled() );
+}
+
+// Gate操作によるStageまたはShopへのScene遷移を処理する。
+bool GameScene::UpdateGates( GameProgress& progress )
+{
+	if ( !m_InputSystem.IsKeyTriggered( USE_GATE_KEY ) )return false;
+
+	const int currentStage = progress.GetCurrentStage();
+
+	const StageGateAvailability gateAvailability = m_StageGateController.GetAvailability( currentStage,
+		StageConstants::FIRST_STAGE_NUMBER, StageConstants::MAX_STAGE_COUNT, progress.IsStageCleared( currentStage ) );
+
+	const StageGateUseResult gateUseResult =
+		m_StageGateController.GetUseResult( m_DebugPlayer.GetPosition(), gateAvailability, m_PreviousStageGate,
+		m_NextStageGate, m_ShopGate, GATE_INTERACTION_RADIUS_SQUARED );
+
+	switch ( gateUseResult )
+	{
+		case StageGateUseResult::e_PREVIOUS_STAGE:
+		if ( !progress.TrySetCurrentStage( currentStage - PREVIOUS_STAGE_OFFSET ) )return false;
+
+		m_SceneChangeRequest = SceneChangeRequest::e_RELOAD_GAME;
+
+		return true;
+
+		case StageGateUseResult::e_NEXT_STAGE:
+		if ( !progress.TrySetCurrentStage( currentStage + NEXT_STAGE_OFFSET ) )return false;
+
+		m_SceneChangeRequest = SceneChangeRequest::e_RELOAD_GAME;
+
+		return true;
+
+		case StageGateUseResult::e_SHOP:
+		m_SceneChangeRequest = SceneChangeRequest::e_SHOP;
+
+		return true;
+
+		case StageGateUseResult::e_NONE:
+		default:
+		return false;
+	}
+}
+// Camera回転、Player移動、Camera追従を更新する。
+void GameScene::UpdatePlayerAndCamera( float deltaTime )
+{
+	// 最後にCamera回転、Player移動、Camera追従位置を更新する。
+	m_FpsCamera.Update( m_InputSystem );
+	m_DebugPlayer.Update( deltaTime, m_InputSystem, m_FpsCamera );
+	m_FpsCamera.SetPosition( m_DebugPlayer.GetPosition() );
 }
 
 // DrawまたはGame進行で予約されたScene遷移をUpdate開始時に実行する。
@@ -469,397 +755,6 @@ bool GameScene::UpdateSceneChangeRequest()
 	return true;
 }
 
-// DrawDebugUiで予約されたDebug操作をUpdate開始時に実行する。
-bool GameScene::UpdateDebugUiRequest()
-{
-	switch ( m_DebugUiRequest )
-	{
-		case DebugUiRequest::e_TAKE_DAMAGE:
-		m_PlayerHealth.TakeDamage( TEST_PLAYER_DAMAGE );
-		m_DebugUiRequest = {};
-		return false;
-
-		case DebugUiRequest::e_PREVIOUS_STAGE:
-		{
-			GameProgress& progress = m_SceneManager.GetGameProgress();
-			const int currentStage = progress.GetCurrentStage();
-
-			if ( progress.TrySetCurrentStage( currentStage - PREVIOUS_STAGE_OFFSET ) )
-			{
-				m_SceneChangeRequest = SceneChangeRequest::e_RELOAD_GAME;
-			}
-
-			m_DebugUiRequest = {};
-			return false;
-		}
-
-		case DebugUiRequest::e_NEXT_STAGE:
-		{
-			GameProgress& progress = m_SceneManager.GetGameProgress();
-			const int currentStage = progress.GetCurrentStage();
-
-			if ( progress.TrySetCurrentStage( currentStage + NEXT_STAGE_OFFSET ) )
-			{
-				m_SceneChangeRequest = SceneChangeRequest::e_RELOAD_GAME;
-			}
-
-			m_DebugUiRequest = {};
-			return false;
-		}
-
-		case DebugUiRequest::e_NONE:
-		default:
-		return false;
-	}
-}
-
-// F2キーによるShopSceneへの遷移を処理する。
-bool GameScene::UpdateDebugSceneChange()
-{
-	if ( !m_InputSystem.IsKeyTriggered( RETURN_TO_SHOP_KEY ) ) return false;
-
-	m_AudioSystem.PlayWarpSe();
-	m_InputSystem.SetMouseCaptureEnabled( false );
-	m_SceneManager.RequestSceneChange<ShopScene>();
-
-	return true;
-}
-
-// Player死亡時のペナルティとShopScene遷移を処理する。
-bool GameScene::UpdatePlayerDeath()
-{
-	if ( !m_PlayerHealth.IsDead() ) return false;
-
-	GameProgress& progress = m_SceneManager.GetGameProgress();
-
-	progress.AddDeath();
-	static_cast<void>( progress.ApplyDeathCurrencyPenalty() );
-
-	m_AudioSystem.PlayWarpSe();
-	m_InputSystem.SetMouseCaptureEnabled( false );
-	m_SceneManager.RequestSceneChange<ShopScene>();
-
-	return true;
-}
-
-// ゲーム進行時間、特殊攻撃、銃口FlashのTimerを更新する。
-void GameScene::UpdateGameProgressAndTimers( float deltaTime, GameProgress& progress )
-{
-	// ゲーム進行時間と攻撃・Flash用Timerを更新する。
-	progress.Update( deltaTime );
-	m_SpecialAttackCooldownTimer =
-		std::max( 0.0f, m_SpecialAttackCooldownTimer - deltaTime );
-	m_GunViewModel.Update( deltaTime );
-}
-
-// 低HP状態の警告SEを更新する。
-void GameScene::UpdateLowHealthWarning()
-{
-	// 低HP状態に入ったときだけ警告SEを再生する。
-	const float playerMaxHp = m_PlayerHealth.GetMaxHp();
-	const float playerCurrentHp = m_PlayerHealth.GetCurrentHp();
-	const bool isLowHealth =
-		playerMaxHp > 0.0f &&
-		playerCurrentHp <= playerMaxHp * LOW_HP_RATIO_THRESHOLD;
-
-	if ( isLowHealth && !m_HasPlayedLowHpSe )
-	{
-		m_AudioSystem.PlayLowHpSe();
-		m_HasPlayedLowHpSe = true;
-	}
-	else if ( !isLowHealth )
-	{
-		m_HasPlayedLowHpSe = false;
-	}
-}
-
-// PlayerとEnemyの水平距離の二乗を返す。
-float GameScene::GetPlayerToEnemyDistanceSquared() const
-{
-	return m_CombatSystem.GetHorizontalDistanceSquared( m_DebugPlayer.GetPosition(), m_EnemyVisual.GetPosition() );
-}
-// 敵通常攻撃と特殊攻撃を更新する。
-void GameScene::UpdateEnemyCombat(
-float deltaTime,
-float playerToEnemyDistanceSquared )
-{
-	const bool isCombatActive =
-		m_GamePhase == GamePhase::e_PLAYING &&
-		!m_EnemyController.IsDead();
-
-	const EnemyAttackResult attackResult =
-		m_EnemyController.UpdateCombat(
-		deltaTime,
-		isCombatActive,
-		playerToEnemyDistanceSquared );
-
-	m_IsLastNormalAttackHit = false;
-	m_IsLastSpecialAttackHit = false;
-
-	if ( !attackResult.didAttack )
-	{
-		return;
-	}
-
-	if ( attackResult.isSpecialAttack )
-	{
-		m_IsLastSpecialAttackHit =
-			attackResult.didHitPlayer;
-	}
-	else
-	{
-		m_IsLastNormalAttackHit =
-			attackResult.didHitPlayer;
-	}
-
-	if ( !attackResult.didHitPlayer )
-	{
-		return;
-	}
-
-	m_PlayerHealth.TakeDamage(
-	attackResult.playerDamage );
-
-	m_AudioSystem.PlayDamageSe();
-}
-
-// Playerの通常射撃と特殊攻撃を更新する。
-void GameScene::UpdatePlayerAttack( GameProgress& progress, const PlayerStats& playerStats, float playerToEnemyDistanceSquared )
-{
-	TryFireNormalShot( progress, playerStats );
-	TryUseSpecialAttack( progress, playerStats, playerToEnemyDistanceSquared );
-}
-
-// 左クリックによる通常射撃、Projectile生成、Ray命中判定を処理する。
-void GameScene::TryFireNormalShot( GameProgress& progress, const PlayerStats& playerStats )
-{
-	if ( !m_InputSystem.IsKeyTriggered( SHOOT_ENEMY_KEY ) ||
-	m_EnemyController.IsDead() ||
-	m_GamePhase != GamePhase::e_PLAYING )
-	{
-		return;
-	}
-
-	m_AudioSystem.PlayGunSe();
-	m_GunViewModel.TriggerMuzzleFlash();
-
-	// Camera空間の銃口座標をWorld座標へ変換してProjectileの生成位置にする。
-	const DirectX::XMMATRIX inverseViewMatrix =
-		DirectX::XMMatrixInverse(
-		nullptr,
-		m_FpsCamera.GetViewMatrix() );
-
-	const DirectX::XMVECTOR projectileSpawnCameraSpace =
-		DirectX::XMVectorSet(
-		BULLET_SPAWN_OFFSET_X,
-		BULLET_SPAWN_OFFSET_Y,
-		BULLET_SPAWN_OFFSET_Z,
-		1.0f );
-
-	const DirectX::XMVECTOR projectileSpawnWorldSpace =
-		DirectX::XMVector3TransformCoord(
-		projectileSpawnCameraSpace,
-		inverseViewMatrix );
-
-	DirectX::XMFLOAT3 projectileSpawnPosition{};
-
-	DirectX::XMStoreFloat3(
-	&projectileSpawnPosition,
-	projectileSpawnWorldSpace );
-
-	const DirectX::XMFLOAT3 projectileDirection =
-		m_FpsCamera.GetForward();
-
-	m_ProjectileSystem.Spawn(
-	projectileSpawnPosition,
-	projectileDirection,
-	BULLET_LIFETIME );
-
-	const EnemyHitTest enemyHitTest
-	{
-	m_EnemyVisual.GetHitSphereCenter(
-	ENEMY_HIT_CENTER_Y_OFFSET ),
-	ENEMY_HIT_SPHERE_RADIUS,
-	SHOOT_MAX_DISTANCE
-	};
-
-	m_IsLastShotHit =
-		m_CombatSystem.IsHitScanHit(
-		m_FpsCamera.GetPosition(),
-		projectileDirection,
-		enemyHitTest );
-
-	if ( !m_IsLastShotHit )return;
-
-
-	const EnemyDamageResult damageResult =
-		m_EnemyController.TakeDamage(
-		playerStats.gunDamage );
-
-	progress.AddDamageReward(
-	damageResult.actualDamage );
-}
-
-// Qキーによる範囲特殊攻撃、Cooldown、EnemyへのDamageを処理する。
-void GameScene::TryUseSpecialAttack(
-GameProgress& progress,
-const PlayerStats& playerStats,
-float playerToEnemyDistanceSquared )
-{
-	if ( !m_InputSystem.IsKeyTriggered(
-		SPECIAL_ATTACK_KEY ) ||
-	m_EnemyController.IsDead() ||
-	m_GamePhase != GamePhase::e_PLAYING ||
-	!playerStats.isSpecialAttackUnlocked ||
-	m_SpecialAttackCooldownTimer > 0.0f )
-	{
-		return;
-	}
-
-	m_AudioSystem.PlaySpecialSe();
-
-	m_IsLastPlayerSpecialAttackHit = m_CombatSystem.IsWithinRangeSquared( playerToEnemyDistanceSquared, PLAYER_SPECIAL_ATTACK_RANGE_SQUARED );
-
-	m_SpecialAttackCooldownTimer = playerStats.specialAttackCooldown;
-
-	if ( !m_IsLastPlayerSpecialAttackHit )return;
-
-	const EnemyDamageResult damageResult =
-		m_EnemyController.TakeDamage(
-		playerStats.gunDamage *
-		PLAYER_SPECIAL_ATTACK_DAMAGE_MULTIPLIER );
-
-	progress.AddDamageReward(
-	damageResult.actualDamage );
-}
-// Projectileの移動と寿命を更新する。
-void GameScene::UpdateProjectiles( float deltaTime )
-{
-	m_ProjectileSystem.Update( deltaTime, BULLET_SPEED );
-}
-
-// EnemyとGateのアニメーションを更新する。
-void GameScene::UpdateAnimations(
-float deltaTime )
-{
-	if ( !m_EnemyController.IsDead() )
-	{
-		m_EnemyVisual.Update( deltaTime );
-	}
-
-	m_PreviousStageGate.Update( deltaTime );
-	m_NextStageGate.Update( deltaTime );
-	m_ShopGate.Update( deltaTime );
-}
-
-// Enemy撃破報酬、Stage Clear、Result遷移予約を更新する。
-void GameScene::UpdateEnemyDefeat(
-GameProgress& progress )
-{
-	if ( !m_EnemyController.IsDead() ||
-	m_HasPlayedEnemyDefeatSe ||
-	m_GamePhase != GamePhase::e_PLAYING )
-	{
-		return;
-	}
-
-	m_AudioSystem.PlayEnemyDefeatSe();
-	m_HasPlayedEnemyDefeatSe = true;
-
-	progress.AddEnemyDefeat();
-
-	const bool isFirstClear =
-		progress.MarkCurrentStageCleared();
-
-	if ( !isFirstClear )
-	{
-		return;
-	}
-
-	progress.AddStageClearReward();
-
-	if ( progress.GetCurrentStage() ==
-	StageConstants::MAX_STAGE_COUNT )
-	{
-		m_GamePhase =
-			GamePhase::e_RESULT_TRANSITION;
-
-		m_SceneChangeRequest =
-			SceneChangeRequest::e_RESULT;
-
-		return;
-	}
-
-	m_GamePhase =
-		GamePhase::e_STAGE_CLEAR;
-}
-
-// F1キーによるMouse Capture切替を処理する。
-void GameScene::UpdateMouseCapture()
-{
-	// F1キーでFPSマウスキャプチャの有効・無効を切り替える。
-	if ( m_InputSystem.IsKeyTriggered( TOGGLE_MOUSE_CAPTURE_KEY ) )
-	{
-		m_InputSystem.SetMouseCaptureEnabled(
-		!m_InputSystem.IsMouseCaptureEnabled() );
-	}
-}
-
-// Gate操作によるStageまたはShopへのScene遷移を処理する。
-bool GameScene::UpdateGates( GameProgress& progress )
-{
-	const DirectX::XMFLOAT3 playerPosition = m_DebugPlayer.GetPosition();
-	// 現在Stageに応じた前後Gateの使用可否を判定する。
-	const int currentStage = progress.GetCurrentStage();
-	const bool isPreviousGateAvailable = currentStage > StageConstants::FIRST_STAGE_NUMBER;
-	const bool isNextGateAvailable = currentStage < StageConstants::MAX_STAGE_COUNT && progress.IsStageCleared( currentStage );
-
-	// Eキーで近くにあるGateを使用し、必要ならStage番号を更新してScene遷移する。
-	if ( !m_InputSystem.IsKeyTriggered( USE_GATE_KEY ) ) return false;
-
-	if ( isPreviousGateAvailable &&
-		 m_PreviousStageGate.IsPlayerNear( playerPosition, GATE_INTERACTION_RADIUS_SQUARED ) &&
-		 progress.TrySetCurrentStage( currentStage - PREVIOUS_STAGE_OFFSET ) )
-	{
-		m_AudioSystem.PlayWarpSe();
-		m_InputSystem.SetMouseCaptureEnabled( false );
-		m_SceneManager.RequestSceneChange<GameScene>();
-
-		return true;
-	}
-
-	if ( isNextGateAvailable &&
-	m_NextStageGate.IsPlayerNear( playerPosition, GATE_INTERACTION_RADIUS_SQUARED ) &&
-	progress.TrySetCurrentStage( currentStage + NEXT_STAGE_OFFSET ) )
-	{
-		m_AudioSystem.PlayWarpSe();
-		m_InputSystem.SetMouseCaptureEnabled( false );
-		m_SceneManager.RequestSceneChange<GameScene>();
-
-		return true;
-	}
-
-	if ( m_ShopGate.IsPlayerNear( playerPosition, GATE_INTERACTION_RADIUS_SQUARED ) )
-	{
-		m_AudioSystem.PlayWarpSe();
-		m_InputSystem.SetMouseCaptureEnabled( false );
-		m_SceneManager.RequestSceneChange<ShopScene>();
-
-		return true;
-	}
-
-	return false;
-}
-
-// Camera回転、Player移動、Camera追従を更新する。
-void GameScene::UpdatePlayerAndCamera( float deltaTime )
-{
-	// 最後にCamera回転、Player移動、Camera追従位置を更新する。
-	m_FpsCamera.Update( m_InputSystem );
-	m_DebugPlayer.Update( deltaTime, m_InputSystem, m_FpsCamera );
-	m_FpsCamera.SetPosition( m_DebugPlayer.GetPosition() );
-}
-
 // Sky DomeをSky Passで描画する。
 void GameScene::DrawSky( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT3& cameraPosition )
 {
@@ -869,66 +764,27 @@ void GameScene::DrawSky( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMM
 // Enemy、Floor、Wall、Gate、GunをOpaque Passで描画する。
 void GameScene::DrawOpaqueWorld( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix, bool isPreviousGateAvailable, bool isNextGateAvailable )
 {
-	if ( !m_EnemyController.IsDead() )
-	{
-		m_EnemyVisual.Draw(
-		m_EnemyModelRenderer,
-		m_GraphicsSystem,
-		viewMatrix,
-		projectionMatrix );
-	}
+	if ( !m_EnemyController.IsDead() )m_EnemyVisual.Draw( m_EnemyModelRenderer, m_GraphicsSystem, viewMatrix, projectionMatrix );
 
 	// Stage FieldのFloorとWallをOpaque Passで描画する。
-	m_StageField.Draw(
-	m_BasicMeshRenderer,
-	m_GraphicsSystem,
-	viewMatrix,
-	projectionMatrix );
+	m_StageField.Draw( m_BasicMeshRenderer, m_GraphicsSystem, viewMatrix, projectionMatrix );
 
 	// 使用可能な前後Gateと常時使用可能なShop Gateを描画する。
-	if ( isPreviousGateAvailable )
-	{
-		m_PreviousStageGate.Draw(
-		m_BasicMeshRenderer,
-		m_GraphicsSystem,
-		viewMatrix,
-		projectionMatrix );
-	}
+	if ( isPreviousGateAvailable )m_PreviousStageGate.Draw( m_BasicMeshRenderer, m_GraphicsSystem, viewMatrix, projectionMatrix );
 
-	if ( isNextGateAvailable )
-	{
-		m_NextStageGate.Draw(
-		m_BasicMeshRenderer,
-		m_GraphicsSystem,
-		viewMatrix,
-		projectionMatrix );
-	}
+	if ( isNextGateAvailable )m_NextStageGate.Draw( m_BasicMeshRenderer, m_GraphicsSystem, viewMatrix, projectionMatrix );
 
-	m_ShopGate.Draw(
-	m_BasicMeshRenderer,
-	m_GraphicsSystem,
-	viewMatrix,
-	projectionMatrix );
+	m_ShopGate.Draw( m_BasicMeshRenderer, m_GraphicsSystem, viewMatrix, projectionMatrix );
 
 	// FPS Cameraに追従するGun本体とGun Barrelを描画する。
-	m_GunViewModel.DrawOpaque(
-	m_BasicMeshRenderer,
-	m_GraphicsSystem,
-	viewMatrix,
-	projectionMatrix );
+	m_GunViewModel.DrawOpaque( m_BasicMeshRenderer, m_GraphicsSystem, viewMatrix, projectionMatrix );
 }
 
 // Muzzle FlashとBulletをTransparent Passで描画する。
-void GameScene::DrawTransparentWorld(
-const DirectX::XMMATRIX& viewMatrix,
-const DirectX::XMMATRIX& projectionMatrix )
+void GameScene::DrawTransparentWorld( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix )
 {
 	// FPS Cameraに追従するMuzzle FlashをTransparent Passで描画する。
-	m_GunViewModel.DrawTransparent(
-	m_BasicMeshRenderer,
-	m_GraphicsSystem,
-	viewMatrix,
-	projectionMatrix );
+	m_GunViewModel.DrawTransparent( m_BasicMeshRenderer, m_GraphicsSystem, viewMatrix, projectionMatrix );
 
 	// 発射中の弾を半透明で描画する。
 	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_TRANSPARENT );
@@ -939,14 +795,10 @@ const DirectX::XMMATRIX& projectionMatrix )
 	{
 		if ( !projectile.isActive ) continue;
 
-		const float projectileAlpha =
-			std::clamp( projectile.remainingLifetime / BULLET_LIFETIME, 0.0f, 1.0f );
+		const float projectileAlpha = std::clamp( projectile.remainingLifetime / BULLET_LIFETIME, 0.0f, 1.0f );
 		const DirectX::XMMATRIX projectileWorldMatrix =
 			DirectX::XMMatrixScaling( BULLET_SCALE, BULLET_SCALE, BULLET_SCALE ) *
-			DirectX::XMMatrixTranslation(
-			projectile.position.x,
-			projectile.position.y,
-			projectile.position.z );
+			DirectX::XMMatrixTranslation( projectile.position.x, projectile.position.y, projectile.position.z );
 
 		m_BasicMeshRenderer.DrawCube(
 		m_GraphicsSystem,
@@ -959,28 +811,58 @@ const DirectX::XMMATRIX& projectionMatrix )
 	}
 }
 
-// ImGui Debug UIを描画し、既存のScene遷移処理を行う。
-void GameScene::DrawDebugUi(
-GameProgress& progress,
-const StageData& stageData,
-int currentStage,
-bool isPreviousGateAvailable,
-bool isNextGateAvailable )
+// ImGui Debug UIを描画し、Debug操作要求を設定する。
+void GameScene::DrawDebugUi( const GameDebugState& gameDebugState )
 {
-	// ImGuiでStage、敵、通貨、Gate操作を確認できるDebug UIを描画する。
 	ImGui::Begin( "Game Debug" );
-	ImGui::Text( "Stage %d / %d", stageData.stageNumber, StageConstants::MAX_STAGE_COUNT );
-	ImGui::Text( "Enemy: %s", stageData.enemyName );
-	ImGui::Text( "Clear Reward: %d", stageData.clearReward );
+
+	ImGui::Text( "Stage %d / %d", gameDebugState.currentStage, gameDebugState.maxStageCount );
+
+	ImGui::Text( "Enemy: %s", gameDebugState.enemyName );
+
+	ImGui::Text( "Clear Reward: %d", gameDebugState.clearReward );
 
 	if ( ImGui::Button( "Test: Take 10 Damage" ) )m_DebugUiRequest = DebugUiRequest::e_TAKE_DAMAGE;
 
 	ImGui::Separator();
 
-	ImGui::Text( "Last Shot: %s", m_IsLastShotHit ? "HIT" : "MISS" );
-	ImGui::Text( "Currency: %d", progress.GetCurrency() );
-	ImGui::Text( "Deaths: %d", progress.GetTotalDeaths() );
-	ImGui::Text( "Play Time: %.1f sec", progress.GetTotalPlayTime() );
+	ImGui::Text( "Enemy HP: %.0f / %.0f", gameDebugState.enemyCurrentHp, gameDebugState.enemyMaxHp );
+
+	ImGui::Text( "Last Shot: %s", gameDebugState.isLastShotHit ? "HIT" : "MISS" );
+
+	ImGui::Text( "Last Enemy Normal Attack: %s", gameDebugState.isLastNormalAttackHit ? "HIT" : "MISS" );
+
+	ImGui::Text( "Last Enemy Special Attack: %s", gameDebugState.isLastSpecialAttackHit ? "HIT" : "MISS" );
+
+	ImGui::Text( "Last Player Special Attack: %s", gameDebugState.isLastPlayerSpecialAttackHit ? "HIT" : "MISS" );
+
+	ImGui::Text( "Currency: %d", gameDebugState.currency );
+
+	ImGui::Text( "Deaths: %d", gameDebugState.totalDeaths );
+
+	ImGui::Text( "Play Time: %.1f sec", gameDebugState.totalPlayTime );
+
+	const char* gamePhaseText = "PLAYING";
+
+	switch ( gameDebugState.gamePhase )
+	{
+		case GamePhase::e_PLAYING:
+		gamePhaseText = "PLAYING";
+		break;
+
+		case GamePhase::e_STAGE_CLEAR:
+		gamePhaseText = "STAGE CLEAR";
+		break;
+
+		case GamePhase::e_RESULT_TRANSITION:
+		gamePhaseText = "RESULT TRANSITION";
+		break;
+
+		default:
+		break;
+	}
+
+	ImGui::Text( "Game Phase: %s", gamePhaseText );
 
 	ImGui::Separator();
 
@@ -995,32 +877,29 @@ bool isNextGateAvailable )
 
 	GateDestination gateDestination{};
 
-	if ( isPreviousGateAvailable &&
-	ImGui::Button( PREVIOUS_STAGE_GATE_LABEL, ImVec2( GATE_BUTTON_WIDTH, GATE_BUTTON_HEIGHT ) ) )
+	if ( gameDebugState.isPreviousGateAvailable && ImGui::Button( PREVIOUS_STAGE_GATE_LABEL, ImVec2{ GATE_BUTTON_WIDTH,GATE_BUTTON_HEIGHT } ) )
 	{
-		gateDestination = GateDestination::e_PREVIOUS_STAGE;
+		gateDestination =
+			GateDestination::e_PREVIOUS_STAGE;
 	}
 
-	if ( currentStage < StageConstants::MAX_STAGE_COUNT )
+	if ( gameDebugState.currentStage < gameDebugState.maxStageCount )
 	{
-		if ( !isNextGateAvailable ) ImGui::BeginDisabled();
+		if ( !gameDebugState.isNextGateAvailable )ImGui::BeginDisabled();
 
-		if ( ImGui::Button( NEXT_STAGE_GATE_LABEL, ImVec2( GATE_BUTTON_WIDTH, GATE_BUTTON_HEIGHT ) ) )
+		if ( ImGui::Button( NEXT_STAGE_GATE_LABEL, ImVec2{ GATE_BUTTON_WIDTH,GATE_BUTTON_HEIGHT } ) )
 		{
 			gateDestination = GateDestination::e_NEXT_STAGE;
 		}
 
-		if ( !isNextGateAvailable ) ImGui::EndDisabled();
+		if ( !gameDebugState.isNextGateAvailable )ImGui::EndDisabled();
+
 	}
 
-	if ( ImGui::Button( SHOP_GATE_LABEL, ImVec2( GATE_BUTTON_WIDTH, GATE_BUTTON_HEIGHT ) ) )
-	{
-		gateDestination = GateDestination::e_SHOP;
-	}
+	if ( ImGui::Button( SHOP_GATE_LABEL, ImVec2{ GATE_BUTTON_WIDTH,GATE_BUTTON_HEIGHT } ) )gateDestination = GateDestination::e_SHOP;
 
 	ImGui::End();
 
-	// ImGui Debug UIで選択されたGateに応じて次フレームのScene遷移を予約する。
 	if ( gateDestination == GateDestination::e_PREVIOUS_STAGE )
 	{
 		m_DebugUiRequest = DebugUiRequest::e_PREVIOUS_STAGE;
@@ -1033,4 +912,56 @@ bool isNextGateAvailable )
 	{
 		m_SceneChangeRequest = SceneChangeRequest::e_SHOP;
 	}
+}
+
+// 通常射撃のSE、Muzzle Flash、Projectile生成、Ray命中判定、Enemy Damageを実行する。
+void GameScene::ExecuteNormalShot( GameProgress& progress, const PlayerStats& playerStats )
+{
+	m_AudioSystem.PlayGunSe();
+
+	m_GunViewModel.TriggerMuzzleFlash();
+
+	// Camera空間の銃口座標をWorld座標へ変換してProjectileの生成位置にする。
+	const DirectX::XMMATRIX inverseViewMatrix = DirectX::XMMatrixInverse( nullptr, m_FpsCamera.GetViewMatrix() );
+
+	const DirectX::XMVECTOR projectileSpawnCameraSpace = DirectX::XMVectorSet( BULLET_SPAWN_OFFSET_X, BULLET_SPAWN_OFFSET_Y, BULLET_SPAWN_OFFSET_Z, 1.0f );
+
+	const DirectX::XMVECTOR projectileSpawnWorldSpace = DirectX::XMVector3TransformCoord( projectileSpawnCameraSpace, inverseViewMatrix );
+
+	DirectX::XMFLOAT3 projectileSpawnPosition{};
+
+	DirectX::XMStoreFloat3( &projectileSpawnPosition, projectileSpawnWorldSpace );
+
+	const DirectX::XMFLOAT3 projectileDirection = m_FpsCamera.GetForward();
+
+	m_ProjectileSystem.Spawn( projectileSpawnPosition, projectileDirection, BULLET_LIFETIME );
+
+	const EnemyHitTest enemyHitTest{ m_EnemyVisual.GetHitSphereCenter( ENEMY_HIT_CENTER_Y_OFFSET ),ENEMY_HIT_SPHERE_RADIUS,SHOOT_MAX_DISTANCE };
+
+	m_IsLastShotHit = m_CombatSystem.IsHitScanHit( m_FpsCamera.GetPosition(), projectileDirection, enemyHitTest );
+
+	if ( !m_IsLastShotHit )return;
+
+	const EnemyDamageResult damageResult = m_EnemyController.TakeDamage( playerStats.gunDamage );
+
+	progress.AddDamageReward( damageResult.actualDamage );
+}
+
+// 特殊攻撃のSE、範囲判定、Enemy Damageを実行する。
+void GameScene::ExecuteSpecialAttack( GameProgress& progress, const PlayerStats& playerStats, float playerToEnemyDistanceSquared )
+{
+	m_AudioSystem.PlaySpecialSe();
+
+	m_IsLastPlayerSpecialAttackHit = m_CombatSystem.IsWithinRangeSquared( playerToEnemyDistanceSquared, PLAYER_SPECIAL_ATTACK_RANGE_SQUARED );
+
+	if ( !m_IsLastPlayerSpecialAttackHit )return;
+
+	const EnemyDamageResult damageResult = m_EnemyController.TakeDamage( playerStats.gunDamage * PLAYER_SPECIAL_ATTACK_DAMAGE_MULTIPLIER );
+
+	progress.AddDamageReward( damageResult.actualDamage );
+}
+
+float GameScene::GetPlayerToEnemyDistanceSquared() const
+{
+	return m_CombatSystem.GetHorizontalDistanceSquared( m_DebugPlayer.GetPosition(), m_EnemyVisual.GetPosition() );
 }

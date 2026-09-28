@@ -11,11 +11,7 @@ namespace
 }
 
 // Gateの種類、Transform、表示色を初期化する。
-void StageGate::Initialize(
-GateType gateType,
-const DirectX::XMFLOAT3& position,
-const DirectX::XMFLOAT3& scale,
-const DirectX::XMFLOAT4& color )
+void StageGate::Initialize( GateType gateType, const DirectX::XMFLOAT3& position, const DirectX::XMFLOAT3& scale, const DirectX::XMFLOAT4& color )
 {
 	m_GateType = gateType;
 	m_Transform.SetPosition( position );
@@ -30,17 +26,11 @@ void StageGate::Update( float deltaTime )
 {
 	m_AnimationTime += deltaTime;
 
-	m_Transform.SetRotation(
-	DirectX::XMFLOAT3{
-	0.0f,
-	m_AnimationTime * GATE_ROTATION_SPEED,
-	0.0f } );
+	m_Transform.SetRotation( DirectX::XMFLOAT3{ 0.0f,m_AnimationTime * GATE_ROTATION_SPEED,0.0f } );
 }
 
 // PlayerがGateの操作範囲内にいるかを返す。
-bool StageGate::IsPlayerNear(
-const DirectX::XMFLOAT3& playerPosition,
-float interactionRadiusSquared ) const
+bool StageGate::IsPlayerNear( const DirectX::XMFLOAT3& playerPosition, float interactionRadiusSquared ) const
 {
 	const DirectX::XMFLOAT3& gatePosition = m_Transform.GetPosition();
 	const float deltaX = playerPosition.x - gatePosition.x;
@@ -51,30 +41,9 @@ float interactionRadiusSquared ) const
 }
 
 // GateをOpaque Passで描画する。
-void StageGate::Draw(
-BasicMeshRenderer& basicMeshRenderer,
-GraphicsSystem& graphicsSystem,
-const DirectX::XMMATRIX& viewMatrix,
-const DirectX::XMMATRIX& projectionMatrix ) const
+void StageGate::Draw( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem& graphicsSystem,
+					  const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix ) const
 {
-	basicMeshRenderer.DrawCube(
-	graphicsSystem,
-	m_Transform.GetWorldMatrix(),
-	viewMatrix,
-	projectionMatrix,
-	m_Color,
-	DirectX::XMFLOAT2{ 1.0f, 1.0f },
-	BasicMeshRenderer::TextureType::Color );
-}
-
-// Gateの種類を返す。
-StageGate::GateType StageGate::GetGateType() const
-{
-	return m_GateType;
-}
-
-// GateのWorld座標を返す。
-const DirectX::XMFLOAT3& StageGate::GetPosition() const
-{
-	return m_Transform.GetPosition();
+	basicMeshRenderer.DrawCube( graphicsSystem, m_Transform.GetWorldMatrix(), viewMatrix, projectionMatrix, m_Color,
+								DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
 }

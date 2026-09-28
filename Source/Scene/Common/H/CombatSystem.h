@@ -18,18 +18,10 @@ class CombatSystem final
 public:
 	//========= 命中判定関数=========
 	// Camera位置・前方向からのRayがEnemy Sphereに命中するか返す。
-	[[nodiscard]] bool IsHitScanHit(
-	const DirectX::XMFLOAT3& rayOrigin,
-	const DirectX::XMFLOAT3& rayDirection,
-	const EnemyHitTest& enemyHitTest ) const;
-
+	[[nodiscard]] bool IsHitScanHit( const DirectX::XMFLOAT3& rayOrigin, const DirectX::XMFLOAT3& rayDirection,
+									 const EnemyHitTest& enemyHitTest ) const;
 	// PlayerとEnemyの水平距離の二乗を返す。
-	[[nodiscard]] float GetHorizontalDistanceSquared(
-	const DirectX::XMFLOAT3& firstPosition,
-	const DirectX::XMFLOAT3& secondPosition ) const;
-
+	[[nodiscard]] float GetHorizontalDistanceSquared( const DirectX::XMFLOAT3& firstPosition, const DirectX::XMFLOAT3& secondPosition ) const;
 	// Playerが指定した攻撃範囲内にいるか返す。
-	[[nodiscard]] bool IsWithinRangeSquared(
-	float distanceSquared,
-	float rangeSquared ) const;
+	[[nodiscard]] bool IsWithinRangeSquared( float distanceSquared, float rangeSquared ) const;
 };

@@ -19,13 +19,8 @@ public:
 
 	//========= 描画関数=========
 	// Camera位置に追従するSky DomeをSky Passで描画する。
-	void Draw(
-	ObjModelRenderer& skyDomeRenderer,
-	GraphicsSystem& graphicsSystem,
-	const DirectX::XMMATRIX& viewMatrix,
-	const DirectX::XMMATRIX& projectionMatrix,
-	const DirectX::XMFLOAT3& cameraPosition );
-
+	void Draw( ObjModelRenderer& skyDomeRenderer, GraphicsSystem& graphicsSystem, const DirectX::XMMATRIX& viewMatrix,
+			   const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT3& cameraPosition );
 private:
 	//========= Sky Dome状態=========
 	// Sky Domeの位置、回転、Scale、World行列を管理する。

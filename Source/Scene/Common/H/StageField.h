@@ -19,26 +19,17 @@ public:
 
 	//========= 描画関数=========
 	// Floorと4面WallをOpaque Passで描画する。
-	void Draw(
-	BasicMeshRenderer& basicMeshRenderer,
-	GraphicsSystem& graphicsSystem,
-	const DirectX::XMMATRIX& viewMatrix,
-	const DirectX::XMMATRIX& projectionMatrix ) const;
-
+	void Draw( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem& graphicsSystem, const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix ) const;
 private:
 	//========= Field Transform=========
 	// FloorのTransform。
 	Transform m_FloorTransform{};
-
 	// Left WallのTransform。
 	Transform m_LeftWallTransform{};
-
 	// Right WallのTransform。
 	Transform m_RightWallTransform{};
-
 	// Near WallのTransform。
 	Transform m_NearWallTransform{};
-
 	// Far WallのTransform。
 	Transform m_FarWallTransform{};
 };

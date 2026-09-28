@@ -78,20 +78,12 @@ public:
 		m_PlayerStats = {};
 		m_StageCleared.fill( false );
 	}
-
 	// 経過時間を累計プレイ時間へ加算する。
-	void Update( float deltaTime )
-	{
-		m_TotalPlayTime += deltaTime;
-	}
+	void Update( float deltaTime ) { m_TotalPlayTime += deltaTime; }
 
 	//========= 通貨・累計記録操作関数=========
 	// 指定した通貨を加算する。
-	void AddCurrency( int amount )
-	{
-		if ( amount > 0 ) m_Currency += amount;
-	}
-
+	void AddCurrency( int amount ) { if ( amount > 0 ) m_Currency += amount; }
 	// 与えたダメージを累計し、一定量ごとに通貨を加算する。
 	void AddDamageReward( float damage )
 	{
@@ -106,13 +98,8 @@ public:
 			++m_Currency;
 		}
 	}
-
 	// 死亡回数を1増やす。
-	void AddDeath()
-	{
-		++m_TotalDeaths;
-	}
-
+	void AddDeath() { ++m_TotalDeaths; }
 	// 所持通貨の死亡ペナルティを適用し、失った通貨を返す。
 	[[nodiscard]] int ApplyDeathCurrencyPenalty()
 	{
@@ -122,12 +109,8 @@ public:
 
 		return lostCurrency;
 	}
-
 	// 敵撃破数を1増やす。
-	void AddEnemyDefeat()
-	{
-		++m_TotalEnemiesDefeated;
-	}
+	void AddEnemyDefeat() { ++m_TotalEnemiesDefeated; }
 
 	//========= Stage進行操作関数=========
 	// 指定したStageが解放済みの場合に現在Stageへ設定する。
@@ -139,7 +122,6 @@ public:
 
 		return true;
 	}
-
 	// 現在Stageを初回クリア済みに設定し、初回設定に成功したかを返す。
 	[[nodiscard]] bool MarkCurrentStageCleared()
 	{
@@ -153,10 +135,7 @@ public:
 	}
 
 	// 現在Stageの初回クリア報酬を通貨へ加算する。
-	void AddStageClearReward()
-	{
-		m_Currency += GetCurrentStageData().clearReward;
-	}
+	void AddStageClearReward() { m_Currency += GetCurrentStageData().clearReward; }
 
 	//========= 強化操作関数=========
 	// 指定した強化に必要な通貨を返す。
@@ -180,15 +159,12 @@ public:
 			return {};
 		}
 	}
-
 	// 通貨と解放条件を満たす場合に指定した恒久強化を購入する。
 	bool TryPurchaseUpgrade( UpgradeType upgradeType )
 	{
-		if ( upgradeType == UpgradeType::e_UNLOCK_SPECIAL_ATTACK &&
-			m_PlayerStats.isSpecialAttackUnlocked ) return false;
+		if ( upgradeType == UpgradeType::e_UNLOCK_SPECIAL_ATTACK && m_PlayerStats.isSpecialAttackUnlocked ) return false;
 
-		if ( upgradeType == UpgradeType::e_SPECIAL_ATTACK_COOLDOWN &&
-			!m_PlayerStats.isSpecialAttackUnlocked ) return false;
+		if ( upgradeType == UpgradeType::e_SPECIAL_ATTACK_COOLDOWN && !m_PlayerStats.isSpecialAttackUnlocked ) return false;
 
 		const int upgradeCost = GetUpgradeCost( upgradeType );
 		if ( m_Currency < upgradeCost ) return false;
@@ -210,10 +186,8 @@ public:
 			break;
 
 			case UpgradeType::e_SPECIAL_ATTACK_COOLDOWN:
-			m_PlayerStats.specialAttackCooldown = std::max(
-				GameBalance::MIN_SPECIAL_ATTACK_COOLDOWN_SECONDS,
-				m_PlayerStats.specialAttackCooldown -
-					GameBalance::SPECIAL_ATTACK_COOLDOWN_UPGRADE_AMOUNT_SECONDS );
+			m_PlayerStats.specialAttackCooldown = std::max( GameBalance::MIN_SPECIAL_ATTACK_COOLDOWN_SECONDS,
+				m_PlayerStats.specialAttackCooldown - GameBalance::SPECIAL_ATTACK_COOLDOWN_UPGRADE_AMOUNT_SECONDS );
 			break;
 
 			default:
@@ -225,33 +199,22 @@ public:
 
 	//========= Getter関数=========
 	// 現在選択しているStage番号を返す。
-	[[nodiscard]] int GetCurrentStage() const
-	{
-		return m_CurrentStage;
-	}
-
+	[[nodiscard]] int GetCurrentStage() const { return m_CurrentStage; }
 	// 現在選択しているStageの設定を返す。
-	[[nodiscard]] const StageData& GetCurrentStageData() const
-	{
-		return STAGE_DATA[ m_CurrentStage - StageConstants::FIRST_STAGE_NUMBER ];
-	}
-
+	[[nodiscard]] const StageData& GetCurrentStageData() const { return STAGE_DATA[ m_CurrentStage - StageConstants::FIRST_STAGE_NUMBER ]; }
 	// 指定したStageが初回クリア済みかを返す。
 	[[nodiscard]] bool IsStageCleared( int stageNumber ) const
 	{
 		const int stageIndex = stageNumber - StageConstants::FIRST_STAGE_NUMBER;
 
-		if ( stageIndex < 0 ||
-			stageIndex >= static_cast<int>( m_StageCleared.size() ) ) return false;
+		if ( stageIndex < 0 || stageIndex >= static_cast<int>( m_StageCleared.size() ) ) return false;
 
 		return m_StageCleared[ stageIndex ];
 	}
-
 	// 指定したStageが移動可能な状態かを返す。
 	[[nodiscard]] bool IsStageUnlocked( int stageNumber ) const
 	{
-		if ( stageNumber < StageConstants::FIRST_STAGE_NUMBER ||
-			stageNumber > StageConstants::MAX_STAGE_COUNT ) return false;
+		if ( stageNumber < StageConstants::FIRST_STAGE_NUMBER || stageNumber > StageConstants::MAX_STAGE_COUNT ) return false;
 
 		if ( stageNumber == StageConstants::FIRST_STAGE_NUMBER ) return true;
 
@@ -259,42 +222,18 @@ public:
 
 		return m_StageCleared[ previousStage ];
 	}
-
 	// 現在所持している通貨を返す。
-	[[nodiscard]] int GetCurrency() const
-	{
-		return m_Currency;
-	}
-
+	[[nodiscard]] int GetCurrency() const { return m_Currency; }
 	// 累計で敵へ与えたダメージを返す。
-	[[nodiscard]] float GetTotalDamageDealt() const
-	{
-		return m_TotalDamageDealt;
-	}
-
+	[[nodiscard]] float GetTotalDamageDealt() const { return m_TotalDamageDealt; }
 	// 累計死亡回数を返す。
-	[[nodiscard]] int GetTotalDeaths() const
-	{
-		return m_TotalDeaths;
-	}
-
+	[[nodiscard]] int GetTotalDeaths() const { return m_TotalDeaths; }
 	// 累計敵撃破数を返す。
-	[[nodiscard]] int GetTotalEnemiesDefeated() const
-	{
-		return m_TotalEnemiesDefeated;
-	}
-
+	[[nodiscard]] int GetTotalEnemiesDefeated() const { return m_TotalEnemiesDefeated; }
 	// 累計プレイ時間を秒で返す。
-	[[nodiscard]] float GetTotalPlayTime() const
-	{
-		return m_TotalPlayTime;
-	}
-
+	[[nodiscard]] float GetTotalPlayTime() const { return m_TotalPlayTime; }
 	// 現在のPlayer恒久強化後能力を返す。
-	[[nodiscard]] const PlayerStats& GetPlayerStats() const
-	{
-		return m_PlayerStats;
-	}
+	[[nodiscard]] const PlayerStats& GetPlayerStats() const { return m_PlayerStats; }
 
 private:
 	//========= Stage進行状態=========

@@ -36,30 +36,17 @@ public:
 	//========= Scene遷移関数=========
 	// 指定したSceneを次の遷移先として予約する。
 	template<class TScene>
-	void RequestSceneChange()
-	{
-		m_NextScene = std::make_unique<TScene>( *this, *m_InputSystem, *m_GraphicsSystem, *m_AudioSystem );
-	}
+	void RequestSceneChange() { m_NextScene = std::make_unique<TScene>( *this, *m_InputSystem, *m_GraphicsSystem, *m_AudioSystem ); }
 
 	//========= ゲーム進捗操作関数=========
 	// 新しいゲーム開始時に進捗を初期化する。
-	void StartNewGame()
-	{
-		m_GameProgress.Initialize();
-	}
+	void StartNewGame() { m_GameProgress.Initialize(); }
 
 	//========= Getter関数=========
 	// Sceneをまたいで維持するゲーム進捗を返す。
-	[[nodiscard]] GameProgress& GetGameProgress()
-	{
-		return m_GameProgress;
-	}
-
+	[[nodiscard]] GameProgress& GetGameProgress() { return m_GameProgress; }
 	// Sceneをまたいで維持する読み取り専用のゲーム進捗を返す。
-	[[nodiscard]] const GameProgress& GetGameProgress() const
-	{
-		return m_GameProgress;
-	}
+	[[nodiscard]] const GameProgress& GetGameProgress() const { return m_GameProgress; }
 
 private:
 	//========= 補助関数=========

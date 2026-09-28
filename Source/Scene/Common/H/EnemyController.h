@@ -32,14 +32,8 @@ class EnemyController final
 public:
 	//========= 初期化関数=========
 	// Stage設定からEnemyのHPと攻撃状態を初期化する。
-	void Initialize(
-	float maxHp,
-	float normalAttackInterval,
-	float normalAttackRangeSquared,
-	float normalAttackDamage,
-	float specialAttackInterval,
-	float specialAttackRangeSquared,
-	float specialAttackDamage );
+	void Initialize( float maxHp, float normalAttackInterval, float normalAttackRangeSquared,
+					 float normalAttackDamage, float specialAttackInterval, float specialAttackRangeSquared, float specialAttackDamage );
 
 	//========= 更新関数=========
 	// Enemy攻撃Timerを更新し、通常攻撃または特殊攻撃の結果を返す。
@@ -51,10 +45,10 @@ public:
 	EnemyDamageResult TakeDamage( float damage );
 
 	//========= 取得関数=========
-	[[nodiscard]] float GetCurrentHp() const;
-	[[nodiscard]] float GetMaxHp() const;
-	[[nodiscard]] bool IsDead() const;
-	[[nodiscard]] EnemyState GetState() const;
+	[[nodiscard]] float GetCurrentHp() const { return m_CurrentHp; }
+	[[nodiscard]] float GetMaxHp() const { return m_MaxHp; }
+	[[nodiscard]] bool IsDead() const { return m_State == EnemyState::e_DEAD; }
+	[[nodiscard]] EnemyState GetState() const { return m_State; }
 
 private:
 	//========= Enemy状態=========

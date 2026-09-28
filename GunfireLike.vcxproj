@@ -209,10 +209,14 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Scene\Common\CPP\EnemyVisual.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\GameHud.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\GunViewModel.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\PlayerCombatController.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\PlayerHealthStateController.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\ProjectileSystem.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\SkyDome.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\StageField.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\StageGate.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\StageGateController.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\StageProgressController.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\Transform.cpp" />
     <ClCompile Include="Source\Scene\ResultScene\CPP\ResultScene.cpp" />
     <ClCompile Include="Source\Scene\ShopScene\CPP\ShopScene.cpp" />
@@ -248,6 +252,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="Source\Scene\Common\H\GunViewModel.h" />
+    <ClInclude Include="Source\Scene\Common\H\PlayerCombatController.h" />
     <ClInclude Include="Source\Scene\Common\H\PlayerHealth.h" />
     <ClInclude Include="Source\Framework\Etc\H\AppConfig.h" />
     <ClInclude Include="Source\Framework\Etc\H\GameTimer.h" />
@@ -260,10 +265,13 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\2D\H\HudRenderer.h" />
     <ClInclude Include="Source\Framework\2D\H\HudTextRenderer.h" />
     <ClInclude Include="Source\Framework\3D\H\ObjModelRenderer.h" />
+    <ClInclude Include="Source\Scene\Common\H\PlayerHealthStateController.h" />
     <ClInclude Include="Source\Scene\Common\H\ProjectileSystem.h" />
     <ClInclude Include="Source\Scene\Common\H\SkyDome.h" />
     <ClInclude Include="Source\Scene\Common\H\StageField.h" />
     <ClInclude Include="Source\Scene\Common\H\StageGate.h" />
+    <ClInclude Include="Source\Scene\Common\H\StageGateController.h" />
+    <ClInclude Include="Source\Scene\Common\H\StageProgressController.h" />
     <ClInclude Include="Source\Scene\Common\H\Transform.h" />
     <ClInclude Include="Source\Scene\ResultScene\H\ResultScene.h" />
     <ClInclude Include="Source\Scene\ShopScene\H\ShopScene.h" />

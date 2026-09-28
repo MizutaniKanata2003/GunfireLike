@@ -19,10 +19,14 @@
 #include "Scene/Common/H/GunViewModel.h"
 #include "Scene/Common/H/IScene.h"
 #include "Scene/Common/H/PlayerHealth.h"
+#include "Scene/Common/H/PlayerHealthStateController.h"
+#include "Scene/Common/H/PlayerCombatController.h"
 #include "Scene/Common/H/ProjectileSystem.h"
 #include "Scene/Common/H/SkyDome.h"
 #include "Scene/Common/H/StageField.h"
 #include "Scene/Common/H/StageGate.h"
+#include "Scene/Common/H/StageGateController.h"
+#include "Scene/Common/H/StageProgressController.h"
 
 //========= 前方宣言=========
 class AudioSystem;
@@ -39,11 +43,7 @@ class GameScene final : public IScene
 public:
 	//========= 生成関数=========
 	// GameSceneが使用するSceneManagerとFramework Systemを登録する。
-	GameScene(
-		SceneManager& sceneManager,
-		InputSystem& inputSystem,
-		GraphicsSystem& graphicsSystem,
-		AudioSystem& audioSystem );
+	GameScene( SceneManager& sceneManager, InputSystem& inputSystem, GraphicsSystem& graphicsSystem, AudioSystem& audioSystem );
 
 	//========= Sceneライフサイクル関数=========
 	// Stageの敵、Player、Renderer、HUD、BGMを初期化する。
@@ -86,90 +86,93 @@ private:
 		e_NEXT_STAGE
 	};
 
+	//========= Debug UI表示状態=========
+	// ImGui Debug UIが読み取り専用で表示するGame状態。
+	struct GameDebugState
+	{
+		int currentStage{};
+		int maxStageCount{};
+		const char* enemyName{};
+		int clearReward{};
+
+		float enemyCurrentHp{};
+		float enemyMaxHp{};
+
+		int currency{};
+		int totalDeaths{};
+		float totalPlayTime{};
+
+		bool isLastShotHit{};
+		bool isLastNormalAttackHit{};
+		bool isLastSpecialAttackHit{};
+		bool isLastPlayerSpecialAttackHit{};
+
+		bool isPreviousGateAvailable{};
+		bool isNextGateAvailable{};
+
+		GamePhase gamePhase{ GamePhase::e_PLAYING };
+	};
+
+	//========= 初期化補助関数=========
+	// Player HP、EnemyController、Projectile、特殊攻撃状態を初期化する。
+	void InitializeCombatState( const StageData& stageData, const PlayerStats& playerStats );
+	// Enemy、Stage Field、Gun、Sky DomeのWorld Objectを初期化する。
+	void InitializeWorldObjects();
+	// 前後StageとShopへ移動するGateを初期化する。
+	void InitializeGates();
+	// GamePhase、Scene遷移要求、Debug要求、戦闘結果、SE再生状態を初期化する。
+	void InitializeSceneState();
+	// FPS操作、Mouse Capture、Game BGMを初期化する。
+	void InitializePlayerAndCamera();
+
 	//========= 更新補助関数=========
 	// DrawDebugUiで予約されたDebug操作をUpdate開始時に実行する。
 	[[nodiscard]] bool UpdateDebugUiRequest();
-
 	// F2キーによるShopSceneへの遷移を処理する。
 	[[nodiscard]] bool UpdateDebugSceneChange();
-
 	// Player死亡時のペナルティとShopScene遷移を処理する。
 	[[nodiscard]] bool UpdatePlayerDeath();
-
 	// ゲーム進行時間、特殊攻撃、銃口FlashのTimerを更新する。
 	void UpdateGameProgressAndTimers( float deltaTime, GameProgress& progress );
-
+	// 現フレームのPlayer HP状態を更新する。
+	void UpdatePlayerHealthState();
 	// 低HP状態の警告SEを更新する。
 	void UpdateLowHealthWarning();
-
-	// PlayerとEnemyの水平距離の二乗を返す。
-	[[nodiscard]] float GetPlayerToEnemyDistanceSquared() const;
-
 	// 敵通常攻撃と特殊攻撃を更新する。
 	void UpdateEnemyCombat( float deltaTime, float playerToEnemyDistanceSquared );
-
 	// Playerの通常射撃と特殊攻撃を更新する。
-	void UpdatePlayerAttack(
-	GameProgress& progress,
-	const PlayerStats& playerStats,
-	float playerToEnemyDistanceSquared );
-
-	// 左クリックによる通常射撃、Projectile生成、Ray命中判定を処理する。
-	void TryFireNormalShot(
-	GameProgress& progress,
-	const PlayerStats& playerStats );
-
-	// Qキーによる範囲特殊攻撃、Cooldown、EnemyへのDamageを処理する。
-	void TryUseSpecialAttack(
-	GameProgress& progress,
-	const PlayerStats& playerStats,
-	float playerToEnemyDistanceSquared );
-
+	void UpdatePlayerAttack( GameProgress& progress, const PlayerStats& playerStats, float playerToEnemyDistanceSquared );
 	// Projectileの移動と寿命を更新する。
 	void UpdateProjectiles( float deltaTime );
-
 	// EnemyとGateのアニメーション時間を更新する。
 	void UpdateAnimations( float deltaTime );
-
 	// Enemy撃破報酬、Stage Clear、Result遷移予約を更新する。
 	void UpdateEnemyDefeat( GameProgress& progress );
-
 	// F1キーによるMouse Capture切替を処理する。
 	void UpdateMouseCapture();
-
 	// Gate操作によるStageまたはShopへのScene遷移を処理する。
 	[[nodiscard]] bool UpdateGates( GameProgress& progress );
-
 	// Camera回転、Player移動、Camera追従を更新する。
 	void UpdatePlayerAndCamera( float deltaTime );
-
 	// DrawまたはGame進行で予約されたScene遷移をUpdate開始時に実行する。
 	[[nodiscard]] bool UpdateSceneChangeRequest();
 
 	//========= 描画補助関数=========
 	// Sky DomeをSky Passで描画する。
-	void DrawSky(
-	const DirectX::XMMATRIX& viewMatrix,
-	const DirectX::XMMATRIX& projectionMatrix,
-	const DirectX::XMFLOAT3& cameraPosition );
-
+	void DrawSky( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT3& cameraPosition );
 	// Enemy、Floor、Wall、Gate、GunをOpaque Passで描画する。
-	void DrawOpaqueWorld(
-	const DirectX::XMMATRIX& viewMatrix,
-	const DirectX::XMMATRIX& projectionMatrix,
-	bool isPreviousGateAvailable,
-	bool isNextGateAvailable );
-
+	void DrawOpaqueWorld( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix, bool isPreviousGateAvailable, bool isNextGateAvailable );
 	// Muzzle FlashとBulletをTransparent Passで描画する。
 	void DrawTransparentWorld( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix );
+	// ImGui Debug UIを描画し、Debug操作要求を設定する。
+	void DrawDebugUi( const GameDebugState& gameDebugState );
+	// 通常射撃のSE、Muzzle Flash、Projectile生成、Ray命中判定、Enemy Damageを実行する。
+	void ExecuteNormalShot( GameProgress& progress, const PlayerStats& playerStats );
+	// 特殊攻撃のSE、範囲判定、Enemy Damageを実行する。
+	void ExecuteSpecialAttack( GameProgress& progress, const PlayerStats& playerStats, float playerToEnemyDistanceSquared );
 
-	// ImGui Debug UIを描画し、既存のScene遷移処理を行う。
-	void DrawDebugUi(
-	GameProgress& progress,
-	const StageData& stageData,
-	int currentStage,
-	bool isPreviousGateAvailable,
-	bool isNextGateAvailable );
+	// PlayerとEnemyの水平距離の二乗を返す。
+	[[nodiscard]] float GetPlayerToEnemyDistanceSquared() const;
 
 	//========= Framework・Scene参照=========
 	// Scene遷移とゲーム進捗操作に使用するSceneManager。
@@ -192,6 +195,12 @@ private:
 	CombatSystem m_CombatSystem{};
 	// Playerの現在HPと最大HPを管理する。
 	PlayerHealth m_PlayerHealth{};
+	// Playerの低HP状態変化と死亡状態を管理する。
+	PlayerHealthStateController m_PlayerHealthStateController{};
+	// 現フレームのPlayer HP状態。Update開始時に一度だけ更新する。
+	PlayerHealthStateResult m_PlayerHealthStateResult{};
+	// Player攻撃の入力条件、特殊攻撃解放条件、Cooldownを管理する。
+	PlayerCombatController m_PlayerCombatController{};
 	// EnemyのHP、生死、通常攻撃・特殊攻撃Timerを管理する。
 	EnemyController m_EnemyController{};
 
@@ -210,6 +219,10 @@ private:
 	StageGate m_NextStageGate{};
 	// Shopへ移動するGate。
 	StageGate m_ShopGate{};
+	// Stageに応じたGate利用可否と使用対象を判定する。
+	StageGateController m_StageGateController{};
+	// Enemy撃破後のStage Clear、Reward、Result判定を担当する。
+	StageProgressController m_StageProgressController{};
 	// FPS Cameraに追従するGunとMuzzle Flashの描画を管理する。
 	GunViewModel m_GunViewModel{};
 	// Cameraに追従するSky DomeのTransformとSky Pass描画を管理する。
@@ -236,8 +249,6 @@ private:
 	//========= アニメーション・Timer状態=========
 	// 敵の浮遊・回転に使用する累計時間。
 	float m_EnemyAnimationTime{};
-	// Player特殊攻撃が再使用可能になるまでの残り時間。
-	float m_SpecialAttackCooldownTimer{};
 
 	//========= Scene進行状態=========
 	// 現在の戦闘・Stage Clear・Result遷移状態を管理する。
@@ -258,8 +269,6 @@ private:
 	bool m_IsLastPlayerSpecialAttackHit{};
 
 	//========= SE再生状態=========
-	// 現在の低HP状態で警告SEを再生済みかを示すフラグ。
-	bool m_HasPlayedLowHpSe{};
 	// 現在の敵撃破で撃破SEを再生済みかを示すフラグ。
 	bool m_HasPlayedEnemyDefeatSe{};
 };

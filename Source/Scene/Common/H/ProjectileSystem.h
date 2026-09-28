@@ -26,11 +26,7 @@ public:
 
 	//========= Projectile操作関数=========
 	// 未使用スロットへProjectileを生成する。
-	void Spawn(
-	const DirectX::XMFLOAT3& position,
-	const DirectX::XMFLOAT3& direction,
-	float lifetime );
-
+	void Spawn( const DirectX::XMFLOAT3& position, const DirectX::XMFLOAT3& direction, float lifetime );
 	// 有効なProjectileを移動し、寿命切れのProjectileを無効化する。
 	void Update( float deltaTime, float speed );
 

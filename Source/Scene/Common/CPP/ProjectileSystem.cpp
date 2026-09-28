@@ -7,10 +7,7 @@ void ProjectileSystem::Initialize()
 }
 
 // 未使用スロットへProjectileを生成する。
-void ProjectileSystem::Spawn(
-const DirectX::XMFLOAT3& position,
-const DirectX::XMFLOAT3& direction,
-float lifetime )
+void ProjectileSystem::Spawn( const DirectX::XMFLOAT3& position, const DirectX::XMFLOAT3& direction, float lifetime )
 {
 	for ( Projectile& projectile : m_Projectiles )
 	{

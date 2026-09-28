@@ -24,36 +24,25 @@ public:
 
 	//========= 描画関数=========
 	// Gun本体とGun BarrelをOpaque Passで描画する。
-	void DrawOpaque(
-	BasicMeshRenderer& basicMeshRenderer,
-	GraphicsSystem& graphicsSystem,
-	const DirectX::XMMATRIX& viewMatrix,
-	const DirectX::XMMATRIX& projectionMatrix ) const;
-
+	void DrawOpaque( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem& graphicsSystem,
+					 const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix ) const;
 	// Muzzle FlashをTransparent Passで描画する。
-	void DrawTransparent(
-	BasicMeshRenderer& basicMeshRenderer,
-	GraphicsSystem& graphicsSystem,
-	const DirectX::XMMATRIX& viewMatrix,
-	const DirectX::XMMATRIX& projectionMatrix ) const;
+	void DrawTransparent( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem& graphicsSystem,
+					 const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix ) const;
 
 private:
 	//========= Gun設定=========
 	// Gun本体のCamera空間における位置とScale。
 	DirectX::XMFLOAT3 m_BodyPosition{};
 	DirectX::XMFLOAT3 m_BodyScale{};
-
 	// Gun BarrelのCamera空間における位置とScale。
 	DirectX::XMFLOAT3 m_BarrelPosition{};
 	DirectX::XMFLOAT3 m_BarrelScale{};
-
 	// Muzzle FlashのCamera空間における位置とScale。
 	DirectX::XMFLOAT3 m_MuzzleFlashPosition{};
 	float m_MuzzleFlashScale{};
-
 	// Muzzle Flashの表示時間。
 	float m_MuzzleFlashDuration{};
-
 	// Muzzle Flashを表示する残り時間。
 	float m_MuzzleFlashTimer{};
 };

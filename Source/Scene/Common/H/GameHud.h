@@ -36,9 +36,5 @@ class GameHud final
 public:
 	//========= 描画関数=========
 	// GameSceneの画面固定HUDをScreen UI Passで描画する。
-	void Draw(
-	HudRenderer& hudRenderer,
-	HudTextRenderer& hudTextRenderer,
-	GraphicsSystem& graphicsSystem,
-	const GameHudState& hudState ) const;
+	void Draw( HudRenderer& hudRenderer, HudTextRenderer& hudTextRenderer, GraphicsSystem& graphicsSystem, const GameHudState& hudState ) const;
 };

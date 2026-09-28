@@ -39,29 +39,16 @@ public:
 	void TakeDamage( float damage )
 	{
 		if ( damage <= PlayerHealthConstants::MIN_DAMAGE || IsDead() ) return;
-
 		m_CurrentHp = std::max( PlayerHealthConstants::DEAD_HP, m_CurrentHp - damage );
 	}
 
 	//========= Getter関数=========
 	// 現在HPが0以下かを返す。
-	[[nodiscard]] bool IsDead() const
-	{
-		return m_CurrentHp <= PlayerHealthConstants::DEAD_HP;
-	}
-
+	[[nodiscard]] bool IsDead() const { return m_CurrentHp <= PlayerHealthConstants::DEAD_HP; }
 	// 現在HPを返す。
-	[[nodiscard]] float GetCurrentHp() const
-	{
-		return m_CurrentHp;
-	}
-
+	[[nodiscard]] float GetCurrentHp() const { return m_CurrentHp; }
 	// 最大HPを返す。
-	[[nodiscard]] float GetMaxHp() const
-	{
-		return m_MaxHp;
-	}
-
+	[[nodiscard]] float GetMaxHp() const { return m_MaxHp; }
 private:
 	//========= HP状態=========
 	// 現在HPと最大HPを保持する。
