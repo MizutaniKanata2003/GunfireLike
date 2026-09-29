@@ -17,14 +17,22 @@
 // Dear ImGui公式のWin32サンプルと同じく、明示的に前方宣言する。
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler( HWND windowHandle, UINT message, WPARAM wParam, LPARAM lParam );
 
+// Win32 Window Procedureが使用するFramework System参照を保持する。
+struct WindowContext
+{
+	InputSystem* inputSystem{};
+	GraphicsSystem* graphicsSystem{};
+};
+
 // Win32ウィンドウのメッセージを処理する。
 // InputSystemへの入力転送、ImGuiへの入力転送、終了要求の処理だけを担当する。
 LRESULT CALLBACK WindowProcedure( HWND windowHandle, UINT message, WPARAM wParam, LPARAM lParam )
 {
-	InputSystem* inputSystem = reinterpret_cast<InputSystem*>( GetWindowLongPtrW( windowHandle, GWLP_USERDATA ) );
+	WindowContext* windowContext = reinterpret_cast<WindowContext*>( GetWindowLongPtrW( windowHandle, GWLP_USERDATA ) );
+	InputSystem* inputSystem = windowContext != nullptr ? windowContext->inputSystem : nullptr;
+	GraphicsSystem* graphicsSystem = windowContext != nullptr ? windowContext->graphicsSystem : nullptr;
 
 	if ( inputSystem != nullptr )inputSystem->OnWindowMessage( message, wParam, lParam );
-
 	// FPS操作モードではゲーム側がマウスを使う。
 	// ImGui操作モードだけDear ImGuiへ入力を渡す。
 	if ( inputSystem == nullptr || !inputSystem->IsMouseCaptureEnabled() )
@@ -37,6 +45,17 @@ LRESULT CALLBACK WindowProcedure( HWND windowHandle, UINT message, WPARAM wParam
 
 	switch ( message )
 	{
+		case WM_SIZE:
+		if ( graphicsSystem != nullptr )
+		{
+			const unsigned int width = static_cast<unsigned int>( LOWORD( lParam ) );
+
+			const unsigned int height = static_cast<unsigned int>( HIWORD( lParam ) );
+
+			graphicsSystem->Resize( width, height );
+		}
+		return 0;
+
 		case WM_DESTROY:
 		PostQuitMessage( 0 );
 		return 0;
@@ -120,7 +139,10 @@ int WINAPI WinMain( HINSTANCE instance, HINSTANCE, LPSTR, int showCommand )
 		return -4;
 	}
 
-	SetWindowLongPtrW( windowHandle, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( &inputSystem ) );
+	WindowContext windowContext{};
+	windowContext.inputSystem = &inputSystem;
+	windowContext.graphicsSystem = &graphicsSystem;
+	SetWindowLongPtrW( windowHandle, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( &windowContext ) );
 
 	GameTimer gameTimer;
 	gameTimer.Initialize();
