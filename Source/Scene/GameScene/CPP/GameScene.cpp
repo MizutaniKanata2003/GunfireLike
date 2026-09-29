@@ -322,6 +322,7 @@ void GameScene::Draw()
 	hudState.isNearPreviousGate = isNearPreviousGate;
 	hudState.isNearNextGate = isNearNextGate;
 	hudState.isNearShopGate = isNearShopGate;
+	hudState.showTutorial = currentStage == TUTORIAL_STAGE_NUMBER;
 
 	if ( !m_EnemyController.IsDead() )
 	{
@@ -331,6 +332,7 @@ void GameScene::Draw()
 		viewMatrix,
 		projectionMatrix );
 	}
+
 	hudState.showSpecialAttackUnlockHint = hudState.showTutorial && !isSpecialAttackUnlocked;
 	hudState.showStageClearMessage = m_GamePhase == GamePhase::e_STAGE_CLEAR;
 
