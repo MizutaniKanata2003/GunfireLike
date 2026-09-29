@@ -21,7 +21,6 @@ enum class e_RenderPass
 class GraphicsSystem final
 {
 public:
-public:
 	//========= ライフサイクル・フレーム制御関数=========
 	// DirectX 11のDevice、Context、SwapChain、RenderTargetを初期化する。
 	bool Init( HWND windowHandle, unsigned int width, unsigned int height );
@@ -36,16 +35,10 @@ public:
 
 	//========= Getter関数=========
 	// DirectX 11 Deviceを返す。
-	[[nodiscard]] ID3D11Device* GetDevice() const
-	{
-		return m_Device.Get();
-	}
+	[[nodiscard]] ID3D11Device* GetDevice() const { return m_Device.Get(); }
 
 	// DirectX 11 Device Contextを返す。
-	[[nodiscard]] ID3D11DeviceContext* GetContext() const
-	{
-		return m_Context.Get();
-	}
+	[[nodiscard]] ID3D11DeviceContext* GetContext() const { return m_Context.Get(); }
 
 	//========= 描画State設定関数=========
 	// 指定した描画Passに必要なBlend、Depth、Rasterizer Stateをまとめて設定する。
@@ -54,7 +47,6 @@ public:
 	void SetAlphaBlendEnabled( bool isEnabled );
 	// Depth Testの有効・無効を切り替える。
 	void SetDepthTestEnabled( bool isEnabled );
-
 private:
 	//========= 補助関数=========
 	// BackBuffer、RenderTargetView、DepthStencilView、Viewportを生成する。

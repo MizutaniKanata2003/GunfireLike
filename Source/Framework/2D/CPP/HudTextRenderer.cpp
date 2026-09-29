@@ -33,22 +33,11 @@ void HudTextRenderer::Begin()
 }
 
 // 指定した文字列を画面座標へ描画する。
-void HudTextRenderer::DrawText(
-	const std::wstring& text,
-	const DirectX::XMFLOAT2& position,
-	const DirectX::XMVECTORF32& color,
-	float scale )
+void HudTextRenderer::DrawText( const std::wstring& text, const DirectX::XMFLOAT2& position, const DirectX::XMVECTORF32& color, float scale )
 {
 	if ( !m_SpriteBatch || !m_SpriteFont || text.empty() || scale <= 0.0f ) return;
 
-	m_SpriteFont->DrawString(
-		m_SpriteBatch.get(),
-		text.c_str(),
-		position,
-		color,
-		0.0f,
-		DirectX::XMFLOAT2{},
-		scale );
+	m_SpriteFont->DrawString( m_SpriteBatch.get(), text.c_str(), position, color, 0.0f, DirectX::XMFLOAT2{}, scale );
 }
 
 // 指定文字列を指定Scaleで描画した場合の幅と高さを返す。

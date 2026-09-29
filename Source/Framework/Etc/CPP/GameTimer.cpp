@@ -1,8 +1,5 @@
 #include "../H/GameTimer.h"
 
-//========= C++標準ライブラリ インクルード=========
-#include <algorithm>
-
 //========= Framework インクルード=========
 #include "../H/AppConfig.h"
 
@@ -20,8 +17,7 @@ void GameTimer::Update()
 	LARGE_INTEGER currentCounter{};
 	QueryPerformanceCounter( &currentCounter );
 
-	const double elapsedTicks =
-		static_cast<double>( currentCounter.QuadPart - m_PreviousCounter.QuadPart );
+	const double elapsedTicks = static_cast<double>( currentCounter.QuadPart - m_PreviousCounter.QuadPart );
 
 	m_PreviousCounter = currentCounter;
 
@@ -41,10 +37,4 @@ void GameTimer::Update()
 	m_FrameRate = static_cast<float>( m_FrameCount ) / m_FrameAccumulator;
 	m_FrameAccumulator = 0.0f;
 	m_FrameCount = 0;
-}
-
-// ゲーム時間の進行倍率を設定する。
-void GameTimer::SetTimeScale( float timeScale )
-{
-	m_TimeScale = std::max( 0.0f, timeScale );
 }

@@ -14,35 +14,23 @@ public:
 	// マウス移動量を使ってYawとPitchを更新する。
 	void Update( InputSystem& input );
 
-	//========= Setter関数=========
-	// カメラを指定したワールド座標へ移動する。
-	void SetPosition( const DirectX::XMFLOAT3& position )
-	{
-		m_Position = position;
-	}
-
 	//========= Getter関数=========
 	// 現在のカメラ位置を返す。
-	[[nodiscard]] const DirectX::XMFLOAT3& GetPosition() const
-	{
-		return m_Position;
-	}
+	[[nodiscard]] const DirectX::XMFLOAT3& GetPosition() const { return m_Position; }
 	// 現在の水平方向の回転角をラジアンで返す。
-	[[nodiscard]] float GetYaw() const
-	{
-		return m_Yaw;
-	}
+	[[nodiscard]] float GetYaw() const { return m_Yaw; }
 	// 現在の垂直方向の回転角をラジアンで返す。
-	[[nodiscard]] float GetPitch() const
-	{
-		return m_Pitch;
-	}
+	[[nodiscard]] float GetPitch() const { return m_Pitch; }
 	// 現在の視線方向を正規化ベクトルで返す。
 	[[nodiscard]] DirectX::XMFLOAT3 GetForward() const;
 	// 現在の右方向を正規化ベクトルで返す。
 	[[nodiscard]] DirectX::XMFLOAT3 GetRight() const;
 	// DirectX 11の左手座標系で使用するView行列を返す。
 	[[nodiscard]] DirectX::XMMATRIX GetViewMatrix() const;
+
+	//========= Setter関数=========
+	// カメラを指定したワールド座標へ移動する。
+	void SetPosition( const DirectX::XMFLOAT3& position ) { m_Position = position; }
 
 private:
 	//========= カメラ操作設定=========

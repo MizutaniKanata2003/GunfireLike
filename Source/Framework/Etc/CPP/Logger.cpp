@@ -57,10 +57,7 @@ namespace
 }
 
 // 指定した重要度、分類、メッセージをデバッグ出力へ書き込む。
-void Logger::Write(
-	e_LogLevel logLevel,
-	e_LogCategory logCategory,
-	std::wstring_view message )
+void Logger::Write( e_LogLevel logLevel, e_LogCategory logCategory, std::wstring_view message )
 {
 	std::wstring logMessage{ L"[" };
 	logMessage += GetLogLevelText( logLevel );

@@ -24,18 +24,13 @@ public:
 	// 文字列描画の開始処理を行う。
 	void Begin();
 	// 指定した文字列を画面座標へ描画する。
-	void DrawText(
-		const std::wstring& text,
-		const DirectX::XMFLOAT2& position,
-		const DirectX::XMVECTORF32& color,
-		float scale = 1.0f );
+	void DrawText( const std::wstring& text, const DirectX::XMFLOAT2& position, const DirectX::XMVECTORF32& color, float scale = 1.0f );
 	// 指定文字列を指定Scaleで描画した場合の幅と高さを返す。
 	[[nodiscard]] DirectX::XMFLOAT2 MeasureText( const std::wstring& text, float scale = 1.0f ) const;
 	// 文字列描画の終了処理を行う。
 	void End();
 	// HUD文字列描画で使用したリソースを解放する。
 	void Uninit();
-
 private:
 	//========= メンバー変数=========
 	// 2D文字列描画の描画バッチ。

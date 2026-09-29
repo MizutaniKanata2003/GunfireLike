@@ -167,11 +167,8 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 		return false;
 	}
 
-	const HRESULT vertexShaderResult = device->CreateVertexShader(
-	vertexShaderBinary.data(),
-	vertexShaderBinary.size(),
-	nullptr,
-	m_VertexShader.GetAddressOf() );
+	const HRESULT vertexShaderResult = device->CreateVertexShader( vertexShaderBinary.data(), vertexShaderBinary.size(),
+																   nullptr, m_VertexShader.GetAddressOf() );
 
 	if ( FAILED( vertexShaderResult ) )
 	{
@@ -182,32 +179,12 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 
 	const D3D11_INPUT_ELEMENT_DESC inputElements[]
 	{
-	{
-	POSITION_SEMANTIC_NAME,
-	0,
-	DXGI_FORMAT_R32G32B32_FLOAT,
-	0,
-	offsetof( Vertex, position ),
-	D3D11_INPUT_PER_VERTEX_DATA,
-	0
-	},
-	{
-	TEXCOORD_SEMANTIC_NAME,
-	0,
-	DXGI_FORMAT_R32G32_FLOAT,
-	0,
-	offsetof( Vertex, uv ),
-	D3D11_INPUT_PER_VERTEX_DATA,
-	0
-	}
+		{POSITION_SEMANTIC_NAME,0,DXGI_FORMAT_R32G32B32_FLOAT,0,offsetof( Vertex, position ),D3D11_INPUT_PER_VERTEX_DATA,0},
+		{TEXCOORD_SEMANTIC_NAME,0,DXGI_FORMAT_R32G32_FLOAT,0,offsetof( Vertex, uv ),D3D11_INPUT_PER_VERTEX_DATA,0}
 	};
 
-	const HRESULT inputLayoutResult = device->CreateInputLayout(
-	inputElements,
-	ARRAYSIZE( inputElements ),
-	vertexShaderBinary.data(),
-	vertexShaderBinary.size(),
-	m_InputLayout.GetAddressOf() );
+	const HRESULT inputLayoutResult = device->CreateInputLayout( inputElements, ARRAYSIZE( inputElements ),
+																 vertexShaderBinary.data(), vertexShaderBinary.size(), m_InputLayout.GetAddressOf() );
 
 	if ( FAILED( inputLayoutResult ) )
 	{
@@ -225,11 +202,8 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 		return false;
 	}
 
-	const HRESULT pixelShaderResult = device->CreatePixelShader(
-	pixelShaderBinary.data(),
-	pixelShaderBinary.size(),
-	nullptr,
-	m_PixelShader.GetAddressOf() );
+	const HRESULT pixelShaderResult = device->CreatePixelShader( pixelShaderBinary.data(), pixelShaderBinary.size(),
+																 nullptr, m_PixelShader.GetAddressOf() );
 
 	if ( FAILED( pixelShaderResult ) )
 	{
@@ -299,14 +273,8 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 }
 
 // 指定した行列、色、UVタイリング、テクスチャ種別でCubeを描画する。
-void BasicMeshRenderer::DrawCube(
-GraphicsSystem& graphicsSystem,
-const DirectX::XMMATRIX& worldMatrix,
-const DirectX::XMMATRIX& viewMatrix,
-const DirectX::XMMATRIX& projectionMatrix,
-const DirectX::XMFLOAT4& color,
-const DirectX::XMFLOAT2& uvTiling,
-TextureType textureType )
+void BasicMeshRenderer::DrawCube( GraphicsSystem& graphicsSystem, const DirectX::XMMATRIX& worldMatrix, const DirectX::XMMATRIX& viewMatrix,
+								  const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT4& color, const DirectX::XMFLOAT2& uvTiling, TextureType textureType )
 {
 	if ( !m_VertexBuffer || !m_IndexBuffer || !m_CameraBuffer.IsValid() ||
 	!m_ObjectBuffer.IsValid() || !m_MaterialBuffer.IsValid() || !m_VertexShader ||

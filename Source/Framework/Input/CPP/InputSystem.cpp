@@ -73,18 +73,6 @@ void InputSystem::OnWindowMessage( UINT message, WPARAM wParam, LPARAM lParam )
 	}
 }
 
-// 指定したキーが現在押され続けているかを返す。
-bool InputSystem::IsKeyPressed( unsigned char keyCode ) const
-{
-	return ( m_CurrentKeys[ keyCode ] & 0x80 ) != 0;
-}
-
-// 指定したキーがこのフレームで押された瞬間かを返す。
-bool InputSystem::IsKeyTriggered( unsigned char keyCode ) const
-{
-	return ( m_CurrentKeys[ keyCode ] & 0x80 ) != 0 && ( m_PreviousKeys[ keyCode ] & 0x80 ) == 0;
-}
-
 // WndProcで蓄積したマウス移動量を返し、内部の差分をリセットする。
 POINT InputSystem::ConsumeMouseDelta()
 {
@@ -138,12 +126,6 @@ void InputSystem::UpdateMouseCenter()
 	m_ScreenCenter = clientCenter;
 }
 
-// FPS操作中にカーソルをクライアント領域中央へ戻す。
-void InputSystem::ResetMousePosition()
-{
-	SetCursorPos( m_ScreenCenter.x, m_ScreenCenter.y );
-}
-
 // FPS操作中にカーソルがウィンドウ外へ出ないよう制限する。
 void InputSystem::ClipMouseCursor()
 {
@@ -157,13 +139,7 @@ void InputSystem::ClipMouseCursor()
 	ClientToScreen( m_WindowHandle, &clipTopLeft );
 	ClientToScreen( m_WindowHandle, &clipBottomRight );
 
-	const RECT clipRect
-	{
-		clipTopLeft.x,
-		clipTopLeft.y,
-		clipBottomRight.x,
-		clipBottomRight.y
-	};
+	const RECT clipRect{ clipTopLeft.x,clipTopLeft.y,clipBottomRight.x,clipBottomRight.y };
 
 	ClipCursor( &clipRect );
 }

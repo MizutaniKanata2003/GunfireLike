@@ -14,8 +14,7 @@ namespace
 	std::wstring GetHRESULTText( HRESULT result )
 	{
 		std::wostringstream stream{};
-		stream << L"0x" << std::uppercase << std::hex << std::setfill( L'0' ) << std::setw( 8 )
-			<< static_cast<unsigned long>( result );
+		stream << L"0x" << std::uppercase << std::hex << std::setfill( L'0' ) << std::setw( 8 ) << static_cast<unsigned long>( result );
 
 		return stream.str();
 	}
@@ -31,53 +30,22 @@ namespace
 	}
 
 	// Debug LayerなしのDirect3D Device、Context、SwapChainを生成する。
-	HRESULT CreateDeviceAndSwapChain(
-		const DXGI_SWAP_CHAIN_DESC& swapChainDesc,
-		const D3D_FEATURE_LEVEL requestedFeatureLevels[],
-		UINT requestedFeatureLevelCount,
-		D3D_FEATURE_LEVEL* createdFeatureLevel,
-		IDXGISwapChain** swapChain,
-		ID3D11Device** device,
-		ID3D11DeviceContext** context )
+	HRESULT CreateDeviceAndSwapChain( const DXGI_SWAP_CHAIN_DESC& swapChainDesc, const D3D_FEATURE_LEVEL requestedFeatureLevels[],
+									  UINT requestedFeatureLevelCount, D3D_FEATURE_LEVEL* createdFeatureLevel,
+									  IDXGISwapChain** swapChain, ID3D11Device** device, ID3D11DeviceContext** context )
 	{
-		return D3D11CreateDeviceAndSwapChain(
-			nullptr,
-			D3D_DRIVER_TYPE_HARDWARE,
-			nullptr,
-			0,
-			requestedFeatureLevels,
-			requestedFeatureLevelCount,
-			D3D11_SDK_VERSION,
-			&swapChainDesc,
-			swapChain,
-			device,
-			createdFeatureLevel,
-			context );
+		return D3D11CreateDeviceAndSwapChain( nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, requestedFeatureLevels, requestedFeatureLevelCount,
+											  D3D11_SDK_VERSION, &swapChainDesc, swapChain, device, createdFeatureLevel, context );
 	}
 
 	// Debug LayerありのDirect3D Device、Context、SwapChainを生成する。
-	HRESULT CreateDebugDeviceAndSwapChain(
-		const DXGI_SWAP_CHAIN_DESC& swapChainDesc,
-		const D3D_FEATURE_LEVEL requestedFeatureLevels[],
-		UINT requestedFeatureLevelCount,
-		D3D_FEATURE_LEVEL* createdFeatureLevel,
-		IDXGISwapChain** swapChain,
-		ID3D11Device** device,
-		ID3D11DeviceContext** context )
+	HRESULT CreateDebugDeviceAndSwapChain( const DXGI_SWAP_CHAIN_DESC& swapChainDesc, const D3D_FEATURE_LEVEL requestedFeatureLevels[],
+										   UINT requestedFeatureLevelCount, D3D_FEATURE_LEVEL* createdFeatureLevel, IDXGISwapChain** swapChain,
+										   ID3D11Device** device, ID3D11DeviceContext** context )
 	{
-		return D3D11CreateDeviceAndSwapChain(
-			nullptr,
-			D3D_DRIVER_TYPE_HARDWARE,
-			nullptr,
-			D3D11_CREATE_DEVICE_DEBUG,
-			requestedFeatureLevels,
-			requestedFeatureLevelCount,
-			D3D11_SDK_VERSION,
-			&swapChainDesc,
-			swapChain,
-			device,
-			createdFeatureLevel,
-			context );
+		return D3D11CreateDeviceAndSwapChain( nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, D3D11_CREATE_DEVICE_DEBUG, requestedFeatureLevels,
+											  requestedFeatureLevelCount, D3D11_SDK_VERSION, &swapChainDesc, swapChain,
+											  device, createdFeatureLevel, context );
 	}
 
 	// Alpha Blendに渡す固定のBlend Factorを返す。
@@ -112,39 +80,21 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 
 	// Debug構成ではD3D11 Debug Layerを有効にしてDeviceを生成する。
 #if defined( _DEBUG )
-	HRESULT result = CreateDebugDeviceAndSwapChain(
-		swapChainDesc,
-		requestedFeatureLevels,
-		ARRAYSIZE( requestedFeatureLevels ),
-		&createdFeatureLevel,
-		m_SwapChain.GetAddressOf(),
-		m_Device.GetAddressOf(),
-		m_Context.GetAddressOf() );
+	HRESULT result = CreateDebugDeviceAndSwapChain( swapChainDesc, requestedFeatureLevels, ARRAYSIZE( requestedFeatureLevels ),
+													&createdFeatureLevel, m_SwapChain.GetAddressOf(), m_Device.GetAddressOf(), m_Context.GetAddressOf() );
 
 	// SDK Layers未導入環境では、Debug LayerなしでDevice生成を再試行する。
 	if ( FAILED( result ) )
 	{
 		Logger::Write( e_LogLevel::e_WARNING, e_LogCategory::e_GRAPHICS, L"D3D11 Debug Layerの有効化に失敗しました。通常Device作成へ再試行します。" );
 
-		result = CreateDeviceAndSwapChain(
-			swapChainDesc,
-			requestedFeatureLevels,
-			ARRAYSIZE( requestedFeatureLevels ),
-			&createdFeatureLevel,
-			m_SwapChain.GetAddressOf(),
-			m_Device.GetAddressOf(),
-			m_Context.GetAddressOf() );
+		result = CreateDeviceAndSwapChain( swapChainDesc, requestedFeatureLevels, ARRAYSIZE( requestedFeatureLevels ), &createdFeatureLevel,
+										   m_SwapChain.GetAddressOf(), m_Device.GetAddressOf(), m_Context.GetAddressOf() );
 	}
 #else
 	// Release構成ではDebug LayerなしでDeviceを生成する。
-	const HRESULT result = CreateDeviceAndSwapChain(
-		swapChainDesc,
-		requestedFeatureLevels,
-		ARRAYSIZE( requestedFeatureLevels ),
-		&createdFeatureLevel,
-		m_SwapChain.GetAddressOf(),
-		m_Device.GetAddressOf(),
-		m_Context.GetAddressOf() );
+	const HRESULT result = CreateDeviceAndSwapChain( swapChainDesc, requestedFeatureLevels, ARRAYSIZE( requestedFeatureLevels ), &createdFeatureLevel,
+													 m_SwapChain.GetAddressOf(), m_Device.GetAddressOf(), m_Context.GetAddressOf() );
 #endif
 
 	if ( FAILED( result ) )
@@ -341,10 +291,7 @@ bool GraphicsSystem::CreateRenderTargets( unsigned int width, unsigned int heigh
 		return false;
 	}
 
-	const HRESULT renderTargetViewResult = m_Device->CreateRenderTargetView(
-		backBuffer.Get(),
-		nullptr,
-		m_RenderTargetView.GetAddressOf() );
+	const HRESULT renderTargetViewResult = m_Device->CreateRenderTargetView( backBuffer.Get(), nullptr, m_RenderTargetView.GetAddressOf() );
 
 	if ( FAILED( renderTargetViewResult ) )
 	{
@@ -373,10 +320,7 @@ bool GraphicsSystem::CreateRenderTargets( unsigned int width, unsigned int heigh
 		return false;
 	}
 
-	const HRESULT depthStencilViewResult = m_Device->CreateDepthStencilView(
-		depthTexture.Get(),
-		nullptr,
-		m_DepthStencilView.GetAddressOf() );
+	const HRESULT depthStencilViewResult = m_Device->CreateDepthStencilView( depthTexture.Get(), nullptr, m_DepthStencilView.GetAddressOf() );
 
 	if ( FAILED( depthStencilViewResult ) )
 	{

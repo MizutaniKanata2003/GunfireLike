@@ -17,10 +17,7 @@ public:
 
 	//========= Getter関数=========
 	// 現在のデバッグプレイヤー位置を返す。
-	[[nodiscard]] const DirectX::XMFLOAT3& GetPosition() const
-	{
-		return m_Position;
-	}
+	[[nodiscard]] const DirectX::XMFLOAT3& GetPosition() const { return m_Position; }
 
 private:
 	//========= メンバー変数=========

@@ -1,6 +1,7 @@
 #pragma once
 
 //========= Windows インクルード=========
+#include <algorithm>
 #include <windows.h>
 
 // フレームごとの経過時間、総経過時間、FPSを管理する。
@@ -15,27 +16,15 @@ public:
 
 	//========= Getter関数=========
 	// 直近フレームのDeltaTimeを返す。
-	[[nodiscard]] float GetDeltaTime() const
-	{
-		return m_DeltaTime;
-	}
-
+	[[nodiscard]] float GetDeltaTime() const { return m_DeltaTime; }
 	// ゲーム開始からの総経過時間を返す。
-	[[nodiscard]] float GetTotalTime() const
-	{
-		return m_TotalTime;
-	}
-
+	[[nodiscard]] float GetTotalTime() const { return m_TotalTime; }
 	// 直近1秒間から計算したFPSを返す。
-	[[nodiscard]] float GetFrameRate() const
-	{
-		return m_FrameRate;
-	}
+	[[nodiscard]] float GetFrameRate() const { return m_FrameRate; }
 
 	//========= Setter関数=========
 	// ゲーム時間の進行倍率を設定する。
-	void SetTimeScale( float timeScale );
-
+	void SetTimeScale( float timeScale ) { m_TimeScale = std::max( 0.0f, timeScale ); }
 private:
 	//========= 高精度タイマー情報=========
 	// 高精度カウンターの周波数。

@@ -35,18 +35,11 @@ public:
 	bool Initialize( GraphicsSystem& graphicsSystem );
 
 	// 指定した行列、色、UVタイリング、テクスチャ種別でCubeを描画する。
-	void DrawCube(
-	GraphicsSystem& graphicsSystem,
-	const DirectX::XMMATRIX& worldMatrix,
-	const DirectX::XMMATRIX& viewMatrix,
-	const DirectX::XMMATRIX& projectionMatrix,
-	const DirectX::XMFLOAT4& color,
-	const DirectX::XMFLOAT2& uvTiling,
-	TextureType textureType );
+	void DrawCube( GraphicsSystem& graphicsSystem, const DirectX::XMMATRIX& worldMatrix, const DirectX::XMMATRIX& viewMatrix,
+				   const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT4& color, const DirectX::XMFLOAT2& uvTiling, TextureType textureType );
 
 	// 描画に使用したDirect3Dリソースを解放する。
 	void Uninit();
-
 private:
 	//========= 構造体=========
 	// Cubeの頂点座標とUV座標。

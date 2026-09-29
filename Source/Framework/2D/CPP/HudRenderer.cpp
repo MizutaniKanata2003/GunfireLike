@@ -95,10 +95,8 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	}
 
 	// HUD Quadの描画に使用するVertex Shaderを生成する。
-	const HRESULT vertexShaderResult = device->CreateVertexShader( vertexShaderData.data(),
-	vertexShaderData.size(),
-	nullptr,
-	m_VertexShader.GetAddressOf() );
+	const HRESULT vertexShaderResult = device->CreateVertexShader( vertexShaderData.data(), vertexShaderData.size(),
+																   nullptr, m_VertexShader.GetAddressOf() );
 
 	if ( FAILED( vertexShaderResult ) )
 	{
@@ -108,11 +106,8 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	}
 
 	// HUD Quadの描画に使用するPixel Shaderを生成する。
-	const HRESULT pixelShaderResult = device->CreatePixelShader(
-	pixelShaderData.data(),
-	pixelShaderData.size(),
-	nullptr,
-	m_PixelShader.GetAddressOf() );
+	const HRESULT pixelShaderResult = device->CreatePixelShader( pixelShaderData.data(), pixelShaderData.size(),
+																 nullptr, m_PixelShader.GetAddressOf() );
 
 	if ( FAILED( pixelShaderResult ) )
 	{
@@ -127,12 +122,8 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 		{ "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	};
 
-	const HRESULT inputLayoutResult = device->CreateInputLayout(
-	inputElements,
-	ARRAYSIZE( inputElements ),
-	vertexShaderData.data(),
-	vertexShaderData.size(),
-	m_InputLayout.GetAddressOf() );
+	const HRESULT inputLayoutResult = device->CreateInputLayout( inputElements, ARRAYSIZE( inputElements ),
+																 vertexShaderData.data(), vertexShaderData.size(), m_InputLayout.GetAddressOf() );
 
 	if ( FAILED( inputLayoutResult ) )
 	{
@@ -209,13 +200,8 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 }
 
 // 指定した画面座標、サイズ、色で単色Quadを描画する。
-void HudRenderer::DrawQuad(
-	GraphicsSystem& graphicsSystem,
-	float positionX,
-	float positionY,
-	float width,
-	float height,
-	const DirectX::XMFLOAT4& color )
+void HudRenderer::DrawQuad( GraphicsSystem& graphicsSystem, float positionX, float positionY, float width, float height,
+							const DirectX::XMFLOAT4& color )
 {
 	if ( width <= 0.0f || height <= 0.0f ) return;
 
@@ -264,21 +250,11 @@ void HudRenderer::DrawCrosshair( GraphicsSystem& graphicsSystem )
 	const DirectX::XMFLOAT4 crosshairColor{ 1.0f, 1.0f, 1.0f, HUD_FOREGROUND_ALPHA };
 
 	// 画面中央へ横線と縦線のQuadを描画する。
-	DrawQuad(
-		graphicsSystem,
-		CROSSHAIR_CENTER_X - CROSSHAIR_LINE_LENGTH * 0.5f,
-		CROSSHAIR_CENTER_Y - CROSSHAIR_LINE_THICKNESS * 0.5f,
-		CROSSHAIR_LINE_LENGTH,
-		CROSSHAIR_LINE_THICKNESS,
-		crosshairColor );
+	DrawQuad( graphicsSystem, CROSSHAIR_CENTER_X - CROSSHAIR_LINE_LENGTH * 0.5f, CROSSHAIR_CENTER_Y - CROSSHAIR_LINE_THICKNESS * 0.5f,
+			  CROSSHAIR_LINE_LENGTH, CROSSHAIR_LINE_THICKNESS, crosshairColor );
 
-	DrawQuad(
-		graphicsSystem,
-		CROSSHAIR_CENTER_X - CROSSHAIR_LINE_THICKNESS * 0.5f,
-		CROSSHAIR_CENTER_Y - CROSSHAIR_LINE_LENGTH * 0.5f,
-		CROSSHAIR_LINE_THICKNESS,
-		CROSSHAIR_LINE_LENGTH,
-		crosshairColor );
+	DrawQuad( graphicsSystem, CROSSHAIR_CENTER_X - CROSSHAIR_LINE_THICKNESS * 0.5f, CROSSHAIR_CENTER_Y - CROSSHAIR_LINE_LENGTH * 0.5f,
+			  CROSSHAIR_LINE_THICKNESS, CROSSHAIR_LINE_LENGTH, crosshairColor );
 }
 
 // 現在HPと最大HPに応じたプレイヤーHPバーを描画する。
@@ -290,13 +266,8 @@ void HudRenderer::DrawPlayerHealthBar( GraphicsSystem& graphicsSystem, float cur
 	const float hpRatio = std::clamp( currentHp / maxHp, 0.0f, FULLY_OPAQUE_ALPHA );
 
 	// HPバーの背景を描画する。
-	DrawQuad(
-		graphicsSystem,
-		HP_BAR_POSITION_X,
-		HP_BAR_POSITION_Y,
-		HP_BAR_WIDTH,
-		HP_BAR_HEIGHT,
-		DirectX::XMFLOAT4{ 0.0f, 0.0f, 0.0f, HUD_BACKGROUND_ALPHA } );
+	DrawQuad( graphicsSystem, HP_BAR_POSITION_X, HP_BAR_POSITION_Y, HP_BAR_WIDTH, HP_BAR_HEIGHT,
+			  DirectX::XMFLOAT4{ 0.0f, 0.0f, 0.0f, HUD_BACKGROUND_ALPHA } );
 
 	// 現在HPに応じたHPバーの幅と色を決定する。
 	const float healthWidth = ( HP_BAR_WIDTH - HP_BAR_BORDER * 2.0f ) * hpRatio;
@@ -305,13 +276,8 @@ void HudRenderer::DrawPlayerHealthBar( GraphicsSystem& graphicsSystem, float cur
 		DirectX::XMFLOAT4{ FULLY_OPAQUE_ALPHA, 0.15f, 0.10f, HUD_FOREGROUND_ALPHA };
 
 	// HPバーの現在値を背景の内側へ描画する。
-	DrawQuad(
-		graphicsSystem,
-		HP_BAR_POSITION_X + HP_BAR_BORDER,
-		HP_BAR_POSITION_Y + HP_BAR_BORDER,
-		healthWidth,
-		HP_BAR_HEIGHT - HP_BAR_BORDER * 2.0f,
-		healthColor );
+	DrawQuad( graphicsSystem, HP_BAR_POSITION_X + HP_BAR_BORDER, HP_BAR_POSITION_Y + HP_BAR_BORDER,
+			  healthWidth, HP_BAR_HEIGHT - HP_BAR_BORDER * 2.0f, healthColor );
 }
 
 // HPが低い場合に画面端の警告枠を描画する。
@@ -324,21 +290,9 @@ void HudRenderer::DrawLowHealthWarning( GraphicsSystem& graphicsSystem, float cu
 
 	// 上下左右のQuadで低HP警告枠を描画する。
 	DrawQuad( graphicsSystem, 0.0f, 0.0f, SCREEN_WIDTH, LOW_HP_BORDER_THICKNESS, warningColor );
-	DrawQuad(
-		graphicsSystem,
-		0.0f,
-		SCREEN_HEIGHT - LOW_HP_BORDER_THICKNESS,
-		SCREEN_WIDTH,
-		LOW_HP_BORDER_THICKNESS,
-		warningColor );
+	DrawQuad( graphicsSystem, 0.0f, SCREEN_HEIGHT - LOW_HP_BORDER_THICKNESS, SCREEN_WIDTH, LOW_HP_BORDER_THICKNESS, warningColor );
 	DrawQuad( graphicsSystem, 0.0f, 0.0f, LOW_HP_BORDER_THICKNESS, SCREEN_HEIGHT, warningColor );
-	DrawQuad(
-		graphicsSystem,
-		SCREEN_WIDTH - LOW_HP_BORDER_THICKNESS,
-		0.0f,
-		LOW_HP_BORDER_THICKNESS,
-		SCREEN_HEIGHT,
-		warningColor );
+	DrawQuad( graphicsSystem, SCREEN_WIDTH - LOW_HP_BORDER_THICKNESS, 0.0f, LOW_HP_BORDER_THICKNESS, SCREEN_HEIGHT, warningColor );
 }
 
 // HUD描画に使用したDirect3Dリソースを解放する。

@@ -20,29 +20,28 @@ public:
 
 	//========= キー入力Getter関数=========
 	// 指定したキーが現在押され続けているかを返す。
-	[[nodiscard]] bool IsKeyPressed( unsigned char keyCode ) const;
+	[[nodiscard]] bool IsKeyPressed( unsigned char keyCode ) const { return ( m_CurrentKeys[ keyCode ] & 0x80 ) != 0; }
 	// 指定したキーがこのフレームで押された瞬間かを返す。
-	[[nodiscard]] bool IsKeyTriggered( unsigned char keyCode ) const;
+	[[nodiscard]] bool IsKeyTriggered( unsigned char keyCode ) const
+	{
+		return ( m_CurrentKeys[ keyCode ] & 0x80 ) != 0 && ( m_PreviousKeys[ keyCode ] & 0x80 ) == 0;
+	}
 
 	//========= マウス入力Getter関数=========
 	// WndProcで蓄積したマウス移動量を返し、内部の差分をリセットする。
 	[[nodiscard]] POINT ConsumeMouseDelta();
 	// FPS操作モードが有効かを返す。
-	[[nodiscard]] bool IsMouseCaptureEnabled() const
-	{
-		return m_IsMouseCaptureEnabled;
-	}
+	[[nodiscard]] bool IsMouseCaptureEnabled() const { return m_IsMouseCaptureEnabled; }
 
 	//========= マウス操作設定関数=========
 	// FPS操作モードの有効・無効を切り替える。
 	void SetMouseCaptureEnabled( bool isEnabled );
-
 private:
 	//========= 補助関数=========
 	// クライアント領域の中央をスクリーン座標へ変換して保持する。
 	void UpdateMouseCenter();
 	// FPS操作中にカーソルをクライアント領域中央へ戻す。
-	void ResetMousePosition();
+	void ResetMousePosition() { SetCursorPos( m_ScreenCenter.x, m_ScreenCenter.y ); }
 	// FPS操作中にカーソルがウィンドウ外へ出ないよう制限する。
 	void ClipMouseCursor();
 

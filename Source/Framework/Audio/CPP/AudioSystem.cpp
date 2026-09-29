@@ -98,10 +98,7 @@ bool AudioSystem::Initialize()
 
 		// XAudio2を利用するAudioEngineを生成する。
 		OutputDebugStringW( L"[Audio] Creating AudioEngine...\n" );
-		m_Impl->audioEngine = std::make_unique<DirectX::AudioEngine>(
-			DirectX::AudioEngine_Default,
-			nullptr,
-			nullptr );
+		m_Impl->audioEngine = std::make_unique<DirectX::AudioEngine>( DirectX::AudioEngine_Default, nullptr, nullptr );
 
 		// 各Sceneで使用するBGMを読み込む。
 		OutputDebugStringW( L"[Audio] Loading: Bgm_Title.wav\n" );

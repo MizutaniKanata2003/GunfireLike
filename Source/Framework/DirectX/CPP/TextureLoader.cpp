@@ -58,10 +58,8 @@ namespace
 }
 
 // 指定した画像ファイルを読み込み、Shader Resource Viewを生成する。
-bool TextureLoader::LoadWicTexture(
-	ID3D11Device* device,
-	std::wstring_view filePath,
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& textureView )
+bool TextureLoader::LoadWicTexture( ID3D11Device* device, std::wstring_view filePath,
+									Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& textureView )
 {
 	textureView.Reset();
 
@@ -85,11 +83,7 @@ bool TextureLoader::LoadWicTexture(
 	Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame{};
 	Microsoft::WRL::ComPtr<IWICFormatConverter> converter{};
 
-	const HRESULT factoryResult = CoCreateInstance(
-		CLSID_WICImagingFactory,
-		nullptr,
-		CLSCTX_INPROC_SERVER,
-		IID_PPV_ARGS( wicFactory.GetAddressOf() ) );
+	const HRESULT factoryResult = CoCreateInstance( CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS( wicFactory.GetAddressOf() ) );
 
 	if ( FAILED( factoryResult ) )
 	{
@@ -97,12 +91,8 @@ bool TextureLoader::LoadWicTexture(
 		return false;
 	}
 
-	const HRESULT decoderResult = wicFactory->CreateDecoderFromFilename(
-		filePathText.c_str(),
-		nullptr,
-		GENERIC_READ,
-		WICDecodeMetadataCacheOnLoad,
-		decoder.GetAddressOf() );
+	const HRESULT decoderResult = wicFactory->CreateDecoderFromFilename( filePathText.c_str(), nullptr, GENERIC_READ,
+																		 WICDecodeMetadataCacheOnLoad, decoder.GetAddressOf() );
 
 	if ( FAILED( decoderResult ) )
 	{
@@ -144,13 +134,8 @@ bool TextureLoader::LoadWicTexture(
 		return false;
 	}
 
-	const HRESULT converterInitializeResult = converter->Initialize(
-		frame.Get(),
-		GUID_WICPixelFormat32bppBGRA,
-		WICBitmapDitherTypeNone,
-		nullptr,
-		0.0,
-		WICBitmapPaletteTypeCustom );
+	const HRESULT converterInitializeResult = converter->Initialize( frame.Get(), GUID_WICPixelFormat32bppBGRA, WICBitmapDitherTypeNone,
+																	 nullptr, 0.0, WICBitmapPaletteTypeCustom );
 
 	if ( FAILED( converterInitializeResult ) )
 	{
@@ -187,10 +172,7 @@ bool TextureLoader::LoadWicTexture(
 
 	Microsoft::WRL::ComPtr<ID3D11Texture2D> texture{};
 
-	const HRESULT textureResult = device->CreateTexture2D(
-		&textureDescription,
-		&textureData,
-		texture.GetAddressOf() );
+	const HRESULT textureResult = device->CreateTexture2D( &textureDescription, &textureData, texture.GetAddressOf() );
 
 	if ( FAILED( textureResult ) )
 	{
@@ -198,10 +180,7 @@ bool TextureLoader::LoadWicTexture(
 		return false;
 	}
 
-	const HRESULT textureViewResult = device->CreateShaderResourceView(
-		texture.Get(),
-		nullptr,
-		textureView.GetAddressOf() );
+	const HRESULT textureViewResult = device->CreateShaderResourceView( texture.Get(), nullptr, textureView.GetAddressOf() );
 
 	if ( FAILED( textureViewResult ) )
 	{

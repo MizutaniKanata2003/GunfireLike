@@ -18,7 +18,6 @@ public:
 	void BeginFrame();
 	// Dear ImGuiの描画データをDirectX 11へ出力する。
 	void EndFrame();
-
 private:
 	//========= 初期化状態=========
 	// Dear ImGui本体とWin32・DirectX 11バックエンドの初期化が完了しているかを保持する。

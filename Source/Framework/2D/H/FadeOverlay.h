@@ -16,17 +16,9 @@ public:
 
 	//========= Getter関数=========
 	// フェード処理が再生中かを返す。
-	[[nodiscard]] bool IsPlaying() const
-	{
-		return m_Mode != FadeMode::e_NONE;
-	}
-
+	[[nodiscard]] bool IsPlaying() const { return m_Mode != FadeMode::e_NONE; }
 	// フェードアウトが完了し、画面が完全に黒い状態かを返す。
-	[[nodiscard]] bool IsFadeOutFinished() const
-	{
-		return m_Mode == FadeMode::e_NONE && m_Alpha >= 1.0f;
-	}
-
+	[[nodiscard]] bool IsFadeOutFinished() const { return m_Mode == FadeMode::e_NONE && m_Alpha >= 1.0f; }
 private:
 	//========= 列挙型=========
 	// 現在実行しているフェードの種類。

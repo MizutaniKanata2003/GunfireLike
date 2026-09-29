@@ -42,24 +42,13 @@ public:
 	}
 
 	// Constant Bufferを解放する。
-	void Uninit()
-	{
-		m_Buffer.Reset();
-	}
+	void Uninit() { m_Buffer.Reset(); }
 
 	//========= Getter・状態取得関数=========
 	// Constant Bufferが使用可能かを返す。
-	[[nodiscard]] bool IsValid() const
-	{
-		return m_Buffer != nullptr;
-	}
-
+	[[nodiscard]] bool IsValid() const { return m_Buffer != nullptr; }
 	// Direct3DのConstant Bufferを返す。
-	[[nodiscard]] ID3D11Buffer* Get() const
-	{
-		return m_Buffer.Get();
-	}
-
+	[[nodiscard]] ID3D11Buffer* Get() const { return m_Buffer.Get(); }
 private:
 	// Direct3DのConstant Bufferを保持する。
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_Buffer{};

@@ -150,11 +150,8 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 		return false;
 	}
 
-	const HRESULT vertexShaderResult = device->CreateVertexShader(
-	vertexShaderBinary.data(),
-	vertexShaderBinary.size(),
-	nullptr,
-	m_VertexShader.GetAddressOf() );
+	const HRESULT vertexShaderResult = device->CreateVertexShader( vertexShaderBinary.data(), vertexShaderBinary.size(),
+																   nullptr, m_VertexShader.GetAddressOf() );
 
 	if ( FAILED( vertexShaderResult ) )
 	{
@@ -165,32 +162,12 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 
 	const D3D11_INPUT_ELEMENT_DESC inputElements[]
 	{
-		{
-			POSITION_SEMANTIC_NAME,
-			0,
-			DXGI_FORMAT_R32G32B32_FLOAT,
-			0,
-			offsetof( Vertex, position ),
-			D3D11_INPUT_PER_VERTEX_DATA,
-			0
-		},
-		{
-			TEXCOORD_SEMANTIC_NAME,
-			0,
-			DXGI_FORMAT_R32G32_FLOAT,
-			0,
-			offsetof( Vertex, uv ),
-			D3D11_INPUT_PER_VERTEX_DATA,
-			0
-		}
+		{POSITION_SEMANTIC_NAME,0,DXGI_FORMAT_R32G32B32_FLOAT,0,offsetof( Vertex, position ),D3D11_INPUT_PER_VERTEX_DATA,0},
+		{TEXCOORD_SEMANTIC_NAME,0,DXGI_FORMAT_R32G32_FLOAT,0,offsetof( Vertex, uv ),D3D11_INPUT_PER_VERTEX_DATA,0}
 	};
 
-	const HRESULT inputLayoutResult = device->CreateInputLayout(
-	inputElements,
-	ARRAYSIZE( inputElements ),
-	vertexShaderBinary.data(),
-	vertexShaderBinary.size(),
-	m_InputLayout.GetAddressOf() );
+	const HRESULT inputLayoutResult = device->CreateInputLayout( inputElements, ARRAYSIZE( inputElements ), vertexShaderBinary.data(),
+																 vertexShaderBinary.size(), m_InputLayout.GetAddressOf() );
 
 	if ( FAILED( inputLayoutResult ) )
 	{
@@ -208,11 +185,8 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 		return false;
 	}
 
-	const HRESULT pixelShaderResult = device->CreatePixelShader(
-	pixelShaderBinary.data(),
-	pixelShaderBinary.size(),
-	nullptr,
-	m_PixelShader.GetAddressOf() );
+	const HRESULT pixelShaderResult = device->CreatePixelShader( pixelShaderBinary.data(), pixelShaderBinary.size(),
+																 nullptr, m_PixelShader.GetAddressOf() );
 
 	if ( FAILED( pixelShaderResult ) )
 	{
@@ -280,12 +254,8 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 }
 
 // 指定したWorld、View、Projection行列と色でOBJモデルを描画する。
-void ObjModelRenderer::Draw(
-GraphicsSystem& graphicsSystem,
-const DirectX::XMMATRIX& worldMatrix,
-const DirectX::XMMATRIX& viewMatrix,
-const DirectX::XMMATRIX& projectionMatrix,
-const DirectX::XMFLOAT4& color )
+void ObjModelRenderer::Draw( GraphicsSystem& graphicsSystem, const DirectX::XMMATRIX& worldMatrix, const DirectX::XMMATRIX& viewMatrix,
+							 const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT4& color )
 {
 	if ( !m_VertexBuffer || !m_IndexBuffer || !m_CameraBuffer.IsValid() ||
 	!m_ObjectBuffer.IsValid() || !m_MaterialBuffer.IsValid() || !m_VertexShader ||

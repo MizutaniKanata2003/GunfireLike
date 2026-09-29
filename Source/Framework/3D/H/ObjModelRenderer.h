@@ -29,16 +29,11 @@ public:
 	bool Initialize( GraphicsSystem& graphicsSystem, const std::wstring& objFilePath, const std::wstring& textureFilePath );
 
 	// 指定したWorld、View、Projection行列と色でOBJモデルを描画する。
-	void Draw(
-	GraphicsSystem& graphicsSystem,
-	const DirectX::XMMATRIX& worldMatrix,
-	const DirectX::XMMATRIX& viewMatrix,
-	const DirectX::XMMATRIX& projectionMatrix,
-	const DirectX::XMFLOAT4& color = DirectX::XMFLOAT4{ 1.0f, 1.0f, 1.0f, 1.0f } );
+	void Draw( GraphicsSystem& graphicsSystem, const DirectX::XMMATRIX& worldMatrix, const DirectX::XMMATRIX& viewMatrix,
+			   const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT4& color = DirectX::XMFLOAT4{ 1.0f, 1.0f, 1.0f, 1.0f } );
 
 	// OBJ描画で使用したDirect3Dリソースを解放する。
 	void Uninit();
-
 private:
 	//========= 構造体=========
 	// OBJモデルの頂点座標とUV座標。

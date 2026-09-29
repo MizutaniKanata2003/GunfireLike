@@ -18,27 +18,17 @@ public:
 	// 派生クラスが必要に応じて初期化処理を実装する。
 	virtual void Initialize() {}
 	// 派生クラスが必要に応じて詳細な初期化処理を実装する。
-	virtual bool Init()
-	{
-		return true;
-	}
+	virtual bool Init() { return true; }
 	// 派生クラスが必要に応じて終了処理を実装する。
 	virtual void Uninit() {}
 
 	//========= 状態変更関数=========
 	// 次の管理タイミングで破棄するための要求を設定する。
-	void SetDestroyRequested()
-	{
-		m_IsDestroyRequested = true;
-	}
+	void SetDestroyRequested() { m_IsDestroyRequested = true; }
 
 	//========= Getter関数=========
 	// 破棄要求が設定されているかを返す。
-	[[nodiscard]] bool IsDestroyRequested() const
-	{
-		return m_IsDestroyRequested;
-	}
-
+	[[nodiscard]] bool IsDestroyRequested() const { return m_IsDestroyRequested; }
 private:
 	//========= 状態管理=========
 	// 管理側がオブジェクトを削除するべきかを示すフラグ。

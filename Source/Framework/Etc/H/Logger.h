@@ -28,11 +28,7 @@ class Logger final
 public:
 	//========= ログ出力関数=========
 	// 指定した重要度、分類、メッセージをデバッグ出力へ書き込む。
-	static void Write(
-		e_LogLevel logLevel,
-		e_LogCategory logCategory,
-		std::wstring_view message );
-
+	static void Write( e_LogLevel logLevel, e_LogCategory logCategory, std::wstring_view message );
 private:
 	//========= 生成禁止関数=========
 	// Loggerのインスタンス生成を禁止する。

@@ -25,13 +25,7 @@ public:
 
 	//========= 描画関数=========
 	// 指定した画面座標、サイズ、色で単色Quadを描画する。
-	void DrawQuad(
-		GraphicsSystem& graphicsSystem,
-		float positionX,
-		float positionY,
-		float width,
-		float height,
-		const DirectX::XMFLOAT4& color );
+	void DrawQuad( GraphicsSystem& graphicsSystem, float positionX, float positionY, float width, float height, const DirectX::XMFLOAT4& color );
 	// 画面中央に照準を描画する。
 	void DrawCrosshair( GraphicsSystem& graphicsSystem );
 	// 現在HPと最大HPに応じたプレイヤーHPバーを描画する。
