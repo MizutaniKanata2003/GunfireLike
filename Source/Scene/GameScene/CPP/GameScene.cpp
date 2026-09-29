@@ -298,7 +298,7 @@ void GameScene::Draw()
 	DrawOpaqueWorld( viewMatrix, projectionMatrix, isPreviousGateAvailable, isNextGateAvailable );
 	DrawTransparentWorld( viewMatrix, projectionMatrix );
 	m_EnemyHealthBar.Draw( m_BasicMeshRenderer, m_GraphicsSystem, viewMatrix, projectionMatrix, cameraPosition,
-	m_EnemyVisual.GetPosition(), m_EnemyController.GetCurrentHp(), m_EnemyController.GetMaxHp(), m_EnemyController.IsDead() );
+						   m_EnemyVisual.GetHealthBarPosition(), m_EnemyController.GetCurrentHp(), m_EnemyController.GetMaxHp(), m_EnemyController.IsDead() );
 
 	const DirectX::XMFLOAT3 playerPosition = m_DebugPlayer.GetPosition();
 	const bool isNearPreviousGate = isPreviousGateAvailable && m_PreviousStageGate.IsPlayerNear( playerPosition, GATE_INTERACTION_RADIUS_SQUARED );

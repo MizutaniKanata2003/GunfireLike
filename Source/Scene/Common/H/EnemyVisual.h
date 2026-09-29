@@ -32,7 +32,7 @@ public:
 	// EnemyのRay命中判定に使用するSphere中心座標を返す。
 	[[nodiscard]] DirectX::XMFLOAT3 GetHitSphereCenter( float hitCenterYOffset ) const;
 	// Enemy頭上HPバーのWorld座標を返す。
-	[[nodiscard]] DirectX::XMFLOAT3 GetHealthBarPosition( float healthBarYOffset ) const;
+	[[nodiscard]] DirectX::XMFLOAT3 GetHealthBarPosition() const;
 private:
 	//========= Transform・Animation状態=========
 	// Enemyの位置、回転、Scale、World行列を管理する。

@@ -12,7 +12,6 @@ namespace
 	// Enemy頭上に描画するHPバーのサイズと配置。
 	constexpr float HP_BAR_WIDTH = 2.0f;
 	constexpr float HP_BAR_HEIGHT = 0.18f;
-	constexpr float HP_BAR_Y_OFFSET = 1.10f;
 
 	// HPバーの厚さ、Camera方向への補正、表示判定に使用する値。
 	constexpr float HP_BAR_BACKGROUND_DEPTH = 0.02f;
@@ -24,7 +23,7 @@ namespace
 
 // Enemyの現在HPをCamera方向へ向けたBillboard HPバーとして描画する。
 void EnemyHealthBar::Draw( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem& graphicsSystem, const DirectX::XMMATRIX& viewMatrix,
-						   const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT3& cameraPosition, const DirectX::XMFLOAT3& enemyPosition,
+						   const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT3& cameraPosition, const DirectX::XMFLOAT3& healthBarPosition,
 						   float currentHp, float maxHp, bool isEnemyDead ) const
 {
 	if ( maxHp <= 0.0f || isEnemyDead ) return;
@@ -33,10 +32,8 @@ void EnemyHealthBar::Draw( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem&
 
 	if ( enemyHpRatio <= HP_BAR_VISIBLE_RATIO_THRESHOLD ) return;
 
-	const DirectX::XMFLOAT3 hpBarPosition{ enemyPosition.x,enemyPosition.y + HP_BAR_Y_OFFSET,enemyPosition.z };
-
 	DirectX::XMVECTOR toCameraVector =
-		DirectX::XMVectorSubtract( DirectX::XMLoadFloat3( &cameraPosition ), DirectX::XMLoadFloat3( &hpBarPosition ) );
+		DirectX::XMVectorSubtract( DirectX::XMLoadFloat3( &cameraPosition ), DirectX::XMLoadFloat3( &healthBarPosition ) );
 	toCameraVector = DirectX::XMVectorSetY( toCameraVector, 0.0f );
 
 	const float toCameraLengthSquared = DirectX::XMVectorGetX( DirectX::XMVector3LengthSq( toCameraVector ) );
@@ -58,11 +55,11 @@ void EnemyHealthBar::Draw( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem&
 	const float hpBarForegroundXOffset = -( HP_BAR_WIDTH - hpBarForegroundWidth ) * 0.5f;
 
 	const DirectX::XMMATRIX hpBarBackgroundWorldMatrix = DirectX::XMMatrixScaling( HP_BAR_WIDTH, HP_BAR_HEIGHT, HP_BAR_BACKGROUND_DEPTH ) *
-		billboardRotationMatrix * DirectX::XMMatrixTranslation( hpBarPosition.x, hpBarPosition.y, hpBarPosition.z );
+		billboardRotationMatrix * DirectX::XMMatrixTranslation( healthBarPosition.x, healthBarPosition.y, healthBarPosition.z );
 
 	const DirectX::XMVECTOR foregroundPositionVector = DirectX::XMVectorAdd(
-		DirectX::XMVectorSet( hpBarPosition.x + hpBarForegroundXOffset, hpBarPosition.y, hpBarPosition.z, 1.0f ),
-		DirectX::XMVectorScale( toCameraVector, HP_BAR_FOREGROUND_CAMERA_OFFSET ) );
+	DirectX::XMVectorSet( healthBarPosition.x + hpBarForegroundXOffset, healthBarPosition.y, healthBarPosition.z, 1.0f ),
+	DirectX::XMVectorScale( toCameraVector, HP_BAR_FOREGROUND_CAMERA_OFFSET ) );
 
 	DirectX::XMFLOAT3 foregroundPosition{};
 	DirectX::XMStoreFloat3( &foregroundPosition, foregroundPositionVector );
@@ -73,8 +70,8 @@ void EnemyHealthBar::Draw( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem&
 	graphicsSystem.SetRenderPass( e_RenderPass::e_TRANSPARENT );
 
 	basicMeshRenderer.DrawCube( graphicsSystem, hpBarBackgroundWorldMatrix, viewMatrix, projectionMatrix,
-								DirectX::XMFLOAT4{ 0.0f,0.0f,0.0f,0.70f }, DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
+	DirectX::XMFLOAT4{ 0.0f,0.0f,0.0f,0.70f }, DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
 
 	basicMeshRenderer.DrawCube( graphicsSystem, hpBarForegroundWorldMatrix, viewMatrix, projectionMatrix,
-								DirectX::XMFLOAT4{ 0.10f,1.0f,0.20f,0.95f }, DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
+	DirectX::XMFLOAT4{ 0.10f,1.0f,0.20f,0.95f }, DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
 }

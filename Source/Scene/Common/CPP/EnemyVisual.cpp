@@ -12,7 +12,8 @@ namespace
 	// Enemyの浮遊演出設定。
 	constexpr float ENEMY_FLOAT_HEIGHT = 0.10f;
 	constexpr float ENEMY_FLOAT_SPEED = 2.0f;
-
+	// Enemy頭上に表示するHPバーのY座標補正。
+	constexpr float ENEMY_HEALTH_BAR_Y_OFFSET = 1.10f;
 	// EnemyのY軸回転速度。
 	constexpr float ENEMY_ROTATION_SPEED = 1.5f;
 
@@ -59,11 +60,10 @@ DirectX::XMFLOAT3 EnemyVisual::GetHitSphereCenter( float hitCenterYOffset ) cons
 }
 
 // Enemy頭上HPバーのWorld座標を返す。
-DirectX::XMFLOAT3 EnemyVisual::GetHealthBarPosition(
-float healthBarYOffset ) const
+DirectX::XMFLOAT3 EnemyVisual::GetHealthBarPosition() const
 {
 	const DirectX::XMFLOAT3& enemyPosition = m_Transform.GetPosition();
 
 	return
-		DirectX::XMFLOAT3{ enemyPosition.x,enemyPosition.y + healthBarYOffset,enemyPosition.z };
+		DirectX::XMFLOAT3{ enemyPosition.x,enemyPosition.y + ENEMY_HEALTH_BAR_Y_OFFSET,enemyPosition.z };
 }

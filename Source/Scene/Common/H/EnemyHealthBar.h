@@ -13,6 +13,6 @@ public:
 	//========= 描画関数=========
 	// Enemyの現在HPをCamera方向へ向けたBillboard HPバーとして描画する。
 	void Draw( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem& graphicsSystem, const DirectX::XMMATRIX& viewMatrix,
-			   const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT3& cameraPosition, const DirectX::XMFLOAT3& enemyPosition,
+			   const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT3& cameraPosition, const DirectX::XMFLOAT3& healthBarPosition,
 			   float currentHp, float maxHp, bool isEnemyDead ) const;
 };
