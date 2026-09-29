@@ -36,7 +36,6 @@ public:
 	//========= Getter関数=========
 	// DirectX 11 Deviceを返す。
 	[[nodiscard]] ID3D11Device* GetDevice() const { return m_Device.Get(); }
-
 	// DirectX 11 Device Contextを返す。
 	[[nodiscard]] ID3D11DeviceContext* GetContext() const { return m_Context.Get(); }
 

@@ -47,7 +47,6 @@ public:
 	[[nodiscard]] GameProgress& GetGameProgress() { return m_GameProgress; }
 	// Sceneをまたいで維持する読み取り専用のゲーム進捗を返す。
 	[[nodiscard]] const GameProgress& GetGameProgress() const { return m_GameProgress; }
-
 private:
 	//========= 補助関数=========
 	// 予約済みSceneを現在Sceneへ反映し、初期化とフェードインを行う。

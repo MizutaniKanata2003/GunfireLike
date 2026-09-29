@@ -22,7 +22,7 @@ public:
 
 	//========= ライフサイクル関数=========
 	// 保持している全Projectileを未使用状態へ初期化する。
-	void Initialize();
+	void Initialize() { m_Projectiles.fill( {} ); }
 
 	//========= Projectile操作関数=========
 	// 未使用スロットへProjectileを生成する。
@@ -32,8 +32,7 @@ public:
 
 	//========= Getter関数=========
 	// 描画用にProjectile Poolを読み取り専用で返す。
-	[[nodiscard]] const std::array<Projectile, 16>& GetProjectiles() const;
-
+	[[nodiscard]] const std::array<Projectile, 16>& GetProjectiles() const { return m_Projectiles; }
 private:
 	//========= Projectile管理=========
 	// 発射中のProjectileを最大数まで保持する固定配列。

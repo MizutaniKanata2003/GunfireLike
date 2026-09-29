@@ -45,18 +45,6 @@ void GunViewModel::Initialize()
 	m_MuzzleFlashTimer = {};
 }
 
-// Muzzle Flash表示用Timerを更新する。
-void GunViewModel::Update( float deltaTime )
-{
-	m_MuzzleFlashTimer = std::max( 0.0f, m_MuzzleFlashTimer - deltaTime );
-}
-
-// Muzzle Flashの表示を開始する。
-void GunViewModel::TriggerMuzzleFlash()
-{
-	m_MuzzleFlashTimer = m_MuzzleFlashDuration;
-}
-
 // Gun本体とGun BarrelをOpaque Passで描画する。
 void GunViewModel::DrawOpaque( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem& graphicsSystem,
 							   const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix ) const

@@ -43,7 +43,6 @@ private:
 	{
 		DirectX::XMFLOAT2 position{};
 	};
-
 	// Shaderへ渡すQuadの矩形情報と色。
 	struct HudBuffer
 	{

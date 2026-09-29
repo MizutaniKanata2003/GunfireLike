@@ -16,11 +16,11 @@ public:
 
 	//========= 更新関数=========
 	// Muzzle Flash表示用Timerを更新する。
-	void Update( float deltaTime );
+	void Update( float deltaTime ) { m_MuzzleFlashTimer = std::max( 0.0f, m_MuzzleFlashTimer - deltaTime ); }
 
 	//========= 操作関数=========
 	// Muzzle Flashの表示を開始する。
-	void TriggerMuzzleFlash();
+	void TriggerMuzzleFlash() { m_MuzzleFlashTimer = m_MuzzleFlashDuration; }
 
 	//========= 描画関数=========
 	// Gun本体とGun BarrelをOpaque Passで描画する。
@@ -29,7 +29,6 @@ public:
 	// Muzzle FlashをTransparent Passで描画する。
 	void DrawTransparent( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem& graphicsSystem,
 					 const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix ) const;
-
 private:
 	//========= Gun設定=========
 	// Gun本体のCamera空間における位置とScale。

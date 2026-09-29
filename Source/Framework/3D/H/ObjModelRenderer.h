@@ -24,14 +24,13 @@ public:
 	//========= Getter関数=========
 	// OBJモデル描画で使用する頂点形式を返す。
 	[[nodiscard]] e_VertexFormat GetVertexFormat() const { return e_VertexFormat::e_POSITION_TEXTURE; }
+
 	//========= ライフサイクル・描画関数=========
 	// OBJ、Shader、Buffer、必要なTexture、Samplerを初期化する。
 	bool Initialize( GraphicsSystem& graphicsSystem, const std::wstring& objFilePath, const std::wstring& textureFilePath );
-
 	// 指定したWorld、View、Projection行列と色でOBJモデルを描画する。
 	void Draw( GraphicsSystem& graphicsSystem, const DirectX::XMMATRIX& worldMatrix, const DirectX::XMMATRIX& viewMatrix,
 			   const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT4& color = DirectX::XMFLOAT4{ 1.0f, 1.0f, 1.0f, 1.0f } );
-
 	// OBJ描画で使用したDirect3Dリソースを解放する。
 	void Uninit();
 private:

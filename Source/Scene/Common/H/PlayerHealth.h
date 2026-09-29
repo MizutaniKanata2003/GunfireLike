@@ -26,7 +26,6 @@ public:
 		m_MaxHp = std::max( PlayerHealthConstants::MIN_MAX_HP, maxHp );
 		m_CurrentHp = m_MaxHp;
 	}
-
 	// 指定した最大HPで現在HPを最大まで回復する。
 	void ResetToMaxHp( float maxHp )
 	{

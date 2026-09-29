@@ -32,7 +32,6 @@ public:
 
 		return SUCCEEDED( result );
 	}
-
 	// Constant Bufferへ最新データを書き込む。
 	void Update( ID3D11DeviceContext* context, const T& data ) const
 	{
@@ -40,7 +39,6 @@ public:
 
 		context->UpdateSubresource( m_Buffer.Get(), 0, nullptr, &data, 0, 0 );
 	}
-
 	// Constant Bufferを解放する。
 	void Uninit() { m_Buffer.Reset(); }
 

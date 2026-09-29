@@ -56,10 +56,8 @@ public:
 	void Draw() override;
 	// GameSceneで使用した描画リソースを終了する。
 	void Finalize() override;
-
 private:
 	//========= 構造体=========
-
 	//========= Game進行状態=========
 	enum class GamePhase
 	{
@@ -67,7 +65,6 @@ private:
 		e_STAGE_CLEAR,
 		e_RESULT_TRANSITION
 	};
-
 	//========= Scene遷移要求=========
 	enum class SceneChangeRequest
 	{
@@ -76,7 +73,6 @@ private:
 		e_SHOP,
 		e_RESULT
 	};
-
 	//========= Debug UI要求=========
 	enum class DebugUiRequest
 	{
@@ -85,7 +81,6 @@ private:
 		e_PREVIOUS_STAGE,
 		e_NEXT_STAGE
 	};
-
 	//========= Debug UI表示状態=========
 	// ImGui Debug UIが読み取り専用で表示するGame状態。
 	struct GameDebugState
@@ -170,7 +165,6 @@ private:
 	void ExecuteNormalShot( GameProgress& progress, const PlayerStats& playerStats );
 	// 特殊攻撃のSE、範囲判定、Enemy Damageを実行する。
 	void ExecuteSpecialAttack( GameProgress& progress, const PlayerStats& playerStats, float playerToEnemyDistanceSquared );
-
 	// PlayerとEnemyの水平距離の二乗を返す。
 	[[nodiscard]] float GetPlayerToEnemyDistanceSquared() const;
 

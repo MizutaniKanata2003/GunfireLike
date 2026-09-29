@@ -49,7 +49,6 @@ public:
 	[[nodiscard]] float GetMaxHp() const { return m_MaxHp; }
 	[[nodiscard]] bool IsDead() const { return m_State == EnemyState::e_DEAD; }
 	[[nodiscard]] EnemyState GetState() const { return m_State; }
-
 private:
 	//========= Enemy状態=========
 	EnemyState m_State{ EnemyState::e_IDLE };

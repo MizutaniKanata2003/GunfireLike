@@ -30,27 +30,19 @@ class ShopScene final : public IScene
 public:
 	//========= 生成関数=========
 	// ShopSceneが使用するSceneManagerとFramework Systemを登録する。
-	ShopScene(
-		SceneManager& sceneManager,
-		InputSystem& inputSystem,
-		GraphicsSystem& graphicsSystem,
-		AudioSystem& audioSystem );
+	ShopScene( SceneManager& sceneManager, InputSystem& inputSystem, GraphicsSystem& graphicsSystem, AudioSystem& audioSystem );
 
 	//========= Sceneライフサイクル関数=========
 	// ShopのPlayer、Camera、Renderer、HUD、BGMを初期化する。
 	void Initialize() override;
 	// Asset読込などの深い初期化を行う。
-	bool Init() override
-	{
-		return true;
-	}
+	bool Init() override { return true; }
 	// Shop内の操作、カメラ、Player、選択対象、メッセージ表示時間を更新する。
 	void Update( float deltaTime ) override;
 	// Shopの3D空間、強化Object、ゲート、HUDを描画する。
 	void Draw() override;
 	// Shopで使用した描画リソースを終了する。
 	void Finalize() override;
-
 private:
 	//========= 列挙型=========
 	// プレイヤーが照準を合わせられるShop内の操作対象。

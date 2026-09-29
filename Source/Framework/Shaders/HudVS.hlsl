@@ -31,11 +31,7 @@ PixelInput main(VertexInput input)
     const float2 normalizedPosition = pixelPosition / float2(1280.0f, 720.0f);
 
     // 正規化座標をDirectXのクリップ座標へ変換する。
-    output.position = float4(
-        normalizedPosition.x * 2.0f - 1.0f,
-        1.0f - normalizedPosition.y * 2.0f,
-        0.0f,
-        1.0f);
+    output.position = float4(normalizedPosition.x * 2.0f - 1.0f, 1.0f - normalizedPosition.y * 2.0f, 0.0f, 1.0f);
 
     output.color = g_Color;
 

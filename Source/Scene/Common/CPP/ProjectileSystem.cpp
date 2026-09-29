@@ -37,9 +37,3 @@ void ProjectileSystem::Update( float deltaTime, float speed )
 		if ( projectile.remainingLifetime <= 0.0f ) projectile.isActive = false;
 	}
 }
-
-// 描画用にProjectile Poolを読み取り専用で返す。
-const std::array<ProjectileSystem::Projectile, 16>& ProjectileSystem::GetProjectiles() const
-{
-	return m_Projectiles;
-}

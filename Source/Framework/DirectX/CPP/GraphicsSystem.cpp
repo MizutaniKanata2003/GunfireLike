@@ -155,7 +155,8 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 	depthReadOnlyDescription.DepthFunc = D3D11_COMPARISON_LESS;
 	depthReadOnlyDescription.StencilEnable = FALSE;
 
-	const HRESULT depthReadOnlyStateResult = m_Device->CreateDepthStencilState( &depthReadOnlyDescription, m_DepthReadOnlyState.GetAddressOf() );
+	const HRESULT depthReadOnlyStateResult =
+		m_Device->CreateDepthStencilState( &depthReadOnlyDescription, m_DepthReadOnlyState.GetAddressOf() );
 
 	if ( FAILED( depthReadOnlyStateResult ) )
 	{
@@ -170,7 +171,8 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 	cullBackRasterizerDescription.CullMode = D3D11_CULL_BACK;
 	cullBackRasterizerDescription.DepthClipEnable = TRUE;
 
-	const HRESULT cullBackRasterizerStateResult = m_Device->CreateRasterizerState( &cullBackRasterizerDescription, m_CullBackRasterizerState.GetAddressOf() );
+	const HRESULT cullBackRasterizerStateResult =
+		m_Device->CreateRasterizerState( &cullBackRasterizerDescription, m_CullBackRasterizerState.GetAddressOf() );
 
 	if ( FAILED( cullBackRasterizerStateResult ) )
 	{
@@ -185,7 +187,8 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 	cullNoneRasterizerDescription.CullMode = D3D11_CULL_NONE;
 	cullNoneRasterizerDescription.DepthClipEnable = TRUE;
 
-	const HRESULT cullNoneRasterizerStateResult = m_Device->CreateRasterizerState( &cullNoneRasterizerDescription, m_CullNoneRasterizerState.GetAddressOf() );
+	const HRESULT cullNoneRasterizerStateResult =
+		m_Device->CreateRasterizerState( &cullNoneRasterizerDescription, m_CullNoneRasterizerState.GetAddressOf() );
 
 	if ( FAILED( cullNoneRasterizerStateResult ) )
 	{

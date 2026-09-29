@@ -25,17 +25,13 @@ public:
 	// タイトル画面の入力設定、HUD、文字、BGMを初期化する。
 	void Initialize() override;
 	// Asset読込などの深い初期化を行う。
-	bool Init() override
-	{
-		return true;
-	}
+	bool Init() override { return true; }
 	// タイトル画面の入力を更新する。
 	void Update( float deltaTime ) override;
 	// タイトル画面の背景、操作説明、ボタンを描画する。
 	void Draw() override;
 	// タイトル画面で使用したHUDと文字描画リソースを終了する。
 	void Finalize() override;
-
 private:
 	//========= 補助関数=========
 	// 新しいゲームを開始してShopSceneへの遷移を予約する。

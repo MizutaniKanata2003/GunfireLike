@@ -78,20 +78,10 @@ int WINAPI WinMain( HINSTANCE instance, HINSTANCE, LPSTR, int showCommand )
 
 	AdjustWindowRect( &windowRect, WS_OVERLAPPEDWINDOW, FALSE );
 
-	HWND windowHandle =
-		CreateWindowExW(
-			0,
-			Config::WINDOW_CLASS_NAME,
-			Config::WINDOW_TITLE,
-			WS_OVERLAPPEDWINDOW,
-			CW_USEDEFAULT,
-			CW_USEDEFAULT,
-			windowRect.right - windowRect.left,
-			windowRect.bottom - windowRect.top,
-			nullptr,
-			nullptr,
-			instance,
-			nullptr );
+	HWND windowHandle = CreateWindowExW( 0, Config::WINDOW_CLASS_NAME, Config::WINDOW_TITLE,
+										 WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+										 windowRect.right - windowRect.left, windowRect.bottom - windowRect.top,
+										 nullptr, nullptr, instance, nullptr );
 
 	if ( windowHandle == nullptr )
 	{

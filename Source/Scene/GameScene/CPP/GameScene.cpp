@@ -156,15 +156,8 @@ namespace
 	}
 }
 // GameSceneが使用するSceneManagerとFramework Systemを登録する。
-GameScene::GameScene(
-	SceneManager& sceneManager,
-	InputSystem& inputSystem,
-	GraphicsSystem& graphicsSystem,
-	AudioSystem& audioSystem )
-	: m_SceneManager( sceneManager )
-	, m_InputSystem( inputSystem )
-	, m_GraphicsSystem( graphicsSystem )
-	, m_AudioSystem( audioSystem )
+GameScene::GameScene( SceneManager& sceneManager, InputSystem& inputSystem, GraphicsSystem& graphicsSystem, AudioSystem& audioSystem )
+	: m_SceneManager( sceneManager ), m_InputSystem( inputSystem ), m_GraphicsSystem( graphicsSystem ), m_AudioSystem( audioSystem )
 {
 }
 
@@ -268,7 +261,6 @@ void GameScene::Update( float deltaTime )
 	const PlayerStats& playerStats = progress.GetPlayerStats();
 
 	UpdateGameProgressAndTimers( deltaTime, progress );
-	UpdateLowHealthWarning();
 
 	const float playerToEnemyDistanceSquared = GetPlayerToEnemyDistanceSquared();
 	UpdateEnemyCombat( deltaTime, playerToEnemyDistanceSquared );
@@ -292,8 +284,8 @@ void GameScene::Draw()
 	// 現在Stageに応じたGateの表示可否を判定する。
 	const int currentStage = progress.GetCurrentStage();
 
-	const StageGateAvailability gateAvailability = m_StageGateController.GetAvailability( currentStage,
-		StageConstants::FIRST_STAGE_NUMBER, StageConstants::MAX_STAGE_COUNT, progress.IsStageCleared( currentStage ) );
+	const StageGateAvailability gateAvailability = m_StageGateController.GetAvailability(
+		currentStage, StageConstants::FIRST_STAGE_NUMBER, StageConstants::MAX_STAGE_COUNT, progress.IsStageCleared( currentStage ) );
 
 	const bool isPreviousGateAvailable = gateAvailability.isPreviousGateAvailable;
 
@@ -415,12 +407,7 @@ void GameScene::InitializeWorldObjects()
 // 前後StageとShopへ移動するGateを初期化する。
 void GameScene::InitializeGates()
 {
-	const DirectX::XMFLOAT3 gateScale
-	{
-	GATE_WIDTH,
-	GATE_HEIGHT,
-	GATE_DEPTH
-	};
+	const DirectX::XMFLOAT3 gateScale{ GATE_WIDTH,GATE_HEIGHT,GATE_DEPTH };
 
 	m_PreviousStageGate.Initialize( StageGate::GateType::e_PREVIOUS_STAGE, DirectX::XMFLOAT3{ PREVIOUS_GATE_POSITION_X,PREVIOUS_GATE_POSITION_Y,PREVIOUS_GATE_POSITION_Z },
 	gateScale, DirectX::XMFLOAT4{ 0.85f,0.30f,1.0f,1.0f } );
@@ -512,7 +499,6 @@ bool GameScene::UpdateDebugSceneChange()
 bool GameScene::UpdatePlayerDeath()
 {
 	if ( !m_PlayerHealthStateResult.isPlayerDead )return false;
-
 
 	GameProgress& progress = m_SceneManager.GetGameProgress();
 
@@ -800,14 +786,8 @@ void GameScene::DrawTransparentWorld( const DirectX::XMMATRIX& viewMatrix, const
 			DirectX::XMMatrixScaling( BULLET_SCALE, BULLET_SCALE, BULLET_SCALE ) *
 			DirectX::XMMatrixTranslation( projectile.position.x, projectile.position.y, projectile.position.z );
 
-		m_BasicMeshRenderer.DrawCube(
-		m_GraphicsSystem,
-		projectileWorldMatrix,
-		viewMatrix,
-		projectionMatrix,
-		DirectX::XMFLOAT4{ 1.0f, 0.85f, 0.10f, projectileAlpha },
-		DirectX::XMFLOAT2{ 1.0f, 1.0f },
-		BasicMeshRenderer::TextureType::Color );
+		m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, projectileWorldMatrix, viewMatrix, projectionMatrix,
+									  DirectX::XMFLOAT4{ 1.0f, 0.85f, 0.10f, projectileAlpha }, DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
 	}
 }
 
@@ -879,8 +859,7 @@ void GameScene::DrawDebugUi( const GameDebugState& gameDebugState )
 
 	if ( gameDebugState.isPreviousGateAvailable && ImGui::Button( PREVIOUS_STAGE_GATE_LABEL, ImVec2{ GATE_BUTTON_WIDTH,GATE_BUTTON_HEIGHT } ) )
 	{
-		gateDestination =
-			GateDestination::e_PREVIOUS_STAGE;
+		gateDestination = GateDestination::e_PREVIOUS_STAGE;
 	}
 
 	if ( gameDebugState.currentStage < gameDebugState.maxStageCount )

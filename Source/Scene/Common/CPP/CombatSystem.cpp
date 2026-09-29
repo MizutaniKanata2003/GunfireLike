@@ -8,8 +8,7 @@
 #include <DirectXMath.h>
 
 // Camera位置・前方向からのRayがEnemy Sphereに命中するか返す。
-bool CombatSystem::IsHitScanHit( const DirectX::XMFLOAT3& rayOrigin, const DirectX::XMFLOAT3& rayDirection,
-								 const EnemyHitTest& enemyHitTest ) const
+bool CombatSystem::IsHitScanHit( const DirectX::XMFLOAT3& rayOrigin, const DirectX::XMFLOAT3& rayDirection, const EnemyHitTest& enemyHitTest ) const
 {
 	const float safeRadius = std::max( 0.0f, enemyHitTest.radius );
 
@@ -43,10 +42,4 @@ float CombatSystem::GetHorizontalDistanceSquared( const DirectX::XMFLOAT3& first
 	const float deltaZ = firstPosition.z - secondPosition.z;
 
 	return deltaX * deltaX + deltaZ * deltaZ;
-}
-
-// Playerが指定した攻撃範囲内にいるか返す。
-bool CombatSystem::IsWithinRangeSquared( float distanceSquared, float rangeSquared ) const
-{
-	return distanceSquared <= std::max( 0.0f, rangeSquared );
 }

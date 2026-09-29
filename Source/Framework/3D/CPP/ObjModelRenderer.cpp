@@ -79,9 +79,7 @@ namespace
 	// 同じ位置、UV、法線の組み合わせを共有するための文字列Keyを作る。
 	std::string MakeVertexKey( const ObjIndex& index )
 	{
-		return std::to_string( index.positionIndex ) + "/" +
-			std::to_string( index.uvIndex ) + "/" +
-			std::to_string( index.normalIndex );
+		return std::to_string( index.positionIndex ) + "/" + std::to_string( index.uvIndex ) + "/" + std::to_string( index.normalIndex );
 	}
 }
 

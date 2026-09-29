@@ -23,12 +23,11 @@ class PlayerCombatController final
 public:
 	//========= 初期化関数=========
 	// Stage開始時の特殊攻撃Cooldownを初期化する。
-	void Initialize();
+	void Initialize() { m_SpecialAttackCooldownRemainingTime = 0.0f; }
 
 	//========= 更新関数=========
 	// 特殊攻撃のCooldownを更新する。
-	void Update(
-	float deltaTime );
+	void Update( float deltaTime );
 
 	//========= 攻撃要求関数=========
 	// 左クリック入力から通常射撃要求を返す。
@@ -43,7 +42,6 @@ public:
 	[[nodiscard]] bool IsSpecialAttackReady() const { return m_SpecialAttackCooldownRemainingTime <= 0.0f; }
 	// 特殊攻撃の残りCooldown時間を返す。
 	[[nodiscard]] float GetSpecialAttackCooldownRemainingTime() const { return m_SpecialAttackCooldownRemainingTime; }
-
 private:
 	//========= Cooldown状態=========
 	// 特殊攻撃が再使用可能になるまでの残り時間。

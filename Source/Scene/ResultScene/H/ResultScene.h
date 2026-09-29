@@ -25,17 +25,13 @@ public:
 	// Result画面の入力設定、HUD、文字、BGMを初期化する。
 	void Initialize() override;
 	// Asset読込などの深い初期化を行う。
-	bool Init() override
-	{
-		return true;
-	}
+	bool Init() override { return true; }
 	// Result画面の入力を更新する。
-	void Update( float deltaTime ) override;
+	void Update( float deltaTime ) override { if ( m_InputSystem.IsKeyTriggered( RESULT_RETURN_TO_TITLE_KEY ) ) ReturnToTitle(); }
 	// 最終結果、背景、タイトルへ戻るボタンを描画する。
 	void Draw() override;
 	// Result画面で使用したHUDと文字描画リソースを終了する。
 	void Finalize() override;
-
 private:
 	//========= 補助関数=========
 	// タイトル画面へのScene遷移を予約する。

@@ -3,12 +3,6 @@
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm>
 
-// Stage開始時の特殊攻撃Cooldownを初期化する。
-void PlayerCombatController::Initialize()
-{
-	m_SpecialAttackCooldownRemainingTime = 0.0f;
-}
-
 // 特殊攻撃のCooldownを更新する。
 void PlayerCombatController::Update( float deltaTime )
 {

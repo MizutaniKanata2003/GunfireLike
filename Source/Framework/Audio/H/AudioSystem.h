@@ -54,7 +54,6 @@ public:
 	void PlaySpecialSe();
 	// 敵撃破SEを再生する。
 	void PlayEnemyDefeatSe();
-
 private:
 	//========= 前方宣言=========
 	// AudioEngineとSoundEffect群を隠蔽する実装クラス。

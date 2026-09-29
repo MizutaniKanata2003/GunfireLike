@@ -21,7 +21,6 @@ public:
 	//========= 更新関数=========
 	// 現在HPから低HP状態の変化と死亡状態を返す。
 	[[nodiscard]] PlayerHealthStateResult Update( float currentHp, float maxHp, float lowHealthRatioThreshold );
-
 private:
 	//========= 低HP状態=========
 	// 前回Update時点で低HP状態だったか。

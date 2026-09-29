@@ -30,14 +30,13 @@ public:
 	//========= Getter関数=========
 	// Cube描画で使用する頂点形式を返す。
 	[[nodiscard]] e_VertexFormat GetVertexFormat() const { return e_VertexFormat::e_POSITION_TEXTURE; }
+
 	//========= ライフサイクル・描画関数=========
 	// Cubeメッシュ、Shader、Texture、Sampler、定数バッファを初期化する。
 	bool Initialize( GraphicsSystem& graphicsSystem );
-
 	// 指定した行列、色、UVタイリング、テクスチャ種別でCubeを描画する。
 	void DrawCube( GraphicsSystem& graphicsSystem, const DirectX::XMMATRIX& worldMatrix, const DirectX::XMMATRIX& viewMatrix,
 				   const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT4& color, const DirectX::XMFLOAT2& uvTiling, TextureType textureType );
-
 	// 描画に使用したDirect3Dリソースを解放する。
 	void Uninit();
 private:
