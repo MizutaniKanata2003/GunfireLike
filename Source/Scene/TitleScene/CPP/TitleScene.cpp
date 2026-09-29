@@ -10,6 +10,7 @@
 #include "Framework/Audio/H/AudioSystem.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
 #include "Framework/Input/H/InputSystem.h"
+#include "Framework/Etc/H/Logger.h"
 
 //========= Scene インクルード=========
 #include "Scene/Common/H/SceneManager.h"
@@ -106,12 +107,34 @@ void TitleScene::Initialize()
 	// タイトル画面ではImGui操作を優先するため、FPSマウスキャプチャを解除する。
 	m_InputSystem.SetMouseCaptureEnabled( false );
 
-	// タイトル画面で使用するHUD Quadと文字描画を初期化する。
-	m_HudRenderer.Initialize( m_GraphicsSystem );
-	m_HudTextRenderer.Initialize( m_GraphicsSystem );
-
 	// タイトル画面のBGMを再生する。
 	m_AudioSystem.PlayTitleBgm();
+}
+
+// HUDと文字描画に使用する深い描画Resourceを初期化する。
+bool TitleScene::Init()
+{
+	// タイトル画面で使用するHUD Quad描画Resourceを初期化する。
+	const bool isHudRendererInitialized = m_HudRenderer.Initialize( m_GraphicsSystem );
+
+	if ( !isHudRendererInitialized )
+	{
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"TitleSceneのHudRenderer初期化失敗" );
+		Finalize();
+		return false;
+	}
+
+	// タイトル画面で使用するHUD文字描画Resourceを初期化する。
+	const bool isHudTextRendererInitialized = m_HudTextRenderer.Initialize( m_GraphicsSystem );
+
+	if ( !isHudTextRendererInitialized )
+	{
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"TitleSceneのHudTextRenderer初期化失敗" );
+		Finalize();
+		return false;
+	}
+
+	return true;
 }
 
 // タイトル画面の入力を更新する。

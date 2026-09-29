@@ -24,8 +24,8 @@ public:
 	//========= Sceneライフサイクル関数=========
 	// タイトル画面の入力設定、HUD、文字、BGMを初期化する。
 	void Initialize() override;
-	// Asset読込などの深い初期化を行う。
-	bool Init() override { return true; }
+	// HUDと文字描画に使用する深い描画Resourceを初期化する。
+	bool Init() override;
 	// タイトル画面の入力を更新する。
 	void Update( float deltaTime ) override;
 	// タイトル画面の背景、操作説明、ボタンを描画する。

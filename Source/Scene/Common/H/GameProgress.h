@@ -125,7 +125,9 @@ public:
 	// 現在Stageを初回クリア済みに設定し、初回設定に成功したかを返す。
 	[[nodiscard]] bool MarkCurrentStageCleared()
 	{
-		const int stageIndex = m_CurrentStage - StageConstants::FIRST_STAGE_NUMBER;
+		const int stageIndex = GetStageIndex( m_CurrentStage );
+
+		if ( stageIndex < 0 ) return false;
 
 		if ( m_StageCleared[ stageIndex ] ) return false;
 
@@ -133,7 +135,6 @@ public:
 
 		return true;
 	}
-
 	// 現在Stageの初回クリア報酬を通貨へ加算する。
 	void AddStageClearReward() { m_Currency += GetCurrentStageData().clearReward; }
 
@@ -201,26 +202,33 @@ public:
 	// 現在選択しているStage番号を返す。
 	[[nodiscard]] int GetCurrentStage() const { return m_CurrentStage; }
 	// 現在選択しているStageの設定を返す。
-	[[nodiscard]] const StageData& GetCurrentStageData() const { return STAGE_DATA[ m_CurrentStage - StageConstants::FIRST_STAGE_NUMBER ]; }
+	[[nodiscard]] const StageData& GetCurrentStageData() const
+	{
+		const int stageIndex = GetStageIndex( m_CurrentStage );
+
+		if ( stageIndex < 0 ) return STAGE_DATA.front();
+
+		return STAGE_DATA[ stageIndex ];
+	}
 	// 指定したStageが初回クリア済みかを返す。
 	[[nodiscard]] bool IsStageCleared( int stageNumber ) const
 	{
-		const int stageIndex = stageNumber - StageConstants::FIRST_STAGE_NUMBER;
+		const int stageIndex = GetStageIndex( stageNumber );
 
-		if ( stageIndex < 0 || stageIndex >= static_cast<int>( m_StageCleared.size() ) ) return false;
+		if ( stageIndex < 0 ) return false;
 
 		return m_StageCleared[ stageIndex ];
 	}
 	// 指定したStageが移動可能な状態かを返す。
 	[[nodiscard]] bool IsStageUnlocked( int stageNumber ) const
 	{
-		if ( stageNumber < StageConstants::FIRST_STAGE_NUMBER || stageNumber > StageConstants::MAX_STAGE_COUNT ) return false;
+		const int stageIndex = GetStageIndex( stageNumber );
 
-		if ( stageNumber == StageConstants::FIRST_STAGE_NUMBER ) return true;
+		if ( stageIndex < 0 ) return false;
 
-		const int previousStage = stageNumber - StageConstants::FIRST_STAGE_NUMBER - 1;
+		if ( stageIndex == 0 ) return true;
 
-		return m_StageCleared[ previousStage ];
+		return m_StageCleared[ stageIndex - 1 ];
 	}
 	// 現在所持している通貨を返す。
 	[[nodiscard]] int GetCurrency() const { return m_Currency; }
@@ -236,6 +244,17 @@ public:
 	[[nodiscard]] const PlayerStats& GetPlayerStats() const { return m_PlayerStats; }
 
 private:
+	//========= Stage番号補助関数=========
+	// 指定したStage番号をStage配列のIndexへ変換し、範囲外なら-1を返す。
+	[[nodiscard]] int GetStageIndex( int stageNumber ) const
+	{
+		const int stageIndex = stageNumber - StageConstants::FIRST_STAGE_NUMBER;
+
+		if ( stageIndex < 0 || stageIndex >= static_cast<int>( m_StageCleared.size() ) ) return -1;
+
+		return stageIndex;
+	}
+
 	//========= Stage進行状態=========
 	// 現在選択しているStage番号。
 	int m_CurrentStage{ StageConstants::FIRST_STAGE_NUMBER };

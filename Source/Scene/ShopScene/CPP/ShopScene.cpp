@@ -14,6 +14,7 @@
 #include "Framework/Audio/H/AudioSystem.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
 #include "Framework/Input/H/InputSystem.h"
+#include "Framework/Etc/H/Logger.h"
 
 //========= Scene インクルード=========
 #include "Scene/Common/H/SceneManager.h"
@@ -119,11 +120,6 @@ ShopScene::ShopScene( SceneManager& sceneManager, InputSystem& inputSystem, Grap
 // ShopのPlayer、Camera、Renderer、HUD、BGMを初期化する。
 void ShopScene::Initialize()
 {
-	// Shop内で使用する3D・2D描画リソースを初期化する。
-	m_BasicMeshRenderer.Initialize( m_GraphicsSystem );
-	m_HudRenderer.Initialize( m_GraphicsSystem );
-	m_HudTextRenderer.Initialize( m_GraphicsSystem );
-
 	// Shop内のアニメーション、照準対象、購入メッセージ状態を初期化する。
 	m_AnimationTime = {};
 	m_AimedTarget = InteractionTarget::e_NONE;
@@ -134,6 +130,42 @@ void ShopScene::Initialize()
 	// ShopではFPS視点操作を使用し、Shop用BGMを再生する。
 	m_InputSystem.SetMouseCaptureEnabled( true );
 	m_AudioSystem.PlayShopBgm();
+}
+
+// 3D、HUD、文字描画に使用する深い描画Resourceを初期化する。
+bool ShopScene::Init()
+{
+	// Shopの3D描画に使用する基本Mesh Rendererを初期化する。
+	const bool isBasicMeshRendererInitialized = m_BasicMeshRenderer.Initialize( m_GraphicsSystem );
+
+	if ( !isBasicMeshRendererInitialized )
+	{
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"ShopSceneのBasicMeshRenderer初期化失敗" );
+		Finalize();
+		return false;
+	}
+
+	// ShopのHUD Quad描画Resourceを初期化する。
+	const bool isHudRendererInitialized = m_HudRenderer.Initialize( m_GraphicsSystem );
+
+	if ( !isHudRendererInitialized )
+	{
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"ShopSceneのHudRenderer初期化失敗" );
+		Finalize();
+		return false;
+	}
+
+	// ShopのHUD文字描画Resourceを初期化する。
+	const bool isHudTextRendererInitialized = m_HudTextRenderer.Initialize( m_GraphicsSystem );
+
+	if ( !isHudTextRendererInitialized )
+	{
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"ShopSceneのHudTextRenderer初期化失敗" );
+		Finalize();
+		return false;
+	}
+
+	return true;
 }
 
 // Shop内の操作、カメラ、Player、選択対象、メッセージ表示時間を更新する。

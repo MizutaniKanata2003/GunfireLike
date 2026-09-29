@@ -24,8 +24,8 @@ public:
 	//========= Sceneライフサイクル関数=========
 	// Result画面の入力設定、HUD、文字、BGMを初期化する。
 	void Initialize() override;
-	// Asset読込などの深い初期化を行う。
-	bool Init() override { return true; }
+	// HUDと文字描画に使用する深い描画Resourceを初期化する。
+	bool Init() override;
 	// Result画面の入力を更新する。
 	void Update( float deltaTime ) override;
 	// 最終結果、背景、タイトルへ戻るボタンを描画する。

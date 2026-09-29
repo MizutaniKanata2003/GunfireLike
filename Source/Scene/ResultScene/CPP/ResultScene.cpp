@@ -14,6 +14,7 @@
 #include "Framework/Audio/H/AudioSystem.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
 #include "Framework/Input/H/InputSystem.h"
+#include "Framework/Etc/H/Logger.h"
 
 //========= Scene インクルード=========
 #include "Scene/Common/H/GameProgress.h"
@@ -98,18 +99,41 @@ void ResultScene::Initialize()
 	// Result画面ではFPSマウスキャプチャを解除する。
 	m_InputSystem.SetMouseCaptureEnabled( false );
 
-	// Result画面で使用するHUD Quadと文字描画を初期化する。
-	m_HudRenderer.Initialize( m_GraphicsSystem );
-	m_HudTextRenderer.Initialize( m_GraphicsSystem );
-
 	// Result画面のBGMを再生する。
 	m_AudioSystem.PlayResultBgm();
+}
+
+// HUDと文字描画に使用する深い描画Resourceを初期化する。
+bool ResultScene::Init()
+{
+	// Result画面で使用するHUD Quad描画Resourceを初期化する。
+	const bool isHudRendererInitialized = m_HudRenderer.Initialize( m_GraphicsSystem );
+
+	if ( !isHudRendererInitialized )
+	{
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"ResultSceneのHudRenderer初期化失敗" );
+		Finalize();
+		return false;
+	}
+
+	// Result画面で使用するHUD文字描画Resourceを初期化する。
+	const bool isHudTextRendererInitialized = m_HudTextRenderer.Initialize( m_GraphicsSystem );
+
+	if ( !isHudTextRendererInitialized )
+	{
+		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"ResultSceneのHudTextRenderer初期化失敗" );
+		Finalize();
+		return false;
+	}
+
+	return true;
 }
 
 void ResultScene::Update( float deltaTime )
 {
 	if ( m_InputSystem.IsKeyTriggered( RESULT_RETURN_TO_TITLE_KEY ) )ReturnToTitle();
 }
+
 // 最終結果、背景、タイトルへ戻るボタンを描画する。
 void ResultScene::Draw()
 {

@@ -240,10 +240,6 @@ private:
 	// Enemy頭上のWorld Space HPバーを描画する。
 	EnemyHealthBar m_EnemyHealthBar{};
 
-	//========= アニメーション・Timer状態=========
-	// 敵の浮遊・回転に使用する累計時間。
-	float m_EnemyAnimationTime{};
-
 	//========= Scene進行状態=========
 	// 現在の戦闘・Stage Clear・Result遷移状態を管理する。
 	GamePhase m_GamePhase{ GamePhase::e_PLAYING };

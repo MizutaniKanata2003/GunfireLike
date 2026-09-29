@@ -35,8 +35,8 @@ public:
 	//========= Sceneライフサイクル関数=========
 	// ShopのPlayer、Camera、Renderer、HUD、BGMを初期化する。
 	void Initialize() override;
-	// Asset読込などの深い初期化を行う。
-	bool Init() override { return true; }
+	// 3D、HUD、文字描画に使用する深い描画Resourceを初期化する。
+	bool Init() override;
 	// Shop内の操作、カメラ、Player、選択対象、メッセージ表示時間を更新する。
 	void Update( float deltaTime ) override;
 	// Shopの3D空間、強化Object、ゲート、HUDを描画する。

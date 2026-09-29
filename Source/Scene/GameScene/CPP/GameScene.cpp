@@ -2,14 +2,11 @@
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm>
-#include <cmath>
-#include <cstdio>
 #include <filesystem>
 #include <system_error>
 
 //========= DirectX インクルード=========
 #include <DirectXMath.h>
-#include <DirectXColors.h>
 
 //========= 外部ライブラリ インクルード=========
 #include "imgui.h"
@@ -257,7 +254,7 @@ void GameScene::Update( float deltaTime )
 
 	// SceneManagerが所有するゲーム進捗と現在Stage設定を取得する。
 	GameProgress& progress = m_SceneManager.GetGameProgress();
-	const StageData& stageData = progress.GetCurrentStageData();
+	// SceneManagerが所有するゲーム進捗とPlayer設定を取得する。
 	const PlayerStats& playerStats = progress.GetPlayerStats();
 
 	UpdateGameProgressAndTimers( deltaTime, progress );
@@ -435,8 +432,6 @@ void GameScene::InitializeSceneState()
 	m_GamePhase = GamePhase::e_PLAYING;
 	m_SceneChangeRequest = SceneChangeRequest::e_NONE;
 	m_DebugUiRequest = DebugUiRequest::e_NONE;
-
-	m_EnemyAnimationTime = 0.0f;
 }
 
 // FPS操作、Mouse Capture、Game BGMを初期化する。
