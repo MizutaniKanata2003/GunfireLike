@@ -191,9 +191,6 @@
     <ClInclude Include="Source\Scene\Common\H\PlayerHealth.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\Common\H\EnemyHealth.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Scene\Common\H\StageData.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>

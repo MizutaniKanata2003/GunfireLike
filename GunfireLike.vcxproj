@@ -243,7 +243,6 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\Etc\H\Logger.h" />
     <ClInclude Include="Source\Scene\Common\H\CombatSystem.h" />
     <ClInclude Include="Source\Scene\Common\H\EnemyController.h" />
-    <ClInclude Include="Source\Scene\Common\H\EnemyHealth.h" />
     <ClInclude Include="Source\Scene\Common\H\EnemyHealthBar.h" />
     <ClInclude Include="Source\Scene\Common\H\EnemyVisual.h" />
     <ClInclude Include="Source\Scene\Common\H\GameHud.h" />
