@@ -22,7 +22,7 @@ public:
 
 	//========= ライフサイクル関数=========
 	// 保持している全Projectileを未使用状態へ初期化する。
-	void Initialize() { m_Projectiles.fill( {} ); }
+	void Initialize();
 
 	//========= Projectile操作関数=========
 	// 未使用スロットへProjectileを生成する。

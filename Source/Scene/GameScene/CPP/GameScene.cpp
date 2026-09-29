@@ -518,20 +518,26 @@ bool GameScene::UpdatePlayerDeath()
 // ゲーム進行時間、特殊攻撃、銃口FlashのTimerを更新する。
 void GameScene::UpdateGameProgressAndTimers( float deltaTime, GameProgress& progress )
 {
-	// ゲーム進行時間と攻撃・Flash用Timerを更新する。
+	// Sceneをまたぐ累計プレイ時間を更新する。
+	progress.Update( deltaTime );
+
+	// 特殊攻撃と銃口Flash用Timerを更新する。
 	m_PlayerCombatController.Update( deltaTime );
 	m_GunViewModel.Update( deltaTime );
 }
+
 // 現フレームのPlayer HP状態を更新する。
 void GameScene::UpdatePlayerHealthState()
 {
 	m_PlayerHealthStateResult = m_PlayerHealthStateController.Update( m_PlayerHealth.GetCurrentHp(), m_PlayerHealth.GetMaxHp(), LOW_HP_RATIO_THRESHOLD );
 }
+
 // 低HP状態の警告SEを更新する。
 void GameScene::UpdateLowHealthWarning()
 {
 	if ( m_PlayerHealthStateResult.didEnterLowHealth )m_AudioSystem.PlayLowHpSe();
 }
+
 // 敵通常攻撃と特殊攻撃を更新する。
 void GameScene::UpdateEnemyCombat( float deltaTime, float playerToEnemyDistanceSquared )
 {

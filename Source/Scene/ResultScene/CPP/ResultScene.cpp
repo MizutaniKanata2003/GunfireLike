@@ -106,6 +106,10 @@ void ResultScene::Initialize()
 	m_AudioSystem.PlayResultBgm();
 }
 
+void ResultScene::Update( float deltaTime )
+{
+	if ( m_InputSystem.IsKeyTriggered( RESULT_RETURN_TO_TITLE_KEY ) )ReturnToTitle();
+}
 // 最終結果、背景、タイトルへ戻るボタンを描画する。
 void ResultScene::Draw()
 {

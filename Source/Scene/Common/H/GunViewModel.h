@@ -1,5 +1,8 @@
 #pragma once
 
+//========= DirectX インクルード=========
+#include <algorithm>
+
 //========= Framework インクルード=========
 #include "Framework/3D/H/BasicMeshRenderer.h"
 

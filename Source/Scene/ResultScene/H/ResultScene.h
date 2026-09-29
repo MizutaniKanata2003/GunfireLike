@@ -27,7 +27,7 @@ public:
 	// Asset読込などの深い初期化を行う。
 	bool Init() override { return true; }
 	// Result画面の入力を更新する。
-	void Update( float deltaTime ) override { if ( m_InputSystem.IsKeyTriggered( RESULT_RETURN_TO_TITLE_KEY ) ) ReturnToTitle(); }
+	void Update( float deltaTime ) override;
 	// 最終結果、背景、タイトルへ戻るボタンを描画する。
 	void Draw() override;
 	// Result画面で使用したHUDと文字描画リソースを終了する。

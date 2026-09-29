@@ -2,6 +2,7 @@
 
 //========= DirectX インクルード=========
 #include <DirectXMath.h>
+#include <algorithm>
 
 // 射撃RayのEnemy Sphere命中判定に必要な設定。
 struct EnemyHitTest
