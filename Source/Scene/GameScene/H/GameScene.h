@@ -123,7 +123,7 @@ private:
 	//========= 更新補助関数=========
 	// DrawDebugUiで予約されたDebug操作をUpdate開始時に実行する。
 	[[nodiscard]] bool UpdateDebugUiRequest();
-	// F2キーによるShopSceneへの遷移を処理する。
+	// F2キーによるShopSceneへの遷移要求を設定する。
 	[[nodiscard]] bool UpdateDebugSceneChange();
 	// Player死亡時のペナルティとShopScene遷移を処理する。
 	[[nodiscard]] bool UpdatePlayerDeath();

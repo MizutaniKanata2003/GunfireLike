@@ -485,14 +485,12 @@ bool GameScene::UpdateDebugUiRequest()
 	}
 }
 
-// F2キーによるShopSceneへの遷移を処理する。
+// F2キーによるShopSceneへの遷移要求を設定する。
 bool GameScene::UpdateDebugSceneChange()
 {
 	if ( !m_InputSystem.IsKeyTriggered( RETURN_TO_SHOP_KEY ) ) return false;
 
-	m_AudioSystem.PlayWarpSe();
-	m_InputSystem.SetMouseCaptureEnabled( false );
-	m_SceneManager.RequestSceneChange<ShopScene>();
+	m_SceneChangeRequest = SceneChangeRequest::e_SHOP;
 
 	return true;
 }
