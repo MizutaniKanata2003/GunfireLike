@@ -6,7 +6,7 @@
 // 現在StageとStage Clear状態から前後Gateの利用可否を返す。
 StageGateAvailability StageGateController::GetAvailability( int currentStage, int firstStage, int maxStage, bool isCurrentStageCleared ) const
 {
-	StageGateAvailability availability{};
+	StageGateAvailability availability {};
 
 	availability.isPreviousGateAvailable = currentStage > firstStage;
 

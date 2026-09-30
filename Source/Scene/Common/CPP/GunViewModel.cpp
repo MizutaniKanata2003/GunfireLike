@@ -32,11 +32,11 @@ namespace
 // Gun View ModelのMuzzle Flash状態を初期化する。
 void GunViewModel::Initialize()
 {
-	m_BodyPosition = DirectX::XMFLOAT3{ GUN_POSITION_X,GUN_POSITION_Y,GUN_POSITION_Z };
-	m_BodyScale = DirectX::XMFLOAT3{ GUN_BODY_SCALE_X,GUN_BODY_SCALE_Y,GUN_BODY_SCALE_Z };
-	m_BarrelPosition = DirectX::XMFLOAT3{ GUN_POSITION_X,GUN_POSITION_Y + GUN_BARREL_OFFSET_Y,GUN_POSITION_Z + GUN_BARREL_OFFSET_Z };
-	m_BarrelScale = DirectX::XMFLOAT3{ GUN_BARREL_SCALE_X,GUN_BARREL_SCALE_Y,GUN_BARREL_SCALE_Z };
-	m_MuzzleFlashPosition = DirectX::XMFLOAT3{ GUN_POSITION_X,GUN_POSITION_Y + GUN_BARREL_OFFSET_Y,GUN_POSITION_Z + MUZZLE_FLASH_OFFSET_Z };
+	m_BodyPosition = DirectX::XMFLOAT3 { GUN_POSITION_X,GUN_POSITION_Y,GUN_POSITION_Z };
+	m_BodyScale = DirectX::XMFLOAT3 { GUN_BODY_SCALE_X,GUN_BODY_SCALE_Y,GUN_BODY_SCALE_Z };
+	m_BarrelPosition = DirectX::XMFLOAT3 { GUN_POSITION_X,GUN_POSITION_Y + GUN_BARREL_OFFSET_Y,GUN_POSITION_Z + GUN_BARREL_OFFSET_Z };
+	m_BarrelScale = DirectX::XMFLOAT3 { GUN_BARREL_SCALE_X,GUN_BARREL_SCALE_Y,GUN_BARREL_SCALE_Z };
+	m_MuzzleFlashPosition = DirectX::XMFLOAT3 { GUN_POSITION_X,GUN_POSITION_Y + GUN_BARREL_OFFSET_Y,GUN_POSITION_Z + MUZZLE_FLASH_OFFSET_Z };
 	m_MuzzleFlashScale = MUZZLE_FLASH_SCALE;
 	m_MuzzleFlashDuration = MUZZLE_FLASH_DURATION;
 	m_MuzzleFlashTimer = {};
@@ -59,11 +59,11 @@ void GunViewModel::DrawOpaque( BasicMeshRenderer& basicMeshRenderer, GraphicsSys
 		inverseViewMatrix;
 
 	basicMeshRenderer.DrawCube( graphicsSystem, bodyWorldMatrix, viewMatrix, projectionMatrix,
-								DirectX::XMFLOAT4{ 0.12f, 0.12f, 0.14f, 1.0f }, DirectX::XMFLOAT2{ 1.0f, 1.0f },
+								DirectX::XMFLOAT4 { 0.12f, 0.12f, 0.14f, 1.0f }, DirectX::XMFLOAT2 { 1.0f, 1.0f },
 								BasicMeshRenderer::TextureType::Color );
 
 	basicMeshRenderer.DrawCube( graphicsSystem, barrelWorldMatrix, viewMatrix, projectionMatrix,
-								DirectX::XMFLOAT4{ 0.30f, 0.32f, 0.36f, 1.0f }, DirectX::XMFLOAT2{ 1.0f, 1.0f },
+								DirectX::XMFLOAT4 { 0.30f, 0.32f, 0.36f, 1.0f }, DirectX::XMFLOAT2 { 1.0f, 1.0f },
 								BasicMeshRenderer::TextureType::Color );
 }
 
@@ -84,6 +84,6 @@ void GunViewModel::DrawTransparent( BasicMeshRenderer& basicMeshRenderer, Graphi
 	graphicsSystem.SetRenderPass( e_RenderPass::e_TRANSPARENT );
 
 	basicMeshRenderer.DrawCube( graphicsSystem, muzzleFlashWorldMatrix, viewMatrix, projectionMatrix,
-								DirectX::XMFLOAT4{ 1.0f, 0.65f, 0.05f, muzzleFlashAlpha }, DirectX::XMFLOAT2{ 1.0f, 1.0f },
+								DirectX::XMFLOAT4 { 1.0f, 0.65f, 0.05f, muzzleFlashAlpha }, DirectX::XMFLOAT2 { 1.0f, 1.0f },
 								BasicMeshRenderer::TextureType::Color );
 }

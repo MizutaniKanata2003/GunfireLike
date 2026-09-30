@@ -1,5 +1,5 @@
 //========= 定数バッファ=========
-cbuffer HudBuffer : register(b0)
+cbuffer HudBuffer : register( b0 )
 {
     float4 g_Rectangle;
     float4 g_Color;
@@ -22,7 +22,7 @@ struct PixelInput
 };
 
 //========= Vertex Shader=========
-PixelInput main(VertexInput input)
+PixelInput main( VertexInput input )
 {
     PixelInput output;
 
@@ -33,7 +33,7 @@ PixelInput main(VertexInput input)
     const float2 normalizedPosition = pixelPosition / g_RenderSize;
 
     // 正規化座標をDirectXのクリップ座標へ変換する。
-    output.position = float4(normalizedPosition.x * 2.0f - 1.0f, 1.0f - normalizedPosition.y * 2.0f, 0.0f, 1.0f);
+    output.position = float4( normalizedPosition.x * 2.0f - 1.0f, 1.0f - normalizedPosition.y * 2.0f, 0.0f, 1.0f );
 
     output.color = g_Color;
 

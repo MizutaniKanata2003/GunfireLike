@@ -32,5 +32,5 @@ public:
 private:
 	//========= 状態管理=========
 	// 管理側がオブジェクトを削除するべきかを示すフラグ。
-	bool m_IsDestroyRequested{};
+	bool m_IsDestroyRequested {};
 };

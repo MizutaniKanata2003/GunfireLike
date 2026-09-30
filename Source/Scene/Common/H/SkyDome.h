@@ -24,5 +24,5 @@ public:
 private:
 	//========= Sky Dome状態=========
 	// Sky Domeの位置、回転、Scale、World行列を管理する。
-	Transform m_Transform{};
+	Transform m_Transform {};
 };

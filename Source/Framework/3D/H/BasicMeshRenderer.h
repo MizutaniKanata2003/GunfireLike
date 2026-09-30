@@ -44,41 +44,41 @@ private:
 	// Cubeの頂点座標とUV座標。
 	struct Vertex
 	{
-		DirectX::XMFLOAT3 position{};
-		DirectX::XMFLOAT2 uv{};
+		DirectX::XMFLOAT3 position {};
+		DirectX::XMFLOAT2 uv {};
 	};
 
 	//========= Shader関連=========
 	// Cube描画に使用するVertex Shader。
-	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_VertexShader{};
+	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_VertexShader {};
 	// Cube描画に使用するPixel Shader。
-	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_PixelShader{};
+	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_PixelShader {};
 	// Vertex構造とVertex Shader入力を対応付けるInput Layout。
-	Microsoft::WRL::ComPtr<ID3D11InputLayout> m_InputLayout{};
+	Microsoft::WRL::ComPtr<ID3D11InputLayout> m_InputLayout {};
 
 	//========= Texture関連=========
 	// テクスチャ参照時のフィルタリングとアドレス指定を行うSampler。
-	Microsoft::WRL::ComPtr<ID3D11SamplerState> m_TextureSampler{};
+	Microsoft::WRL::ComPtr<ID3D11SamplerState> m_TextureSampler {};
 	// 床描画に使用するテクスチャ。
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_FloorTextureView{};
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_FloorTextureView {};
 	// 壁描画に使用するテクスチャ。
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_WallTextureView{};
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_WallTextureView {};
 	// 画像付きオブジェクト描画に使用するテクスチャ。
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_ObjectTextureView{};
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_ObjectTextureView {};
 
 	//========= Buffer関連=========
 	// Cubeの頂点情報を保持するVertex Buffer。
-	Microsoft::WRL::ComPtr<ID3D11Buffer> m_VertexBuffer{};
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_VertexBuffer {};
 	// Cubeの三角形順序を保持するIndex Buffer。
-	Microsoft::WRL::ComPtr<ID3D11Buffer> m_IndexBuffer{};
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_IndexBuffer {};
 	// ViewProjection行列をShaderへ渡す定数バッファ。
-	ConstantBuffer<CameraConstants> m_CameraBuffer{};
+	ConstantBuffer<CameraConstants> m_CameraBuffer {};
 	// World行列と色をShaderへ渡す定数バッファ。
-	ConstantBuffer<ObjectConstants> m_ObjectBuffer{};
+	ConstantBuffer<ObjectConstants> m_ObjectBuffer {};
 	// UVタイリングとTexture使用有無をShaderへ渡す定数バッファ。
-	ConstantBuffer<MaterialConstants> m_MaterialBuffer{};
+	ConstantBuffer<MaterialConstants> m_MaterialBuffer {};
 
 	//========= 描画情報=========
 	// DrawIndexedに渡すCubeのIndex数。
-	unsigned int m_IndexCount{};
+	unsigned int m_IndexCount {};
 };

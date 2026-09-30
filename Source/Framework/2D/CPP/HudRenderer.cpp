@@ -55,16 +55,16 @@ namespace
 	// GraphicsカテゴリでHUD描画Resource生成失敗を出力する。
 	void WriteHudGraphicsError( const wchar_t* functionName, HRESULT result )
 	{
-		std::wstring message{ functionName };
+		std::wstring message { functionName };
 		message += L" に失敗しました。HRESULT: 0x";
 
-		constexpr wchar_t hexDigits[]{ L"0123456789ABCDEF" };
+		constexpr wchar_t hexDigits[] { L"0123456789ABCDEF" };
 		const unsigned long resultValue = static_cast<unsigned long>( result );
 
 		for ( int digitIndex = 7; digitIndex >= 0; --digitIndex )
 		{
 			const unsigned long digit = ( resultValue >> digitIndex * 4 ) & 0x0f;
-			message += hexDigits[ digit ];
+			message += hexDigits[digit];
 		}
 
 		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_GRAPHICS, message );
@@ -79,8 +79,8 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	if ( device == nullptr ) return false;
 
 	// Vertex ShaderとPixel ShaderのCSOデータを読み込む。
-	std::vector<char> vertexShaderData{};
-	std::vector<char> pixelShaderData{};
+	std::vector<char> vertexShaderData {};
+	std::vector<char> pixelShaderData {};
 
 	if ( !ShaderBinaryLoader::Load( HUD_VERTEX_SHADER_PATH, vertexShaderData ) )
 	{
@@ -142,12 +142,12 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	};
 
 	// HUD QuadのVertex Bufferを生成する。
-	D3D11_BUFFER_DESC vertexBufferDescription{};
+	D3D11_BUFFER_DESC vertexBufferDescription {};
 	vertexBufferDescription.ByteWidth = static_cast<UINT>( sizeof( Vertex ) * vertices.size() );
 	vertexBufferDescription.Usage = D3D11_USAGE_IMMUTABLE;
 	vertexBufferDescription.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 
-	D3D11_SUBRESOURCE_DATA vertexData{};
+	D3D11_SUBRESOURCE_DATA vertexData {};
 	vertexData.pSysMem = vertices.data();
 
 	const HRESULT vertexBufferResult = device->CreateBuffer( &vertexBufferDescription, &vertexData, m_VertexBuffer.GetAddressOf() );
@@ -167,12 +167,12 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	};
 
 	// HUD QuadのIndex Bufferを生成する。
-	D3D11_BUFFER_DESC indexBufferDescription{};
+	D3D11_BUFFER_DESC indexBufferDescription {};
 	indexBufferDescription.ByteWidth = static_cast<UINT>( sizeof( unsigned short ) * indices.size() );
 	indexBufferDescription.Usage = D3D11_USAGE_IMMUTABLE;
 	indexBufferDescription.BindFlags = D3D11_BIND_INDEX_BUFFER;
 
-	D3D11_SUBRESOURCE_DATA indexData{};
+	D3D11_SUBRESOURCE_DATA indexData {};
 	indexData.pSysMem = indices.data();
 
 	const HRESULT indexBufferResult = device->CreateBuffer( &indexBufferDescription, &indexData, m_IndexBuffer.GetAddressOf() );
@@ -185,7 +185,7 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	}
 
 	// Quadの画面座標、サイズ、色を渡す定数バッファを生成する。
-	HRESULT hudBufferResult{};
+	HRESULT hudBufferResult {};
 
 	if ( !m_HudBuffer.Init( device, hudBufferResult ) )
 	{
@@ -217,11 +217,11 @@ void HudRenderer::DrawQuad( GraphicsSystem& graphicsSystem, float positionX, flo
 		 !m_VertexBuffer || !m_IndexBuffer || !m_HudBuffer.IsValid() ) return;
 
 	// Virtual Canvas座標とサイズを現在のRender Target座標へ変換する。
-	const HudCanvas hudCanvas{ renderWidth,renderHeight };
+	const HudCanvas hudCanvas { renderWidth,renderHeight };
 
-	const DirectX::XMFLOAT2 screenPosition = hudCanvas.ToScreenPosition( DirectX::XMFLOAT2{ positionX,positionY } );
+	const DirectX::XMFLOAT2 screenPosition = hudCanvas.ToScreenPosition( DirectX::XMFLOAT2 { positionX,positionY } );
 
-	const DirectX::XMFLOAT2 screenSize = hudCanvas.ToScreenSize( DirectX::XMFLOAT2{ width,height } );
+	const DirectX::XMFLOAT2 screenSize = hudCanvas.ToScreenSize( DirectX::XMFLOAT2 { width,height } );
 
 	// Shaderへ渡すQuadの画面座標、サイズ、色、Render Targetサイズをまとめる。
 	const HudBuffer hudBuffer
@@ -234,11 +234,11 @@ void HudRenderer::DrawQuad( GraphicsSystem& graphicsSystem, float positionX, flo
 
 	// Input Assemblerへ設定する頂点Buffer情報をまとめる。
 	const UINT stride = sizeof( Vertex );
-	const UINT offset{};
-	ID3D11Buffer* vertexBuffers[]{ m_VertexBuffer.Get() };
+	const UINT offset {};
+	ID3D11Buffer* vertexBuffers[] { m_VertexBuffer.Get() };
 
 	// Shaderへ設定する定数Bufferをまとめる。
-	ID3D11Buffer* constantBuffers[]{ m_HudBuffer.Get() };
+	ID3D11Buffer* constantBuffers[] { m_HudBuffer.Get() };
 
 	m_HudBuffer.Update( context, hudBuffer );
 
@@ -262,7 +262,7 @@ void HudRenderer::DrawQuad( GraphicsSystem& graphicsSystem, float positionX, flo
 void HudRenderer::DrawCrosshair( GraphicsSystem& graphicsSystem )
 {
 	// 横線と縦線で構成する照準の色を設定する。
-	const DirectX::XMFLOAT4 crosshairColor{ 1.0f, 1.0f, 1.0f, HUD_FOREGROUND_ALPHA };
+	const DirectX::XMFLOAT4 crosshairColor { 1.0f, 1.0f, 1.0f, HUD_FOREGROUND_ALPHA };
 
 	// 画面中央へ横線と縦線のQuadを描画する。
 	DrawQuad( graphicsSystem, CROSSHAIR_CENTER_X - CROSSHAIR_LINE_LENGTH * 0.5f, CROSSHAIR_CENTER_Y - CROSSHAIR_LINE_THICKNESS * 0.5f,
@@ -282,13 +282,13 @@ void HudRenderer::DrawPlayerHealthBar( GraphicsSystem& graphicsSystem, float cur
 
 	// HPバーの背景を描画する。
 	DrawQuad( graphicsSystem, HP_BAR_POSITION_X, HP_BAR_POSITION_Y, HP_BAR_WIDTH, HP_BAR_HEIGHT,
-			  DirectX::XMFLOAT4{ 0.0f, 0.0f, 0.0f, HUD_BACKGROUND_ALPHA } );
+			  DirectX::XMFLOAT4 { 0.0f, 0.0f, 0.0f, HUD_BACKGROUND_ALPHA } );
 
 	// 現在HPに応じたHPバーの幅と色を決定する。
 	const float healthWidth = ( HP_BAR_WIDTH - HP_BAR_BORDER * 2.0f ) * hpRatio;
 	const DirectX::XMFLOAT4 healthColor = hpRatio > LOW_HP_RATIO ?
-		DirectX::XMFLOAT4{ 0.10f, 0.95f, 0.20f, HUD_FOREGROUND_ALPHA } :
-		DirectX::XMFLOAT4{ FULLY_OPAQUE_ALPHA, 0.15f, 0.10f, HUD_FOREGROUND_ALPHA };
+		DirectX::XMFLOAT4 { 0.10f, 0.95f, 0.20f, HUD_FOREGROUND_ALPHA } :
+		DirectX::XMFLOAT4 { FULLY_OPAQUE_ALPHA, 0.15f, 0.10f, HUD_FOREGROUND_ALPHA };
 
 	// HPバーの現在値を背景の内側へ描画する。
 	DrawQuad( graphicsSystem, HP_BAR_POSITION_X + HP_BAR_BORDER, HP_BAR_POSITION_Y + HP_BAR_BORDER,
@@ -301,7 +301,7 @@ void HudRenderer::DrawLowHealthWarning( GraphicsSystem& graphicsSystem, float cu
 	if ( maxHp <= 0.0f || currentHp / maxHp > LOW_HP_RATIO ) return;
 
 	// 画面端へ描画する半透明の赤い警告色を設定する。
-	const DirectX::XMFLOAT4 warningColor{ FULLY_OPAQUE_ALPHA, 0.0f, 0.0f, WARNING_ALPHA };
+	const DirectX::XMFLOAT4 warningColor { FULLY_OPAQUE_ALPHA, 0.0f, 0.0f, WARNING_ALPHA };
 
 	// 上下左右のQuadで低HP警告枠を描画する。
 	DrawQuad( graphicsSystem, 0.0f, 0.0f, SCREEN_WIDTH, LOW_HP_BORDER_THICKNESS, warningColor );

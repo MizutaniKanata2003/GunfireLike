@@ -14,7 +14,7 @@ void PlayerCombatController::Update( float deltaTime )
 // 左クリック入力から通常射撃要求を返す。
 PlayerAttackRequest PlayerCombatController::RequestNormalShot( bool isShootTriggered, bool isCombatActive, bool isEnemyDead ) const
 {
-	PlayerAttackRequest request{};
+	PlayerAttackRequest request {};
 
 	if ( !isShootTriggered || !isCombatActive || isEnemyDead )return request;
 
@@ -28,7 +28,7 @@ PlayerAttackRequest PlayerCombatController::RequestNormalShot( bool isShootTrigg
 PlayerAttackRequest PlayerCombatController::RequestSpecialAttack( bool isSpecialAttackTriggered, bool isCombatActive, bool isEnemyDead,
 																  bool isSpecialAttackUnlocked, float specialAttackCooldown )
 {
-	PlayerAttackRequest request{};
+	PlayerAttackRequest request {};
 
 	if ( !isSpecialAttackTriggered || !isCombatActive || isEnemyDead || !isSpecialAttackUnlocked || !IsSpecialAttackReady() )
 	{

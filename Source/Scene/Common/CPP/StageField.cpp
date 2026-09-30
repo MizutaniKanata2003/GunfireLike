@@ -34,45 +34,45 @@ namespace
 // Floorと4面WallのTransformを初期化する。
 void StageField::Initialize()
 {
-	m_FloorTransform.SetPosition( DirectX::XMFLOAT3{ FLOOR_POSITION_X,FLOOR_POSITION_Y,FLOOR_POSITION_Z } );
-	m_FloorTransform.SetRotation( DirectX::XMFLOAT3{} );
-	m_FloorTransform.SetScale( DirectX::XMFLOAT3{ FLOOR_SCALE_X,FLOOR_SCALE_Y,FLOOR_SCALE_Z } );
+	m_FloorTransform.SetPosition( DirectX::XMFLOAT3 { FLOOR_POSITION_X,FLOOR_POSITION_Y,FLOOR_POSITION_Z } );
+	m_FloorTransform.SetRotation( DirectX::XMFLOAT3 {} );
+	m_FloorTransform.SetScale( DirectX::XMFLOAT3 { FLOOR_SCALE_X,FLOOR_SCALE_Y,FLOOR_SCALE_Z } );
 
-	m_LeftWallTransform.SetPosition( DirectX::XMFLOAT3{ LEFT_WALL_POSITION_X,WALL_CENTER_Y,SIDE_WALL_POSITION_Z } );
-	m_LeftWallTransform.SetRotation( DirectX::XMFLOAT3{} );
-	m_LeftWallTransform.SetScale( DirectX::XMFLOAT3{ WALL_THICKNESS,WALL_HEIGHT,WALL_LENGTH } );
+	m_LeftWallTransform.SetPosition( DirectX::XMFLOAT3 { LEFT_WALL_POSITION_X,WALL_CENTER_Y,SIDE_WALL_POSITION_Z } );
+	m_LeftWallTransform.SetRotation( DirectX::XMFLOAT3 {} );
+	m_LeftWallTransform.SetScale( DirectX::XMFLOAT3 { WALL_THICKNESS,WALL_HEIGHT,WALL_LENGTH } );
 
-	m_RightWallTransform.SetPosition( DirectX::XMFLOAT3{ RIGHT_WALL_POSITION_X,WALL_CENTER_Y,SIDE_WALL_POSITION_Z } );
-	m_RightWallTransform.SetRotation( DirectX::XMFLOAT3{} );
-	m_RightWallTransform.SetScale( DirectX::XMFLOAT3{ WALL_THICKNESS,WALL_HEIGHT,WALL_LENGTH } );
+	m_RightWallTransform.SetPosition( DirectX::XMFLOAT3 { RIGHT_WALL_POSITION_X,WALL_CENTER_Y,SIDE_WALL_POSITION_Z } );
+	m_RightWallTransform.SetRotation( DirectX::XMFLOAT3 {} );
+	m_RightWallTransform.SetScale( DirectX::XMFLOAT3 { WALL_THICKNESS,WALL_HEIGHT,WALL_LENGTH } );
 
-	m_NearWallTransform.SetPosition( DirectX::XMFLOAT3{ FRONT_WALL_POSITION_X,WALL_CENTER_Y,NEAR_WALL_POSITION_Z } );
-	m_NearWallTransform.SetRotation( DirectX::XMFLOAT3{} );
-	m_NearWallTransform.SetScale( DirectX::XMFLOAT3{ WALL_LENGTH,WALL_HEIGHT,WALL_THICKNESS } );
+	m_NearWallTransform.SetPosition( DirectX::XMFLOAT3 { FRONT_WALL_POSITION_X,WALL_CENTER_Y,NEAR_WALL_POSITION_Z } );
+	m_NearWallTransform.SetRotation( DirectX::XMFLOAT3 {} );
+	m_NearWallTransform.SetScale( DirectX::XMFLOAT3 { WALL_LENGTH,WALL_HEIGHT,WALL_THICKNESS } );
 
-	m_FarWallTransform.SetPosition( DirectX::XMFLOAT3{ BACK_WALL_POSITION_X,WALL_CENTER_Y,FAR_WALL_POSITION_Z } );
-	m_FarWallTransform.SetRotation( DirectX::XMFLOAT3{} );
-	m_FarWallTransform.SetScale( DirectX::XMFLOAT3{ WALL_LENGTH,WALL_HEIGHT,WALL_THICKNESS } );
+	m_FarWallTransform.SetPosition( DirectX::XMFLOAT3 { BACK_WALL_POSITION_X,WALL_CENTER_Y,FAR_WALL_POSITION_Z } );
+	m_FarWallTransform.SetRotation( DirectX::XMFLOAT3 {} );
+	m_FarWallTransform.SetScale( DirectX::XMFLOAT3 { WALL_LENGTH,WALL_HEIGHT,WALL_THICKNESS } );
 }
 
 // Floorと4面WallをOpaque Passで描画する。
 void StageField::Draw( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem& graphicsSystem,
 					   const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix ) const
 {
-	const DirectX::XMFLOAT4 wallColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+	const DirectX::XMFLOAT4 wallColor { 1.0f, 1.0f, 1.0f, 1.0f };
 
 	basicMeshRenderer.DrawCube( graphicsSystem, m_FloorTransform.GetWorldMatrix(), viewMatrix, projectionMatrix,
-								DirectX::XMFLOAT4{ 1.0f, 1.0f, 1.0f, 1.0f }, DirectX::XMFLOAT2{ 10.0f, 10.0f }, BasicMeshRenderer::TextureType::Floor );
+								DirectX::XMFLOAT4 { 1.0f, 1.0f, 1.0f, 1.0f }, DirectX::XMFLOAT2 { 10.0f, 10.0f }, BasicMeshRenderer::TextureType::Floor );
 
 	basicMeshRenderer.DrawCube( graphicsSystem, m_LeftWallTransform.GetWorldMatrix(), viewMatrix, projectionMatrix,
-								wallColor, DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Wall );
+								wallColor, DirectX::XMFLOAT2 { 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Wall );
 
 	basicMeshRenderer.DrawCube( graphicsSystem, m_RightWallTransform.GetWorldMatrix(), viewMatrix, projectionMatrix, wallColor,
-								DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Wall );
+								DirectX::XMFLOAT2 { 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Wall );
 
 	basicMeshRenderer.DrawCube( graphicsSystem, m_NearWallTransform.GetWorldMatrix(), viewMatrix, projectionMatrix, wallColor,
-								DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Wall );
+								DirectX::XMFLOAT2 { 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Wall );
 
 	basicMeshRenderer.DrawCube( graphicsSystem, m_FarWallTransform.GetWorldMatrix(), viewMatrix, projectionMatrix, wallColor,
-								DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Wall );
+								DirectX::XMFLOAT2 { 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Wall );
 }

@@ -90,8 +90,7 @@ namespace
 // ResultSceneが使用するSceneManagerとFramework Systemを登録する。
 ResultScene::ResultScene( SceneManager& sceneManager, InputSystem& inputSystem, GraphicsSystem& graphicsSystem, AudioSystem& audioSystem )
 	: m_SceneManager( sceneManager ), m_InputSystem( inputSystem ), m_GraphicsSystem( graphicsSystem ), m_AudioSystem( audioSystem )
-{
-}
+{}
 
 // Result画面の入力設定、HUD、文字、BGMを初期化する。
 void ResultScene::Initialize()
@@ -146,27 +145,27 @@ void ResultScene::Draw()
 
 	// 背景、上部発光、メインパネルを描画する。
 	m_HudRenderer.DrawQuad( m_GraphicsSystem, 0.0f, 0.0f, RESULT_SCREEN_WIDTH, RESULT_SCREEN_HEIGHT,
-							DirectX::XMFLOAT4{ RESULT_BACKGROUND_RED, RESULT_BACKGROUND_GREEN, RESULT_BACKGROUND_BLUE, FULLY_OPAQUE_ALPHA } );
+							DirectX::XMFLOAT4 { RESULT_BACKGROUND_RED, RESULT_BACKGROUND_GREEN, RESULT_BACKGROUND_BLUE, FULLY_OPAQUE_ALPHA } );
 
 	m_HudRenderer.DrawQuad( m_GraphicsSystem, 0.0f, 0.0f, RESULT_SCREEN_WIDTH, 170.0f,
-							DirectX::XMFLOAT4{ RESULT_TOP_GLOW_RED, RESULT_TOP_GLOW_GREEN, RESULT_TOP_GLOW_BLUE, RESULT_TOP_GLOW_ALPHA } );
+							DirectX::XMFLOAT4 { RESULT_TOP_GLOW_RED, RESULT_TOP_GLOW_GREEN, RESULT_TOP_GLOW_BLUE, RESULT_TOP_GLOW_ALPHA } );
 
 	m_HudRenderer.DrawQuad( m_GraphicsSystem, RESULT_PANEL_X - 4.0f, RESULT_PANEL_Y - 4.0f, RESULT_PANEL_WIDTH + 8.0f, RESULT_PANEL_HEIGHT + 8.0f,
-							DirectX::XMFLOAT4{ RESULT_PANEL_BORDER_RED,RESULT_PANEL_BORDER_GREEN,RESULT_PANEL_BORDER_BLUE,RESULT_PANEL_BORDER_ALPHA } );
+							DirectX::XMFLOAT4 { RESULT_PANEL_BORDER_RED,RESULT_PANEL_BORDER_GREEN,RESULT_PANEL_BORDER_BLUE,RESULT_PANEL_BORDER_ALPHA } );
 
 	m_HudRenderer.DrawQuad( m_GraphicsSystem, RESULT_PANEL_X, RESULT_PANEL_Y, RESULT_PANEL_WIDTH, RESULT_PANEL_HEIGHT,
-							DirectX::XMFLOAT4{ RESULT_PANEL_RED, RESULT_PANEL_GREEN, RESULT_PANEL_BLUE, RESULT_PANEL_ALPHA } );
+							DirectX::XMFLOAT4 { RESULT_PANEL_RED, RESULT_PANEL_GREEN, RESULT_PANEL_BLUE, RESULT_PANEL_ALPHA } );
 
 	// タイトルへ戻るボタンの外枠と本体を描画する。
 	m_HudRenderer.DrawQuad( m_GraphicsSystem, RESULT_RETURN_BUTTON_X - RESULT_BUTTON_BORDER, RESULT_RETURN_BUTTON_Y - RESULT_BUTTON_BORDER,
 							RESULT_RETURN_BUTTON_WIDTH + RESULT_BUTTON_BORDER * 2.0f, RESULT_RETURN_BUTTON_HEIGHT + RESULT_BUTTON_BORDER * 2.0f,
-							DirectX::XMFLOAT4{ 1.0f, 0.80f, 0.25f, FULLY_OPAQUE_ALPHA } );
+							DirectX::XMFLOAT4 { 1.0f, 0.80f, 0.25f, FULLY_OPAQUE_ALPHA } );
 
 	m_HudRenderer.DrawQuad( m_GraphicsSystem, RESULT_RETURN_BUTTON_X, RESULT_RETURN_BUTTON_Y, RESULT_RETURN_BUTTON_WIDTH, RESULT_RETURN_BUTTON_HEIGHT,
-							DirectX::XMFLOAT4{ RESULT_BUTTON_RED, RESULT_BUTTON_GREEN, RESULT_BUTTON_BLUE, FULLY_OPAQUE_ALPHA } );
+							DirectX::XMFLOAT4 { RESULT_BUTTON_RED, RESULT_BUTTON_GREEN, RESULT_BUTTON_BLUE, FULLY_OPAQUE_ALPHA } );
 
 	// ボタン内文字の位置計算に使用する文字列と描画サイズを取得する。
-	const std::wstring returnButtonText{ L"タイトルへ戻る" };
+	const std::wstring returnButtonText { L"タイトルへ戻る" };
 	const DirectX::XMFLOAT2 returnTextSize = m_HudTextRenderer.MeasureText( returnButtonText, RESULT_RETURN_BUTTON_TEXT_SCALE );
 
 	// ボタン中央へ文字を配置する座標を計算する。
@@ -179,35 +178,35 @@ void ResultScene::Draw()
 	// Result画面のタイトルと最終結果を描画する。
 	m_HudTextRenderer.Begin();
 
-	m_HudTextRenderer.DrawText( L"ゲームクリア！", DirectX::XMFLOAT2{ 485.0f, 115.0f }, DirectX::Colors::Gold, 1.90f );
+	m_HudTextRenderer.DrawText( L"ゲームクリア！", DirectX::XMFLOAT2 { 485.0f, 115.0f }, DirectX::Colors::Gold, 1.90f );
 
-	m_HudTextRenderer.DrawText( L"最終結果", DirectX::XMFLOAT2{ 565.0f, 200.0f }, DirectX::Colors::White, 1.0f );
+	m_HudTextRenderer.DrawText( L"最終結果", DirectX::XMFLOAT2 { 565.0f, 200.0f }, DirectX::Colors::White, 1.0f );
 
 	// 各最終結果を文字列へ変換して描画する。
-	wchar_t text[ 128 ]{};
+	wchar_t text[128] {};
 
 	swprintf_s( text, L"クリア時間: %.1f 秒", progress.GetTotalPlayTime() );
-	m_HudTextRenderer.DrawText( text, DirectX::XMFLOAT2{ 445.0f, 265.0f }, DirectX::Colors::White, 0.90f );
+	m_HudTextRenderer.DrawText( text, DirectX::XMFLOAT2 { 445.0f, 265.0f }, DirectX::Colors::White, 0.90f );
 
 	swprintf_s( text, L"総ダメージ: %.0f", progress.GetTotalDamageDealt() );
-	m_HudTextRenderer.DrawText( text, DirectX::XMFLOAT2{ 445.0f, 305.0f }, DirectX::Colors::White, 0.90f );
+	m_HudTextRenderer.DrawText( text, DirectX::XMFLOAT2 { 445.0f, 305.0f }, DirectX::Colors::White, 0.90f );
 
 	swprintf_s( text, L"死亡回数: %d", progress.GetTotalDeaths() );
-	m_HudTextRenderer.DrawText( text, DirectX::XMFLOAT2{ 445.0f, 345.0f }, DirectX::Colors::White, 0.90f );
+	m_HudTextRenderer.DrawText( text, DirectX::XMFLOAT2 { 445.0f, 345.0f }, DirectX::Colors::White, 0.90f );
 
 	swprintf_s( text, L"撃破数: %d", progress.GetTotalEnemiesDefeated() );
-	m_HudTextRenderer.DrawText( text, DirectX::XMFLOAT2{ 445.0f, 385.0f }, DirectX::Colors::White, 0.90f );
+	m_HudTextRenderer.DrawText( text, DirectX::XMFLOAT2 { 445.0f, 385.0f }, DirectX::Colors::White, 0.90f );
 
 	swprintf_s( text, L"最終ゴールド: %d G", progress.GetCurrency() );
-	m_HudTextRenderer.DrawText( text, DirectX::XMFLOAT2{ 445.0f, 435.0f }, DirectX::Colors::Gold, 0.90f );
+	m_HudTextRenderer.DrawText( text, DirectX::XMFLOAT2 { 445.0f, 435.0f }, DirectX::Colors::Gold, 0.90f );
 
 	swprintf_s( text, L"最終HP: %.0f   最終攻撃力: %.0f", playerStats.maxHp, playerStats.gunDamage );
-	m_HudTextRenderer.DrawText( text, DirectX::XMFLOAT2{ 410.0f, 485.0f }, DirectX::Colors::LightGray, 0.78f );
+	m_HudTextRenderer.DrawText( text, DirectX::XMFLOAT2 { 410.0f, 485.0f }, DirectX::Colors::LightGray, 0.78f );
 
 	// ボタン文字とタイトルへ戻る操作説明を描画する。
 	m_HudTextRenderer.DrawText( returnButtonText, returnTextPosition, DirectX::Colors::White, RESULT_RETURN_BUTTON_TEXT_SCALE );
 
-	m_HudTextRenderer.DrawText( L"Enterキーでタイトルへ戻る", DirectX::XMFLOAT2{ 500.0f, 680.0f }, DirectX::Colors::LightGray, 0.65f );
+	m_HudTextRenderer.DrawText( L"Enterキーでタイトルへ戻る", DirectX::XMFLOAT2 { 500.0f, 680.0f }, DirectX::Colors::LightGray, 0.65f );
 
 	m_HudTextRenderer.End();
 

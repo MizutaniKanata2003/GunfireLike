@@ -21,5 +21,5 @@ public:
 private:
 	//========= 初期化状態=========
 	// Dear ImGui本体とWin32・DirectX 11バックエンドの初期化が完了しているかを保持する。
-	bool m_IsInitialized{};
+	bool m_IsInitialized {};
 };

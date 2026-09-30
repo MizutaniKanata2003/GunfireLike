@@ -54,23 +54,23 @@ private:
 
 	//========= Framework参照=========
 	// Scene生成時に渡すInputSystemへの非所有参照。
-	InputSystem* m_InputSystem{};
+	InputSystem* m_InputSystem {};
 	// Scene生成時に渡すGraphicsSystemへの非所有参照。
-	GraphicsSystem* m_GraphicsSystem{};
+	GraphicsSystem* m_GraphicsSystem {};
 	// Scene生成時に渡すAudioSystemへの非所有参照。
-	AudioSystem* m_AudioSystem{};
+	AudioSystem* m_AudioSystem {};
 
 	//========= Scene管理=========
 	// 現在更新・描画するScene。
-	std::unique_ptr<IScene> m_CurrentScene{};
+	std::unique_ptr<IScene> m_CurrentScene {};
 	// 次の遷移時に現在Sceneへ切り替えるScene。
-	std::unique_ptr<IScene> m_NextScene{};
+	std::unique_ptr<IScene> m_NextScene {};
 
 	//========= ゲーム進捗=========
 	// Sceneをまたいで維持するゲーム進捗。
-	GameProgress m_GameProgress{};
+	GameProgress m_GameProgress {};
 
 	//========= Scene遷移演出=========
 	// Scene遷移時に黒画面のフェードを表示する。
-	FadeOverlay m_FadeOverlay{};
+	FadeOverlay m_FadeOverlay {};
 };

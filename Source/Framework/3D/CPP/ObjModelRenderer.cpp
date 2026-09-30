@@ -28,16 +28,16 @@ namespace
 	// OBJのv/vt/vn形式から取得した位置、UV、法線のIndex。
 	struct ObjIndex
 	{
-		int positionIndex{};
-		int uvIndex{};
-		int normalIndex{};
+		int positionIndex {};
+		int uvIndex {};
+		int normalIndex {};
 	};
 
 	//========= 補助関数=========
 	// AssetカテゴリでOBJまたはTextureの読込失敗を出力する。
 	void WriteObjModelAssetError( const wchar_t* errorText, const std::wstring& filePath )
 	{
-		std::wstring message{ errorText };
+		std::wstring message { errorText };
 		message += L": ";
 		message += filePath;
 
@@ -47,16 +47,16 @@ namespace
 	// GraphicsカテゴリでOBJ描画Resource生成失敗を出力する。
 	void WriteObjModelGraphicsError( const wchar_t* functionName, HRESULT result )
 	{
-		std::wstring message{ functionName };
+		std::wstring message { functionName };
 		message += L" に失敗しました。HRESULT: 0x";
 
-		constexpr wchar_t hexDigits[]{ L"0123456789ABCDEF" };
+		constexpr wchar_t hexDigits[] { L"0123456789ABCDEF" };
 		const unsigned long resultValue = static_cast<unsigned long>( result );
 
 		for ( int digitIndex = 7; digitIndex >= 0; --digitIndex )
 		{
 			const unsigned long digit = ( resultValue >> digitIndex * 4 ) & 0x0f;
-			message += hexDigits[ digit ];
+			message += hexDigits[digit];
 		}
 
 		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_GRAPHICS, message );
@@ -66,7 +66,7 @@ namespace
 	bool ParseObjIndex( const std::string& token, ObjIndex& result )
 	{
 		std::stringstream stream( token );
-		std::string value{};
+		std::string value {};
 
 		if ( !std::getline( stream, value, '/' ) ) return false;
 		if ( !value.empty() ) result.positionIndex = std::stoi( value );
@@ -93,8 +93,8 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 	if ( device == nullptr ) return false;
 
 	// OBJファイルからGPU Buffer生成に使用する頂点・Index情報を読み込む。
-	std::vector<Vertex> vertices{};
-	std::vector<unsigned int> indices{};
+	std::vector<Vertex> vertices {};
+	std::vector<unsigned int> indices {};
 
 	if ( !LoadObjFile( objFilePath, vertices, indices ) )
 	{
@@ -104,12 +104,12 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 	}
 
 	// OBJモデルのVertex Bufferを生成する。
-	D3D11_BUFFER_DESC vertexBufferDesc{};
+	D3D11_BUFFER_DESC vertexBufferDesc {};
 	vertexBufferDesc.ByteWidth = static_cast<UINT>( sizeof( Vertex ) * vertices.size() );
 	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 
-	D3D11_SUBRESOURCE_DATA vertexData{};
+	D3D11_SUBRESOURCE_DATA vertexData {};
 	vertexData.pSysMem = vertices.data();
 
 	const HRESULT vertexBufferResult = device->CreateBuffer( &vertexBufferDesc, &vertexData, m_VertexBuffer.GetAddressOf() );
@@ -122,12 +122,12 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 	}
 
 	// OBJモデルのIndex Bufferを生成する。
-	D3D11_BUFFER_DESC indexBufferDesc{};
+	D3D11_BUFFER_DESC indexBufferDesc {};
 	indexBufferDesc.ByteWidth = static_cast<UINT>( sizeof( unsigned int ) * indices.size() );
 	indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 	indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
 
-	D3D11_SUBRESOURCE_DATA indexData{};
+	D3D11_SUBRESOURCE_DATA indexData {};
 	indexData.pSysMem = indices.data();
 
 	const HRESULT indexBufferResult = device->CreateBuffer( &indexBufferDesc, &indexData, m_IndexBuffer.GetAddressOf() );
@@ -140,7 +140,7 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 	}
 
 	// Vertex ShaderのCSO読込、Shader生成、Input Layout生成を行う。
-	std::vector<char> vertexShaderBinary{};
+	std::vector<char> vertexShaderBinary {};
 
 	if ( !ShaderBinaryLoader::Load( MODEL_VERTEX_SHADER_CSO_PATH, vertexShaderBinary ) )
 	{
@@ -175,7 +175,7 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 	}
 
 	// Pixel Shaderを読み込み、OBJ描画用のPixel Shaderを生成する。
-	std::vector<char> pixelShaderBinary{};
+	std::vector<char> pixelShaderBinary {};
 
 	if ( !ShaderBinaryLoader::Load( MODEL_PIXEL_SHADER_CSO_PATH, pixelShaderBinary ) )
 	{
@@ -193,7 +193,7 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 		return false;
 	}
 
-	HRESULT cameraBufferResult{};
+	HRESULT cameraBufferResult {};
 
 	if ( !m_CameraBuffer.Init( device, cameraBufferResult ) )
 	{
@@ -202,7 +202,7 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 		return false;
 	}
 
-	HRESULT objectBufferResult{};
+	HRESULT objectBufferResult {};
 
 	if ( !m_ObjectBuffer.Init( device, objectBufferResult ) )
 	{
@@ -211,7 +211,7 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 		return false;
 	}
 
-	HRESULT materialBufferResult{};
+	HRESULT materialBufferResult {};
 
 	if ( !m_MaterialBuffer.Init( device, materialBufferResult ) )
 	{
@@ -229,7 +229,7 @@ bool ObjModelRenderer::Initialize( GraphicsSystem& graphicsSystem, const std::ws
 	}
 
 	// Texture参照時のフィルタリングとアドレス指定を行うSamplerを生成する。
-	D3D11_SAMPLER_DESC samplerDesc{};
+	D3D11_SAMPLER_DESC samplerDesc {};
 	samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
 	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
@@ -267,28 +267,28 @@ void ObjModelRenderer::Draw( GraphicsSystem& graphicsSystem, const DirectX::XMMA
 	const DirectX::XMMATRIX viewProjectionMatrix = DirectX::XMMatrixTranspose( viewMatrix * projectionMatrix );
 	const DirectX::XMMATRIX transposedWorldMatrix = DirectX::XMMatrixTranspose( worldMatrix );
 
-	CameraConstants cameraConstants{};
+	CameraConstants cameraConstants {};
 	DirectX::XMStoreFloat4x4( &cameraConstants.viewProjectionMatrix, viewProjectionMatrix );
 
-	ObjectConstants objectConstants{};
+	ObjectConstants objectConstants {};
 	DirectX::XMStoreFloat4x4( &objectConstants.worldMatrix, transposedWorldMatrix );
 	objectConstants.color = color;
 
-	MaterialConstants materialConstants{};
-	materialConstants.uvTiling = DirectX::XMFLOAT2{ 1.0f, 1.0f };
+	MaterialConstants materialConstants {};
+	materialConstants.uvTiling = DirectX::XMFLOAT2 { 1.0f, 1.0f };
 	materialConstants.useTexture = m_TextureView ? 1.0f : 0.0f;
 
 	// Input Assemblerへ設定する頂点Buffer情報をまとめる。
 	const UINT vertexStride = sizeof( Vertex );
-	const UINT vertexOffset{};
-	ID3D11Buffer* vertexBuffers[]{ m_VertexBuffer.Get() };
+	const UINT vertexOffset {};
+	ID3D11Buffer* vertexBuffers[] { m_VertexBuffer.Get() };
 
 	// Shaderへ設定する定数Buffer、Texture、Samplerをまとめる。
-	ID3D11Buffer* cameraBuffers[]{ m_CameraBuffer.Get() };
-	ID3D11Buffer* objectBuffers[]{ m_ObjectBuffer.Get() };
-	ID3D11Buffer* materialBuffers[]{ m_MaterialBuffer.Get() };
-	ID3D11ShaderResourceView* textureViews[]{ m_TextureView.Get() };
-	ID3D11SamplerState* samplers[]{ m_TextureSampler.Get() };
+	ID3D11Buffer* cameraBuffers[] { m_CameraBuffer.Get() };
+	ID3D11Buffer* objectBuffers[] { m_ObjectBuffer.Get() };
+	ID3D11Buffer* materialBuffers[] { m_MaterialBuffer.Get() };
+	ID3D11ShaderResourceView* textureViews[] { m_TextureView.Get() };
+	ID3D11SamplerState* samplers[] { m_TextureSampler.Get() };
 
 	m_CameraBuffer.Update( context, cameraConstants );
 	m_ObjectBuffer.Update( context, objectConstants );
@@ -342,22 +342,22 @@ bool ObjModelRenderer::LoadObjFile( const std::wstring& objFilePath, std::vector
 	if ( !file ) return false;
 
 	// OBJから読み込む位置、UV、重複頂点の対応表を保持する。
-	std::vector<DirectX::XMFLOAT3> positions{};
-	std::vector<DirectX::XMFLOAT2> uvs{};
-	std::unordered_map<std::string, unsigned int> vertexMap{};
+	std::vector<DirectX::XMFLOAT3> positions {};
+	std::vector<DirectX::XMFLOAT2> uvs {};
+	std::unordered_map<std::string, unsigned int> vertexMap {};
 
-	std::string line{};
+	std::string line {};
 
 	while ( std::getline( file, line ) )
 	{
 		std::stringstream lineStream( line );
-		std::string type{};
+		std::string type {};
 
 		lineStream >> type;
 
 		if ( type == "v" )
 		{
-			DirectX::XMFLOAT3 position{};
+			DirectX::XMFLOAT3 position {};
 			lineStream >> position.x >> position.y >> position.z;
 			positions.push_back( position );
 			continue;
@@ -365,7 +365,7 @@ bool ObjModelRenderer::LoadObjFile( const std::wstring& objFilePath, std::vector
 
 		if ( type == "vt" )
 		{
-			DirectX::XMFLOAT2 uv{};
+			DirectX::XMFLOAT2 uv {};
 			lineStream >> uv.x >> uv.y;
 
 			// OBJのUV座標をDirect3Dの上下反転したUV座標へ変換する。
@@ -377,12 +377,12 @@ bool ObjModelRenderer::LoadObjFile( const std::wstring& objFilePath, std::vector
 		if ( type != "f" ) continue;
 
 		// 面を構成するOBJ Indexを読み込む。
-		std::vector<ObjIndex> faceIndices{};
-		std::string token{};
+		std::vector<ObjIndex> faceIndices {};
+		std::string token {};
 
 		while ( lineStream >> token )
 		{
-			ObjIndex objIndex{};
+			ObjIndex objIndex {};
 			if ( ParseObjIndex( token, objIndex ) ) faceIndices.push_back( objIndex );
 		}
 
@@ -393,9 +393,9 @@ bool ObjModelRenderer::LoadObjFile( const std::wstring& objFilePath, std::vector
 		{
 			const ObjIndex triangle[]
 			{
-				faceIndices[ 0 ],
-				faceIndices[ index ],
-				faceIndices[ index + 1 ]
+				faceIndices[0],
+				faceIndices[index],
+				faceIndices[index + 1]
 			};
 
 			for ( const ObjIndex& objIndex : triangle )
@@ -412,17 +412,17 @@ bool ObjModelRenderer::LoadObjFile( const std::wstring& objFilePath, std::vector
 				const int positionIndex = objIndex.positionIndex - 1;
 				if ( positionIndex < 0 || positionIndex >= static_cast<int>( positions.size() ) ) return false;
 
-				DirectX::XMFLOAT2 uv{};
+				DirectX::XMFLOAT2 uv {};
 
 				if ( objIndex.uvIndex > 0 )
 				{
 					const int uvIndex = objIndex.uvIndex - 1;
 					if ( uvIndex < 0 || uvIndex >= static_cast<int>( uvs.size() ) ) return false;
 
-					uv = uvs[ uvIndex ];
+					uv = uvs[uvIndex];
 				}
 
-				const Vertex vertex{ positions[ positionIndex ], uv };
+				const Vertex vertex { positions[positionIndex], uv };
 				const unsigned int newIndex = static_cast<unsigned int>( vertices.size() );
 
 				vertices.push_back( vertex );

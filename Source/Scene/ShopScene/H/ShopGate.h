@@ -46,13 +46,13 @@ public:
 private:
 	//========= Gate状態=========
 	// Gateの遷移先種別。
-	GateType m_GateType{ GateType::e_CHALLENGE };
+	GateType m_GateType { GateType::e_CHALLENGE };
 	// Gateの位置、回転、Scaleを管理するTransform。
-	Transform m_Transform{};
+	Transform m_Transform {};
 	// Gateの単色描画に使用する色。
-	DirectX::XMFLOAT4 m_Color{ 1.0f,1.0f,1.0f,1.0f };
+	DirectX::XMFLOAT4 m_Color { 1.0f,1.0f,1.0f,1.0f };
 	// Raycast判定に使用するSphere半径。
-	float m_HitSphereRadius{};
+	float m_HitSphereRadius {};
 	// Gateの回転Animationに使用する累計時間。
-	float m_AnimationTime{};
+	float m_AnimationTime {};
 };

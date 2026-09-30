@@ -21,7 +21,7 @@ public:
 private:
 	//========= メンバー変数=========
 	// カメラ追従とデバッグ表示に使用するプレイヤー位置。
-	DirectX::XMFLOAT3 m_Position{ 0.0f, 1.6f, -5.0f };
+	DirectX::XMFLOAT3 m_Position { 0.0f, 1.6f, -5.0f };
 	// 1秒あたりの水平移動距離。
-	float m_MoveSpeed{ 6.0f };
+	float m_MoveSpeed { 6.0f };
 };

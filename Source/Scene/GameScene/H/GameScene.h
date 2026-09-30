@@ -87,27 +87,27 @@ private:
 	// ImGui Debug UIが読み取り専用で表示するGame状態。
 	struct GameDebugState
 	{
-		int currentStage{};
-		int maxStageCount{};
-		const char* enemyName{};
-		int clearReward{};
+		int currentStage {};
+		int maxStageCount {};
+		const char* enemyName {};
+		int clearReward {};
 
-		float enemyCurrentHp{};
-		float enemyMaxHp{};
+		float enemyCurrentHp {};
+		float enemyMaxHp {};
 
-		int currency{};
-		int totalDeaths{};
-		float totalPlayTime{};
+		int currency {};
+		int totalDeaths {};
+		float totalPlayTime {};
 
-		bool isLastShotHit{};
-		bool isLastNormalAttackHit{};
-		bool isLastSpecialAttackHit{};
-		bool isLastPlayerSpecialAttackHit{};
+		bool isLastShotHit {};
+		bool isLastNormalAttackHit {};
+		bool isLastSpecialAttackHit {};
+		bool isLastPlayerSpecialAttackHit {};
 
-		bool isPreviousGateAvailable{};
-		bool isNextGateAvailable{};
+		bool isPreviousGateAvailable {};
+		bool isNextGateAvailable {};
 
-		GamePhase gamePhase{ GamePhase::e_PLAYING };
+		GamePhase gamePhase { GamePhase::e_PLAYING };
 	};
 
 	//========= 初期化補助関数=========
@@ -182,85 +182,85 @@ private:
 
 	//========= Player・Camera=========
 	// FPS視点に追従するデバッグ用Player。
-	DebugPlayer m_DebugPlayer{};
+	DebugPlayer m_DebugPlayer {};
 	// Playerの視点、前方向、View行列を管理するCamera。
-	FpsCamera m_FpsCamera{};
+	FpsCamera m_FpsCamera {};
 
 	//========= HP管理=========
 	// HitScan、距離二乗、攻撃範囲内判定を管理する。
-	CombatSystem m_CombatSystem{};
+	CombatSystem m_CombatSystem {};
 	// Playerの現在HPと最大HPを管理する。
-	PlayerHealth m_PlayerHealth{};
+	PlayerHealth m_PlayerHealth {};
 	// Playerの低HP状態変化と死亡状態を管理する。
-	PlayerHealthStateController m_PlayerHealthStateController{};
+	PlayerHealthStateController m_PlayerHealthStateController {};
 	// 現フレームのPlayer HP状態。Update開始時に一度だけ更新する。
-	PlayerHealthStateResult m_PlayerHealthStateResult{};
+	PlayerHealthStateResult m_PlayerHealthStateResult {};
 	// Player攻撃の入力条件、特殊攻撃解放条件、Cooldownを管理する。
-	PlayerCombatController m_PlayerCombatController{};
+	PlayerCombatController m_PlayerCombatController {};
 	// EnemyのHP、生死、通常攻撃・特殊攻撃Timerを管理する。
-	EnemyController m_EnemyController{};
+	EnemyController m_EnemyController {};
 
 	//========= Projectile管理=========
 	// Playerが発射したProjectileの生成、更新、寿命を管理する。
-	ProjectileSystem m_ProjectileSystem{};
+	ProjectileSystem m_ProjectileSystem {};
 
 	//========= 3D描画=========
 	// EnemyのTransform、Animation、Model描画、Hit位置を管理する。
-	EnemyVisual m_EnemyVisual{};
+	EnemyVisual m_EnemyVisual {};
 	// FloorとWallで構成される静的な3Dフィールドを管理する。
-	StageField m_StageField{};
+	StageField m_StageField {};
 	// 前Stageへ移動するGate。
-	StageGate m_PreviousStageGate{};
+	StageGate m_PreviousStageGate {};
 	// 次Stageへ移動するGate。
-	StageGate m_NextStageGate{};
+	StageGate m_NextStageGate {};
 	// Shopへ移動するGate。
-	StageGate m_ShopGate{};
+	StageGate m_ShopGate {};
 	// Stageに応じたGate利用可否と使用対象を判定する。
-	StageGateController m_StageGateController{};
+	StageGateController m_StageGateController {};
 	// Enemy撃破後のStage Clear、Reward、Result判定を担当する。
-	StageProgressController m_StageProgressController{};
+	StageProgressController m_StageProgressController {};
 	// FPS Cameraに追従するGunとMuzzle Flashの描画を管理する。
-	GunViewModel m_GunViewModel{};
+	GunViewModel m_GunViewModel {};
 	// Cameraに追従するSky DomeのTransformとSky Pass描画を管理する。
-	SkyDome m_SkyDome{};
+	SkyDome m_SkyDome {};
 	// 床、壁、ゲート、銃、弾、HPバーを描画する基本Mesh Renderer。
-	BasicMeshRenderer m_BasicMeshRenderer{};
+	BasicMeshRenderer m_BasicMeshRenderer {};
 	// Sky DomeのOBJモデルを描画するRenderer。
-	ObjModelRenderer m_SkyDomeRenderer{};
+	ObjModelRenderer m_SkyDomeRenderer {};
 	// 敵のOBJモデルを描画するRenderer。
-	ObjModelRenderer m_EnemyModelRenderer{};
+	ObjModelRenderer m_EnemyModelRenderer {};
 
 	//========= HUD描画=========
 	// GameSceneのCrosshair、HP、Text、Tutorial、Gate案内を描画する。
-	GameHud m_GameHud{};
+	GameHud m_GameHud {};
 	// Crosshair、HPバー、低HP警告を描画するHUD Renderer。
-	HudRenderer m_HudRenderer{};
+	HudRenderer m_HudRenderer {};
 	// Stage、通貨、操作説明を描画するHUD文字Renderer。
-	HudTextRenderer m_HudTextRenderer{};
+	HudTextRenderer m_HudTextRenderer {};
 
 	//========= HUD3D描画=========
 	// Enemy頭上のWorld Space HPバーを描画する。
-	EnemyHealthBar m_EnemyHealthBar{};
+	EnemyHealthBar m_EnemyHealthBar {};
 
 	//========= Scene進行状態=========
 	// 現在の戦闘・Stage Clear・Result遷移状態を管理する。
-	GamePhase m_GamePhase{ GamePhase::e_PLAYING };
+	GamePhase m_GamePhase { GamePhase::e_PLAYING };
 	// DrawまたはGame進行から受け取ったScene遷移要求を保持する。
-	SceneChangeRequest m_SceneChangeRequest{};
+	SceneChangeRequest m_SceneChangeRequest {};
 	// DrawDebugUiから受け取ったDebug操作要求を保持する。
-	DebugUiRequest m_DebugUiRequest{};
+	DebugUiRequest m_DebugUiRequest {};
 
 	//========= 戦闘結果状態=========
 	// 直前の通常射撃が敵へ命中したかを示すフラグ。
-	bool m_IsLastShotHit{};
+	bool m_IsLastShotHit {};
 	// 直前の敵通常攻撃がPlayerへ命中したかを示すフラグ。
-	bool m_IsLastNormalAttackHit{};
+	bool m_IsLastNormalAttackHit {};
 	// 直前の敵特殊攻撃がPlayerへ命中したかを示すフラグ。
-	bool m_IsLastSpecialAttackHit{};
+	bool m_IsLastSpecialAttackHit {};
 	// 直前のPlayer特殊攻撃が敵へ命中したかを示すフラグ。
-	bool m_IsLastPlayerSpecialAttackHit{};
+	bool m_IsLastPlayerSpecialAttackHit {};
 
 	//========= SE再生状態=========
 	// 現在の敵撃破で撃破SEを再生済みかを示すフラグ。
-	bool m_HasPlayedEnemyDefeatSe{};
+	bool m_HasPlayedEnemyDefeatSe {};
 };

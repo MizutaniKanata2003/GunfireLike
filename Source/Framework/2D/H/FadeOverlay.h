@@ -31,10 +31,10 @@ private:
 
 	//========= メンバー変数=========
 	// 現在の黒画面の不透明度とフェード開始からの経過時間。
-	float m_Alpha{};
-	float m_ElapsedTime{};
+	float m_Alpha {};
+	float m_ElapsedTime {};
 	// フェードにかける時間を秒で保持する。
-	float m_Duration{ 0.35f };
+	float m_Duration { 0.35f };
 	// 現在実行中のフェード状態。
-	FadeMode m_Mode{ FadeMode::e_NONE };
+	FadeMode m_Mode { FadeMode::e_NONE };
 };

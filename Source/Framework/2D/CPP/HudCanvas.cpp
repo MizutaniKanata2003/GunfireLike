@@ -25,13 +25,13 @@ HudCanvas::HudCanvas( unsigned int renderWidth, unsigned int renderHeight )
 // Virtual Canvas座標をRender Target座標へ変換する。
 DirectX::XMFLOAT2 HudCanvas::ToScreenPosition( const DirectX::XMFLOAT2& virtualPosition ) const
 {
-	return DirectX::XMFLOAT2{ m_Offset.x + virtualPosition.x * m_Scale,m_Offset.y + virtualPosition.y * m_Scale };
+	return DirectX::XMFLOAT2 { m_Offset.x + virtualPosition.x * m_Scale,m_Offset.y + virtualPosition.y * m_Scale };
 }
 
 // Virtual CanvasサイズをRender Targetサイズへ変換する。
 DirectX::XMFLOAT2 HudCanvas::ToScreenSize( const DirectX::XMFLOAT2& virtualSize ) const
 {
-	return DirectX::XMFLOAT2{ virtualSize.x * m_Scale,virtualSize.y * m_Scale };
+	return DirectX::XMFLOAT2 { virtualSize.x * m_Scale,virtualSize.y * m_Scale };
 }
 
 // Virtual Canvas基準の文字ScaleをRender Target基準のScaleへ変換する。

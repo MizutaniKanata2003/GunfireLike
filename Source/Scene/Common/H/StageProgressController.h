@@ -3,10 +3,10 @@
 // Enemy撃破後のStage進行ルールが返す結果。
 struct StageClearResult
 {
-	bool shouldMarkStageCleared{};
-	bool shouldAddStageClearReward{};
-	bool shouldEnterStageClear{};
-	bool shouldRequestResult{};
+	bool shouldMarkStageCleared {};
+	bool shouldAddStageClearReward {};
+	bool shouldEnterStageClear {};
+	bool shouldRequestResult {};
 };
 
 // Stage ClearとResult移行に関するルールを判定する。

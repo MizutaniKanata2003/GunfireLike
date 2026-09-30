@@ -15,15 +15,15 @@ namespace StageConstants
 struct StageData
 {
 	// Stage番号と敵の表示名。
-	int stageNumber{ StageConstants::FIRST_STAGE_NUMBER };
-	const char* enemyName{};
+	int stageNumber { StageConstants::FIRST_STAGE_NUMBER };
+	const char* enemyName {};
 
 	// 敵の戦闘パラメータと初回クリア報酬。
-	float enemyMaxHp{};
-	float enemyDamage{};
-	float specialAttackInterval{};
-	float specialAttackHitboxRadius{};
-	int clearReward{};
+	float enemyMaxHp {};
+	float enemyDamage {};
+	float specialAttackInterval {};
+	float specialAttackHitboxRadius {};
+	int clearReward {};
 };
 
 //========= Stageデータ=========

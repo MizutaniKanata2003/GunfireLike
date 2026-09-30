@@ -14,7 +14,7 @@ void GameTimer::Initialize()
 void GameTimer::Update()
 {
 	// 現在時刻と前フレーム時刻から経過Tick数を取得する。
-	LARGE_INTEGER currentCounter{};
+	LARGE_INTEGER currentCounter {};
 	QueryPerformanceCounter( &currentCounter );
 
 	const double elapsedTicks = static_cast<double>( currentCounter.QuadPart - m_PreviousCounter.QuadPart );

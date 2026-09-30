@@ -46,11 +46,11 @@ public:
 private:
 	//========= Gate状態=========
 	// Gateの遷移先種別。
-	GateType m_GateType{ GateType::e_SHOP };
+	GateType m_GateType { GateType::e_SHOP };
 	// Gateの位置、回転、Scaleを管理するTransform。
-	Transform m_Transform{};
+	Transform m_Transform {};
 	// Gateの単色描画に使用する色。
-	DirectX::XMFLOAT4 m_Color{ 1.0f, 1.0f, 1.0f, 1.0f };
+	DirectX::XMFLOAT4 m_Color { 1.0f, 1.0f, 1.0f, 1.0f };
 	// Gateの回転アニメーションに使用する累計時間。
-	float m_AnimationTime{};
+	float m_AnimationTime {};
 };

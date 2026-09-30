@@ -36,9 +36,9 @@ public:
 private:
 	//========= Transform・Animation状態=========
 	// Enemyの位置、回転、Scale、World行列を管理する。
-	Transform m_Transform{};
+	Transform m_Transform {};
 	// Enemyの初期World座標。
-	DirectX::XMFLOAT3 m_BasePosition{};
+	DirectX::XMFLOAT3 m_BasePosition {};
 	// Enemy浮遊・回転Animationに使用する累計時間。
-	float m_AnimationTime{};
+	float m_AnimationTime {};
 };

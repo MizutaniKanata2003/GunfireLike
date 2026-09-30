@@ -47,9 +47,9 @@ void EnemyHealthBar::Draw( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem&
 	const DirectX::XMVECTOR billboardForwardVector = DirectX::XMVector3Normalize( DirectX::XMVector3Cross( billboardRightVector, worldUpVector ) );
 
 	DirectX::XMMATRIX billboardRotationMatrix = DirectX::XMMatrixIdentity();
-	billboardRotationMatrix.r[ 0 ] = DirectX::XMVectorSetW( billboardRightVector, 0.0f );
-	billboardRotationMatrix.r[ 1 ] = DirectX::XMVectorSetW( worldUpVector, 0.0f );
-	billboardRotationMatrix.r[ 2 ] = DirectX::XMVectorSetW( billboardForwardVector, 0.0f );
+	billboardRotationMatrix.r[0] = DirectX::XMVectorSetW( billboardRightVector, 0.0f );
+	billboardRotationMatrix.r[1] = DirectX::XMVectorSetW( worldUpVector, 0.0f );
+	billboardRotationMatrix.r[2] = DirectX::XMVectorSetW( billboardForwardVector, 0.0f );
 
 	const float hpBarForegroundWidth = HP_BAR_WIDTH * enemyHpRatio;
 	const float hpBarForegroundXOffset = -( HP_BAR_WIDTH - hpBarForegroundWidth ) * 0.5f;
@@ -61,7 +61,7 @@ void EnemyHealthBar::Draw( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem&
 	DirectX::XMVectorSet( healthBarPosition.x + hpBarForegroundXOffset, healthBarPosition.y, healthBarPosition.z, 1.0f ),
 	DirectX::XMVectorScale( toCameraVector, HP_BAR_FOREGROUND_CAMERA_OFFSET ) );
 
-	DirectX::XMFLOAT3 foregroundPosition{};
+	DirectX::XMFLOAT3 foregroundPosition {};
 	DirectX::XMStoreFloat3( &foregroundPosition, foregroundPositionVector );
 
 	const DirectX::XMMATRIX hpBarForegroundWorldMatrix = DirectX::XMMatrixScaling( hpBarForegroundWidth, HP_BAR_HEIGHT, HP_BAR_FOREGROUND_DEPTH ) *
@@ -70,8 +70,8 @@ void EnemyHealthBar::Draw( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem&
 	graphicsSystem.SetRenderPass( e_RenderPass::e_TRANSPARENT );
 
 	basicMeshRenderer.DrawCube( graphicsSystem, hpBarBackgroundWorldMatrix, viewMatrix, projectionMatrix,
-	DirectX::XMFLOAT4{ 0.0f,0.0f,0.0f,0.70f }, DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
+	DirectX::XMFLOAT4 { 0.0f,0.0f,0.0f,0.70f }, DirectX::XMFLOAT2 { 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
 
 	basicMeshRenderer.DrawCube( graphicsSystem, hpBarForegroundWorldMatrix, viewMatrix, projectionMatrix,
-	DirectX::XMFLOAT4{ 0.10f,1.0f,0.20f,0.95f }, DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
+	DirectX::XMFLOAT4 { 0.10f,1.0f,0.20f,0.95f }, DirectX::XMFLOAT2 { 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
 }

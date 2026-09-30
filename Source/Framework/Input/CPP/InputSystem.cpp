@@ -52,7 +52,7 @@ void InputSystem::OnWindowMessage( UINT message, WPARAM wParam, LPARAM lParam )
 		case WM_MOUSEMOVE:
 		{
 			// クライアント座標のマウス位置をスクリーン座標へ変換して差分を計算する。
-			POINT mousePosition{};
+			POINT mousePosition {};
 			mousePosition.x = GET_X_LPARAM( lParam );
 			mousePosition.y = GET_Y_LPARAM( lParam );
 
@@ -64,12 +64,12 @@ void InputSystem::OnWindowMessage( UINT message, WPARAM wParam, LPARAM lParam )
 		}
 
 		case WM_KILLFOCUS:
-		// フォーカスを失った場合はカーソルを解放し、意図しない視点回転を防ぐ。
-		SetMouseCaptureEnabled( false );
-		break;
+			// フォーカスを失った場合はカーソルを解放し、意図しない視点回転を防ぐ。
+			SetMouseCaptureEnabled( false );
+			break;
 
 		default:
-		break;
+			break;
 	}
 }
 
@@ -114,10 +114,10 @@ void InputSystem::SetMouseCaptureEnabled( bool isEnabled )
 void InputSystem::UpdateMouseCenter()
 {
 	// クライアント領域の中央をクライアント座標で計算する。
-	RECT clientRect{};
+	RECT clientRect {};
 	GetClientRect( m_WindowHandle, &clientRect );
 
-	POINT clientCenter{};
+	POINT clientCenter {};
 	clientCenter.x = ( clientRect.right - clientRect.left ) / 2;
 	clientCenter.y = ( clientRect.bottom - clientRect.top ) / 2;
 
@@ -130,16 +130,16 @@ void InputSystem::UpdateMouseCenter()
 void InputSystem::ClipMouseCursor()
 {
 	// クライアント領域の左上と右下をスクリーン座標へ変換する。
-	RECT clientRect{};
+	RECT clientRect {};
 	GetClientRect( m_WindowHandle, &clientRect );
 
-	POINT clipTopLeft{ clientRect.left, clientRect.top };
-	POINT clipBottomRight{ clientRect.right, clientRect.bottom };
+	POINT clipTopLeft { clientRect.left, clientRect.top };
+	POINT clipBottomRight { clientRect.right, clientRect.bottom };
 
 	ClientToScreen( m_WindowHandle, &clipTopLeft );
 	ClientToScreen( m_WindowHandle, &clipBottomRight );
 
-	const RECT clipRect{ clipTopLeft.x,clipTopLeft.y,clipBottomRight.x,clipBottomRight.y };
+	const RECT clipRect { clipTopLeft.x,clipTopLeft.y,clipBottomRight.x,clipBottomRight.y };
 
 	ClipCursor( &clipRect );
 }

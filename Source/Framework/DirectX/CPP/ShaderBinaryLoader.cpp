@@ -12,7 +12,7 @@ namespace
 	// Shaderファイル読込失敗のログメッセージを作る。
 	void WriteShaderAssetError( const wchar_t* errorText, const char* filePath )
 	{
-		std::wstring message{ errorText };
+		std::wstring message { errorText };
 		message += L": ";
 
 		while ( *filePath != '\0' )
@@ -30,7 +30,7 @@ bool ShaderBinaryLoader::Load( const char* filePath, std::vector<char>& binaryDa
 {
 	binaryData.clear();
 
-	if ( filePath == nullptr || filePath[ 0 ] == '\0' )
+	if ( filePath == nullptr || filePath[0] == '\0' )
 	{
 		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_ASSET, L"Shaderファイルパスが空です。" );
 		return false;

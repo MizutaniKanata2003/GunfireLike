@@ -51,6 +51,6 @@ public:
 private:
 	//========= HP状態=========
 	// 現在HPと最大HPを保持する。
-	float m_CurrentHp{ PlayerHealthConstants::DEFAULT_MAX_HP };
-	float m_MaxHp{ PlayerHealthConstants::DEFAULT_MAX_HP };
+	float m_CurrentHp { PlayerHealthConstants::DEFAULT_MAX_HP };
+	float m_MaxHp { PlayerHealthConstants::DEFAULT_MAX_HP };
 };

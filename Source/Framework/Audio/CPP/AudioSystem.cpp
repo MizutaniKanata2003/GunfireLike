@@ -53,28 +53,28 @@ class AudioSystem::Impl final
 public:
 	//========= AudioEngine=========
 	// XAudio2を利用した音声エンジン。
-	std::unique_ptr<DirectX::AudioEngine> audioEngine{};
+	std::unique_ptr<DirectX::AudioEngine> audioEngine {};
 
 	//========= BGM=========
 	// 各Sceneで使用するBGM。
-	std::unique_ptr<DirectX::SoundEffect> titleBgm{};
-	std::unique_ptr<DirectX::SoundEffect> shopBgm{};
-	std::unique_ptr<DirectX::SoundEffect> gameBgm{};
-	std::unique_ptr<DirectX::SoundEffect> resultBgm{};
+	std::unique_ptr<DirectX::SoundEffect> titleBgm {};
+	std::unique_ptr<DirectX::SoundEffect> shopBgm {};
+	std::unique_ptr<DirectX::SoundEffect> gameBgm {};
+	std::unique_ptr<DirectX::SoundEffect> resultBgm {};
 
 	//========= SE=========
 	// ゲーム中に再生するSE。
-	std::unique_ptr<DirectX::SoundEffect> gunSe{};
-	std::unique_ptr<DirectX::SoundEffect> warpSe{};
-	std::unique_ptr<DirectX::SoundEffect> lowHpSe{};
-	std::unique_ptr<DirectX::SoundEffect> purchaseSe{};
-	std::unique_ptr<DirectX::SoundEffect> damageSe{};
-	std::unique_ptr<DirectX::SoundEffect> specialSe{};
-	std::unique_ptr<DirectX::SoundEffect> enemyDefeatSe{};
+	std::unique_ptr<DirectX::SoundEffect> gunSe {};
+	std::unique_ptr<DirectX::SoundEffect> warpSe {};
+	std::unique_ptr<DirectX::SoundEffect> lowHpSe {};
+	std::unique_ptr<DirectX::SoundEffect> purchaseSe {};
+	std::unique_ptr<DirectX::SoundEffect> damageSe {};
+	std::unique_ptr<DirectX::SoundEffect> specialSe {};
+	std::unique_ptr<DirectX::SoundEffect> enemyDefeatSe {};
 
 	//========= BGM再生Instance=========
 	// 現在ループ再生しているBGMのInstance。
-	std::unique_ptr<DirectX::SoundEffectInstance> bgmInstance{};
+	std::unique_ptr<DirectX::SoundEffectInstance> bgmInstance {};
 };
 
 // AudioSystemを生成する。

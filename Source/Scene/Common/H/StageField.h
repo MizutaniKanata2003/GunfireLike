@@ -23,13 +23,13 @@ public:
 private:
 	//========= Field Transform=========
 	// FloorのTransform。
-	Transform m_FloorTransform{};
+	Transform m_FloorTransform {};
 	// Left WallのTransform。
-	Transform m_LeftWallTransform{};
+	Transform m_LeftWallTransform {};
 	// Right WallのTransform。
-	Transform m_RightWallTransform{};
+	Transform m_RightWallTransform {};
 	// Near WallのTransform。
-	Transform m_NearWallTransform{};
+	Transform m_NearWallTransform {};
 	// Far WallのTransform。
-	Transform m_FarWallTransform{};
+	Transform m_FarWallTransform {};
 };

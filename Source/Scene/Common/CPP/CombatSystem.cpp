@@ -8,7 +8,7 @@
 RaycastResult CombatSystem::RaycastSphere( const DirectX::XMFLOAT3& rayOrigin, const DirectX::XMFLOAT3& rayDirection,
 										   const DirectX::XMFLOAT3& sphereCenter, float sphereRadius, float maxDistance ) const
 {
-	RaycastResult result{};
+	RaycastResult result {};
 
 	const float safeRadius = std::max( 0.0f, sphereRadius );
 	const float safeMaxDistance = std::max( 0.0f, maxDistance );
@@ -24,7 +24,7 @@ RaycastResult CombatSystem::RaycastSphere( const DirectX::XMFLOAT3& rayOrigin, c
 	const DirectX::XMVECTOR normalizedDirection = DirectX::XMVector3Normalize( directionVector );
 	const DirectX::BoundingSphere sphere( sphereCenter, safeRadius );
 
-	float hitDistance{};
+	float hitDistance {};
 
 	if ( !sphere.Intersects( originVector, normalizedDirection, hitDistance ) ) return result;
 

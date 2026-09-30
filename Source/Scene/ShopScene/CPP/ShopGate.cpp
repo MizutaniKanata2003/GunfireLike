@@ -18,7 +18,7 @@ void ShopGate::Initialize( GateType gateType, const DirectX::XMFLOAT3& position,
 	m_GateType = gateType;
 
 	m_Transform.SetPosition( position );
-	m_Transform.SetRotation( DirectX::XMFLOAT3{} );
+	m_Transform.SetRotation( DirectX::XMFLOAT3 {} );
 	m_Transform.SetScale( scale );
 
 	m_Color = color;
@@ -30,7 +30,7 @@ void ShopGate::Initialize( GateType gateType, const DirectX::XMFLOAT3& position,
 void ShopGate::Update( float deltaTime )
 {
 	m_AnimationTime += deltaTime;
-	m_Transform.SetRotation( DirectX::XMFLOAT3{ 0.0f,m_AnimationTime * SHOP_GATE_ROTATION_SPEED,0.0f } );
+	m_Transform.SetRotation( DirectX::XMFLOAT3 { 0.0f,m_AnimationTime * SHOP_GATE_ROTATION_SPEED,0.0f } );
 }
 
 // 指定したRayがGateのSphereへ命中した場合、命中距離を返す。
@@ -56,5 +56,5 @@ void ShopGate::Draw( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem& graph
 		DirectX::XMMatrixTranslation( position.x, position.y, position.z );
 
 	basicMeshRenderer.DrawCube( graphicsSystem, worldMatrix, viewMatrix, projectionMatrix, m_Color,
-								DirectX::XMFLOAT2{ 1.0f,1.0f }, BasicMeshRenderer::TextureType::Color );
+								DirectX::XMFLOAT2 { 1.0f,1.0f }, BasicMeshRenderer::TextureType::Color );
 }

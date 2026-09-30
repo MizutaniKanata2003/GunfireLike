@@ -6,7 +6,7 @@ struct PixelInput
 };
 
 //========= Pixel Shader=========
-float4 main(PixelInput input) : SV_TARGET
+float4 main( PixelInput input ) : SV_TARGET
 {
     return input.color;
 }

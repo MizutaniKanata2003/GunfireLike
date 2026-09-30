@@ -25,7 +25,7 @@ void EnemyController::Initialize( float maxHp, float normalAttackInterval, float
 // 特殊攻撃を優先し、発動フレームに通常攻撃は実行しない。
 EnemyAttackResult EnemyController::UpdateCombat( float deltaTime, bool isCombatActive, float playerToEnemyDistanceSquared )
 {
-	EnemyAttackResult result{};
+	EnemyAttackResult result {};
 
 	if ( m_State == EnemyState::e_DEAD || !isCombatActive )return result;
 
@@ -68,7 +68,7 @@ EnemyAttackResult EnemyController::UpdateCombat( float deltaTime, bool isCombatA
 // EnemyへDamageを与え、実ダメージ量と撃破結果を返す。
 EnemyDamageResult EnemyController::TakeDamage( float damage )
 {
-	EnemyDamageResult result{};
+	EnemyDamageResult result {};
 
 	if ( m_State == EnemyState::e_DEAD || damage <= 0.0f )return result;
 

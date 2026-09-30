@@ -40,16 +40,16 @@ namespace
 	// GraphicsカテゴリでBasicMesh描画Resource生成失敗を出力する。
 	void WriteBasicMeshGraphicsError( const wchar_t* functionName, HRESULT result )
 	{
-		std::wstring message{ functionName };
+		std::wstring message { functionName };
 		message += L" に失敗しました。HRESULT: 0x";
 
-		constexpr wchar_t hexDigits[]{ L"0123456789ABCDEF" };
+		constexpr wchar_t hexDigits[] { L"0123456789ABCDEF" };
 		const unsigned long resultValue = static_cast<unsigned long>( result );
 
 		for ( int digitIndex = 7; digitIndex >= 0; --digitIndex )
 		{
 			const unsigned long digit = ( resultValue >> digitIndex * 4 ) & 0x0f;
-			message += hexDigits[ digit ];
+			message += hexDigits[digit];
 		}
 
 		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_GRAPHICS, message );
@@ -66,7 +66,7 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	if ( device == nullptr ) return false;
 
 	// Cubeの各面で独立したUVを持つ頂点配列を作成する。
-	const Vertex vertices[ CUBE_VERTEX_COUNT ]
+	const Vertex vertices[CUBE_VERTEX_COUNT]
 	{
 		// 前面: Z = -0.5
 		{ { CUBE_MIN_COORDINATE, CUBE_MIN_COORDINATE, CUBE_MIN_COORDINATE }, { 0.0f, 1.0f } },
@@ -106,7 +106,7 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	};
 
 	// Cubeを構成する12枚の三角形のIndex配列を作成する。
-	const unsigned short indices[ CUBE_INDEX_COUNT ]
+	const unsigned short indices[CUBE_INDEX_COUNT]
 	{
 		// 前面
 		0, 1, 2, 0, 2, 3,
@@ -123,12 +123,12 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	};
 
 	// CubeのVertex Bufferを生成する。
-	D3D11_BUFFER_DESC vertexBufferDesc{};
+	D3D11_BUFFER_DESC vertexBufferDesc {};
 	vertexBufferDesc.ByteWidth = static_cast<UINT>( sizeof( vertices ) );
 	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 
-	D3D11_SUBRESOURCE_DATA vertexData{};
+	D3D11_SUBRESOURCE_DATA vertexData {};
 	vertexData.pSysMem = vertices;
 
 	const HRESULT vertexBufferResult = device->CreateBuffer( &vertexBufferDesc, &vertexData, m_VertexBuffer.GetAddressOf() );
@@ -141,12 +141,12 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	}
 
 	// CubeのIndex Bufferを生成する。
-	D3D11_BUFFER_DESC indexBufferDesc{};
+	D3D11_BUFFER_DESC indexBufferDesc {};
 	indexBufferDesc.ByteWidth = static_cast<UINT>( sizeof( indices ) );
 	indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 	indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
 
-	D3D11_SUBRESOURCE_DATA indexData{};
+	D3D11_SUBRESOURCE_DATA indexData {};
 	indexData.pSysMem = indices;
 
 	const HRESULT indexBufferResult = device->CreateBuffer( &indexBufferDesc, &indexData, m_IndexBuffer.GetAddressOf() );
@@ -159,7 +159,7 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	}
 
 	// Vertex ShaderのCSO読込、Shader生成、Input Layout生成を行う。
-	std::vector<char> vertexShaderBinary{};
+	std::vector<char> vertexShaderBinary {};
 
 	if ( !ShaderBinaryLoader::Load( BASIC_COLOR_VERTEX_SHADER_CSO_PATH, vertexShaderBinary ) )
 	{
@@ -194,7 +194,7 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	}
 
 	// Pixel Shaderを読み込み、Cube描画用のPixel Shaderを生成する。
-	std::vector<char> pixelShaderBinary{};
+	std::vector<char> pixelShaderBinary {};
 
 	if ( !ShaderBinaryLoader::Load( BASIC_COLOR_PIXEL_SHADER_CSO_PATH, pixelShaderBinary ) )
 	{
@@ -213,7 +213,7 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	}
 
 	// Camera、Object、Material用の定数バッファを生成する。
-	HRESULT cameraBufferResult{};
+	HRESULT cameraBufferResult {};
 
 	if ( !m_CameraBuffer.Init( device, cameraBufferResult ) )
 	{
@@ -222,7 +222,7 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 		return false;
 	}
 
-	HRESULT objectBufferResult{};
+	HRESULT objectBufferResult {};
 
 	if ( !m_ObjectBuffer.Init( device, objectBufferResult ) )
 	{
@@ -231,7 +231,7 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 		return false;
 	}
 
-	HRESULT materialBufferResult{};
+	HRESULT materialBufferResult {};
 
 	if ( !m_MaterialBuffer.Init( device, materialBufferResult ) )
 	{
@@ -250,7 +250,7 @@ bool BasicMeshRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	}
 
 	// Texture参照時のフィルタリングとアドレス指定を行うSamplerを生成する。
-	D3D11_SAMPLER_DESC samplerDescription{};
+	D3D11_SAMPLER_DESC samplerDescription {};
 	samplerDescription.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 	samplerDescription.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
 	samplerDescription.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
@@ -285,56 +285,56 @@ void BasicMeshRenderer::DrawCube( GraphicsSystem& graphicsSystem, const DirectX:
 	if ( context == nullptr ) return;
 
 	// テクスチャ種別に応じてShaderへ渡すTextureと使用フラグを決定する。
-	ID3D11ShaderResourceView* textureView{};
-	float useTexture{};
+	ID3D11ShaderResourceView* textureView {};
+	float useTexture {};
 
 	switch ( textureType )
 	{
 		case TextureType::Floor:
-		textureView = m_FloorTextureView.Get();
-		useTexture = 1.0f;
-		break;
+			textureView = m_FloorTextureView.Get();
+			useTexture = 1.0f;
+			break;
 
 		case TextureType::Wall:
-		textureView = m_WallTextureView.Get();
-		useTexture = 1.0f;
-		break;
+			textureView = m_WallTextureView.Get();
+			useTexture = 1.0f;
+			break;
 
 		case TextureType::Object:
-		textureView = m_ObjectTextureView.Get();
-		useTexture = 1.0f;
-		break;
+			textureView = m_ObjectTextureView.Get();
+			useTexture = 1.0f;
+			break;
 
 		case TextureType::Color:
 		default:
-		break;
+			break;
 	}
 
 	// Shaderへ渡すCamera、Object、Material定数を作成する。
 	const DirectX::XMMATRIX viewProjectionMatrix = DirectX::XMMatrixTranspose( viewMatrix * projectionMatrix );
 	const DirectX::XMMATRIX transposedWorldMatrix = DirectX::XMMatrixTranspose( worldMatrix );
 
-	CameraConstants cameraConstants{};
+	CameraConstants cameraConstants {};
 	DirectX::XMStoreFloat4x4( &cameraConstants.viewProjectionMatrix, viewProjectionMatrix );
 
-	ObjectConstants objectConstants{};
+	ObjectConstants objectConstants {};
 	DirectX::XMStoreFloat4x4( &objectConstants.worldMatrix, transposedWorldMatrix );
 	objectConstants.color = color;
 
-	MaterialConstants materialConstants{};
+	MaterialConstants materialConstants {};
 	materialConstants.uvTiling = uvTiling;
 	materialConstants.useTexture = useTexture;
 
 	// Input Assemblerへ設定する頂点Buffer情報をまとめる。
 	const UINT vertexStride = sizeof( Vertex );
-	const UINT vertexOffset{};
-	ID3D11Buffer* vertexBuffers[]{ m_VertexBuffer.Get() };
+	const UINT vertexOffset {};
+	ID3D11Buffer* vertexBuffers[] { m_VertexBuffer.Get() };
 
 	// Shaderへ設定する定数Buffer、Texture、Samplerをまとめる。
-	ID3D11Buffer* cameraBuffers[]{ m_CameraBuffer.Get() };
-	ID3D11Buffer* objectBuffers[]{ m_ObjectBuffer.Get() };
-	ID3D11Buffer* materialBuffers[]{ m_MaterialBuffer.Get() };
-	ID3D11SamplerState* samplers[]{ m_TextureSampler.Get() };
+	ID3D11Buffer* cameraBuffers[] { m_CameraBuffer.Get() };
+	ID3D11Buffer* objectBuffers[] { m_ObjectBuffer.Get() };
+	ID3D11Buffer* materialBuffers[] { m_MaterialBuffer.Get() };
+	ID3D11SamplerState* samplers[] { m_TextureSampler.Get() };
 
 	m_CameraBuffer.Update( context, cameraConstants );
 	m_ObjectBuffer.Update( context, objectConstants );

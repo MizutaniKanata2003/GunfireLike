@@ -8,18 +8,18 @@
 // b3: Light Constants。
 // b4: Post Process Constants。
 
-cbuffer CameraConstants : register(b0)
+cbuffer CameraConstants : register( b0 )
 {
     matrix viewProjectionMatrix;
 };
 
-cbuffer ObjectConstants : register(b1)
+cbuffer ObjectConstants : register( b1 )
 {
     matrix worldMatrix;
     float4 color;
 };
 
-cbuffer MaterialConstants : register(b2)
+cbuffer MaterialConstants : register( b2 )
 {
     float4 baseColor;
     float2 uvTiling;

@@ -20,11 +20,11 @@ public:
 
 	//========= キー入力Getter関数=========
 	// 指定したキーが現在押され続けているかを返す。
-	[[nodiscard]] bool IsKeyPressed( unsigned char keyCode ) const { return ( m_CurrentKeys[ keyCode ] & 0x80 ) != 0; }
+	[[nodiscard]] bool IsKeyPressed( unsigned char keyCode ) const { return ( m_CurrentKeys[keyCode] & 0x80 ) != 0; }
 	// 指定したキーがこのフレームで押された瞬間かを返す。
 	[[nodiscard]] bool IsKeyTriggered( unsigned char keyCode ) const
 	{
-		return ( m_CurrentKeys[ keyCode ] & 0x80 ) != 0 && ( m_PreviousKeys[ keyCode ] & 0x80 ) == 0;
+		return ( m_CurrentKeys[keyCode] & 0x80 ) != 0 && ( m_PreviousKeys[keyCode] & 0x80 ) == 0;
 	}
 
 	//========= マウス入力Getter関数=========
@@ -47,19 +47,19 @@ private:
 
 	//========= ウィンドウ情報=========
 	// 入力対象として登録したWin32ウィンドウ。
-	HWND m_WindowHandle{};
+	HWND m_WindowHandle {};
 
 	//========= キーボード状態=========
 	// 現フレームのキーボード状態。
-	BYTE m_CurrentKeys[ 256 ]{};
+	BYTE m_CurrentKeys[256] {};
 	// 前フレームのキーボード状態。
-	BYTE m_PreviousKeys[ 256 ]{};
+	BYTE m_PreviousKeys[256] {};
 
 	//========= マウス状態=========
 	// WndProcから蓄積した中央座標基準のマウス移動量。
-	POINT m_MouseDelta{};
+	POINT m_MouseDelta {};
 	// クライアント領域中央のスクリーン座標。
-	POINT m_ScreenCenter{};
+	POINT m_ScreenCenter {};
 	// FPS操作としてカーソルを非表示・固定するかを示すフラグ。
-	bool m_IsMouseCaptureEnabled{};
+	bool m_IsMouseCaptureEnabled {};
 };

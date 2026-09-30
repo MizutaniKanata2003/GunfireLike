@@ -19,14 +19,14 @@ namespace
 	// HRESULTを16進数の表示用文字列へ変換する。
 	std::wstring GetHRESULTText( HRESULT result )
 	{
-		std::wstring resultText{ L"0x" };
-		constexpr wchar_t hexDigits[]{ L"0123456789ABCDEF" };
+		std::wstring resultText { L"0x" };
+		constexpr wchar_t hexDigits[] { L"0123456789ABCDEF" };
 		const unsigned long resultValue = static_cast<unsigned long>( result );
 
 		for ( int digitIndex = 7; digitIndex >= 0; --digitIndex )
 		{
 			const unsigned long digit = ( resultValue >> digitIndex * 4 ) & 0x0f;
-			resultText += hexDigits[ digit ];
+			resultText += hexDigits[digit];
 		}
 
 		return resultText;
@@ -35,7 +35,7 @@ namespace
 	// AssetカテゴリでTexture読込失敗を出力する。
 	void WriteTextureAssetError( const wchar_t* functionName, std::wstring_view filePath, HRESULT result )
 	{
-		std::wstring message{ functionName };
+		std::wstring message { functionName };
 		message += L" に失敗しました。Texture: ";
 		message += filePath;
 		message += L" HRESULT: ";
@@ -47,7 +47,7 @@ namespace
 	// GraphicsカテゴリでTexture GPU Resource生成失敗を出力する。
 	void WriteTextureGraphicsError( const wchar_t* functionName, std::wstring_view filePath, HRESULT result )
 	{
-		std::wstring message{ functionName };
+		std::wstring message { functionName };
 		message += L" に失敗しました。Texture: ";
 		message += filePath;
 		message += L" HRESULT: ";
@@ -75,13 +75,13 @@ bool TextureLoader::LoadWicTexture( ID3D11Device* device, std::wstring_view file
 		return false;
 	}
 
-	const std::wstring filePathText{ filePath };
+	const std::wstring filePathText { filePath };
 
 	// WICを使用して画像をデコードするためのCOMオブジェクト。
-	Microsoft::WRL::ComPtr<IWICImagingFactory> wicFactory{};
-	Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder{};
-	Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame{};
-	Microsoft::WRL::ComPtr<IWICFormatConverter> converter{};
+	Microsoft::WRL::ComPtr<IWICImagingFactory> wicFactory {};
+	Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder {};
+	Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame {};
+	Microsoft::WRL::ComPtr<IWICFormatConverter> converter {};
 
 	const HRESULT factoryResult = CoCreateInstance( CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS( wicFactory.GetAddressOf() ) );
 
@@ -109,8 +109,8 @@ bool TextureLoader::LoadWicTexture( ID3D11Device* device, std::wstring_view file
 	}
 
 	// デコードした画像サイズとBGRA変換後のピクセルデータを取得する。
-	UINT width{};
-	UINT height{};
+	UINT width {};
+	UINT height {};
 
 	const HRESULT imageSizeResult = frame->GetSize( &width, &height );
 
@@ -156,7 +156,7 @@ bool TextureLoader::LoadWicTexture( ID3D11Device* device, std::wstring_view file
 	}
 
 	// Direct3DのTextureとShader Resource Viewを生成する。
-	D3D11_TEXTURE2D_DESC textureDescription{};
+	D3D11_TEXTURE2D_DESC textureDescription {};
 	textureDescription.Width = width;
 	textureDescription.Height = height;
 	textureDescription.MipLevels = 1;
@@ -166,11 +166,11 @@ bool TextureLoader::LoadWicTexture( ID3D11Device* device, std::wstring_view file
 	textureDescription.Usage = D3D11_USAGE_DEFAULT;
 	textureDescription.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 
-	D3D11_SUBRESOURCE_DATA textureData{};
+	D3D11_SUBRESOURCE_DATA textureData {};
 	textureData.pSysMem = pixels.data();
 	textureData.SysMemPitch = rowPitch;
 
-	Microsoft::WRL::ComPtr<ID3D11Texture2D> texture{};
+	Microsoft::WRL::ComPtr<ID3D11Texture2D> texture {};
 
 	const HRESULT textureResult = device->CreateTexture2D( &textureDescription, &textureData, texture.GetAddressOf() );
 

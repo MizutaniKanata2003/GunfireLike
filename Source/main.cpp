@@ -20,8 +20,8 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler( HWND windowHandle,
 // Win32 Window Procedureが使用するFramework System参照を保持する。
 struct WindowContext
 {
-	InputSystem* inputSystem{};
-	GraphicsSystem* graphicsSystem{};
+	InputSystem* inputSystem {};
+	GraphicsSystem* graphicsSystem {};
 };
 
 // Win32ウィンドウのメッセージを処理する。
@@ -46,22 +46,22 @@ LRESULT CALLBACK WindowProcedure( HWND windowHandle, UINT message, WPARAM wParam
 	switch ( message )
 	{
 		case WM_SIZE:
-		if ( graphicsSystem != nullptr )
-		{
-			const unsigned int width = static_cast<unsigned int>( LOWORD( lParam ) );
+			if ( graphicsSystem != nullptr )
+			{
+				const unsigned int width = static_cast<unsigned int>( LOWORD( lParam ) );
 
-			const unsigned int height = static_cast<unsigned int>( HIWORD( lParam ) );
+				const unsigned int height = static_cast<unsigned int>( HIWORD( lParam ) );
 
-			graphicsSystem->Resize( width, height );
-		}
-		return 0;
+				graphicsSystem->Resize( width, height );
+			}
+			return 0;
 
 		case WM_DESTROY:
-		PostQuitMessage( 0 );
-		return 0;
+			PostQuitMessage( 0 );
+			return 0;
 
 		default:
-		return DefWindowProcW( windowHandle, message, wParam, lParam );
+			return DefWindowProcW( windowHandle, message, wParam, lParam );
 	}
 }
 
@@ -74,7 +74,7 @@ int WINAPI WinMain( HINSTANCE instance, HINSTANCE, LPSTR, int showCommand )
 
 	if ( FAILED( comResult ) )return -100;
 
-	WNDCLASSEXW windowClass{};
+	WNDCLASSEXW windowClass {};
 	windowClass.cbSize = sizeof( windowClass );
 	windowClass.hInstance = instance;
 	windowClass.lpfnWndProc = WindowProcedure;
@@ -139,7 +139,7 @@ int WINAPI WinMain( HINSTANCE instance, HINSTANCE, LPSTR, int showCommand )
 		return -4;
 	}
 
-	WindowContext windowContext{};
+	WindowContext windowContext {};
 	windowContext.inputSystem = &inputSystem;
 	windowContext.graphicsSystem = &graphicsSystem;
 	SetWindowLongPtrW( windowHandle, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( &windowContext ) );
@@ -174,7 +174,7 @@ int WINAPI WinMain( HINSTANCE instance, HINSTANCE, LPSTR, int showCommand )
 
 	while ( isRunning )
 	{
-		MSG message{};
+		MSG message {};
 
 		while ( PeekMessage( &message, nullptr, 0, 0, PM_REMOVE ) )
 		{
@@ -201,7 +201,7 @@ int WINAPI WinMain( HINSTANCE instance, HINSTANCE, LPSTR, int showCommand )
 
 		sceneManager.Update( gameTimer.GetDeltaTime() );
 
-		const float clearColor[ 4 ]
+		const float clearColor[4]
 		{
 			0.06f,
 			0.09f,

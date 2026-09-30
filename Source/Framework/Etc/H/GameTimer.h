@@ -28,23 +28,23 @@ public:
 private:
 	//========= 高精度タイマー情報=========
 	// 高精度カウンターの周波数。
-	LARGE_INTEGER m_Frequency{};
+	LARGE_INTEGER m_Frequency {};
 	// 前フレーム時点の高精度カウンター値。
-	LARGE_INTEGER m_PreviousCounter{};
+	LARGE_INTEGER m_PreviousCounter {};
 
 	//========= 時間情報=========
 	// 直近フレームの経過時間。
-	float m_DeltaTime{};
+	float m_DeltaTime {};
 	// TimeScale適用後のゲーム総経過時間。
-	float m_TotalTime{};
+	float m_TotalTime {};
 	// ゲーム時間へ掛ける進行倍率。
-	float m_TimeScale{ 1.0f };
+	float m_TimeScale { 1.0f };
 
 	//========= FPS計算情報=========
 	// FPS計算用の実時間累積値。
-	float m_FrameAccumulator{};
+	float m_FrameAccumulator {};
 	// FPS計算用の累積フレーム数。
-	unsigned int m_FrameCount{};
+	unsigned int m_FrameCount {};
 	// 直近1秒間の平均FPS。
-	float m_FrameRate{};
+	float m_FrameRate {};
 };

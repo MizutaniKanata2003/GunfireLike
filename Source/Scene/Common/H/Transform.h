@@ -27,9 +27,9 @@ public:
 private:
 	//========= Transform状態=========
 	// ObjectのWorld座標。
-	DirectX::XMFLOAT3 m_Position{};
+	DirectX::XMFLOAT3 m_Position {};
 	// ObjectのEuler角Rotation。単位はRadian。
-	DirectX::XMFLOAT3 m_Rotation{};
+	DirectX::XMFLOAT3 m_Rotation {};
 	// Objectの各軸Scale。
-	DirectX::XMFLOAT3 m_Scale{ 1.0f, 1.0f, 1.0f };
+	DirectX::XMFLOAT3 m_Scale { 1.0f, 1.0f, 1.0f };
 };

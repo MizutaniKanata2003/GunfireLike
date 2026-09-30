@@ -61,5 +61,5 @@ private:
 
 	//========= メンバー変数=========
 	// AudioEngineとSoundEffect群を保持する実装クラス。
-	std::unique_ptr<Impl> m_Impl{};
+	std::unique_ptr<Impl> m_Impl {};
 };

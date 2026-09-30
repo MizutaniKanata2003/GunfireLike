@@ -13,7 +13,7 @@ namespace
 	// HRESULTを16進数の表示用文字列へ変換する。
 	std::wstring GetHRESULTText( HRESULT result )
 	{
-		std::wostringstream stream{};
+		std::wostringstream stream {};
 		stream << L"0x" << std::uppercase << std::hex << std::setfill( L'0' ) << std::setw( 8 ) << static_cast<unsigned long>( result );
 
 		return stream.str();
@@ -22,7 +22,7 @@ namespace
 	// GraphicsカテゴリでHRESULTを含むエラーログを出力する。
 	void WriteGraphicsError( const wchar_t* functionName, HRESULT result )
 	{
-		std::wstring message{ functionName };
+		std::wstring message { functionName };
 		message += L" に失敗しました。HRESULT: ";
 		message += GetHRESULTText( result );
 
@@ -51,7 +51,7 @@ namespace
 	// Alpha Blendに渡す固定のBlend Factorを返す。
 	const float* GetBlendFactor()
 	{
-		static const float blendFactor[ 4 ]{};
+		static const float blendFactor[4] {};
 		return blendFactor;
 	}
 }
@@ -63,7 +63,7 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 	Uninit();
 
 	// DeviceとSwapChainの生成に使用する設定を作成する。
-	DXGI_SWAP_CHAIN_DESC swapChainDesc{};
+	DXGI_SWAP_CHAIN_DESC swapChainDesc {};
 	swapChainDesc.BufferCount = 2;
 	swapChainDesc.BufferDesc.Width = width;
 	swapChainDesc.BufferDesc.Height = height;
@@ -75,8 +75,8 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 
 	// 使用するDirect3D Feature Levelを指定する。
-	const D3D_FEATURE_LEVEL requestedFeatureLevels[]{ D3D_FEATURE_LEVEL_11_0 };
-	D3D_FEATURE_LEVEL createdFeatureLevel{};
+	const D3D_FEATURE_LEVEL requestedFeatureLevels[] { D3D_FEATURE_LEVEL_11_0 };
+	D3D_FEATURE_LEVEL createdFeatureLevel {};
 
 	// Debug構成ではD3D11 Debug Layerを有効にしてDeviceを生成する。
 #if defined( _DEBUG )
@@ -109,11 +109,11 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 #endif
 
 	// 半透明HUDやフェードを描画するためのAlpha Blend Stateを生成する。
-	D3D11_BLEND_DESC blendDescription{};
+	D3D11_BLEND_DESC blendDescription {};
 	blendDescription.AlphaToCoverageEnable = FALSE;
 	blendDescription.IndependentBlendEnable = FALSE;
 
-	D3D11_RENDER_TARGET_BLEND_DESC& renderTargetBlend = blendDescription.RenderTarget[ 0 ];
+	D3D11_RENDER_TARGET_BLEND_DESC& renderTargetBlend = blendDescription.RenderTarget[0];
 	renderTargetBlend.BlendEnable = TRUE;
 	renderTargetBlend.SrcBlend = D3D11_BLEND_SRC_ALPHA;
 	renderTargetBlend.DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
@@ -133,7 +133,7 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 	}
 
 	// HUDとSkyを描画するときにDepth TestとDepth Writeを無効化するStateを生成する。
-	D3D11_DEPTH_STENCIL_DESC depthDisabledDescription{};
+	D3D11_DEPTH_STENCIL_DESC depthDisabledDescription {};
 	depthDisabledDescription.DepthEnable = FALSE;
 	depthDisabledDescription.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
 	depthDisabledDescription.DepthFunc = D3D11_COMPARISON_ALWAYS;
@@ -149,7 +149,7 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 	}
 
 	// 半透明3D ObjectでDepth Testを維持し、Depth Writeだけ無効化するStateを生成する。
-	D3D11_DEPTH_STENCIL_DESC depthReadOnlyDescription{};
+	D3D11_DEPTH_STENCIL_DESC depthReadOnlyDescription {};
 	depthReadOnlyDescription.DepthEnable = TRUE;
 	depthReadOnlyDescription.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
 	depthReadOnlyDescription.DepthFunc = D3D11_COMPARISON_LESS;
@@ -166,7 +166,7 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 	}
 
 	// 背面を除外する3D描画用Rasterizer Stateを生成する。
-	D3D11_RASTERIZER_DESC cullBackRasterizerDescription{};
+	D3D11_RASTERIZER_DESC cullBackRasterizerDescription {};
 	cullBackRasterizerDescription.FillMode = D3D11_FILL_SOLID;
 	cullBackRasterizerDescription.CullMode = D3D11_CULL_BACK;
 	cullBackRasterizerDescription.DepthClipEnable = TRUE;
@@ -182,7 +182,7 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 	}
 
 	// 表裏を除外しないSkyと画面UI用Rasterizer Stateを生成する。
-	D3D11_RASTERIZER_DESC cullNoneRasterizerDescription{};
+	D3D11_RASTERIZER_DESC cullNoneRasterizerDescription {};
 	cullNoneRasterizerDescription.FillMode = D3D11_FILL_SOLID;
 	cullNoneRasterizerDescription.CullMode = D3D11_CULL_NONE;
 	cullNoneRasterizerDescription.DepthClipEnable = TRUE;
@@ -211,7 +211,7 @@ bool GraphicsSystem::Init( HWND windowHandle, unsigned int width, unsigned int h
 }
 
 // RenderTargetとDepthStencilをクリアし、フレーム描画を開始する。
-void GraphicsSystem::BeginFrame( const float clearColor[ 4 ] )
+void GraphicsSystem::BeginFrame( const float clearColor[4] )
 {
 	if ( !m_Context || !m_RenderTargetView || !m_DepthStencilView ) return;
 
@@ -284,7 +284,7 @@ bool GraphicsSystem::CreateRenderTargets( unsigned int width, unsigned int heigh
 	if ( !m_Device || !m_Context || !m_SwapChain ) return false;
 
 	// SwapChainのBackBufferを取得してRenderTarget Viewを生成する。
-	Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer{};
+	Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer {};
 	const HRESULT getBufferResult = m_SwapChain->GetBuffer( 0, IID_PPV_ARGS( backBuffer.GetAddressOf() ) );
 
 	if ( FAILED( getBufferResult ) )
@@ -304,7 +304,7 @@ bool GraphicsSystem::CreateRenderTargets( unsigned int width, unsigned int heigh
 	}
 
 	// 3D描画の奥行き判定に使用するDepthStencil用Textureを生成する。
-	D3D11_TEXTURE2D_DESC depthTextureDesc{};
+	D3D11_TEXTURE2D_DESC depthTextureDesc {};
 	depthTextureDesc.Width = width;
 	depthTextureDesc.Height = height;
 	depthTextureDesc.MipLevels = 1;
@@ -313,7 +313,7 @@ bool GraphicsSystem::CreateRenderTargets( unsigned int width, unsigned int heigh
 	depthTextureDesc.SampleDesc.Count = 1;
 	depthTextureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
 
-	Microsoft::WRL::ComPtr<ID3D11Texture2D> depthTexture{};
+	Microsoft::WRL::ComPtr<ID3D11Texture2D> depthTexture {};
 	const HRESULT depthTextureResult = m_Device->CreateTexture2D( &depthTextureDesc, nullptr, depthTexture.GetAddressOf() );
 
 	if ( FAILED( depthTextureResult ) )
@@ -333,7 +333,7 @@ bool GraphicsSystem::CreateRenderTargets( unsigned int width, unsigned int heigh
 	}
 
 	// 新しい画面サイズに合わせてViewportを設定する。
-	D3D11_VIEWPORT viewport{};
+	D3D11_VIEWPORT viewport {};
 	viewport.Width = static_cast<float>( width );
 	viewport.Height = static_cast<float>( height );
 	viewport.MinDepth = 0.0f;
@@ -365,31 +365,31 @@ void GraphicsSystem::SetRenderPass( e_RenderPass renderPass )
 	switch ( renderPass )
 	{
 		case e_RenderPass::e_SKY:
-		m_Context->OMSetBlendState( nullptr, GetBlendFactor(), 0xffffffff );
-		m_Context->OMSetDepthStencilState( m_DepthDisabledState.Get(), 0 );
-		m_Context->RSSetState( m_CullNoneRasterizerState.Get() );
-		return;
+			m_Context->OMSetBlendState( nullptr, GetBlendFactor(), 0xffffffff );
+			m_Context->OMSetDepthStencilState( m_DepthDisabledState.Get(), 0 );
+			m_Context->RSSetState( m_CullNoneRasterizerState.Get() );
+			return;
 
 		case e_RenderPass::e_OPAQUE:
-		m_Context->OMSetBlendState( nullptr, GetBlendFactor(), 0xffffffff );
-		m_Context->OMSetDepthStencilState( nullptr, 0 );
-		m_Context->RSSetState( m_CullBackRasterizerState.Get() );
-		return;
+			m_Context->OMSetBlendState( nullptr, GetBlendFactor(), 0xffffffff );
+			m_Context->OMSetDepthStencilState( nullptr, 0 );
+			m_Context->RSSetState( m_CullBackRasterizerState.Get() );
+			return;
 
 		case e_RenderPass::e_TRANSPARENT:
-		m_Context->OMSetBlendState( m_AlphaBlendState.Get(), GetBlendFactor(), 0xffffffff );
-		m_Context->OMSetDepthStencilState( m_DepthReadOnlyState.Get(), 0 );
-		m_Context->RSSetState( m_CullBackRasterizerState.Get() );
-		return;
+			m_Context->OMSetBlendState( m_AlphaBlendState.Get(), GetBlendFactor(), 0xffffffff );
+			m_Context->OMSetDepthStencilState( m_DepthReadOnlyState.Get(), 0 );
+			m_Context->RSSetState( m_CullBackRasterizerState.Get() );
+			return;
 
 		case e_RenderPass::e_SCREEN_UI:
-		m_Context->OMSetBlendState( m_AlphaBlendState.Get(), GetBlendFactor(), 0xffffffff );
-		m_Context->OMSetDepthStencilState( m_DepthDisabledState.Get(), 0 );
-		m_Context->RSSetState( m_CullNoneRasterizerState.Get() );
-		return;
+			m_Context->OMSetBlendState( m_AlphaBlendState.Get(), GetBlendFactor(), 0xffffffff );
+			m_Context->OMSetDepthStencilState( m_DepthDisabledState.Get(), 0 );
+			m_Context->RSSetState( m_CullNoneRasterizerState.Get() );
+			return;
 
 		default:
-		return;
+			return;
 	}
 }
 

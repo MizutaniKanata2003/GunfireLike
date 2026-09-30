@@ -44,11 +44,11 @@ void HudTextRenderer::DrawText( const std::wstring& text, const DirectX::XMFLOAT
 
 	if ( renderWidth == 0 || renderHeight == 0 ) return;
 
-	const HudCanvas hudCanvas{ renderWidth,renderHeight };
+	const HudCanvas hudCanvas { renderWidth,renderHeight };
 	const DirectX::XMFLOAT2 screenPosition = hudCanvas.ToScreenPosition( position );
 	const float screenScale = hudCanvas.ToScreenScale( scale );
 
-	m_SpriteFont->DrawString( m_SpriteBatch.get(), text.c_str(), screenPosition, color, 0.0f, DirectX::XMFLOAT2{}, screenScale );
+	m_SpriteFont->DrawString( m_SpriteBatch.get(), text.c_str(), screenPosition, color, 0.0f, DirectX::XMFLOAT2 {}, screenScale );
 }
 
 // 指定文字列を指定Scaleで描画した場合の幅と高さを返す。

@@ -56,7 +56,7 @@ DirectX::XMFLOAT3 FpsCamera::GetRight() const
 	const DirectX::XMVECTOR forwardVector = DirectX::XMLoadFloat3( &forward );
 	const DirectX::XMVECTOR rightVector = DirectX::XMVector3Normalize( DirectX::XMVector3Cross( upVector, forwardVector ) );
 
-	DirectX::XMFLOAT3 right{};
+	DirectX::XMFLOAT3 right {};
 	DirectX::XMStoreFloat3( &right, rightVector );
 
 	return right;

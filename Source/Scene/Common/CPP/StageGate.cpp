@@ -15,7 +15,7 @@ void StageGate::Initialize( GateType gateType, const DirectX::XMFLOAT3& position
 {
 	m_GateType = gateType;
 	m_Transform.SetPosition( position );
-	m_Transform.SetRotation( DirectX::XMFLOAT3{} );
+	m_Transform.SetRotation( DirectX::XMFLOAT3 {} );
 	m_Transform.SetScale( scale );
 	m_Color = color;
 	m_AnimationTime = {};
@@ -26,7 +26,7 @@ void StageGate::Update( float deltaTime )
 {
 	m_AnimationTime += deltaTime;
 
-	m_Transform.SetRotation( DirectX::XMFLOAT3{ 0.0f,m_AnimationTime * GATE_ROTATION_SPEED,0.0f } );
+	m_Transform.SetRotation( DirectX::XMFLOAT3 { 0.0f,m_AnimationTime * GATE_ROTATION_SPEED,0.0f } );
 }
 
 // PlayerがGateの操作範囲内にいるかを返す。
@@ -45,5 +45,5 @@ void StageGate::Draw( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem& grap
 					  const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix ) const
 {
 	basicMeshRenderer.DrawCube( graphicsSystem, m_Transform.GetWorldMatrix(), viewMatrix, projectionMatrix, m_Color,
-								DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
+								DirectX::XMFLOAT2 { 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
 }

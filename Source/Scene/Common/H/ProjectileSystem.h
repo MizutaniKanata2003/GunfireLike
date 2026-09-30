@@ -14,10 +14,10 @@ public:
 	// 発射後に一定時間だけ移動・描画する弾情報。
 	struct Projectile
 	{
-		DirectX::XMFLOAT3 position{};
-		DirectX::XMFLOAT3 direction{};
-		float remainingLifetime{};
-		bool isActive{};
+		DirectX::XMFLOAT3 position {};
+		DirectX::XMFLOAT3 direction {};
+		float remainingLifetime {};
+		bool isActive {};
 	};
 
 	//========= ライフサイクル関数=========
@@ -36,5 +36,5 @@ public:
 private:
 	//========= Projectile管理=========
 	// 発射中のProjectileを最大数まで保持する固定配列。
-	std::array<Projectile, 16> m_Projectiles{};
+	std::array<Projectile, 16> m_Projectiles {};
 };

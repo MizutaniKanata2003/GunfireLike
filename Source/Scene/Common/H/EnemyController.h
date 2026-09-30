@@ -13,17 +13,17 @@ enum class EnemyState
 // GameSceneがPlayerへのDamage適用、SE再生を担当する。
 struct EnemyAttackResult
 {
-	bool didAttack{};
-	bool didHitPlayer{};
-	bool isSpecialAttack{};
-	float playerDamage{};
+	bool didAttack {};
+	bool didHitPlayer {};
+	bool isSpecialAttack {};
+	float playerDamage {};
 };
 // EnemyへのDamage適用結果。
 // GameSceneがDamage Reward、撃破SE、Stage Clearを担当する。
 struct EnemyDamageResult
 {
-	float actualDamage{};
-	bool didDefeatEnemy{};
+	float actualDamage {};
+	bool didDefeatEnemy {};
 };
 
 // EnemyのHP、生死、通常攻撃・特殊攻撃の経過時間を管理する。
@@ -52,24 +52,24 @@ public:
 	[[nodiscard]] EnemyState GetState() const { return m_State; }
 private:
 	//========= Enemy状態=========
-	EnemyState m_State{ EnemyState::e_IDLE };
+	EnemyState m_State { EnemyState::e_IDLE };
 
 	//========= HP=========
-	float m_CurrentHp{};
-	float m_MaxHp{};
+	float m_CurrentHp {};
+	float m_MaxHp {};
 
 	//========= 通常攻撃設定=========
-	float m_NormalAttackInterval{};
-	float m_NormalAttackRangeSquared{};
-	float m_NormalAttackDamage{};
+	float m_NormalAttackInterval {};
+	float m_NormalAttackRangeSquared {};
+	float m_NormalAttackDamage {};
 
 	//========= 特殊攻撃設定=========
-	float m_SpecialAttackInterval{};
-	float m_SpecialAttackRangeSquared{};
-	float m_SpecialAttackDamage{};
+	float m_SpecialAttackInterval {};
+	float m_SpecialAttackRangeSquared {};
+	float m_SpecialAttackDamage {};
 
 	//========= 攻撃Timer=========
 	// GameTimerから渡されたDeltaTimeを蓄積する。
-	float m_NormalAttackElapsedTime{};
-	float m_SpecialAttackElapsedTime{};
+	float m_NormalAttackElapsedTime {};
+	float m_SpecialAttackElapsedTime {};
 };

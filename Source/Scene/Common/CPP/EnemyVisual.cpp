@@ -18,7 +18,7 @@ namespace
 	constexpr float ENEMY_ROTATION_SPEED = 1.5f;
 
 	// Enemy OBJ Modelの単色Tint。
-	const DirectX::XMFLOAT4 ENEMY_COLOR{ 0.18f,0.95f,0.28f,1.0f };
+	const DirectX::XMFLOAT4 ENEMY_COLOR { 0.18f,0.95f,0.28f,1.0f };
 }
 
 // EnemyのTransform、浮遊・回転Animation状態を初期化する。
@@ -26,7 +26,7 @@ void EnemyVisual::Initialize( const DirectX::XMFLOAT3& position, const DirectX::
 {
 	m_BasePosition = position;
 	m_Transform.SetPosition( position );
-	m_Transform.SetRotation( DirectX::XMFLOAT3{} );
+	m_Transform.SetRotation( DirectX::XMFLOAT3 {} );
 	m_Transform.SetScale( scale );
 	m_AnimationTime = {};
 }
@@ -38,9 +38,9 @@ void EnemyVisual::Update( float deltaTime )
 
 	const float floatOffset = std::sinf( m_AnimationTime * ENEMY_FLOAT_SPEED ) * ENEMY_FLOAT_HEIGHT;
 
-	m_Transform.SetPosition( DirectX::XMFLOAT3{ m_BasePosition.x,m_BasePosition.y + floatOffset,m_BasePosition.z } );
+	m_Transform.SetPosition( DirectX::XMFLOAT3 { m_BasePosition.x,m_BasePosition.y + floatOffset,m_BasePosition.z } );
 
-	m_Transform.SetRotation( DirectX::XMFLOAT3{ 0.0f,m_AnimationTime * ENEMY_ROTATION_SPEED,0.0f } );
+	m_Transform.SetRotation( DirectX::XMFLOAT3 { 0.0f,m_AnimationTime * ENEMY_ROTATION_SPEED,0.0f } );
 }
 
 // Enemy OBJ ModelをOpaque Passで描画する。
@@ -56,7 +56,7 @@ DirectX::XMFLOAT3 EnemyVisual::GetHitSphereCenter( float hitCenterYOffset ) cons
 	const DirectX::XMFLOAT3& enemyPosition = m_Transform.GetPosition();
 
 	return
-		DirectX::XMFLOAT3{ enemyPosition.x,enemyPosition.y + hitCenterYOffset,enemyPosition.z };
+		DirectX::XMFLOAT3 { enemyPosition.x,enemyPosition.y + hitCenterYOffset,enemyPosition.z };
 }
 
 // Enemy頭上HPバーのWorld座標を返す。
@@ -65,5 +65,5 @@ DirectX::XMFLOAT3 EnemyVisual::GetHealthBarPosition() const
 	const DirectX::XMFLOAT3& enemyPosition = m_Transform.GetPosition();
 
 	return
-		DirectX::XMFLOAT3{ enemyPosition.x,enemyPosition.y + ENEMY_HEALTH_BAR_Y_OFFSET,enemyPosition.z };
+		DirectX::XMFLOAT3 { enemyPosition.x,enemyPosition.y + ENEMY_HEALTH_BAR_Y_OFFSET,enemyPosition.z };
 }

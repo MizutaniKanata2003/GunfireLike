@@ -9,15 +9,15 @@
 // 射撃RayのEnemy Sphere命中判定に必要な設定。
 struct EnemyHitTest
 {
-	DirectX::XMFLOAT3 center{};
-	float radius{};
-	float maxDistance{};
+	DirectX::XMFLOAT3 center {};
+	float radius {};
+	float maxDistance {};
 };
 // RayとSphereの交差判定結果。
 struct RaycastResult
 {
-	bool isHit{};
-	float hitDistance{};
+	bool isHit {};
+	float hitDistance {};
 };
 
 // Combatに関するHitScan、距離判定を提供する。

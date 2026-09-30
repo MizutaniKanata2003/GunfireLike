@@ -49,7 +49,7 @@ private:
 
 	//========= HUD描画=========
 	// 単色Quadを描画するHUDレンダラー。
-	HudRenderer m_HudRenderer{};
+	HudRenderer m_HudRenderer {};
 	// Result画面の文字列を描画するHUD文字レンダラー。
-	HudTextRenderer m_HudTextRenderer{};
+	HudTextRenderer m_HudTextRenderer {};
 };

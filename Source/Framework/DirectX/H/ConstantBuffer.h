@@ -23,7 +23,7 @@ public:
 
 		if ( !device ) return false;
 
-		D3D11_BUFFER_DESC bufferDesc{};
+		D3D11_BUFFER_DESC bufferDesc {};
 		bufferDesc.ByteWidth = static_cast<UINT>( sizeof( T ) );
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
@@ -49,5 +49,5 @@ public:
 	[[nodiscard]] ID3D11Buffer* Get() const { return m_Buffer.Get(); }
 private:
 	// Direct3DのConstant Bufferを保持する。
-	Microsoft::WRL::ComPtr<ID3D11Buffer> m_Buffer{};
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_Buffer {};
 };

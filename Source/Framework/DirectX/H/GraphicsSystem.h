@@ -26,7 +26,7 @@ public:
 	// DirectX 11のDevice、Context、SwapChain、RenderTargetを初期化する。
 	bool Init( HWND windowHandle, unsigned int width, unsigned int height );
 	// RenderTargetとDepthStencilをクリアし、フレーム描画を開始する。
-	void BeginFrame( const float clearColor[ 4 ] );
+	void BeginFrame( const float clearColor[4] );
 	// 描画済みフレームをSwapChainへ表示する。
 	void EndFrame();
 	// ウィンドウサイズに合わせてRenderTarget、DepthStencil、Viewportを再生成する。
@@ -60,33 +60,33 @@ private:
 
 	//========= Direct3D主要リソース=========
 	// DirectX 11 Deviceを保持する。
-	Microsoft::WRL::ComPtr<ID3D11Device> m_Device{};
+	Microsoft::WRL::ComPtr<ID3D11Device> m_Device {};
 	// 描画コマンドを発行するDevice Context。
-	Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_Context{};
+	Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_Context {};
 	// BackBufferの交換と画面表示を行うSwapChain。
-	Microsoft::WRL::ComPtr<IDXGISwapChain> m_SwapChain{};
+	Microsoft::WRL::ComPtr<IDXGISwapChain> m_SwapChain {};
 
 	//========= RenderTarget・DepthStencil関連=========
 	// BackBufferへ描画するためのRenderTarget View。
-	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_RenderTargetView{};
+	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_RenderTargetView {};
 	// 3D描画の奥行き判定に使用するDepthStencil View。
-	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_DepthStencilView{};
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_DepthStencilView {};
 
 	//========= Render Targetサイズ=========
 	// 現在生成されているRender Targetの幅。
-	unsigned int m_RenderWidth{};
+	unsigned int m_RenderWidth {};
 	// 現在生成されているRender Targetの高さ。
-	unsigned int m_RenderHeight{};
+	unsigned int m_RenderHeight {};
 
 	//========= 描画State関連=========
 	// HUDとSkyを描画するときにDepth TestとDepth Writeを無効化するState。
-	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_DepthDisabledState{};
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_DepthDisabledState {};
 	// 半透明3D ObjectでDepth Testを維持し、Depth Writeだけ無効化するState。
-	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_DepthReadOnlyState{};
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_DepthReadOnlyState {};
 	// 半透明HUDなどを描画するときに使用するAlpha Blend State。
-	Microsoft::WRL::ComPtr<ID3D11BlendState> m_AlphaBlendState{};
+	Microsoft::WRL::ComPtr<ID3D11BlendState> m_AlphaBlendState {};
 	// 不透明3D Objectと半透明3D Objectで背面を除外するRasterizer State。
-	Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_CullBackRasterizerState{};
+	Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_CullBackRasterizerState {};
 	// Skyと画面UIで表裏を除外しないRasterizer State。
-	Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_CullNoneRasterizerState{};
+	Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_CullNoneRasterizerState {};
 };

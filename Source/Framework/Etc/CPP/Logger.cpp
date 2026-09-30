@@ -14,16 +14,16 @@ namespace
 		switch ( logLevel )
 		{
 			case e_LogLevel::e_INFO:
-			return L"Info";
+				return L"Info";
 
 			case e_LogLevel::e_WARNING:
-			return L"Warning";
+				return L"Warning";
 
 			case e_LogLevel::e_ERROR:
-			return L"Error";
+				return L"Error";
 
 			default:
-			return L"Unknown";
+				return L"Unknown";
 		}
 	}
 
@@ -33,25 +33,25 @@ namespace
 		switch ( logCategory )
 		{
 			case e_LogCategory::e_ASSET:
-			return L"Asset";
+				return L"Asset";
 
 			case e_LogCategory::e_GRAPHICS:
-			return L"Graphics";
+				return L"Graphics";
 
 			case e_LogCategory::e_SCENE:
-			return L"Scene";
+				return L"Scene";
 
 			case e_LogCategory::e_AUDIO:
-			return L"Audio";
+				return L"Audio";
 
 			case e_LogCategory::e_INPUT:
-			return L"Input";
+				return L"Input";
 
 			case e_LogCategory::e_GAME:
-			return L"Game";
+				return L"Game";
 
 			default:
-			return L"Unknown";
+				return L"Unknown";
 		}
 	}
 }
@@ -59,7 +59,7 @@ namespace
 // 指定した重要度、分類、メッセージをデバッグ出力へ書き込む。
 void Logger::Write( e_LogLevel logLevel, e_LogCategory logCategory, std::wstring_view message )
 {
-	std::wstring logMessage{ L"[" };
+	std::wstring logMessage { L"[" };
 	logMessage += GetLogLevelText( logLevel );
 	logMessage += L"][";
 	logMessage += GetLogCategoryText( logCategory );

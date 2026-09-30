@@ -33,7 +33,7 @@ public:
 private:
 	//========= Canvas変換状態=========
 	// Virtual CanvasをRender Targetへ収める均一Scale。
-	float m_Scale{};
+	float m_Scale {};
 	// Render Target内でVirtual Canvasを中央寄せするOffset。
-	DirectX::XMFLOAT2 m_Offset{};
+	DirectX::XMFLOAT2 m_Offset {};
 };

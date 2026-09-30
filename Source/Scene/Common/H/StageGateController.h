@@ -19,8 +19,8 @@ enum class StageGateUseResult
 // 現在StageにおけるGateの表示・使用可否。
 struct StageGateAvailability
 {
-	bool isPreviousGateAvailable{};
-	bool isNextGateAvailable{};
+	bool isPreviousGateAvailable {};
+	bool isNextGateAvailable {};
 };
 
 // Stage番号、Stage Clear状態、Player位置からGateの利用可否を判定する。

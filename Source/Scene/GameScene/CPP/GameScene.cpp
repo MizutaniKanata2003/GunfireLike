@@ -125,12 +125,12 @@ namespace
 	// 指定した必須Assetが存在するかを確認し、失敗時は対象パスを出力する。
 	bool IsRequiredAssetAvailable( const wchar_t* assetPath )
 	{
-		std::error_code errorCode{};
-		const bool isAssetAvailable = std::filesystem::exists( std::filesystem::path{ assetPath }, errorCode );
+		std::error_code errorCode {};
+		const bool isAssetAvailable = std::filesystem::exists( std::filesystem::path { assetPath }, errorCode );
 
 		if ( errorCode )
 		{
-			std::wstring message{ L"必須Assetの存在確認に失敗しました: " };
+			std::wstring message { L"必須Assetの存在確認に失敗しました: " };
 			message += assetPath;
 
 			Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_ASSET, message );
@@ -140,7 +140,7 @@ namespace
 
 		if ( !isAssetAvailable )
 		{
-			std::wstring message{ L"必須Assetが見つかりません: " };
+			std::wstring message { L"必須Assetが見つかりません: " };
 			message += assetPath;
 
 			Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_ASSET, message );
@@ -154,26 +154,19 @@ namespace
 // GameSceneが使用するSceneManagerとFramework Systemを登録する。
 GameScene::GameScene( SceneManager& sceneManager, InputSystem& inputSystem, GraphicsSystem& graphicsSystem, AudioSystem& audioSystem )
 	: m_SceneManager( sceneManager ), m_InputSystem( inputSystem ), m_GraphicsSystem( graphicsSystem ), m_AudioSystem( audioSystem )
-{
-}
+{}
 
 // Stageの敵、Player、HUD、BGMに使用するゲーム状態を初期化する。
 void GameScene::Initialize()
 {
 	const GameProgress& progress = m_SceneManager.GetGameProgress();
-
 	const StageData& stageData = progress.GetCurrentStageData();
-
 	const PlayerStats& playerStats = progress.GetPlayerStats();
 
 	InitializeCombatState( stageData, playerStats );
-
 	InitializeWorldObjects();
-
 	InitializeGates();
-
 	InitializeSceneState();
-
 	InitializePlayerAndCamera();
 }
 // GameSceneで使用する必須の3D・2D描画Resourceを初期化する。
@@ -284,7 +277,6 @@ void GameScene::Draw()
 		currentStage, StageConstants::FIRST_STAGE_NUMBER, StageConstants::MAX_STAGE_COUNT, progress.IsStageCleared( currentStage ) );
 
 	const bool isPreviousGateAvailable = gateAvailability.isPreviousGateAvailable;
-
 	const bool isNextGateAvailable = gateAvailability.isNextGateAvailable;
 
 	// 3D描画に使用する現在のRender Targetサイズを取得する。
@@ -313,7 +305,7 @@ void GameScene::Draw()
 	const bool isNearShopGate = m_ShopGate.IsPlayerNear( playerPosition, GATE_INTERACTION_RADIUS_SQUARED );
 	const bool isSpecialAttackUnlocked = playerStats.isSpecialAttackUnlocked;
 
-	GameHudState hudState{};
+	GameHudState hudState {};
 
 	hudState.currentStage = currentStage;
 	hudState.maxStageCount = StageConstants::MAX_STAGE_COUNT;
@@ -341,7 +333,7 @@ void GameScene::Draw()
 	hudState.showStageClearMessage = m_GamePhase == GamePhase::e_STAGE_CLEAR;
 
 	m_GameHud.Draw( m_HudRenderer, m_HudTextRenderer, m_GraphicsSystem, hudState );
-	GameDebugState gameDebugState{};
+	GameDebugState gameDebugState {};
 
 	gameDebugState.currentStage = currentStage;
 	gameDebugState.maxStageCount = StageConstants::MAX_STAGE_COUNT;
@@ -383,7 +375,6 @@ void GameScene::Finalize()
 void GameScene::InitializeCombatState( const StageData& stageData, const PlayerStats& playerStats )
 {
 	m_PlayerHealth.Initialize( playerStats.maxHp );
-
 	m_PlayerHealthStateController.Initialize( m_PlayerHealth.GetCurrentHp(), m_PlayerHealth.GetMaxHp(), LOW_HP_RATIO_THRESHOLD );
 
 	const float specialAttackRangeSquared = stageData.specialAttackHitboxRadius * stageData.specialAttackHitboxRadius;
@@ -392,7 +383,6 @@ void GameScene::InitializeCombatState( const StageData& stageData, const PlayerS
 	stageData.enemyDamage, stageData.specialAttackInterval, specialAttackRangeSquared, stageData.enemyDamage * ENEMY_SPECIAL_ATTACK_DAMAGE_MULTIPLIER );
 
 	m_ProjectileSystem.Initialize();
-
 	m_PlayerCombatController.Initialize();
 }
 
@@ -400,29 +390,27 @@ void GameScene::InitializeCombatState( const StageData& stageData, const PlayerS
 void GameScene::InitializeWorldObjects()
 {
 	m_EnemyVisual.Initialize(
-	DirectX::XMFLOAT3{ ENEMY_BASE_X,ENEMY_BASE_Y,ENEMY_BASE_Z },
-	DirectX::XMFLOAT3{ ENEMY_MODEL_SCALE,ENEMY_MODEL_SCALE,ENEMY_MODEL_SCALE } );
+	DirectX::XMFLOAT3 { ENEMY_BASE_X,ENEMY_BASE_Y,ENEMY_BASE_Z },
+	DirectX::XMFLOAT3 { ENEMY_MODEL_SCALE,ENEMY_MODEL_SCALE,ENEMY_MODEL_SCALE } );
 
 	m_StageField.Initialize();
-
 	m_GunViewModel.Initialize();
-
 	m_SkyDome.Initialize();
 }
 
 // 前後StageとShopへ移動するGateを初期化する。
 void GameScene::InitializeGates()
 {
-	const DirectX::XMFLOAT3 gateScale{ GATE_WIDTH,GATE_HEIGHT,GATE_DEPTH };
+	const DirectX::XMFLOAT3 gateScale { GATE_WIDTH,GATE_HEIGHT,GATE_DEPTH };
 
-	m_PreviousStageGate.Initialize( StageGate::GateType::e_PREVIOUS_STAGE, DirectX::XMFLOAT3{ PREVIOUS_GATE_POSITION_X,PREVIOUS_GATE_POSITION_Y,PREVIOUS_GATE_POSITION_Z },
-	gateScale, DirectX::XMFLOAT4{ 0.85f,0.30f,1.0f,1.0f } );
+	m_PreviousStageGate.Initialize( StageGate::GateType::e_PREVIOUS_STAGE, DirectX::XMFLOAT3 { PREVIOUS_GATE_POSITION_X,PREVIOUS_GATE_POSITION_Y,PREVIOUS_GATE_POSITION_Z },
+	gateScale, DirectX::XMFLOAT4 { 0.85f,0.30f,1.0f,1.0f } );
 
-	m_NextStageGate.Initialize( StageGate::GateType::e_NEXT_STAGE, DirectX::XMFLOAT3{ NEXT_GATE_POSITION_X,NEXT_GATE_POSITION_Y,NEXT_GATE_POSITION_Z },
-	gateScale, DirectX::XMFLOAT4{ 0.10f,0.85f,1.0f,1.0f } );
+	m_NextStageGate.Initialize( StageGate::GateType::e_NEXT_STAGE, DirectX::XMFLOAT3 { NEXT_GATE_POSITION_X,NEXT_GATE_POSITION_Y,NEXT_GATE_POSITION_Z },
+	gateScale, DirectX::XMFLOAT4 { 0.10f,0.85f,1.0f,1.0f } );
 
-	m_ShopGate.Initialize( StageGate::GateType::e_SHOP, DirectX::XMFLOAT3{ SHOP_GATE_POSITION_X,SHOP_GATE_POSITION_Y,SHOP_GATE_POSITION_Z },
-	gateScale, DirectX::XMFLOAT4{ 1.0f,0.75f,0.10f,1.0f } );
+	m_ShopGate.Initialize( StageGate::GateType::e_SHOP, DirectX::XMFLOAT3 { SHOP_GATE_POSITION_X,SHOP_GATE_POSITION_Y,SHOP_GATE_POSITION_Z },
+	gateScale, DirectX::XMFLOAT4 { 1.0f,0.75f,0.10f,1.0f } );
 }
 
 // GamePhase、Scene遷移要求、Debug要求、戦闘結果、SE再生状態を初期化する。
@@ -445,7 +433,6 @@ void GameScene::InitializeSceneState()
 void GameScene::InitializePlayerAndCamera()
 {
 	m_InputSystem.SetMouseCaptureEnabled( true );
-
 	m_AudioSystem.PlayGameBgm();
 }
 
@@ -455,9 +442,9 @@ bool GameScene::UpdateDebugUiRequest()
 	switch ( m_DebugUiRequest )
 	{
 		case DebugUiRequest::e_TAKE_DAMAGE:
-		m_PlayerHealth.TakeDamage( TEST_PLAYER_DAMAGE );
-		m_DebugUiRequest = {};
-		return false;
+			m_PlayerHealth.TakeDamage( TEST_PLAYER_DAMAGE );
+			m_DebugUiRequest = {};
+			return false;
 
 		case DebugUiRequest::e_PREVIOUS_STAGE:
 		{
@@ -483,7 +470,7 @@ bool GameScene::UpdateDebugUiRequest()
 
 		case DebugUiRequest::e_NONE:
 		default:
-		return false;
+			return false;
 	}
 }
 
@@ -509,9 +496,7 @@ bool GameScene::UpdatePlayerDeath()
 	static_cast<void>( progress.ApplyDeathCurrencyPenalty() );
 
 	m_AudioSystem.PlayWarpSe();
-
 	m_InputSystem.SetMouseCaptureEnabled( false );
-
 	m_SceneManager.RequestSceneChange<ShopScene>();
 
 	return true;
@@ -544,7 +529,6 @@ void GameScene::UpdateLowHealthWarning()
 void GameScene::UpdateEnemyCombat( float deltaTime, float playerToEnemyDistanceSquared )
 {
 	const bool isCombatActive = m_GamePhase == GamePhase::e_PLAYING && !m_EnemyController.IsDead();
-
 	const EnemyAttackResult attackResult = m_EnemyController.UpdateCombat( deltaTime, isCombatActive, playerToEnemyDistanceSquared );
 
 	m_IsLastNormalAttackHit = false;
@@ -564,7 +548,6 @@ void GameScene::UpdateEnemyCombat( float deltaTime, float playerToEnemyDistanceS
 	if ( !attackResult.didHitPlayer )return;
 
 	m_PlayerHealth.TakeDamage( attackResult.playerDamage );
-
 	m_AudioSystem.PlayDamageSe();
 }
 
@@ -572,7 +555,6 @@ void GameScene::UpdateEnemyCombat( float deltaTime, float playerToEnemyDistanceS
 void GameScene::UpdatePlayerAttack( GameProgress& progress, const PlayerStats& playerStats, float playerToEnemyDistanceSquared )
 {
 	const bool isCombatActive = m_GamePhase == GamePhase::e_PLAYING;
-
 	const bool isEnemyDead = m_EnemyController.IsDead();
 
 	const PlayerAttackRequest normalShotRequest = m_PlayerCombatController.RequestNormalShot( m_InputSystem.IsKeyTriggered( SHOOT_ENEMY_KEY ),
@@ -581,12 +563,12 @@ void GameScene::UpdatePlayerAttack( GameProgress& progress, const PlayerStats& p
 	switch ( normalShotRequest.attackType )
 	{
 		case PlayerAttackType::e_NORMAL_SHOT:
-		ExecuteNormalShot( progress, playerStats );
-		break;
+			ExecuteNormalShot( progress, playerStats );
+			break;
 
 		case PlayerAttackType::e_NONE:
 		default:
-		break;
+			break;
 	}
 
 	const PlayerAttackRequest specialAttackRequest = m_PlayerCombatController.RequestSpecialAttack( m_InputSystem.IsKeyTriggered( SPECIAL_ATTACK_KEY ),
@@ -595,12 +577,12 @@ void GameScene::UpdatePlayerAttack( GameProgress& progress, const PlayerStats& p
 	switch ( specialAttackRequest.attackType )
 	{
 		case PlayerAttackType::e_SPECIAL_ATTACK:
-		ExecuteSpecialAttack( progress, playerStats, playerToEnemyDistanceSquared );
-		break;
+			ExecuteSpecialAttack( progress, playerStats, playerToEnemyDistanceSquared );
+			break;
 
 		case PlayerAttackType::e_NONE:
 		default:
-		break;
+			break;
 	}
 }
 // Projectileの移動と寿命を更新する。
@@ -630,9 +612,7 @@ void GameScene::UpdateEnemyDefeat( GameProgress& progress )
 	progress.AddEnemyDefeat();
 
 	const int currentStage = progress.GetCurrentStage();
-
 	const bool isCurrentStageAlreadyCleared = progress.IsStageCleared( currentStage );
-
 	const StageClearResult stageClearResult = m_StageProgressController.EvaluateEnemyDefeat( isCurrentStageAlreadyCleared, currentStage, StageConstants::MAX_STAGE_COUNT );
 
 	if ( stageClearResult.shouldMarkStageCleared )
@@ -650,7 +630,6 @@ void GameScene::UpdateEnemyDefeat( GameProgress& progress )
 	if ( stageClearResult.shouldRequestResult )
 	{
 		m_GamePhase = GamePhase::e_RESULT_TRANSITION;
-
 		m_SceneChangeRequest = SceneChangeRequest::e_RESULT;
 
 		return;
@@ -683,27 +662,27 @@ bool GameScene::UpdateGates( GameProgress& progress )
 	switch ( gateUseResult )
 	{
 		case StageGateUseResult::e_PREVIOUS_STAGE:
-		if ( !progress.TrySetCurrentStage( currentStage - PREVIOUS_STAGE_OFFSET ) )return false;
+			if ( !progress.TrySetCurrentStage( currentStage - PREVIOUS_STAGE_OFFSET ) )return false;
 
-		m_SceneChangeRequest = SceneChangeRequest::e_RELOAD_GAME;
+			m_SceneChangeRequest = SceneChangeRequest::e_RELOAD_GAME;
 
-		return true;
+			return true;
 
 		case StageGateUseResult::e_NEXT_STAGE:
-		if ( !progress.TrySetCurrentStage( currentStage + NEXT_STAGE_OFFSET ) )return false;
+			if ( !progress.TrySetCurrentStage( currentStage + NEXT_STAGE_OFFSET ) )return false;
 
-		m_SceneChangeRequest = SceneChangeRequest::e_RELOAD_GAME;
+			m_SceneChangeRequest = SceneChangeRequest::e_RELOAD_GAME;
 
-		return true;
+			return true;
 
 		case StageGateUseResult::e_SHOP:
-		m_SceneChangeRequest = SceneChangeRequest::e_SHOP;
+			m_SceneChangeRequest = SceneChangeRequest::e_SHOP;
 
-		return true;
+			return true;
 
 		case StageGateUseResult::e_NONE:
 		default:
-		return false;
+			return false;
 	}
 }
 // Camera回転、Player移動、Camera追従を更新する。
@@ -726,22 +705,22 @@ bool GameScene::UpdateSceneChangeRequest()
 	switch ( m_SceneChangeRequest )
 	{
 		case SceneChangeRequest::e_RELOAD_GAME:
-		m_SceneManager.RequestSceneChange<GameScene>();
-		break;
+			m_SceneManager.RequestSceneChange<GameScene>();
+			break;
 
 		case SceneChangeRequest::e_SHOP:
-		m_SceneManager.RequestSceneChange<ShopScene>();
-		break;
+			m_SceneManager.RequestSceneChange<ShopScene>();
+			break;
 
 		case SceneChangeRequest::e_RESULT:
-		m_SceneManager.RequestSceneChange<ResultScene>();
-		break;
+			m_SceneManager.RequestSceneChange<ResultScene>();
+			break;
 
 		case SceneChangeRequest::e_NONE:
-		break;
+			break;
 
 		default:
-		break;
+			break;
 	}
 
 	m_SceneChangeRequest = {};
@@ -795,7 +774,7 @@ void GameScene::DrawTransparentWorld( const DirectX::XMMATRIX& viewMatrix, const
 			DirectX::XMMatrixTranslation( projectile.position.x, projectile.position.y, projectile.position.z );
 
 		m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, projectileWorldMatrix, viewMatrix, projectionMatrix,
-									  DirectX::XMFLOAT4{ 1.0f, 0.85f, 0.10f, projectileAlpha }, DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
+									  DirectX::XMFLOAT4 { 1.0f, 0.85f, 0.10f, projectileAlpha }, DirectX::XMFLOAT2 { 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
 	}
 }
 
@@ -835,19 +814,19 @@ void GameScene::DrawDebugUi( const GameDebugState& gameDebugState )
 	switch ( gameDebugState.gamePhase )
 	{
 		case GamePhase::e_PLAYING:
-		gamePhaseText = "PLAYING";
-		break;
+			gamePhaseText = "PLAYING";
+			break;
 
 		case GamePhase::e_STAGE_CLEAR:
-		gamePhaseText = "STAGE CLEAR";
-		break;
+			gamePhaseText = "STAGE CLEAR";
+			break;
 
 		case GamePhase::e_RESULT_TRANSITION:
-		gamePhaseText = "RESULT TRANSITION";
-		break;
+			gamePhaseText = "RESULT TRANSITION";
+			break;
 
 		default:
-		break;
+			break;
 	}
 
 	ImGui::Text( "Game Phase: %s", gamePhaseText );
@@ -863,9 +842,9 @@ void GameScene::DrawDebugUi( const GameDebugState& gameDebugState )
 		e_SHOP
 	};
 
-	GateDestination gateDestination{};
+	GateDestination gateDestination {};
 
-	if ( gameDebugState.isPreviousGateAvailable && ImGui::Button( PREVIOUS_STAGE_GATE_LABEL, ImVec2{ GATE_BUTTON_WIDTH,GATE_BUTTON_HEIGHT } ) )
+	if ( gameDebugState.isPreviousGateAvailable && ImGui::Button( PREVIOUS_STAGE_GATE_LABEL, ImVec2 { GATE_BUTTON_WIDTH,GATE_BUTTON_HEIGHT } ) )
 	{
 		gateDestination = GateDestination::e_PREVIOUS_STAGE;
 	}
@@ -874,7 +853,7 @@ void GameScene::DrawDebugUi( const GameDebugState& gameDebugState )
 	{
 		if ( !gameDebugState.isNextGateAvailable )ImGui::BeginDisabled();
 
-		if ( ImGui::Button( NEXT_STAGE_GATE_LABEL, ImVec2{ GATE_BUTTON_WIDTH,GATE_BUTTON_HEIGHT } ) )
+		if ( ImGui::Button( NEXT_STAGE_GATE_LABEL, ImVec2 { GATE_BUTTON_WIDTH,GATE_BUTTON_HEIGHT } ) )
 		{
 			gateDestination = GateDestination::e_NEXT_STAGE;
 		}
@@ -883,7 +862,7 @@ void GameScene::DrawDebugUi( const GameDebugState& gameDebugState )
 
 	}
 
-	if ( ImGui::Button( SHOP_GATE_LABEL, ImVec2{ GATE_BUTTON_WIDTH,GATE_BUTTON_HEIGHT } ) )gateDestination = GateDestination::e_SHOP;
+	if ( ImGui::Button( SHOP_GATE_LABEL, ImVec2 { GATE_BUTTON_WIDTH,GATE_BUTTON_HEIGHT } ) )gateDestination = GateDestination::e_SHOP;
 
 	ImGui::End();
 
@@ -915,7 +894,7 @@ void GameScene::ExecuteNormalShot( GameProgress& progress, const PlayerStats& pl
 
 	const DirectX::XMVECTOR projectileSpawnWorldSpace = DirectX::XMVector3TransformCoord( projectileSpawnCameraSpace, inverseViewMatrix );
 
-	DirectX::XMFLOAT3 projectileSpawnPosition{};
+	DirectX::XMFLOAT3 projectileSpawnPosition {};
 
 	DirectX::XMStoreFloat3( &projectileSpawnPosition, projectileSpawnWorldSpace );
 
@@ -923,7 +902,7 @@ void GameScene::ExecuteNormalShot( GameProgress& progress, const PlayerStats& pl
 
 	m_ProjectileSystem.Spawn( projectileSpawnPosition, projectileDirection, BULLET_LIFETIME );
 
-	const EnemyHitTest enemyHitTest{ m_EnemyVisual.GetHitSphereCenter( ENEMY_HIT_CENTER_Y_OFFSET ),ENEMY_HIT_SPHERE_RADIUS,SHOOT_MAX_DISTANCE };
+	const EnemyHitTest enemyHitTest { m_EnemyVisual.GetHitSphereCenter( ENEMY_HIT_CENTER_Y_OFFSET ),ENEMY_HIT_SPHERE_RADIUS,SHOOT_MAX_DISTANCE };
 
 	m_IsLastShotHit = m_CombatSystem.IsHitScanHit( m_FpsCamera.GetPosition(), projectileDirection, enemyHitTest );
 

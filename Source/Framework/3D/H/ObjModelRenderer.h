@@ -30,7 +30,7 @@ public:
 	bool Initialize( GraphicsSystem& graphicsSystem, const std::wstring& objFilePath, const std::wstring& textureFilePath );
 	// 指定したWorld、View、Projection行列と色でOBJモデルを描画する。
 	void Draw( GraphicsSystem& graphicsSystem, const DirectX::XMMATRIX& worldMatrix, const DirectX::XMMATRIX& viewMatrix,
-			   const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT4& color = DirectX::XMFLOAT4{ 1.0f, 1.0f, 1.0f, 1.0f } );
+			   const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT4& color = DirectX::XMFLOAT4 { 1.0f, 1.0f, 1.0f, 1.0f } );
 	// OBJ描画で使用したDirect3Dリソースを解放する。
 	void Uninit();
 private:
@@ -38,8 +38,8 @@ private:
 	// OBJモデルの頂点座標とUV座標。
 	struct Vertex
 	{
-		DirectX::XMFLOAT3 position{};
-		DirectX::XMFLOAT2 uv{};
+		DirectX::XMFLOAT3 position {};
+		DirectX::XMFLOAT2 uv {};
 	};
 
 	//========= 補助関数=========
@@ -50,31 +50,31 @@ private:
 
 	//========= Shader関連=========
 	// OBJ描画に使用するVertex Shader。
-	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_VertexShader{};
+	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_VertexShader {};
 	// OBJ描画に使用するPixel Shader。
-	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_PixelShader{};
+	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_PixelShader {};
 	// OBJ頂点形式とVertex Shader入力を対応付けるInput Layout。
-	Microsoft::WRL::ComPtr<ID3D11InputLayout> m_InputLayout{};
+	Microsoft::WRL::ComPtr<ID3D11InputLayout> m_InputLayout {};
 
 	//========= Buffer関連=========
 	// OBJ頂点情報を保持するVertex Buffer。
-	Microsoft::WRL::ComPtr<ID3D11Buffer> m_VertexBuffer{};
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_VertexBuffer {};
 	// OBJ三角形のIndex情報を保持するIndex Buffer。
-	Microsoft::WRL::ComPtr<ID3D11Buffer> m_IndexBuffer{};
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_IndexBuffer {};
 	// ViewProjection行列をShaderへ渡す定数バッファ。
-	ConstantBuffer<CameraConstants> m_CameraBuffer{};
+	ConstantBuffer<CameraConstants> m_CameraBuffer {};
 	// World行列と色をShaderへ渡す定数バッファ。
-	ConstantBuffer<ObjectConstants> m_ObjectBuffer{};
+	ConstantBuffer<ObjectConstants> m_ObjectBuffer {};
 	// UVタイリングとTexture使用有無をShaderへ渡す定数バッファ。
-	ConstantBuffer<MaterialConstants> m_MaterialBuffer{};
+	ConstantBuffer<MaterialConstants> m_MaterialBuffer {};
 
 	//========= Texture関連=========
 	// OBJに貼り付けるテクスチャ。
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_TextureView{};
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_TextureView {};
 	// テクスチャの拡大縮小とアドレス指定を行うSampler。
-	Microsoft::WRL::ComPtr<ID3D11SamplerState> m_TextureSampler{};
+	Microsoft::WRL::ComPtr<ID3D11SamplerState> m_TextureSampler {};
 
 	//========= 描画情報=========
 	// DrawIndexedに渡すIndex数。
-	unsigned int m_IndexCount{};
+	unsigned int m_IndexCount {};
 };

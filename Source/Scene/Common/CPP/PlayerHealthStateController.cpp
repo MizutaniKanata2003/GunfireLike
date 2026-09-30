@@ -14,7 +14,7 @@ void PlayerHealthStateController::Initialize( float currentHp, float maxHp, floa
 // 現在HPから低HP状態の変化と死亡状態を返す。
 PlayerHealthStateResult PlayerHealthStateController::Update( float currentHp, float maxHp, float lowHealthRatioThreshold )
 {
-	PlayerHealthStateResult result{};
+	PlayerHealthStateResult result {};
 
 	const float safeMaxHp = std::max( 0.0f, maxHp );
 

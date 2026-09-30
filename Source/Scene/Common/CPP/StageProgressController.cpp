@@ -3,7 +3,7 @@
 // Enemy撃破後のStage進行結果を返す。
 StageClearResult StageProgressController::EvaluateEnemyDefeat( bool isCurrentStageAlreadyCleared, int currentStage, int maxStageCount ) const
 {
-	StageClearResult result{};
+	StageClearResult result {};
 
 	if ( isCurrentStageAlreadyCleared ) { return result; }
 

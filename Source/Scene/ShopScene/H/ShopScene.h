@@ -60,15 +60,22 @@ private:
 		e_CHALLENGE_GATE,
 		e_TITLE_GATE
 	};
+	// 強化購入後にHUDへ表示する結果状態。
+	enum class PurchaseResult
+	{
+		e_NONE,
+		e_SUCCESS,
+		e_FAILURE
+	};
 
 	//========= 構造体=========
 	// Shopの強化Objectに対応する購入対象、配置、表示色を保持する。
 	struct ShopUpgradeData
 	{
-		InteractionTarget interactionTarget{ InteractionTarget::e_NONE };
-		UpgradeType upgradeType{ UpgradeType::e_MAX_HP };
-		DirectX::XMFLOAT3 position{};
-		DirectX::XMFLOAT4 color{};
+		InteractionTarget interactionTarget { InteractionTarget::e_NONE };
+		UpgradeType upgradeType { UpgradeType::e_MAX_HP };
+		DirectX::XMFLOAT3 position {};
+		DirectX::XMFLOAT4 color {};
 	};
 
 	//========= 初期化補助関数=========
@@ -123,37 +130,37 @@ private:
 
 	//========= Player・Camera=========
 	// Shop内を移動するデバッグ用Player。
-	DebugPlayer m_DebugPlayer{};
+	DebugPlayer m_DebugPlayer {};
 	// FPS視点を管理するCamera。
-	FpsCamera m_FpsCamera{};
+	FpsCamera m_FpsCamera {};
 
 	//========= Raycast判定=========
 	// Shop内の強化ObjectとGateへのRay判定を管理する。
-	CombatSystem m_CombatSystem{};
+	CombatSystem m_CombatSystem {};
 
 	//========= Shop Gate=========
 	// GameSceneへ遷移するChallenge Gate。
-	ShopGate m_ChallengeGate{};
+	ShopGate m_ChallengeGate {};
 	// TitleSceneへ遷移するTitle Gate。
-	ShopGate m_TitleGate{};
+	ShopGate m_TitleGate {};
 
 	//========= Renderer=========
 	// Shopの床、壁、強化Object、ゲートを描画する3D Renderer。
-	BasicMeshRenderer m_BasicMeshRenderer{};
+	BasicMeshRenderer m_BasicMeshRenderer {};
 	// 画面固定のQuadを描画するHUD Renderer。
-	HudRenderer m_HudRenderer{};
+	HudRenderer m_HudRenderer {};
 	// HUD文字列を描画するText Renderer。
-	HudTextRenderer m_HudTextRenderer{};
+	HudTextRenderer m_HudTextRenderer {};
 
 	//========= 操作・演出状態=========
 	// 強化Objectとゲートの回転・浮遊に使用する累計時間。
-	float m_AnimationTime{};
+	float m_AnimationTime {};
 	// 現在カメラ中央のRayが照準している操作対象。
-	InteractionTarget m_AimedTarget{ InteractionTarget::e_NONE };
+	InteractionTarget m_AimedTarget { InteractionTarget::e_NONE };
 
 	// 購入結果メッセージの表示状態。
-	bool m_ShowPurchaseSuccess{};
-	bool m_ShowPurchaseFailure{};
+	bool m_ShowPurchaseSuccess {};
+	bool m_ShowPurchaseFailure {};
 	// 購入結果メッセージを表示する残り時間。
-	float m_InteractionMessageTimer{};
+	float m_InteractionMessageTimer {};
 };

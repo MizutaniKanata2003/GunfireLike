@@ -39,8 +39,8 @@ void DebugPlayer::Update( float deltaTime, const InputSystem& input, const FpsCa
 	const DirectX::XMFLOAT3 right = camera.GetRight();
 
 	// 前後左右の入力から作成する水平方向の移動ベクトル。
-	float moveX{};
-	float moveZ{};
+	float moveX {};
+	float moveZ {};
 
 	if ( input.IsKeyPressed( 'W' ) )
 	{

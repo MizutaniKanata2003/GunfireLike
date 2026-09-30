@@ -37,9 +37,9 @@ public:
 private:
 	//========= メンバー変数=========
 	// 2D文字列描画の描画バッチ。
-	std::unique_ptr<DirectX::SpriteBatch> m_SpriteBatch{};
+	std::unique_ptr<DirectX::SpriteBatch> m_SpriteBatch {};
 	// SpriteFont形式のフォント情報。
-	std::unique_ptr<DirectX::SpriteFont> m_SpriteFont{};
+	std::unique_ptr<DirectX::SpriteFont> m_SpriteFont {};
 	// HUD文字列を描画するRender Targetサイズの取得に使用するGraphicsSystem。
-	GraphicsSystem* m_GraphicsSystem{};
+	GraphicsSystem* m_GraphicsSystem {};
 };
