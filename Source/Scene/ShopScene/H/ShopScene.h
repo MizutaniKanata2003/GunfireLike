@@ -18,6 +18,7 @@
 //========= Scene インクルード=========
 #include "Scene/Common/H/CombatSystem.h"
 #include "Scene/Common/H/IScene.h"
+#include "Scene/ShopScene/H/ShopGate.h"
 
 //========= 前方宣言=========
 class AudioSystem;
@@ -60,11 +61,15 @@ private:
 		e_TITLE_GATE
 	};
 
+	//========= 初期化補助関数=========
+	// Challenge GateとTitle GateのTransform、色、Raycast設定を初期化する。
+	void InitializeGates();
+
 	//========= 更新補助関数=========
 	// F1キーによるFPSマウスキャプチャ切替を処理する。
 	void UpdateMouseCapture();
 	// 強化ObjectとGateの回転・浮遊に使用する時間を更新する。
-	void UpdateAnimation( float deltaTime ) { m_AnimationTime += deltaTime; }
+	void UpdateAnimation( float deltaTime );
 	// 購入結果Messageの表示時間と表示状態を更新する。
 	void UpdateInteractionMessage( float deltaTime );
 	// FPS Camera、DebugPlayer、Camera追従位置を更新する。
@@ -115,6 +120,12 @@ private:
 	//========= Raycast判定=========
 	// Shop内の強化ObjectとGateへのRay判定を管理する。
 	CombatSystem m_CombatSystem{};
+
+	//========= Shop Gate=========
+	// GameSceneへ遷移するChallenge Gate。
+	ShopGate m_ChallengeGate{};
+	// TitleSceneへ遷移するTitle Gate。
+	ShopGate m_TitleGate{};
 
 	//========= Renderer=========
 	// Shopの床、壁、強化Object、ゲートを描画する3D Renderer。

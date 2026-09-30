@@ -81,11 +81,10 @@ namespace
 	constexpr float SHOP_SPECIAL_COOLDOWN_ORB_X = 4.5f;
 
 	//========= ゲート定数=========
-	// ゲートのScale、回転速度、Ray判定設定。
+	// GateのScaleとRay判定設定。
 	constexpr float SHOP_GATE_SCALE_X = 1.2f;
 	constexpr float SHOP_GATE_SCALE_Y = 1.4f;
 	constexpr float SHOP_GATE_SCALE_Z = 0.35f;
-	constexpr float SHOP_GATE_ROTATION_SPEED = 1.4f;
 	constexpr float SHOP_GATE_AIM_MAX_DISTANCE = 10.0f;
 	constexpr float SHOP_GATE_HIT_SPHERE_RADIUS = 1.5f;
 
@@ -125,6 +124,8 @@ void ShopScene::Initialize()
 	m_ShowPurchaseSuccess = {};
 	m_ShowPurchaseFailure = {};
 	m_InteractionMessageTimer = {};
+
+	InitializeGates();
 
 	// ShopではFPS視点操作を使用し、Shop用BGMを再生する。
 	m_InputSystem.SetMouseCaptureEnabled( true );
@@ -213,6 +214,17 @@ void ShopScene::Finalize()
 	m_BasicMeshRenderer.Uninit();
 }
 
+// Challenge GateとTitle GateのTransform、色、Raycast設定を初期化する。
+void ShopScene::InitializeGates()
+{
+	const DirectX::XMFLOAT3 gateScale{ SHOP_GATE_SCALE_X,SHOP_GATE_SCALE_Y,SHOP_GATE_SCALE_Z };
+
+	m_ChallengeGate.Initialize( ShopGate::GateType::e_CHALLENGE, DirectX::XMFLOAT3{ SHOP_CHALLENGE_GATE_X,SHOP_CHALLENGE_GATE_Y,SHOP_CHALLENGE_GATE_Z },
+								gateScale, DirectX::XMFLOAT4{ 0.10f,0.85f,1.0f,1.0f }, SHOP_GATE_HIT_SPHERE_RADIUS );
+	m_TitleGate.Initialize( ShopGate::GateType::e_TITLE, DirectX::XMFLOAT3{ SHOP_TITLE_GATE_X,SHOP_TITLE_GATE_Y,SHOP_TITLE_GATE_Z },
+							gateScale, DirectX::XMFLOAT4{ 0.85f,0.30f,1.0f,1.0f }, SHOP_GATE_HIT_SPHERE_RADIUS );
+}
+
 // F1キーによるFPSマウスキャプチャ切替を処理する。
 void ShopScene::UpdateMouseCapture()
 {
@@ -220,6 +232,15 @@ void ShopScene::UpdateMouseCapture()
 	{
 		m_InputSystem.SetMouseCaptureEnabled( !m_InputSystem.IsMouseCaptureEnabled() );
 	}
+}
+
+// 強化ObjectとGateの回転・浮遊に使用する時間を更新する。
+void ShopScene::UpdateAnimation( float deltaTime )
+{
+	m_AnimationTime += deltaTime;
+
+	m_ChallengeGate.Update( deltaTime );
+	m_TitleGate.Update( deltaTime );
 }
 
 // 購入結果Messageの表示時間と表示状態を更新する。
@@ -286,11 +307,8 @@ ShopScene::InteractionTarget ShopScene::GetAimedInteractionTarget() const
 		nearestTarget = target;
 	}
 
-	// チャレンジゲートへのRayとSphereの交差判定を行う。
-	const RaycastResult challengeGateRaycastResult =
-		m_CombatSystem.RaycastSphere( rayOrigin, rayDirection,
-									  DirectX::XMFLOAT3{ SHOP_CHALLENGE_GATE_X,SHOP_CHALLENGE_GATE_Y,SHOP_CHALLENGE_GATE_Z },
-									  SHOP_GATE_HIT_SPHERE_RADIUS, SHOP_GATE_AIM_MAX_DISTANCE );
+	// チャレンジゲートへのRaycast判定を行う。
+	const RaycastResult challengeGateRaycastResult = m_ChallengeGate.Raycast( m_CombatSystem, rayOrigin, rayDirection, SHOP_GATE_AIM_MAX_DISTANCE );
 
 	if ( challengeGateRaycastResult.isHit && challengeGateRaycastResult.hitDistance < nearestDistance )
 	{
@@ -298,11 +316,8 @@ ShopScene::InteractionTarget ShopScene::GetAimedInteractionTarget() const
 		nearestTarget = InteractionTarget::e_CHALLENGE_GATE;
 	}
 
-	// タイトルゲートへのRayとSphereの交差判定を行う。
-	const RaycastResult titleGateRaycastResult =
-		m_CombatSystem.RaycastSphere( rayOrigin, rayDirection,
-									  DirectX::XMFLOAT3{ SHOP_TITLE_GATE_X,SHOP_TITLE_GATE_Y,SHOP_TITLE_GATE_Z },
-									  SHOP_GATE_HIT_SPHERE_RADIUS, SHOP_GATE_AIM_MAX_DISTANCE );
+	// タイトルゲートへのRaycast判定を行う。
+	const RaycastResult titleGateRaycastResult = m_TitleGate.Raycast( m_CombatSystem, rayOrigin, rayDirection, SHOP_GATE_AIM_MAX_DISTANCE );
 
 	if ( titleGateRaycastResult.isHit && titleGateRaycastResult.hitDistance < nearestDistance )
 	{
@@ -532,27 +547,11 @@ void ShopScene::DrawUpgradeObjects( const DirectX::XMMATRIX& viewMatrix, const D
 // Challenge GateとTitle GateをOpaque Passで描画する。
 void ShopScene::DrawGates( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix )
 {
-	const float gateRotation = m_AnimationTime * SHOP_GATE_ROTATION_SPEED;
 	const bool isChallengeGateAimed = m_AimedTarget == InteractionTarget::e_CHALLENGE_GATE;
 	const bool isTitleGateAimed = m_AimedTarget == InteractionTarget::e_TITLE_GATE;
-	const float challengeGateScale = isChallengeGateAimed ? 1.10f : 1.0f;
-	const float titleGateScale = isTitleGateAimed ? 1.10f : 1.0f;
 
-	const DirectX::XMMATRIX challengeGateWorldMatrix =
-		DirectX::XMMatrixScaling( SHOP_GATE_SCALE_X * challengeGateScale, SHOP_GATE_SCALE_Y * challengeGateScale, SHOP_GATE_SCALE_Z * challengeGateScale ) *
-		DirectX::XMMatrixRotationY( gateRotation ) *
-		DirectX::XMMatrixTranslation( SHOP_CHALLENGE_GATE_X, SHOP_CHALLENGE_GATE_Y, SHOP_CHALLENGE_GATE_Z );
-
-	const DirectX::XMMATRIX titleGateWorldMatrix =
-		DirectX::XMMatrixScaling( SHOP_GATE_SCALE_X * titleGateScale, SHOP_GATE_SCALE_Y * titleGateScale, SHOP_GATE_SCALE_Z * titleGateScale ) *
-		DirectX::XMMatrixRotationY( gateRotation ) *
-		DirectX::XMMatrixTranslation( SHOP_TITLE_GATE_X, SHOP_TITLE_GATE_Y, SHOP_TITLE_GATE_Z );
-
-	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, challengeGateWorldMatrix, viewMatrix, projectionMatrix,
-								  DirectX::XMFLOAT4{ 0.10f,0.85f,1.0f,1.0f }, DirectX::XMFLOAT2{ 1.0f,1.0f }, BasicMeshRenderer::TextureType::Color );
-
-	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, titleGateWorldMatrix, viewMatrix, projectionMatrix,
-								  DirectX::XMFLOAT4{ 0.85f,0.30f,1.0f,1.0f }, DirectX::XMFLOAT2{ 1.0f,1.0f }, BasicMeshRenderer::TextureType::Color );
+	m_ChallengeGate.Draw( m_BasicMeshRenderer, m_GraphicsSystem, viewMatrix, projectionMatrix, isChallengeGateAimed );
+	m_TitleGate.Draw( m_BasicMeshRenderer, m_GraphicsSystem, viewMatrix, projectionMatrix, isTitleGateAimed );
 }
 
 // Shop HUD、照準、所持金、操作案内、購入結果MessageをScreen UI Passで描画する。

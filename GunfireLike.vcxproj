@@ -220,6 +220,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Scene\Common\CPP\StageProgressController.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\Transform.cpp" />
     <ClCompile Include="Source\Scene\ResultScene\CPP\ResultScene.cpp" />
+    <ClCompile Include="Source\Scene\ShopScene\CPP\ShopGate.cpp" />
     <ClCompile Include="Source\Scene\ShopScene\CPP\ShopScene.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\GraphicsSystem.cpp" />
     <ClCompile Include="Source\main.cpp" />
@@ -275,6 +276,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\Common\H\StageProgressController.h" />
     <ClInclude Include="Source\Scene\Common\H\Transform.h" />
     <ClInclude Include="Source\Scene\ResultScene\H\ResultScene.h" />
+    <ClInclude Include="Source\Scene\ShopScene\H\ShopGate.h" />
     <ClInclude Include="Source\Scene\ShopScene\H\ShopScene.h" />
     <ClInclude Include="Source\Scene\Common\H\StageData.h" />
     <ClInclude Include="Source\Framework\DirectX\H\GraphicsSystem.h" />
