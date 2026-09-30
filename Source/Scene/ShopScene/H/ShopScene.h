@@ -20,9 +20,11 @@
 
 //========= 前方宣言=========
 class AudioSystem;
+class GameProgress;
 class GraphicsSystem;
 class InputSystem;
 class SceneManager;
+struct PlayerStats;
 
 // Shopの3D空間、強化、ゲート、HUD、Scene遷移を管理する。
 class ShopScene final : public IScene
@@ -80,6 +82,18 @@ private:
 	[[nodiscard]] DirectX::XMFLOAT3 GetUpgradeObjectPosition( InteractionTarget target ) const;
 	// 指定した強化Objectの表示色を返す。
 	[[nodiscard]] DirectX::XMFLOAT4 GetUpgradeObjectColor( InteractionTarget target ) const;
+
+	//========= 描画補助関数=========
+	// Camera位置に追従する単色SkyboxをSky Passで描画する。
+	void DrawSky( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT3& cameraPosition );
+	// Floorと4面のWallをOpaque Passで描画する。
+	void DrawOpaqueField( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix );
+	// 強化Objectを浮遊・回転・照準状態に応じてOpaque Passで描画する。
+	void DrawUpgradeObjects( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix );
+	// Challenge GateとTitle GateをOpaque Passで描画する。
+	void DrawGates( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix );
+	// Shop HUD、照準、所持金、操作案内、購入結果MessageをScreen UI Passで描画する。
+	void DrawHud( GameProgress& progress, const PlayerStats& playerStats );
 
 	//========= Framework・Scene参照=========
 	// Scene遷移とゲーム進捗操作に使用するSceneManager。

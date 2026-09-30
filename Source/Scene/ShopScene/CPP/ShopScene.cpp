@@ -177,227 +177,32 @@ void ShopScene::Update( float deltaTime )
 	UpdateAimedInteractionTarget();
 	UpdateInteraction();
 }
+
 // Shopの3D空間、強化Object、ゲート、HUDを描画する。
 void ShopScene::Draw()
 {
-	// SceneManagerが所有するゲーム進捗と現在のPlayer能力を取得する。
-	GameProgress& progress = m_SceneManager.GetGameProgress();
-	const PlayerStats& playerStats = progress.GetPlayerStats();
-
 	// 3D描画に使用する現在のRender Targetサイズを取得する。
 	const unsigned int renderWidth = m_GraphicsSystem.GetRenderWidth();
 	const unsigned int renderHeight = m_GraphicsSystem.GetRenderHeight();
 
 	if ( renderWidth == 0 || renderHeight == 0 ) return;
 
-	// 現在のRender Target比率に合わせたCamera行列とSkybox追従用Camera座標を取得する。
+	// 現在のRender Target比率に合わせたProjection、View、Camera座標を取得する。
 	const float projectionAspectRatio = static_cast<float>( renderWidth ) / static_cast<float>( renderHeight );
-
 	const DirectX::XMMATRIX projectionMatrix = DirectX::XMMatrixPerspectiveFovLH( DirectX::XMConvertToRadians( SHOP_FIELD_FOV_DEGREES ),
 																				  projectionAspectRatio, SHOP_NEAR_CLIP, SHOP_FAR_CLIP );
+
 	const DirectX::XMMATRIX viewMatrix = m_FpsCamera.GetViewMatrix();
 	const DirectX::XMFLOAT3 cameraPosition = m_FpsCamera.GetPosition();
+	// HUD表示に使用するゲーム進捗とPlayer能力を取得する。
+	GameProgress& progress = m_SceneManager.GetGameProgress();
+	const PlayerStats& playerStats = progress.GetPlayerStats();
 
-	// Camera位置に追従する単色Skyboxを描画する。
-	const DirectX::XMMATRIX skyboxWorldMatrix = DirectX::XMMatrixScaling( SHOP_SKYBOX_SCALE, SHOP_SKYBOX_SCALE, SHOP_SKYBOX_SCALE ) *
-		DirectX::XMMatrixTranslation( cameraPosition.x, cameraPosition.y, cameraPosition.z );
-
-	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_SKY );
-	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, skyboxWorldMatrix, viewMatrix, projectionMatrix,
-								  DirectX::XMFLOAT4{ SHOP_SKY_COLOR_RED,SHOP_SKY_COLOR_GREEN,SHOP_SKY_COLOR_BLUE,SHOP_SKY_COLOR_ALPHA },
-								  DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
-	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_OPAQUE );
-
-	// 床のWorld行列を作成してFloor Textureで描画する。
-	const DirectX::XMMATRIX floorWorldMatrix = DirectX::XMMatrixScaling( SHOP_FLOOR_SCALE_X, SHOP_FLOOR_SCALE_Y, SHOP_FLOOR_SCALE_Z ) *
-		DirectX::XMMatrixTranslation( SHOP_FLOOR_POSITION_X, SHOP_FLOOR_POSITION_Y, SHOP_FLOOR_POSITION_Z );
-
-	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, floorWorldMatrix, viewMatrix, projectionMatrix,
-								  DirectX::XMFLOAT4{ 1.0f, 1.0f, 1.0f, 1.0f }, DirectX::XMFLOAT2{ 10.0f, 10.0f }, BasicMeshRenderer::TextureType::Floor );
-
-	// 壁の色と4面のWorld行列を作成する。
-	const DirectX::XMFLOAT4 wallColor{ 0.25f, 0.30f, 0.38f, 1.0f };
-
-	const DirectX::XMMATRIX leftWallWorldMatrix = DirectX::XMMatrixScaling( SHOP_WALL_THICKNESS, SHOP_WALL_HEIGHT, SHOP_WALL_LENGTH ) *
-		DirectX::XMMatrixTranslation( SHOP_LEFT_WALL_X, SHOP_WALL_CENTER_Y, SHOP_WALL_CENTER_Z );
-	const DirectX::XMMATRIX rightWallWorldMatrix = DirectX::XMMatrixScaling( SHOP_WALL_THICKNESS, SHOP_WALL_HEIGHT, SHOP_WALL_LENGTH ) *
-		DirectX::XMMatrixTranslation( SHOP_RIGHT_WALL_X, SHOP_WALL_CENTER_Y, SHOP_WALL_CENTER_Z );
-	const DirectX::XMMATRIX nearWallWorldMatrix = DirectX::XMMatrixScaling( SHOP_WALL_LENGTH, SHOP_WALL_HEIGHT, SHOP_WALL_THICKNESS ) *
-		DirectX::XMMatrixTranslation( SHOP_WALL_CENTER_X, SHOP_WALL_CENTER_Y, SHOP_NEAR_WALL_Z );
-	const DirectX::XMMATRIX farWallWorldMatrix = DirectX::XMMatrixScaling( SHOP_WALL_LENGTH, SHOP_WALL_HEIGHT, SHOP_WALL_THICKNESS ) *
-		DirectX::XMMatrixTranslation( SHOP_WALL_CENTER_X, SHOP_WALL_CENTER_Y, SHOP_FAR_WALL_Z );
-
-	// 4面の壁をWall Textureで描画する。
-	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, leftWallWorldMatrix, viewMatrix, projectionMatrix, wallColor,
-								  DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Wall );
-
-	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, rightWallWorldMatrix, viewMatrix, projectionMatrix, wallColor,
-								  DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Wall );
-
-	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, nearWallWorldMatrix, viewMatrix, projectionMatrix, wallColor,
-								  DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Wall );
-
-	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, farWallWorldMatrix, viewMatrix, projectionMatrix, wallColor,
-								  DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Wall );
-
-	// 強化Objectとして描画する対象を定義する。
-	constexpr std::array<InteractionTarget, 4> upgradeTargets
-	{
-		InteractionTarget::e_MAX_HP_UPGRADE,
-		InteractionTarget::e_GUN_DAMAGE_UPGRADE,
-		InteractionTarget::e_SPECIAL_UNLOCK_UPGRADE,
-		InteractionTarget::e_SPECIAL_COOLDOWN_UPGRADE
-	};
-
-	// 各強化Objectを浮遊・回転させ、照準中は少し大きく明るく描画する。
-	for ( const InteractionTarget target : upgradeTargets )
-	{
-		const DirectX::XMFLOAT3 basePosition = GetUpgradeObjectPosition( target );
-		const float floatingOffset = std::sinf( m_AnimationTime * SHOP_UPGRADE_ORB_FLOAT_SPEED + basePosition.x ) * SHOP_UPGRADE_ORB_FLOAT_HEIGHT;
-		const bool isAimed = target == m_AimedTarget;
-		const float scale = isAimed ? SHOP_UPGRADE_ORB_SCALE * 1.20f : SHOP_UPGRADE_ORB_SCALE;
-
-		DirectX::XMFLOAT4 color = GetUpgradeObjectColor( target );
-
-		if ( isAimed )
-		{
-			color.x = std::min( 1.0f, color.x + 0.25f );
-			color.y = std::min( 1.0f, color.y + 0.25f );
-			color.z = std::min( 1.0f, color.z + 0.25f );
-		}
-
-		// 現段階はテクスチャなしの単色Cubeを使用する。
-		// Sphereメッシュ追加後、このDrawCubeをDrawSphereへ置き換える。
-		const DirectX::XMMATRIX upgradeWorldMatrix = DirectX::XMMatrixScaling( scale, scale, scale ) *
-			DirectX::XMMatrixRotationY( m_AnimationTime * SHOP_UPGRADE_ORB_ROTATION_SPEED ) *
-			DirectX::XMMatrixRotationX( m_AnimationTime * 0.7f ) *
-			DirectX::XMMatrixTranslation( basePosition.x, basePosition.y + floatingOffset, basePosition.z );
-
-		m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, upgradeWorldMatrix, viewMatrix, projectionMatrix, color,
-									  DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
-	}
-
-	// 2つのゲートの回転角、照準状態、拡大率を計算する。
-	const float gateRotation = m_AnimationTime * SHOP_GATE_ROTATION_SPEED;
-	const bool isChallengeGateAimed = m_AimedTarget == InteractionTarget::e_CHALLENGE_GATE;
-	const bool isTitleGateAimed = m_AimedTarget == InteractionTarget::e_TITLE_GATE;
-	const float challengeGateScale = isChallengeGateAimed ? 1.10f : 1.0f;
-	const float titleGateScale = isTitleGateAimed ? 1.10f : 1.0f;
-
-	// チャレンジゲートとタイトルゲートのWorld行列を作成する。
-	const DirectX::XMMATRIX challengeGateWorldMatrix =
-		DirectX::XMMatrixScaling( SHOP_GATE_SCALE_X * challengeGateScale, SHOP_GATE_SCALE_Y * challengeGateScale, SHOP_GATE_SCALE_Z * challengeGateScale ) *
-		DirectX::XMMatrixRotationY( gateRotation ) *
-		DirectX::XMMatrixTranslation( SHOP_CHALLENGE_GATE_X, SHOP_CHALLENGE_GATE_Y, SHOP_CHALLENGE_GATE_Z );
-
-	const DirectX::XMMATRIX titleGateWorldMatrix =
-		DirectX::XMMatrixScaling( SHOP_GATE_SCALE_X * titleGateScale, SHOP_GATE_SCALE_Y * titleGateScale, SHOP_GATE_SCALE_Z * titleGateScale ) *
-		DirectX::XMMatrixRotationY( gateRotation ) *
-		DirectX::XMMatrixTranslation( SHOP_TITLE_GATE_X, SHOP_TITLE_GATE_Y, SHOP_TITLE_GATE_Z );
-
-	// Challenge用とTitle用の単色ゲートを描画する。
-	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, challengeGateWorldMatrix, viewMatrix, projectionMatrix,
-								  DirectX::XMFLOAT4{ 0.10f, 0.85f, 1.0f, 1.0f }, DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
-
-	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, titleGateWorldMatrix, viewMatrix, projectionMatrix,
-								  DirectX::XMFLOAT4{ 0.85f, 0.30f, 1.0f, 1.0f }, DirectX::XMFLOAT2{ 1.0f, 1.0f }, BasicMeshRenderer::TextureType::Color );
-
-	// HUDを画面固定で描画するためDepth Testを無効化する。
-	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_SCREEN_UI );
-	m_HudRenderer.DrawCrosshair( m_GraphicsSystem );
-	m_HudTextRenderer.Begin();
-
-	// 所持金とPlayer能力を画面左上へ表示する。
-	wchar_t statusText[ 128 ]{};
-	swprintf_s( statusText, L"所持金: %d G   最大HP: %.0f   攻撃力: %.0f", progress.GetCurrency(), playerStats.maxHp, playerStats.gunDamage );
-
-	m_HudTextRenderer.DrawText( statusText, DirectX::XMFLOAT2{ SHOP_HUD_STATUS_X, SHOP_HUD_STATUS_Y }, DirectX::Colors::Gold, SHOP_HUD_TEXT_SCALE );
-
-	// 照準中の強化Objectまたはゲートに応じた操作説明を表示する。
-	if ( m_AimedTarget == InteractionTarget::e_MAX_HP_UPGRADE )
-	{
-		const int cost = progress.GetUpgradeCost( UpgradeType::e_MAX_HP );
-		wchar_t hintText[ 128 ]{};
-
-		swprintf_s( hintText, L"E: 最大HPを25上げる  （%d G）", cost );
-
-		m_HudTextRenderer.DrawText( hintText, DirectX::XMFLOAT2{ SHOP_HUD_HINT_X, SHOP_HUD_HINT_Y }, DirectX::Colors::Lime, SHOP_HUD_TEXT_SCALE );
-	}
-	else if ( m_AimedTarget == InteractionTarget::e_GUN_DAMAGE_UPGRADE )
-	{
-		const int cost = progress.GetUpgradeCost( UpgradeType::e_GUN_DAMAGE );
-		wchar_t hintText[ 128 ]{};
-
-		swprintf_s( hintText, L"E: 攻撃力を5上げる  （%d G）", cost );
-
-		m_HudTextRenderer.DrawText( hintText, DirectX::XMFLOAT2{ SHOP_HUD_HINT_X, SHOP_HUD_HINT_Y }, DirectX::Colors::Orange, SHOP_HUD_TEXT_SCALE );
-	}
-	else if ( m_AimedTarget == InteractionTarget::e_SPECIAL_UNLOCK_UPGRADE )
-	{
-		if ( playerStats.isSpecialAttackUnlocked )
-		{
-			m_HudTextRenderer.DrawText( L"特殊攻撃は解放済みです", DirectX::XMFLOAT2{ SHOP_HUD_HINT_X, SHOP_HUD_HINT_Y },
-										DirectX::Colors::Violet, SHOP_HUD_TEXT_SCALE );
-		}
-		else
-		{
-			const int cost = progress.GetUpgradeCost( UpgradeType::e_UNLOCK_SPECIAL_ATTACK );
-			wchar_t hintText[ 128 ]{};
-
-			swprintf_s( hintText, L"E: 特殊攻撃を解放する  （%d G）", cost );
-
-			m_HudTextRenderer.DrawText( hintText, DirectX::XMFLOAT2{ SHOP_HUD_HINT_X, SHOP_HUD_HINT_Y }, DirectX::Colors::Violet, SHOP_HUD_TEXT_SCALE );
-		}
-	}
-	else if ( m_AimedTarget == InteractionTarget::e_SPECIAL_COOLDOWN_UPGRADE )
-	{
-		if ( !playerStats.isSpecialAttackUnlocked )
-		{
-			m_HudTextRenderer.DrawText( L"先に特殊攻撃を解放してください", DirectX::XMFLOAT2{ SHOP_HUD_HINT_X, SHOP_HUD_HINT_Y },
-										DirectX::Colors::Yellow, SHOP_HUD_TEXT_SCALE );
-		}
-		else
-		{
-			const int cost = progress.GetUpgradeCost( UpgradeType::e_SPECIAL_ATTACK_COOLDOWN );
-			wchar_t hintText[ 128 ]{};
-
-			swprintf_s( hintText, L"E: 特殊攻撃の待機時間を1秒短縮  （%d G）", cost );
-
-			m_HudTextRenderer.DrawText( hintText, DirectX::XMFLOAT2{ SHOP_HUD_HINT_X, SHOP_HUD_HINT_Y }, DirectX::Colors::Cyan, SHOP_HUD_TEXT_SCALE );
-		}
-	}
-	else if ( m_AimedTarget == InteractionTarget::e_CHALLENGE_GATE )
-	{
-		m_HudTextRenderer.DrawText( L"E: 現在のステージに挑戦", DirectX::XMFLOAT2{ SHOP_HUD_HINT_X, SHOP_HUD_HINT_Y },
-									DirectX::Colors::Cyan, SHOP_HUD_TEXT_SCALE );
-	}
-	else if ( m_AimedTarget == InteractionTarget::e_TITLE_GATE )
-	{
-		m_HudTextRenderer.DrawText( L"E: タイトルへ戻る", DirectX::XMFLOAT2{ SHOP_HUD_HINT_X, SHOP_HUD_HINT_Y }, DirectX::Colors::Violet, SHOP_HUD_TEXT_SCALE );
-	}
-	else
-	{
-		m_HudTextRenderer.DrawText( L"強化オブジェクトまたはゲートに照準を合わせてEキー", DirectX::XMFLOAT2{ 255.0f, SHOP_HUD_HINT_Y },
-									DirectX::Colors::White, 0.68f );
-	}
-
-	// 強化購入後の成功または失敗メッセージを画面上部へ表示する。
-	if ( m_ShowPurchaseSuccess )
-	{
-		m_HudTextRenderer.DrawText( L"強化に成功しました！", DirectX::XMFLOAT2{ 525.0f, 120.0f }, DirectX::Colors::Lime, 1.0f );
-	}
-	else if ( m_ShowPurchaseFailure )
-	{
-		m_HudTextRenderer.DrawText( L"ゴールド不足、または強化できません", DirectX::XMFLOAT2{ 400.0f, 120.0f }, DirectX::Colors::Red, 0.85f );
-	}
-
-	// Shop内の基本操作を画面下部へ表示する。
-	m_HudTextRenderer.DrawText( L"WASD: 移動   マウス: 視点移動   E: 調べる   F1: マウス固定切替", DirectX::XMFLOAT2{ 210.0f, 680.0f },
-								DirectX::Colors::White, 0.60f );
-	m_HudTextRenderer.End();
-
-	// 次の3D描画へ影響を残さないようDepth TestとAlpha Blendを戻す。
-	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_OPAQUE );
+	DrawSky( viewMatrix, projectionMatrix, cameraPosition );
+	DrawOpaqueField( viewMatrix, projectionMatrix );
+	DrawUpgradeObjects( viewMatrix, projectionMatrix );
+	DrawGates( viewMatrix, projectionMatrix );
+	DrawHud( progress, playerStats );
 }
 
 // Shopで使用した描画リソースを終了する。
@@ -637,4 +442,223 @@ DirectX::XMFLOAT4 ShopScene::GetUpgradeObjectColor( InteractionTarget target ) c
 		default:
 		return DirectX::XMFLOAT4{ 1.0f, 1.0f, 1.0f, 1.0f };
 	}
+}
+
+// Camera位置に追従する単色SkyboxをSky Passで描画する。
+void ShopScene::DrawSky( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix, const DirectX::XMFLOAT3& cameraPosition )
+{
+	const DirectX::XMMATRIX skyboxWorldMatrix =
+		DirectX::XMMatrixScaling( SHOP_SKYBOX_SCALE, SHOP_SKYBOX_SCALE, SHOP_SKYBOX_SCALE ) *
+		DirectX::XMMatrixTranslation( cameraPosition.x, cameraPosition.y, cameraPosition.z );
+
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_SKY );
+
+	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, skyboxWorldMatrix, viewMatrix, projectionMatrix,
+								  DirectX::XMFLOAT4{ SHOP_SKY_COLOR_RED,SHOP_SKY_COLOR_GREEN,SHOP_SKY_COLOR_BLUE,SHOP_SKY_COLOR_ALPHA },
+								  DirectX::XMFLOAT2{ 1.0f,1.0f }, BasicMeshRenderer::TextureType::Color );
+
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_OPAQUE );
+}
+
+// Floorと4面のWallをOpaque Passで描画する。
+void ShopScene::DrawOpaqueField( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix )
+{
+	const DirectX::XMMATRIX floorWorldMatrix =
+		DirectX::XMMatrixScaling( SHOP_FLOOR_SCALE_X, SHOP_FLOOR_SCALE_Y, SHOP_FLOOR_SCALE_Z ) *
+		DirectX::XMMatrixTranslation( SHOP_FLOOR_POSITION_X, SHOP_FLOOR_POSITION_Y, SHOP_FLOOR_POSITION_Z );
+
+	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, floorWorldMatrix, viewMatrix, projectionMatrix,
+								  DirectX::XMFLOAT4{ 1.0f,1.0f,1.0f,1.0f }, DirectX::XMFLOAT2{ 10.0f,10.0f },
+								  BasicMeshRenderer::TextureType::Floor );
+
+	const DirectX::XMFLOAT4 wallColor{ 0.25f,0.30f,0.38f,1.0f };
+
+	const DirectX::XMMATRIX leftWallWorldMatrix =
+		DirectX::XMMatrixScaling( SHOP_WALL_THICKNESS, SHOP_WALL_HEIGHT, SHOP_WALL_LENGTH ) *
+		DirectX::XMMatrixTranslation( SHOP_LEFT_WALL_X, SHOP_WALL_CENTER_Y, SHOP_WALL_CENTER_Z );
+
+	const DirectX::XMMATRIX rightWallWorldMatrix =
+		DirectX::XMMatrixScaling( SHOP_WALL_THICKNESS, SHOP_WALL_HEIGHT, SHOP_WALL_LENGTH ) *
+		DirectX::XMMatrixTranslation( SHOP_RIGHT_WALL_X, SHOP_WALL_CENTER_Y, SHOP_WALL_CENTER_Z );
+
+	const DirectX::XMMATRIX nearWallWorldMatrix =
+		DirectX::XMMatrixScaling( SHOP_WALL_LENGTH, SHOP_WALL_HEIGHT, SHOP_WALL_THICKNESS ) *
+		DirectX::XMMatrixTranslation( SHOP_WALL_CENTER_X, SHOP_WALL_CENTER_Y, SHOP_NEAR_WALL_Z );
+
+	const DirectX::XMMATRIX farWallWorldMatrix =
+		DirectX::XMMatrixScaling( SHOP_WALL_LENGTH, SHOP_WALL_HEIGHT, SHOP_WALL_THICKNESS ) *
+		DirectX::XMMatrixTranslation( SHOP_WALL_CENTER_X, SHOP_WALL_CENTER_Y, SHOP_FAR_WALL_Z );
+
+	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, leftWallWorldMatrix, viewMatrix, projectionMatrix, wallColor,
+								  DirectX::XMFLOAT2{ 1.0f,1.0f }, BasicMeshRenderer::TextureType::Wall );
+
+	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, rightWallWorldMatrix, viewMatrix, projectionMatrix, wallColor,
+								  DirectX::XMFLOAT2{ 1.0f,1.0f }, BasicMeshRenderer::TextureType::Wall );
+
+	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, nearWallWorldMatrix, viewMatrix, projectionMatrix, wallColor,
+								  DirectX::XMFLOAT2{ 1.0f,1.0f }, BasicMeshRenderer::TextureType::Wall );
+
+	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, farWallWorldMatrix, viewMatrix, projectionMatrix, wallColor,
+								  DirectX::XMFLOAT2{ 1.0f,1.0f }, BasicMeshRenderer::TextureType::Wall );
+}
+
+// 強化Objectを浮遊・回転・照準状態に応じてOpaque Passで描画する。
+void ShopScene::DrawUpgradeObjects( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix )
+{
+	constexpr std::array<InteractionTarget, 4> upgradeTargets
+	{
+	InteractionTarget::e_MAX_HP_UPGRADE,
+	InteractionTarget::e_GUN_DAMAGE_UPGRADE,
+	InteractionTarget::e_SPECIAL_UNLOCK_UPGRADE,
+	InteractionTarget::e_SPECIAL_COOLDOWN_UPGRADE
+	};
+
+	for ( const InteractionTarget target : upgradeTargets )
+	{
+		const DirectX::XMFLOAT3 basePosition = GetUpgradeObjectPosition( target );
+		const float floatingOffset = std::sinf( m_AnimationTime * SHOP_UPGRADE_ORB_FLOAT_SPEED + basePosition.x ) * SHOP_UPGRADE_ORB_FLOAT_HEIGHT;
+		const bool isAimed = target == m_AimedTarget;
+		const float scale = isAimed ? SHOP_UPGRADE_ORB_SCALE * 1.20f : SHOP_UPGRADE_ORB_SCALE;
+
+		DirectX::XMFLOAT4 color = GetUpgradeObjectColor( target );
+
+		if ( isAimed )
+		{
+			color.x = std::min( 1.0f, color.x + 0.25f );
+			color.y = std::min( 1.0f, color.y + 0.25f );
+			color.z = std::min( 1.0f, color.z + 0.25f );
+		}
+
+		// 現段階はテクスチャなしの単色Cubeを使用する。
+		// Sphereメッシュ追加後、このDrawCubeをDrawSphereへ置き換える。
+		const DirectX::XMMATRIX upgradeWorldMatrix =
+			DirectX::XMMatrixScaling( scale, scale, scale ) *
+			DirectX::XMMatrixRotationY( m_AnimationTime * SHOP_UPGRADE_ORB_ROTATION_SPEED ) *
+			DirectX::XMMatrixRotationX( m_AnimationTime * 0.7f ) *
+			DirectX::XMMatrixTranslation( basePosition.x, basePosition.y + floatingOffset, basePosition.z );
+
+		m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, upgradeWorldMatrix, viewMatrix, projectionMatrix, color,
+									  DirectX::XMFLOAT2{ 1.0f,1.0f }, BasicMeshRenderer::TextureType::Color );
+	}
+}
+
+// Challenge GateとTitle GateをOpaque Passで描画する。
+void ShopScene::DrawGates( const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix )
+{
+	const float gateRotation = m_AnimationTime * SHOP_GATE_ROTATION_SPEED;
+	const bool isChallengeGateAimed = m_AimedTarget == InteractionTarget::e_CHALLENGE_GATE;
+	const bool isTitleGateAimed = m_AimedTarget == InteractionTarget::e_TITLE_GATE;
+	const float challengeGateScale = isChallengeGateAimed ? 1.10f : 1.0f;
+	const float titleGateScale = isTitleGateAimed ? 1.10f : 1.0f;
+
+	const DirectX::XMMATRIX challengeGateWorldMatrix =
+		DirectX::XMMatrixScaling( SHOP_GATE_SCALE_X * challengeGateScale, SHOP_GATE_SCALE_Y * challengeGateScale, SHOP_GATE_SCALE_Z * challengeGateScale ) *
+		DirectX::XMMatrixRotationY( gateRotation ) *
+		DirectX::XMMatrixTranslation( SHOP_CHALLENGE_GATE_X, SHOP_CHALLENGE_GATE_Y, SHOP_CHALLENGE_GATE_Z );
+
+	const DirectX::XMMATRIX titleGateWorldMatrix =
+		DirectX::XMMatrixScaling( SHOP_GATE_SCALE_X * titleGateScale, SHOP_GATE_SCALE_Y * titleGateScale, SHOP_GATE_SCALE_Z * titleGateScale ) *
+		DirectX::XMMatrixRotationY( gateRotation ) *
+		DirectX::XMMatrixTranslation( SHOP_TITLE_GATE_X, SHOP_TITLE_GATE_Y, SHOP_TITLE_GATE_Z );
+
+	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, challengeGateWorldMatrix, viewMatrix, projectionMatrix,
+								  DirectX::XMFLOAT4{ 0.10f,0.85f,1.0f,1.0f }, DirectX::XMFLOAT2{ 1.0f,1.0f }, BasicMeshRenderer::TextureType::Color );
+
+	m_BasicMeshRenderer.DrawCube( m_GraphicsSystem, titleGateWorldMatrix, viewMatrix, projectionMatrix,
+								  DirectX::XMFLOAT4{ 0.85f,0.30f,1.0f,1.0f }, DirectX::XMFLOAT2{ 1.0f,1.0f }, BasicMeshRenderer::TextureType::Color );
+}
+
+// Shop HUD、照準、所持金、操作案内、購入結果MessageをScreen UI Passで描画する。
+void ShopScene::DrawHud( GameProgress& progress, const PlayerStats& playerStats )
+{
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_SCREEN_UI );
+	m_HudRenderer.DrawCrosshair( m_GraphicsSystem );
+	m_HudTextRenderer.Begin();
+
+	wchar_t statusText[ 128 ]{};
+
+	swprintf_s( statusText, L"所持金: %d G   最大HP: %.0f   攻撃力: %.0f", progress.GetCurrency(), playerStats.maxHp, playerStats.gunDamage );
+
+	m_HudTextRenderer.DrawText( statusText, DirectX::XMFLOAT2{ SHOP_HUD_STATUS_X,SHOP_HUD_STATUS_Y }, DirectX::Colors::Gold, SHOP_HUD_TEXT_SCALE );
+
+	if ( m_AimedTarget == InteractionTarget::e_MAX_HP_UPGRADE )
+	{
+		const int cost = progress.GetUpgradeCost( UpgradeType::e_MAX_HP );
+
+		wchar_t hintText[ 128 ]{};
+
+		swprintf_s( hintText, L"E: 最大HPを25上げる  （%d G）", cost );
+
+		m_HudTextRenderer.DrawText( hintText, DirectX::XMFLOAT2{ SHOP_HUD_HINT_X,SHOP_HUD_HINT_Y }, DirectX::Colors::Lime, SHOP_HUD_TEXT_SCALE );
+	}
+	else if ( m_AimedTarget == InteractionTarget::e_GUN_DAMAGE_UPGRADE )
+	{
+		const int cost = progress.GetUpgradeCost( UpgradeType::e_GUN_DAMAGE );
+
+		wchar_t hintText[ 128 ]{};
+
+		swprintf_s( hintText, L"E: 攻撃力を5上げる  （%d G）", cost );
+
+		m_HudTextRenderer.DrawText( hintText, DirectX::XMFLOAT2{ SHOP_HUD_HINT_X,SHOP_HUD_HINT_Y }, DirectX::Colors::Orange, SHOP_HUD_TEXT_SCALE );
+	}
+	else if ( m_AimedTarget == InteractionTarget::e_SPECIAL_UNLOCK_UPGRADE )
+	{
+		if ( playerStats.isSpecialAttackUnlocked )
+		{
+			m_HudTextRenderer.DrawText( L"特殊攻撃は解放済みです", DirectX::XMFLOAT2{ SHOP_HUD_HINT_X,SHOP_HUD_HINT_Y }, DirectX::Colors::Violet, SHOP_HUD_TEXT_SCALE );
+		}
+		else
+		{
+			const int cost = progress.GetUpgradeCost( UpgradeType::e_UNLOCK_SPECIAL_ATTACK );
+
+			wchar_t hintText[ 128 ]{};
+
+			swprintf_s( hintText, L"E: 特殊攻撃を解放する  （%d G）", cost );
+
+			m_HudTextRenderer.DrawText( hintText, DirectX::XMFLOAT2{ SHOP_HUD_HINT_X,SHOP_HUD_HINT_Y }, DirectX::Colors::Violet, SHOP_HUD_TEXT_SCALE );
+		}
+	}
+	else if ( m_AimedTarget == InteractionTarget::e_SPECIAL_COOLDOWN_UPGRADE )
+	{
+		if ( !playerStats.isSpecialAttackUnlocked )
+		{
+			m_HudTextRenderer.DrawText( L"先に特殊攻撃を解放してください", DirectX::XMFLOAT2{ SHOP_HUD_HINT_X,SHOP_HUD_HINT_Y }, DirectX::Colors::Yellow, SHOP_HUD_TEXT_SCALE );
+		}
+		else
+		{
+			const int cost = progress.GetUpgradeCost( UpgradeType::e_SPECIAL_ATTACK_COOLDOWN );
+
+			wchar_t hintText[ 128 ]{};
+
+			swprintf_s( hintText, L"E: 特殊攻撃の待機時間を1秒短縮  （%d G）", cost );
+
+			m_HudTextRenderer.DrawText( hintText, DirectX::XMFLOAT2{ SHOP_HUD_HINT_X,SHOP_HUD_HINT_Y }, DirectX::Colors::Cyan, SHOP_HUD_TEXT_SCALE );
+		}
+	}
+	else if ( m_AimedTarget == InteractionTarget::e_CHALLENGE_GATE )
+	{
+		m_HudTextRenderer.DrawText( L"E: 現在のステージに挑戦", DirectX::XMFLOAT2{ SHOP_HUD_HINT_X,SHOP_HUD_HINT_Y }, DirectX::Colors::Cyan, SHOP_HUD_TEXT_SCALE );
+	}
+	else if ( m_AimedTarget == InteractionTarget::e_TITLE_GATE )
+	{
+		m_HudTextRenderer.DrawText( L"E: タイトルへ戻る", DirectX::XMFLOAT2{ SHOP_HUD_HINT_X,SHOP_HUD_HINT_Y }, DirectX::Colors::Violet, SHOP_HUD_TEXT_SCALE );
+	}
+	else
+	{
+		m_HudTextRenderer.DrawText( L"強化オブジェクトまたはゲートに照準を合わせてEキー", DirectX::XMFLOAT2{ 255.0f,SHOP_HUD_HINT_Y }, DirectX::Colors::White, 0.68f );
+	}
+
+	if ( m_ShowPurchaseSuccess )
+	{
+		m_HudTextRenderer.DrawText( L"強化に成功しました！", DirectX::XMFLOAT2{ 525.0f,120.0f }, DirectX::Colors::Lime, 1.0f );
+	}
+	else if ( m_ShowPurchaseFailure )
+	{
+		m_HudTextRenderer.DrawText( L"ゴールド不足、または強化できません", DirectX::XMFLOAT2{ 400.0f,120.0f }, DirectX::Colors::Red, 0.85f );
+	}
+
+	m_HudTextRenderer.DrawText( L"WASD: 移動   マウス: 視点移動   E: 調べる   F1: マウス固定切替", DirectX::XMFLOAT2{ 210.0f,680.0f }, DirectX::Colors::White, 0.60f );
+
+	m_HudTextRenderer.End();
+	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_OPAQUE );
 }
