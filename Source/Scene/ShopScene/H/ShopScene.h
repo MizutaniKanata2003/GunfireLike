@@ -57,7 +57,21 @@ private:
 		e_TITLE_GATE
 	};
 
-	//========= 補助関数=========
+	//========= 更新補助関数=========
+	// F1キーによるFPSマウスキャプチャ切替を処理する。
+	void UpdateMouseCapture();
+	// 強化ObjectとGateの回転・浮遊に使用する時間を更新する。
+	void UpdateAnimation( float deltaTime ) { m_AnimationTime += deltaTime; }
+	// 購入結果Messageの表示時間と表示状態を更新する。
+	void UpdateInteractionMessage( float deltaTime );
+	// FPS Camera、DebugPlayer、Camera追従位置を更新する。
+	void UpdatePlayerAndCamera( float deltaTime );
+	// Camera中央Rayが照準しているShop内の操作対象を更新する。
+	void UpdateAimedInteractionTarget() { m_AimedTarget = GetAimedInteractionTarget(); }
+	// Eキーによる現在照準中の操作対象との相互作用を処理する。
+	void UpdateInteraction();
+
+	//========= 相互作用補助関数=========
 	// カメラ中央のRayが当たる最も近い操作対象を返す。
 	[[nodiscard]] InteractionTarget GetAimedInteractionTarget() const;
 	// 指定した操作対象に応じて強化購入またはScene遷移を実行する。

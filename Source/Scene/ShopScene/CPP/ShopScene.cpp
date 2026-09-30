@@ -170,36 +170,13 @@ bool ShopScene::Init()
 // Shop内の操作、カメラ、Player、選択対象、メッセージ表示時間を更新する。
 void ShopScene::Update( float deltaTime )
 {
-	// F1キーでFPSマウスキャプチャの有効・無効を切り替える。
-	if ( m_InputSystem.IsKeyTriggered( SHOP_TOGGLE_MOUSE_CAPTURE_KEY ) )m_InputSystem.SetMouseCaptureEnabled( !m_InputSystem.IsMouseCaptureEnabled() );
-
-	// 強化Objectとゲートのアニメーション時間を進める。
-	m_AnimationTime += deltaTime;
-
-	// 購入結果メッセージの表示時間を更新する。
-	if ( m_InteractionMessageTimer > 0.0f )
-	{
-		m_InteractionMessageTimer = std::max( 0.0f, m_InteractionMessageTimer - deltaTime );
-
-		if ( m_InteractionMessageTimer <= 0.0f )
-		{
-			m_ShowPurchaseSuccess = false;
-			m_ShowPurchaseFailure = false;
-		}
-	}
-
-	// FPS CameraとCamera基準のDebugPlayer位置を更新する。
-	m_FpsCamera.Update( m_InputSystem );
-	m_DebugPlayer.Update( deltaTime, m_InputSystem, m_FpsCamera );
-	m_FpsCamera.SetPosition( m_DebugPlayer.GetPosition() );
-
-	// カメラ中央のRayが照準している操作対象を更新する。
-	m_AimedTarget = GetAimedInteractionTarget();
-
-	// Eキーが押された場合、現在照準している対象と相互作用する。
-	if ( m_InputSystem.IsKeyTriggered( SHOP_USE_INTERACTION_KEY ) )TryInteractWithTarget( m_AimedTarget );
+	UpdateMouseCapture();
+	UpdateAnimation( deltaTime );
+	UpdateInteractionMessage( deltaTime );
+	UpdatePlayerAndCamera( deltaTime );
+	UpdateAimedInteractionTarget();
+	UpdateInteraction();
 }
-
 // Shopの3D空間、強化Object、ゲート、HUDを描画する。
 void ShopScene::Draw()
 {
@@ -430,6 +407,45 @@ void ShopScene::Finalize()
 	m_HudRenderer.Uninit();
 	m_BasicMeshRenderer.Uninit();
 }
+
+// F1キーによるFPSマウスキャプチャ切替を処理する。
+void ShopScene::UpdateMouseCapture()
+{
+	if ( m_InputSystem.IsKeyTriggered( SHOP_TOGGLE_MOUSE_CAPTURE_KEY ) )
+	{
+		m_InputSystem.SetMouseCaptureEnabled( !m_InputSystem.IsMouseCaptureEnabled() );
+	}
+}
+
+// 購入結果Messageの表示時間と表示状態を更新する。
+void ShopScene::UpdateInteractionMessage( float deltaTime )
+{
+	if ( m_InteractionMessageTimer <= 0.0f ) return;
+
+	m_InteractionMessageTimer = std::max( 0.0f, m_InteractionMessageTimer - deltaTime );
+
+	if ( m_InteractionMessageTimer > 0.0f ) return;
+
+	m_ShowPurchaseSuccess = false;
+	m_ShowPurchaseFailure = false;
+}
+
+// FPS Camera、DebugPlayer、Camera追従位置を更新する。
+void ShopScene::UpdatePlayerAndCamera( float deltaTime )
+{
+	m_FpsCamera.Update( m_InputSystem );
+	m_DebugPlayer.Update( deltaTime, m_InputSystem, m_FpsCamera );
+	m_FpsCamera.SetPosition( m_DebugPlayer.GetPosition() );
+}
+
+// Eキーによる現在照準中の操作対象との相互作用を処理する。
+void ShopScene::UpdateInteraction()
+{
+	if ( !m_InputSystem.IsKeyTriggered( SHOP_USE_INTERACTION_KEY ) ) return;
+
+	TryInteractWithTarget( m_AimedTarget );
+}
+
 // カメラ中央のRayが当たる最も近い操作対象を返す。
 ShopScene::InteractionTarget ShopScene::GetAimedInteractionTarget() const
 {
