@@ -16,6 +16,7 @@
 #include "Framework/Input/H/FpsCamera.h"
 
 //========= Scene インクルード=========
+#include "Scene/Common/H/CombatSystem.h"
 #include "Scene/Common/H/IScene.h"
 
 //========= 前方宣言=========
@@ -110,6 +111,10 @@ private:
 	DebugPlayer m_DebugPlayer{};
 	// FPS視点を管理するCamera。
 	FpsCamera m_FpsCamera{};
+
+	//========= Raycast判定=========
+	// Shop内の強化ObjectとGateへのRay判定を管理する。
+	CombatSystem m_CombatSystem{};
 
 	//========= Renderer=========
 	// Shopの床、壁、強化Object、ゲートを描画する3D Renderer。

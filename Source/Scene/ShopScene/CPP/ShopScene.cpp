@@ -7,8 +7,8 @@
 #include <cwchar>
 
 //========= DirectX インクルード=========
-#include <DirectXCollision.h>
 #include <DirectXColors.h>
+#include <DirectXMath.h>
 
 //========= Framework インクルード=========
 #include "Framework/Audio/H/AudioSystem.h"
@@ -254,23 +254,21 @@ void ShopScene::UpdateInteraction()
 // カメラ中央のRayが当たる最も近い操作対象を返す。
 ShopScene::InteractionTarget ShopScene::GetAimedInteractionTarget() const
 {
-	// Rayの始点と正規化した視線方向をCameraから取得する。
+	// Rayの始点と視線方向をCameraから取得する。
 	const DirectX::XMFLOAT3 rayOrigin = m_FpsCamera.GetPosition();
-	const DirectX::XMFLOAT3 forward = m_FpsCamera.GetForward();
-	const DirectX::XMVECTOR rayOriginVector = DirectX::XMLoadFloat3( &rayOrigin );
-	const DirectX::XMVECTOR rayDirection = DirectX::XMVector3Normalize( DirectX::XMLoadFloat3( &forward ) );
+	const DirectX::XMFLOAT3 rayDirection = m_FpsCamera.GetForward();
 
 	// 現在見つかっている最も近い対象と距離を保持する。
 	InteractionTarget nearestTarget = InteractionTarget::e_NONE;
 	float nearestDistance = SHOP_GATE_AIM_MAX_DISTANCE;
 
 	// Ray判定する強化Objectの対象一覧。
-	constexpr std::array<InteractionTarget, 4> upgradeTargets
+	constexpr std::array upgradeTargets
 	{
-		InteractionTarget::e_MAX_HP_UPGRADE,
-		InteractionTarget::e_GUN_DAMAGE_UPGRADE,
-		InteractionTarget::e_SPECIAL_UNLOCK_UPGRADE,
-		InteractionTarget::e_SPECIAL_COOLDOWN_UPGRADE
+	InteractionTarget::e_MAX_HP_UPGRADE,
+	InteractionTarget::e_GUN_DAMAGE_UPGRADE,
+	InteractionTarget::e_SPECIAL_UNLOCK_UPGRADE,
+	InteractionTarget::e_SPECIAL_COOLDOWN_UPGRADE
 	};
 
 	// 各強化ObjectへのRayとSphereの交差判定を行う。
@@ -278,46 +276,35 @@ ShopScene::InteractionTarget ShopScene::GetAimedInteractionTarget() const
 	{
 		const DirectX::XMFLOAT3 basePosition = GetUpgradeObjectPosition( target );
 		const float floatingOffset = std::sinf( m_AnimationTime * SHOP_UPGRADE_ORB_FLOAT_SPEED + basePosition.x ) * SHOP_UPGRADE_ORB_FLOAT_HEIGHT;
-		const DirectX::XMFLOAT3 sphereCenter
-		{
-			basePosition.x,
-			basePosition.y + floatingOffset,
-			basePosition.z
-		};
+		const DirectX::XMFLOAT3 sphereCenter{ basePosition.x,basePosition.y + floatingOffset,basePosition.z };
+		const RaycastResult raycastResult = m_CombatSystem.RaycastSphere( rayOrigin, rayDirection, sphereCenter,
+																		  SHOP_UPGRADE_HIT_SPHERE_RADIUS, SHOP_UPGRADE_AIM_MAX_DISTANCE );
 
-		const DirectX::BoundingSphere sphere( sphereCenter, SHOP_UPGRADE_HIT_SPHERE_RADIUS );
-		float hitDistance{};
+		if ( !raycastResult.isHit || raycastResult.hitDistance >= nearestDistance ) continue;
 
-		if ( sphere.Intersects( rayOriginVector, rayDirection, hitDistance ) &&
-			hitDistance <= SHOP_UPGRADE_AIM_MAX_DISTANCE &&
-			hitDistance < nearestDistance )
-		{
-			nearestDistance = hitDistance;
-			nearestTarget = target;
-		}
+		nearestDistance = raycastResult.hitDistance;
+		nearestTarget = target;
 	}
 
 	// チャレンジゲートへのRayとSphereの交差判定を行う。
-	const DirectX::BoundingSphere challengeGateSphere(
-		DirectX::XMFLOAT3{ SHOP_CHALLENGE_GATE_X,SHOP_CHALLENGE_GATE_Y,SHOP_CHALLENGE_GATE_Z }, SHOP_GATE_HIT_SPHERE_RADIUS );
-	float challengeGateDistance{};
+	const RaycastResult challengeGateRaycastResult =
+		m_CombatSystem.RaycastSphere( rayOrigin, rayDirection,
+									  DirectX::XMFLOAT3{ SHOP_CHALLENGE_GATE_X,SHOP_CHALLENGE_GATE_Y,SHOP_CHALLENGE_GATE_Z },
+									  SHOP_GATE_HIT_SPHERE_RADIUS, SHOP_GATE_AIM_MAX_DISTANCE );
 
-	if ( challengeGateSphere.Intersects( rayOriginVector, rayDirection, challengeGateDistance ) &&
-		challengeGateDistance <= SHOP_GATE_AIM_MAX_DISTANCE &&
-		challengeGateDistance < nearestDistance )
+	if ( challengeGateRaycastResult.isHit && challengeGateRaycastResult.hitDistance < nearestDistance )
 	{
-		nearestDistance = challengeGateDistance;
+		nearestDistance = challengeGateRaycastResult.hitDistance;
 		nearestTarget = InteractionTarget::e_CHALLENGE_GATE;
 	}
 
 	// タイトルゲートへのRayとSphereの交差判定を行う。
-	const DirectX::BoundingSphere titleGateSphere(
-		DirectX::XMFLOAT3{ SHOP_TITLE_GATE_X,SHOP_TITLE_GATE_Y,SHOP_TITLE_GATE_Z }, SHOP_GATE_HIT_SPHERE_RADIUS );
-	float titleGateDistance{};
+	const RaycastResult titleGateRaycastResult =
+		m_CombatSystem.RaycastSphere( rayOrigin, rayDirection,
+									  DirectX::XMFLOAT3{ SHOP_TITLE_GATE_X,SHOP_TITLE_GATE_Y,SHOP_TITLE_GATE_Z },
+									  SHOP_GATE_HIT_SPHERE_RADIUS, SHOP_GATE_AIM_MAX_DISTANCE );
 
-	if ( titleGateSphere.Intersects( rayOriginVector, rayDirection, titleGateDistance ) &&
-		titleGateDistance <= SHOP_GATE_AIM_MAX_DISTANCE &&
-		titleGateDistance < nearestDistance )
+	if ( titleGateRaycastResult.isHit && titleGateRaycastResult.hitDistance < nearestDistance )
 	{
 		nearestTarget = InteractionTarget::e_TITLE_GATE;
 	}

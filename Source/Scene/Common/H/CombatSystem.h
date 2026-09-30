@@ -13,6 +13,12 @@ struct EnemyHitTest
 	float radius{};
 	float maxDistance{};
 };
+// RayとSphereの交差判定結果。
+struct RaycastResult
+{
+	bool isHit{};
+	float hitDistance{};
+};
 
 // Combatに関するHitScan、距離判定を提供する。
 // HP、Damage、Reward、SE、Scene遷移は保持しない。
@@ -20,6 +26,9 @@ class CombatSystem final
 {
 public:
 	//========= 命中判定関数=========
+	// 指定したRayがSphereへ命中した場合、命中距離を含む判定結果を返す。
+	[[nodiscard]] RaycastResult RaycastSphere( const DirectX::XMFLOAT3& rayOrigin, const DirectX::XMFLOAT3& rayDirection,
+											   const DirectX::XMFLOAT3& sphereCenter, float sphereRadius, float maxDistance ) const;
 	// Camera位置・前方向からのRayがEnemy Sphereに命中するか返す。
 	[[nodiscard]] bool IsHitScanHit( const DirectX::XMFLOAT3& rayOrigin, const DirectX::XMFLOAT3& rayDirection, const EnemyHitTest& enemyHitTest ) const;
 	// PlayerとEnemyの水平距離の二乗を返す。
