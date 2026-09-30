@@ -42,7 +42,6 @@ namespace
 
 	//========= Camera設定定数=========
 	// 3D描画に使用するProjection設定。
-	constexpr float PROJECTION_ASPECT_RATIO = 1280.0f / 720.0f;
 	constexpr float PROJECTION_FOV_DEGREES = 60.0f;
 	constexpr float PROJECTION_NEAR_Z = 0.1f;
 	constexpr float PROJECTION_FAR_Z = 1000.0f;
@@ -288,9 +287,17 @@ void GameScene::Draw()
 
 	const bool isNextGateAvailable = gateAvailability.isNextGateAvailable;
 
-	// 3D描画に使用するProjection、View、Camera座標を取得する。
+	// 3D描画に使用する現在のRender Targetサイズを取得する。
+	const unsigned int renderWidth = m_GraphicsSystem.GetRenderWidth();
+	const unsigned int renderHeight = m_GraphicsSystem.GetRenderHeight();
+
+	if ( renderWidth == 0 || renderHeight == 0 ) return;
+
+	// 現在のRender Target比率に合わせたProjection、View、Camera座標を取得する。
+	const float projectionAspectRatio = static_cast<float>( renderWidth ) / static_cast<float>( renderHeight );
+
 	const DirectX::XMMATRIX projectionMatrix = DirectX::XMMatrixPerspectiveFovLH( DirectX::XMConvertToRadians( PROJECTION_FOV_DEGREES ),
-	PROJECTION_ASPECT_RATIO, PROJECTION_NEAR_Z, PROJECTION_FAR_Z );
+	projectionAspectRatio, PROJECTION_NEAR_Z, PROJECTION_FAR_Z );
 	const DirectX::XMMATRIX viewMatrix = m_FpsCamera.GetViewMatrix();
 	const DirectX::XMFLOAT3 cameraPosition = m_FpsCamera.GetPosition();
 

@@ -38,6 +38,10 @@ public:
 	[[nodiscard]] ID3D11Device* GetDevice() const { return m_Device.Get(); }
 	// DirectX 11 Device Contextを返す。
 	[[nodiscard]] ID3D11DeviceContext* GetContext() const { return m_Context.Get(); }
+	// 現在のRender Targetの幅を返す。
+	[[nodiscard]] unsigned int GetRenderWidth() const { return m_RenderWidth; }
+	// 現在のRender Targetの高さを返す。
+	[[nodiscard]] unsigned int GetRenderHeight() const { return m_RenderHeight; }
 
 	//========= 描画State設定関数=========
 	// 指定した描画Passに必要なBlend、Depth、Rasterizer Stateをまとめて設定する。
@@ -66,6 +70,12 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_RenderTargetView{};
 	// 3D描画の奥行き判定に使用するDepthStencil View。
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_DepthStencilView{};
+
+	//========= Render Targetサイズ=========
+	// 現在生成されているRender Targetの幅。
+	unsigned int m_RenderWidth{};
+	// 現在生成されているRender Targetの高さ。
+	unsigned int m_RenderHeight{};
 
 	//========= 描画State関連=========
 	// HUDとSkyを描画するときにDepth TestとDepth Writeを無効化するState。

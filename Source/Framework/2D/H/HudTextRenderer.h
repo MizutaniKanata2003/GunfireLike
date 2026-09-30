@@ -11,6 +11,9 @@
 #include <SpriteBatch.h>
 #include <SpriteFont.h>
 
+//========= Framework インクルード=========
+#include "Framework/2D/H/HudCanvas.h"
+
 //========= 前方宣言=========
 class GraphicsSystem;
 
@@ -37,4 +40,6 @@ private:
 	std::unique_ptr<DirectX::SpriteBatch> m_SpriteBatch{};
 	// SpriteFont形式のフォント情報。
 	std::unique_ptr<DirectX::SpriteFont> m_SpriteFont{};
+	// HUD文字列を描画するRender Targetサイズの取得に使用するGraphicsSystem。
+	GraphicsSystem* m_GraphicsSystem{};
 };

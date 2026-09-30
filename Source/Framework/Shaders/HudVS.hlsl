@@ -3,6 +3,8 @@ cbuffer HudBuffer : register(b0)
 {
     float4 g_Rectangle;
     float4 g_Color;
+    float2 g_RenderSize;
+    float2 g_Padding;
 };
 
 //========= Vertex Shader入力=========
@@ -27,8 +29,8 @@ PixelInput main(VertexInput input)
     // 0.0から1.0のQuad座標をHUDのピクセル座標へ変換する。
     const float2 pixelPosition = g_Rectangle.xy + input.position * g_Rectangle.zw;
 
-    // 基準画面サイズを使ってピクセル座標を0.0から1.0へ正規化する。
-    const float2 normalizedPosition = pixelPosition / float2(1280.0f, 720.0f);
+    // Render Targetサイズを使ってピクセル座標を0.0から1.0へ正規化する。
+    const float2 normalizedPosition = pixelPosition / g_RenderSize;
 
     // 正規化座標をDirectXのクリップ座標へ変換する。
     output.position = float4(normalizedPosition.x * 2.0f - 1.0f, 1.0f - normalizedPosition.y * 2.0f, 0.0f, 1.0f);

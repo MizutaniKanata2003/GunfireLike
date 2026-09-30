@@ -199,22 +199,37 @@ bool HudRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	return true;
 }
 
-// 指定した画面座標、サイズ、色で単色Quadを描画する。
+// 指定したVirtual Canvas座標、サイズ、色で単色Quadを描画する。
 void HudRenderer::DrawQuad( GraphicsSystem& graphicsSystem, float positionX, float positionY, float width, float height,
 							const DirectX::XMFLOAT4& color )
 {
 	if ( width <= 0.0f || height <= 0.0f ) return;
 
-	// 描画に使用するDirect3D ContextとGPUリソースを確認する。
+	// 描画に使用するDirect3D ContextとRender Targetサイズを確認する。
 	ID3D11DeviceContext* context = graphicsSystem.GetContext();
-	if ( context == nullptr || !m_VertexShader || !m_PixelShader || !m_InputLayout ||
-	!m_VertexBuffer || !m_IndexBuffer || !m_HudBuffer.IsValid() ) return;
 
-	// Shaderへ渡すQuadの画面座標、サイズ、色をまとめる。
+	const unsigned int renderWidth = graphicsSystem.GetRenderWidth();
+
+	const unsigned int renderHeight = graphicsSystem.GetRenderHeight();
+
+	if ( context == nullptr || renderWidth == 0 || renderHeight == 0 ||
+		 !m_VertexShader || !m_PixelShader || !m_InputLayout ||
+		 !m_VertexBuffer || !m_IndexBuffer || !m_HudBuffer.IsValid() ) return;
+
+	// Virtual Canvas座標とサイズを現在のRender Target座標へ変換する。
+	const HudCanvas hudCanvas{ renderWidth,renderHeight };
+
+	const DirectX::XMFLOAT2 screenPosition = hudCanvas.ToScreenPosition( DirectX::XMFLOAT2{ positionX,positionY } );
+
+	const DirectX::XMFLOAT2 screenSize = hudCanvas.ToScreenSize( DirectX::XMFLOAT2{ width,height } );
+
+	// Shaderへ渡すQuadの画面座標、サイズ、色、Render Targetサイズをまとめる。
 	const HudBuffer hudBuffer
 	{
-		DirectX::XMFLOAT4{ positionX, positionY, width, height },
-		color
+		DirectX::XMFLOAT4{ screenPosition.x,screenPosition.y,screenSize.x,screenSize.y },
+		color,
+		DirectX::XMFLOAT2{ static_cast<float>( renderWidth ),static_cast<float>( renderHeight ) },
+		DirectX::XMFLOAT2{}
 	};
 
 	// Input Assemblerへ設定する頂点Buffer情報をまとめる。

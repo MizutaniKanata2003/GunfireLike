@@ -6,6 +6,7 @@
 #include <wrl/client.h>
 
 //========= Framework インクルード=========
+#include "Framework/2D/H/HudCanvas.h"
 #include "Framework/DirectX/H/ConstantBuffer.h"
 #include "Framework/DirectX/H/VertexFormat.h"
 
@@ -43,11 +44,13 @@ private:
 	{
 		DirectX::XMFLOAT2 position{};
 	};
-	// Shaderへ渡すQuadの矩形情報と色。
+	// Shaderへ渡すQuadの矩形情報、色、Render Targetサイズ。
 	struct HudBuffer
 	{
 		DirectX::XMFLOAT4 rectangle{};
 		DirectX::XMFLOAT4 color{};
+		DirectX::XMFLOAT2 renderSize{};
+		DirectX::XMFLOAT2 padding{};
 	};
 
 	//========= Shader関連=========

@@ -23,6 +23,8 @@ bool HudTextRenderer::Initialize( GraphicsSystem& graphicsSystem )
 	m_SpriteBatch = std::make_unique<DirectX::SpriteBatch>( context );
 	m_SpriteFont = std::make_unique<DirectX::SpriteFont>( device, HUD_FONT_PATH );
 
+	m_GraphicsSystem = &graphicsSystem;
+
 	return true;
 }
 
@@ -32,12 +34,21 @@ void HudTextRenderer::Begin()
 	if ( m_SpriteBatch ) m_SpriteBatch->Begin();
 }
 
-// 指定した文字列を画面座標へ描画する。
+// 指定したVirtual Canvas座標へ文字列を描画する。
 void HudTextRenderer::DrawText( const std::wstring& text, const DirectX::XMFLOAT2& position, const DirectX::XMVECTORF32& color, float scale )
 {
-	if ( !m_SpriteBatch || !m_SpriteFont || text.empty() || scale <= 0.0f ) return;
+	if ( !m_SpriteBatch || !m_SpriteFont || m_GraphicsSystem == nullptr || text.empty() || scale <= 0.0f ) return;
 
-	m_SpriteFont->DrawString( m_SpriteBatch.get(), text.c_str(), position, color, 0.0f, DirectX::XMFLOAT2{}, scale );
+	const unsigned int renderWidth = m_GraphicsSystem->GetRenderWidth();
+	const unsigned int renderHeight = m_GraphicsSystem->GetRenderHeight();
+
+	if ( renderWidth == 0 || renderHeight == 0 ) return;
+
+	const HudCanvas hudCanvas{ renderWidth,renderHeight };
+	const DirectX::XMFLOAT2 screenPosition = hudCanvas.ToScreenPosition( position );
+	const float screenScale = hudCanvas.ToScreenScale( scale );
+
+	m_SpriteFont->DrawString( m_SpriteBatch.get(), text.c_str(), screenPosition, color, 0.0f, DirectX::XMFLOAT2{}, screenScale );
 }
 
 // 指定文字列を指定Scaleで描画した場合の幅と高さを返す。
@@ -66,4 +77,5 @@ void HudTextRenderer::Uninit()
 {
 	m_SpriteFont.reset();
 	m_SpriteBatch.reset();
+	m_GraphicsSystem = nullptr;
 }

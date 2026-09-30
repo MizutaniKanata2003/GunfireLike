@@ -30,7 +30,6 @@ namespace
 
 	//========= Camera設定定数=========
 	// Shopの3D描画に使用するProjection設定。
-	constexpr float SHOP_ASPECT_RATIO = 1280.0f / 720.0f;
 	constexpr float SHOP_NEAR_CLIP = 0.1f;
 	constexpr float SHOP_FAR_CLIP = 1000.0f;
 	constexpr float SHOP_FIELD_FOV_DEGREES = 60.0f;
@@ -208,10 +207,17 @@ void ShopScene::Draw()
 	GameProgress& progress = m_SceneManager.GetGameProgress();
 	const PlayerStats& playerStats = progress.GetPlayerStats();
 
-	// 3D描画に使用するCamera行列とSkybox追従用Camera座標を取得する。
-	const DirectX::XMMATRIX projectionMatrix = DirectX::XMMatrixPerspectiveFovLH( DirectX::XMConvertToRadians( SHOP_FIELD_FOV_DEGREES ),
-		SHOP_ASPECT_RATIO, SHOP_NEAR_CLIP, SHOP_FAR_CLIP );
+	// 3D描画に使用する現在のRender Targetサイズを取得する。
+	const unsigned int renderWidth = m_GraphicsSystem.GetRenderWidth();
+	const unsigned int renderHeight = m_GraphicsSystem.GetRenderHeight();
 
+	if ( renderWidth == 0 || renderHeight == 0 ) return;
+
+	// 現在のRender Target比率に合わせたCamera行列とSkybox追従用Camera座標を取得する。
+	const float projectionAspectRatio = static_cast<float>( renderWidth ) / static_cast<float>( renderHeight );
+
+	const DirectX::XMMATRIX projectionMatrix = DirectX::XMMatrixPerspectiveFovLH( DirectX::XMConvertToRadians( SHOP_FIELD_FOV_DEGREES ),
+																				  projectionAspectRatio, SHOP_NEAR_CLIP, SHOP_FAR_CLIP );
 	const DirectX::XMMATRIX viewMatrix = m_FpsCamera.GetViewMatrix();
 	const DirectX::XMFLOAT3 cameraPosition = m_FpsCamera.GetPosition();
 

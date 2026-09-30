@@ -341,6 +341,9 @@ bool GraphicsSystem::CreateRenderTargets( unsigned int width, unsigned int heigh
 
 	m_Context->RSSetViewports( 1, &viewport );
 
+	m_RenderWidth = width;
+	m_RenderHeight = height;
+
 	return true;
 }
 
@@ -349,6 +352,9 @@ void GraphicsSystem::ReleaseRenderTargets()
 {
 	m_DepthStencilView.Reset();
 	m_RenderTargetView.Reset();
+
+	m_RenderWidth = {};
+	m_RenderHeight = {};
 }
 
 // 指定した描画Passに必要なBlend、Depth、Rasterizer Stateをまとめて設定する。
