@@ -1,5 +1,6 @@
 #pragma once
 
+//========= 列挙型=========
 // Rendererと将来のMeshが使用する頂点属性の組み合わせを表す。
 enum class e_VertexFormat
 {

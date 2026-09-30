@@ -1,5 +1,6 @@
 #pragma once
 
+//========= 構造体=========
 // Player HP状態更新の結果。
 struct PlayerHealthStateResult
 {

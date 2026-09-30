@@ -6,6 +6,7 @@
 //========= Scene インクルード=========
 #include "Scene/Common/H/StageGate.h"
 
+//========= 列挙型=========
 // Gate使用判定の結果。
 enum class StageGateUseResult
 {

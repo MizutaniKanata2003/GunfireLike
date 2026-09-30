@@ -1,5 +1,6 @@
 #pragma once
 
+//========= 列挙型=========
 // Player攻撃要求の種別。
 enum class PlayerAttackType
 {
@@ -8,6 +9,7 @@ enum class PlayerAttackType
 	e_SPECIAL_ATTACK
 };
 
+//========= 構造体=========
 // Player攻撃要求。
 // GameSceneがSE、Projectile、HitScan、Damage適用を担当する。
 struct PlayerAttackRequest

@@ -31,7 +31,6 @@ public:
 	//========= Setter関数=========
 	// カメラを指定したワールド座標へ移動する。
 	void SetPosition( const DirectX::XMFLOAT3& position ) { m_Position = position; }
-
 private:
 	//========= カメラ操作設定=========
 	// マウス1ピクセルあたりのカメラ回転量をラジアンで保持する。

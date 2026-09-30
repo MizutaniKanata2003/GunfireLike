@@ -3,19 +3,18 @@
 //========= DirectX インクルード=========
 #include <DirectXMath.h>
 
+//========= 構造体=========
 // Camera用Constant Bufferデータを保持する。
 struct CameraConstants final
 {
 	DirectX::XMFLOAT4X4 viewProjectionMatrix{};
 };
-
 // Object用Constant Bufferデータを保持する。
 struct ObjectConstants final
 {
 	DirectX::XMFLOAT4X4 worldMatrix{};
 	DirectX::XMFLOAT4 color{ 1.0f, 1.0f, 1.0f, 1.0f };
 };
-
 // Material用Constant Bufferデータを保持する。
 struct MaterialConstants final
 {
@@ -24,7 +23,6 @@ struct MaterialConstants final
 	float useTexture{};
 	float padding{};
 };
-
 // Directional Light用Constant Bufferデータを保持する。
 struct LightConstants final
 {
@@ -33,7 +31,6 @@ struct LightConstants final
 	DirectX::XMFLOAT3 color{ 1.0f, 1.0f, 1.0f };
 	float ambientIntensity{ 0.1f };
 };
-
 // PostProcess用Constant Bufferデータを保持する。
 struct PostProcessConstants final
 {

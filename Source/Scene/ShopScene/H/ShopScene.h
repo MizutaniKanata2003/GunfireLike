@@ -61,6 +61,16 @@ private:
 		e_TITLE_GATE
 	};
 
+	//========= 構造体=========
+	// Shopの強化Objectに対応する購入対象、配置、表示色を保持する。
+	struct ShopUpgradeData
+	{
+		InteractionTarget interactionTarget{ InteractionTarget::e_NONE };
+		UpgradeType upgradeType{ UpgradeType::e_MAX_HP };
+		DirectX::XMFLOAT3 position{};
+		DirectX::XMFLOAT4 color{};
+	};
+
 	//========= 初期化補助関数=========
 	// Challenge GateとTitle GateのTransform、色、Raycast設定を初期化する。
 	void InitializeGates();

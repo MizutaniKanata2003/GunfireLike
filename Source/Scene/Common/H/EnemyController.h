@@ -1,5 +1,6 @@
 #pragma once
 
+//========= 列挙型=========
 // Enemyのゲーム上の状態。
 enum class EnemyState
 {
@@ -7,6 +8,7 @@ enum class EnemyState
 	e_DEAD
 };
 
+//========= 構造体=========
 // Enemyの攻撃更新結果。
 // GameSceneがPlayerへのDamage適用、SE再生を担当する。
 struct EnemyAttackResult
@@ -16,7 +18,6 @@ struct EnemyAttackResult
 	bool isSpecialAttack{};
 	float playerDamage{};
 };
-
 // EnemyへのDamage適用結果。
 // GameSceneがDamage Reward、撃破SE、Stage Clearを担当する。
 struct EnemyDamageResult

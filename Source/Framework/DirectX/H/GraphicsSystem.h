@@ -4,6 +4,7 @@
 #include <d3d11.h>
 #include <wrl/client.h>
 
+//========= 列挙型=========
 // 描画対象ごとに適用するDirect3D描画Stateを表す。
 enum class e_RenderPass
 {

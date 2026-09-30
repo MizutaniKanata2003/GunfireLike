@@ -57,7 +57,7 @@ public:
 	// GameSceneで使用した描画リソースを終了する。
 	void Finalize() override;
 private:
-	//========= 構造体=========
+	//========= 列挙型=========
 	//========= Game進行状態=========
 	enum class GamePhase
 	{
@@ -81,6 +81,8 @@ private:
 		e_PREVIOUS_STAGE,
 		e_NEXT_STAGE
 	};
+
+	//========= 構造体=========
 	//========= Debug UI表示状態=========
 	// ImGui Debug UIが読み取り専用で表示するGame状態。
 	struct GameDebugState

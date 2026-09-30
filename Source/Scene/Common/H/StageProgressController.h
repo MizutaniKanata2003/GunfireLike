@@ -1,5 +1,5 @@
 #pragma once
-
+//========= 構造体=========
 // Enemy撃破後のStage進行ルールが返す結果。
 struct StageClearResult
 {

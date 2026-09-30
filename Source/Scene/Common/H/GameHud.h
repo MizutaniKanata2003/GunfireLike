@@ -7,6 +7,7 @@
 //========= 前方宣言=========
 class GraphicsSystem;
 
+//========= 構造体=========
 // GameSceneのHUD表示に必要な読み取り専用状態。
 struct GameHudState
 {

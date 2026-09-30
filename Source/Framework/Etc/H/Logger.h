@@ -3,6 +3,7 @@
 //========= C++標準ライブラリ インクルード=========
 #include <string_view>
 
+//========= 列挙型=========
 // ログ出力の重要度を表す。
 enum class e_LogLevel
 {
@@ -10,7 +11,6 @@ enum class e_LogLevel
 	e_WARNING,
 	e_ERROR
 };
-
 // ログを出力した機能分類を表す。
 enum class e_LogCategory
 {
