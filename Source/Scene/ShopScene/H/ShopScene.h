@@ -17,12 +17,12 @@
 
 //========= Scene インクルード=========
 #include "Scene/Common/H/CombatSystem.h"
+#include "Scene/Common/H/GameProgress.h"
 #include "Scene/Common/H/IScene.h"
 #include "Scene/ShopScene/H/ShopGate.h"
 
 //========= 前方宣言=========
 class AudioSystem;
-class GameProgress;
 class GraphicsSystem;
 class InputSystem;
 class SceneManager;
@@ -94,10 +94,10 @@ private:
 	[[nodiscard]] InteractionTarget GetAimedInteractionTarget() const;
 	// 指定した操作対象に応じて強化購入またはScene遷移を実行する。
 	void TryInteractWithTarget( InteractionTarget target );
-	// 指定した強化Objectのワールド座標を返す。
-	[[nodiscard]] DirectX::XMFLOAT3 GetUpgradeObjectPosition( InteractionTarget target ) const;
-	// 指定した強化Objectの表示色を返す。
-	[[nodiscard]] DirectX::XMFLOAT4 GetUpgradeObjectColor( InteractionTarget target ) const;
+	// Shopの全強化Object設定を読み取り専用で返す。
+	[[nodiscard]] static const std::array<ShopUpgradeData, 4>& GetUpgradeData();
+	// 指定した操作対象に対応する強化Object設定を返す。対応しない場合はnullptrを返す。
+	[[nodiscard]] const ShopUpgradeData* FindUpgradeData( InteractionTarget target ) const;
 
 	//========= 描画補助関数=========
 	// Camera位置に追従する単色SkyboxをSky Passで描画する。
