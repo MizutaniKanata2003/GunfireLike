@@ -112,8 +112,7 @@ void ShopScene::Initialize()
 	// Shop内のアニメーション、照準対象、購入メッセージ状態を初期化する。
 	m_AnimationTime = {};
 	m_AimedTarget = InteractionTarget::e_NONE;
-	m_ShowPurchaseSuccess = {};
-	m_ShowPurchaseFailure = {};
+	m_PurchaseResult = PurchaseResult::e_NONE;
 	m_InteractionMessageTimer = {};
 
 	InitializeGates();
@@ -243,8 +242,7 @@ void ShopScene::UpdateInteractionMessage( float deltaTime )
 
 	if ( m_InteractionMessageTimer > 0.0f ) return;
 
-	m_ShowPurchaseSuccess = false;
-	m_ShowPurchaseFailure = false;
+	m_PurchaseResult = PurchaseResult::e_NONE;
 }
 
 // FPS Camera、DebugPlayer、Camera追従位置を更新する。
@@ -375,19 +373,17 @@ void ShopScene::TryInteractWithTarget( InteractionTarget target )
 		if ( isPurchaseSuccessful )
 		{
 			m_AudioSystem.PlayPurchaseSe();
-			m_ShowPurchaseSuccess = true;
-			m_ShowPurchaseFailure = false;
+			m_PurchaseResult = PurchaseResult::e_SUCCESS;
 			m_InteractionMessageTimer = SHOP_INTERACTION_MESSAGE_DURATION;
+
 			return;
 		}
 
-		m_ShowPurchaseSuccess = false;
-		m_ShowPurchaseFailure = true;
+		m_PurchaseResult = PurchaseResult::e_FAILURE;
 		m_InteractionMessageTimer = SHOP_INTERACTION_MESSAGE_DURATION;
 
 		return;
 	}
-
 	switch ( target )
 	{
 		case InteractionTarget::e_CHALLENGE_GATE:
@@ -591,13 +587,21 @@ void ShopScene::DrawHud( GameProgress& progress, const PlayerStats& playerStats 
 		m_HudTextRenderer.DrawText( L"強化オブジェクトまたはゲートに照準を合わせてEキー", DirectX::XMFLOAT2 { 255.0f,SHOP_HUD_HINT_Y }, DirectX::Colors::White, 0.68f );
 	}
 
-	if ( m_ShowPurchaseSuccess )
+	switch ( m_PurchaseResult )
 	{
-		m_HudTextRenderer.DrawText( L"強化に成功しました！", DirectX::XMFLOAT2 { 525.0f,120.0f }, DirectX::Colors::Lime, 1.0f );
-	}
-	else if ( m_ShowPurchaseFailure )
-	{
-		m_HudTextRenderer.DrawText( L"ゴールド不足、または強化できません", DirectX::XMFLOAT2 { 400.0f,120.0f }, DirectX::Colors::Red, 0.85f );
+		case PurchaseResult::e_SUCCESS:
+			m_HudTextRenderer.DrawText( L"強化に成功しました！",
+			DirectX::XMFLOAT2 { 525.0f,120.0f }, DirectX::Colors::Lime, 1.0f );
+			break;
+
+		case PurchaseResult::e_FAILURE:
+			m_HudTextRenderer.DrawText( L"ゴールド不足、または強化できません",
+			DirectX::XMFLOAT2 { 400.0f,120.0f }, DirectX::Colors::Red, 0.85f );
+			break;
+
+		case PurchaseResult::e_NONE:
+		default:
+			break;
 	}
 
 	m_HudTextRenderer.DrawText( L"WASD: 移動   マウス: 視点移動   E: 調べる   F1: マウス固定切替", DirectX::XMFLOAT2 { 210.0f,680.0f }, DirectX::Colors::White, 0.60f );

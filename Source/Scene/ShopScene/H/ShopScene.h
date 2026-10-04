@@ -157,10 +157,8 @@ private:
 	float m_AnimationTime {};
 	// 現在カメラ中央のRayが照準している操作対象。
 	InteractionTarget m_AimedTarget { InteractionTarget::e_NONE };
-
 	// 購入結果メッセージの表示状態。
-	bool m_ShowPurchaseSuccess {};
-	bool m_ShowPurchaseFailure {};
+	PurchaseResult m_PurchaseResult { PurchaseResult::e_NONE };
 	// 購入結果メッセージを表示する残り時間。
 	float m_InteractionMessageTimer {};
 };
