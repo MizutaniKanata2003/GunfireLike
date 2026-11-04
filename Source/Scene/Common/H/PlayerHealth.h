@@ -21,24 +21,24 @@ class PlayerHealth final
 public:
 	//========= 初期化・リセット関数=========
 	// 指定した最大HPで現在HPと最大HPを初期化する。
-	void Initialize( float maxHp )
+	void Initialize(float maxHp)
 	{
-		m_MaxHp = std::max( PlayerHealthConstants::MIN_MAX_HP, maxHp );
+		m_MaxHp = std::max(PlayerHealthConstants::MIN_MAX_HP,maxHp);
 		m_CurrentHp = m_MaxHp;
 	}
 	// 指定した最大HPで現在HPを最大まで回復する。
-	void ResetToMaxHp( float maxHp )
+	void ResetToMaxHp(float maxHp)
 	{
-		m_MaxHp = std::max( PlayerHealthConstants::MIN_MAX_HP, maxHp );
+		m_MaxHp = std::max(PlayerHealthConstants::MIN_MAX_HP,maxHp);
 		m_CurrentHp = m_MaxHp;
 	}
 
 	//========= HP操作関数=========
 	// 指定したダメージを受け、現在HPを0未満にしない。
-	void TakeDamage( float damage )
+	void TakeDamage(float damage)
 	{
-		if ( damage <= PlayerHealthConstants::MIN_DAMAGE || IsDead() ) return;
-		m_CurrentHp = std::max( PlayerHealthConstants::DEAD_HP, m_CurrentHp - damage );
+		if(damage <= PlayerHealthConstants::MIN_DAMAGE || IsDead()) return;
+		m_CurrentHp = std::max(PlayerHealthConstants::DEAD_HP,m_CurrentHp - damage);
 	}
 
 	//========= Getter関数=========
@@ -51,6 +51,6 @@ public:
 private:
 	//========= HP状態=========
 	// 現在HPと最大HPを保持する。
-	float m_CurrentHp { PlayerHealthConstants::DEFAULT_MAX_HP };
-	float m_MaxHp { PlayerHealthConstants::DEFAULT_MAX_HP };
+	float m_CurrentHp{PlayerHealthConstants::DEFAULT_MAX_HP};
+	float m_MaxHp{PlayerHealthConstants::DEFAULT_MAX_HP};
 };

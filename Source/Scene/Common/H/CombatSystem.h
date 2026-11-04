@@ -9,15 +9,15 @@
 // 射撃RayのEnemy Sphere命中判定に必要な設定。
 struct EnemyHitTest
 {
-	DirectX::XMFLOAT3 center {};
-	float radius {};
-	float maxDistance {};
+	DirectX::XMFLOAT3 center{};
+	float radius{};
+	float maxDistance{};
 };
 // RayとSphereの交差判定結果。
 struct RaycastResult
 {
-	bool isHit {};
-	float hitDistance {};
+	bool isHit{};
+	float hitDistance{};
 };
 
 // Combatに関するHitScan、距離判定を提供する。
@@ -27,12 +27,12 @@ class CombatSystem final
 public:
 	//========= 命中判定関数=========
 	// 指定したRayがSphereへ命中した場合、命中距離を含む判定結果を返す。
-	[[nodiscard]] RaycastResult RaycastSphere( const DirectX::XMFLOAT3& rayOrigin, const DirectX::XMFLOAT3& rayDirection,
-											   const DirectX::XMFLOAT3& sphereCenter, float sphereRadius, float maxDistance ) const;
+	[[nodiscard]] RaycastResult RaycastSphere(const DirectX::XMFLOAT3& rayOrigin,const DirectX::XMFLOAT3& rayDirection,
+												 const DirectX::XMFLOAT3& sphereCenter,float sphereRadius,float maxDistance) const;
 	// Camera位置・前方向からのRayがEnemy Sphereに命中するか返す。
-	[[nodiscard]] bool IsHitScanHit( const DirectX::XMFLOAT3& rayOrigin, const DirectX::XMFLOAT3& rayDirection, const EnemyHitTest& enemyHitTest ) const;
+	[[nodiscard]] bool IsHitScanHit(const DirectX::XMFLOAT3& rayOrigin,const DirectX::XMFLOAT3& rayDirection,const EnemyHitTest& enemyHitTest) const;
 	// PlayerとEnemyの水平距離の二乗を返す。
-	[[nodiscard]] float GetHorizontalDistanceSquared( const DirectX::XMFLOAT3& firstPosition, const DirectX::XMFLOAT3& secondPosition ) const;
+	[[nodiscard]] float GetHorizontalDistanceSquared(const DirectX::XMFLOAT3& firstPosition,const DirectX::XMFLOAT3& secondPosition) const;
 	// Playerが指定した攻撃範囲内にいるか返す。
-	[[nodiscard]] bool IsWithinRangeSquared( float distanceSquared, float rangeSquared ) const { return distanceSquared <= std::max( 0.0f, rangeSquared ); }
+	[[nodiscard]] bool IsWithinRangeSquared(float distanceSquared,float rangeSquared) const { return distanceSquared <= std::max(0.0f,rangeSquared); }
 };

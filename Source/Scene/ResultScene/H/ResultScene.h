@@ -14,12 +14,12 @@ class InputSystem;
 class SceneManager;
 
 // ゲームクリア後の最終結果、BGM、タイトル画面への遷移を管理する。
-class ResultScene final : public IScene
+class ResultScene final: public IScene
 {
 public:
 	//========= 生成関数=========
 	// ResultSceneが使用するSceneManagerとFramework Systemを登録する。
-	ResultScene( SceneManager& sceneManager, InputSystem& inputSystem, GraphicsSystem& graphicsSystem, AudioSystem& audioSystem );
+	ResultScene(SceneManager& sceneManager,InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem);
 
 	//========= Sceneライフサイクル関数=========
 	// Result画面の入力設定、HUD、文字、BGMを初期化する。
@@ -27,7 +27,7 @@ public:
 	// HUDと文字描画に使用する深い描画Resourceを初期化する。
 	bool Init() override;
 	// Result画面の入力を更新する。
-	void Update( float deltaTime ) override;
+	void Update(float deltaTime) override;
 	// 最終結果、背景、タイトルへ戻るボタンを描画する。
 	void Draw() override;
 	// Result画面で使用したHUDと文字描画リソースを終了する。
@@ -49,7 +49,7 @@ private:
 
 	//========= HUD描画=========
 	// 単色Quadを描画するHUDレンダラー。
-	HudRenderer m_HudRenderer {};
+	HudRenderer m_HudRenderer{};
 	// Result画面の文字列を描画するHUD文字レンダラー。
-	HudTextRenderer m_HudTextRenderer {};
+	HudTextRenderer m_HudTextRenderer{};
 };

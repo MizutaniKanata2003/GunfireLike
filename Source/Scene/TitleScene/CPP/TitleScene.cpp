@@ -96,16 +96,15 @@ namespace
 }
 
 // TitleSceneが使用するSceneManagerとFramework Systemを登録する。
-TitleScene::TitleScene( SceneManager& sceneManager, InputSystem& inputSystem, GraphicsSystem& graphicsSystem, AudioSystem& audioSystem )
-	: m_SceneManager( sceneManager ), m_InputSystem( inputSystem ), m_GraphicsSystem( graphicsSystem ), m_AudioSystem( audioSystem )
-{
-}
+TitleScene::TitleScene(SceneManager& sceneManager,InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem)
+	: m_SceneManager(sceneManager),m_InputSystem(inputSystem),m_GraphicsSystem(graphicsSystem),m_AudioSystem(audioSystem)
+{}
 
 // タイトル画面の入力設定、HUD、文字、BGMを初期化する。
 void TitleScene::Initialize()
 {
 	// タイトル画面ではImGui操作を優先するため、FPSマウスキャプチャを解除する。
-	m_InputSystem.SetMouseCaptureEnabled( false );
+	m_InputSystem.SetMouseCaptureEnabled(false);
 
 	// タイトル画面のBGMを再生する。
 	m_AudioSystem.PlayTitleBgm();
@@ -115,21 +114,19 @@ void TitleScene::Initialize()
 bool TitleScene::Init()
 {
 	// タイトル画面で使用するHUD Quad描画Resourceを初期化する。
-	const bool isHudRendererInitialized = m_HudRenderer.Initialize( m_GraphicsSystem );
+	const bool isHudRendererInitialized = m_HudRenderer.Initialize(m_GraphicsSystem);
 
-	if ( !isHudRendererInitialized )
-	{
-		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"TitleSceneのHudRenderer初期化失敗" );
+	if(!isHudRendererInitialized){
+		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"TitleSceneのHudRenderer初期化失敗");
 		Finalize();
 		return false;
 	}
 
 	// タイトル画面で使用するHUD文字描画Resourceを初期化する。
-	const bool isHudTextRendererInitialized = m_HudTextRenderer.Initialize( m_GraphicsSystem );
+	const bool isHudTextRendererInitialized = m_HudTextRenderer.Initialize(m_GraphicsSystem);
 
-	if ( !isHudTextRendererInitialized )
-	{
-		Logger::Write( e_LogLevel::e_ERROR, e_LogCategory::e_SCENE, L"TitleSceneのHudTextRenderer初期化失敗" );
+	if(!isHudTextRendererInitialized){
+		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"TitleSceneのHudTextRenderer初期化失敗");
 		Finalize();
 		return false;
 	}
@@ -138,95 +135,94 @@ bool TitleScene::Init()
 }
 
 // タイトル画面の入力を更新する。
-void TitleScene::Update( float deltaTime )
+void TitleScene::Update(float deltaTime)
 {
-	if ( m_InputSystem.IsKeyTriggered( TITLE_START_GAME_KEY ) )
-	{
+	if(m_InputSystem.IsKeyTriggered(TITLE_START_GAME_KEY)){
 		StartGame();
 		return;
 	}
 
-	if ( m_InputSystem.IsKeyTriggered( TITLE_EXIT_KEY ) ) PostQuitMessage( 0 );
+	if(m_InputSystem.IsKeyTriggered(TITLE_EXIT_KEY)) PostQuitMessage(0);
 }
 
 // タイトル画面の背景、操作説明、ボタンを描画する。
 void TitleScene::Draw()
 {
 	// タイトル画面のQuadと文字をScreen UI Passで描画する。
-	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_SCREEN_UI );
+	m_GraphicsSystem.SetRenderPass(e_RenderPass::e_SCREEN_UI);
 
 	// 背景、上部発光、メインパネルを描画する。
-	m_HudRenderer.DrawQuad( m_GraphicsSystem, 0.0f, 0.0f, TITLE_SCREEN_WIDTH, TITLE_SCREEN_HEIGHT,
-							DirectX::XMFLOAT4{ TITLE_BACKGROUND_RED, TITLE_BACKGROUND_GREEN, TITLE_BACKGROUND_BLUE, FULLY_OPAQUE_ALPHA } );
+	m_HudRenderer.DrawQuad(m_GraphicsSystem,0.0f,0.0f,TITLE_SCREEN_WIDTH,TITLE_SCREEN_HEIGHT,
+							DirectX::XMFLOAT4{TITLE_BACKGROUND_RED,TITLE_BACKGROUND_GREEN,TITLE_BACKGROUND_BLUE,FULLY_OPAQUE_ALPHA});
 
-	m_HudRenderer.DrawQuad( m_GraphicsSystem, 0.0f, 0.0f, TITLE_SCREEN_WIDTH, 180.0f,
-							DirectX::XMFLOAT4{ TITLE_TOP_GLOW_RED, TITLE_TOP_GLOW_GREEN, TITLE_TOP_GLOW_BLUE, TITLE_TOP_GLOW_ALPHA } );
+	m_HudRenderer.DrawQuad(m_GraphicsSystem,0.0f,0.0f,TITLE_SCREEN_WIDTH,180.0f,
+							DirectX::XMFLOAT4{TITLE_TOP_GLOW_RED,TITLE_TOP_GLOW_GREEN,TITLE_TOP_GLOW_BLUE,TITLE_TOP_GLOW_ALPHA});
 
-	m_HudRenderer.DrawQuad( m_GraphicsSystem, TITLE_MAIN_PANEL_X - 4.0f, TITLE_MAIN_PANEL_Y - 4.0f,
-							TITLE_MAIN_PANEL_WIDTH + 8.0f, TITLE_MAIN_PANEL_HEIGHT + 8.0f,
-							DirectX::XMFLOAT4{ TITLE_BORDER_RED, TITLE_BORDER_GREEN, TITLE_BORDER_BLUE, TITLE_BORDER_ALPHA } );
+	m_HudRenderer.DrawQuad(m_GraphicsSystem,TITLE_MAIN_PANEL_X - 4.0f,TITLE_MAIN_PANEL_Y - 4.0f,
+							TITLE_MAIN_PANEL_WIDTH + 8.0f,TITLE_MAIN_PANEL_HEIGHT + 8.0f,
+							DirectX::XMFLOAT4{TITLE_BORDER_RED,TITLE_BORDER_GREEN,TITLE_BORDER_BLUE,TITLE_BORDER_ALPHA});
 
-	m_HudRenderer.DrawQuad( m_GraphicsSystem, TITLE_MAIN_PANEL_X, TITLE_MAIN_PANEL_Y, TITLE_MAIN_PANEL_WIDTH, TITLE_MAIN_PANEL_HEIGHT,
-							DirectX::XMFLOAT4{ TITLE_PANEL_RED, TITLE_PANEL_GREEN, TITLE_PANEL_BLUE, TITLE_PANEL_ALPHA } );
+	m_HudRenderer.DrawQuad(m_GraphicsSystem,TITLE_MAIN_PANEL_X,TITLE_MAIN_PANEL_Y,TITLE_MAIN_PANEL_WIDTH,TITLE_MAIN_PANEL_HEIGHT,
+							DirectX::XMFLOAT4{TITLE_PANEL_RED,TITLE_PANEL_GREEN,TITLE_PANEL_BLUE,TITLE_PANEL_ALPHA});
 
 	// ゲーム開始ボタンと終了ボタンを描画する。
-	m_HudRenderer.DrawQuad( m_GraphicsSystem, TITLE_START_BUTTON_X - TITLE_BUTTON_BORDER, TITLE_START_BUTTON_Y - TITLE_BUTTON_BORDER,
-							TITLE_START_BUTTON_WIDTH + TITLE_BUTTON_BORDER * 2.0f, TITLE_START_BUTTON_HEIGHT + TITLE_BUTTON_BORDER * 2.0f,
-							DirectX::XMFLOAT4{ 0.35f, 0.85f, 1.0f, FULLY_OPAQUE_ALPHA } );
+	m_HudRenderer.DrawQuad(m_GraphicsSystem,TITLE_START_BUTTON_X - TITLE_BUTTON_BORDER,TITLE_START_BUTTON_Y - TITLE_BUTTON_BORDER,
+							TITLE_START_BUTTON_WIDTH + TITLE_BUTTON_BORDER * 2.0f,TITLE_START_BUTTON_HEIGHT + TITLE_BUTTON_BORDER * 2.0f,
+							DirectX::XMFLOAT4{0.35f,0.85f,1.0f,FULLY_OPAQUE_ALPHA});
 
-	m_HudRenderer.DrawQuad( m_GraphicsSystem, TITLE_START_BUTTON_X, TITLE_START_BUTTON_Y, TITLE_START_BUTTON_WIDTH, TITLE_START_BUTTON_HEIGHT,
-							DirectX::XMFLOAT4{ TITLE_START_BUTTON_RED, TITLE_START_BUTTON_GREEN, TITLE_START_BUTTON_BLUE, FULLY_OPAQUE_ALPHA } );
+	m_HudRenderer.DrawQuad(m_GraphicsSystem,TITLE_START_BUTTON_X,TITLE_START_BUTTON_Y,TITLE_START_BUTTON_WIDTH,TITLE_START_BUTTON_HEIGHT,
+							DirectX::XMFLOAT4{TITLE_START_BUTTON_RED,TITLE_START_BUTTON_GREEN,TITLE_START_BUTTON_BLUE,FULLY_OPAQUE_ALPHA});
 
-	m_HudRenderer.DrawQuad( m_GraphicsSystem, TITLE_EXIT_BUTTON_X - TITLE_BUTTON_BORDER, TITLE_EXIT_BUTTON_Y - TITLE_BUTTON_BORDER,
-							TITLE_EXIT_BUTTON_WIDTH + TITLE_BUTTON_BORDER * 2.0f, TITLE_EXIT_BUTTON_HEIGHT + TITLE_BUTTON_BORDER * 2.0f,
-							DirectX::XMFLOAT4{ 0.95f, 0.25f, 0.30f, FULLY_OPAQUE_ALPHA } );
+	m_HudRenderer.DrawQuad(m_GraphicsSystem,TITLE_EXIT_BUTTON_X - TITLE_BUTTON_BORDER,TITLE_EXIT_BUTTON_Y - TITLE_BUTTON_BORDER,
+							TITLE_EXIT_BUTTON_WIDTH + TITLE_BUTTON_BORDER * 2.0f,TITLE_EXIT_BUTTON_HEIGHT + TITLE_BUTTON_BORDER * 2.0f,
+							DirectX::XMFLOAT4{0.95f,0.25f,0.30f,FULLY_OPAQUE_ALPHA});
 
-	m_HudRenderer.DrawQuad( m_GraphicsSystem, TITLE_EXIT_BUTTON_X, TITLE_EXIT_BUTTON_Y, TITLE_EXIT_BUTTON_WIDTH, TITLE_EXIT_BUTTON_HEIGHT,
-							DirectX::XMFLOAT4{ TITLE_EXIT_BUTTON_RED, TITLE_EXIT_BUTTON_GREEN, TITLE_EXIT_BUTTON_BLUE, FULLY_OPAQUE_ALPHA } );
+	m_HudRenderer.DrawQuad(m_GraphicsSystem,TITLE_EXIT_BUTTON_X,TITLE_EXIT_BUTTON_Y,TITLE_EXIT_BUTTON_WIDTH,TITLE_EXIT_BUTTON_HEIGHT,
+							DirectX::XMFLOAT4{TITLE_EXIT_BUTTON_RED,TITLE_EXIT_BUTTON_GREEN,TITLE_EXIT_BUTTON_BLUE,FULLY_OPAQUE_ALPHA});
 
 	// ボタン内文字の位置計算に使用する文字列と描画サイズを取得する。
-	const std::wstring startButtonText{ L"ゲーム開始" };
-	const std::wstring exitButtonText{ L"終了" };
+	const std::wstring startButtonText{L"ゲーム開始"};
+	const std::wstring exitButtonText{L"終了"};
 
-	const DirectX::XMFLOAT2 startTextSize = m_HudTextRenderer.MeasureText( startButtonText, TITLE_START_BUTTON_TEXT_SCALE );
-	const DirectX::XMFLOAT2 exitTextSize = m_HudTextRenderer.MeasureText( exitButtonText, TITLE_EXIT_BUTTON_TEXT_SCALE );
+	const DirectX::XMFLOAT2 startTextSize = m_HudTextRenderer.MeasureText(startButtonText,TITLE_START_BUTTON_TEXT_SCALE);
+	const DirectX::XMFLOAT2 exitTextSize = m_HudTextRenderer.MeasureText(exitButtonText,TITLE_EXIT_BUTTON_TEXT_SCALE);
 
 	// ボタン中央へ文字を配置する座標を計算する。
 	const DirectX::XMFLOAT2 startTextPosition
 	{
-	TITLE_START_BUTTON_X + ( TITLE_START_BUTTON_WIDTH - startTextSize.x ) * 0.5f,
-	TITLE_START_BUTTON_Y + ( TITLE_START_BUTTON_HEIGHT - startTextSize.y ) * 0.5f
+		TITLE_START_BUTTON_X + (TITLE_START_BUTTON_WIDTH - startTextSize.x) * 0.5f,
+		TITLE_START_BUTTON_Y + (TITLE_START_BUTTON_HEIGHT - startTextSize.y) * 0.5f
 	};
 
 	const DirectX::XMFLOAT2 exitTextPosition
 	{
-	TITLE_EXIT_BUTTON_X + ( TITLE_EXIT_BUTTON_WIDTH - exitTextSize.x ) * 0.5f,
-	TITLE_EXIT_BUTTON_Y + ( TITLE_EXIT_BUTTON_HEIGHT - exitTextSize.y ) * 0.5f
+		TITLE_EXIT_BUTTON_X + (TITLE_EXIT_BUTTON_WIDTH - exitTextSize.x) * 0.5f,
+		TITLE_EXIT_BUTTON_Y + (TITLE_EXIT_BUTTON_HEIGHT - exitTextSize.y) * 0.5f
 	};
 
 	// タイトル、説明文、操作説明、ボタン文字を描画する。
 	m_HudTextRenderer.Begin();
 
-	m_HudTextRenderer.DrawText( L"GUNFIRE LIKE DX11", DirectX::XMFLOAT2{ 320.0f, 155.0f }, DirectX::Colors::Gold, 1.85f );
+	m_HudTextRenderer.DrawText(L"GUNFIRE LIKE DX11",DirectX::XMFLOAT2{320.0f,155.0f},DirectX::Colors::Gold,1.85f);
 
-	m_HudTextRenderer.DrawText( L"5 ステージ サバイバル FPS", DirectX::XMFLOAT2{ 430.0f, 245.0f }, DirectX::Colors::White, 1.0f );
+	m_HudTextRenderer.DrawText(L"5 ステージ サバイバル FPS",DirectX::XMFLOAT2{430.0f,245.0f},DirectX::Colors::White,1.0f);
 
-	m_HudTextRenderer.DrawText( L"敵を倒してゴールドを集め、装備を強化しよう。", DirectX::XMFLOAT2{ 310.0f, 305.0f }, DirectX::Colors::LightGray, 0.72f );
+	m_HudTextRenderer.DrawText(L"敵を倒してゴールドを集め、装備を強化しよう。",DirectX::XMFLOAT2{310.0f,305.0f},DirectX::Colors::LightGray,0.72f);
 
-	m_HudTextRenderer.DrawText( L"WASD: 移動   マウス: 視点移動   左クリック: 射撃", DirectX::XMFLOAT2{ 340.0f, 365.0f }, DirectX::Colors::White, 0.70f );
+	m_HudTextRenderer.DrawText(L"WASD: 移動   マウス: 視点移動   左クリック: 射撃",DirectX::XMFLOAT2{340.0f,365.0f},DirectX::Colors::White,0.70f);
 
-	m_HudTextRenderer.DrawText( L"E: 調べる   Q: 特殊攻撃   F1: マウス固定切替", DirectX::XMFLOAT2{ 355.0f, 400.0f }, DirectX::Colors::White, 0.70f );
+	m_HudTextRenderer.DrawText(L"E: 調べる   Q: 特殊攻撃   F1: マウス固定切替",DirectX::XMFLOAT2{355.0f,400.0f},DirectX::Colors::White,0.70f);
 
-	m_HudTextRenderer.DrawText( startButtonText, startTextPosition, DirectX::Colors::White, TITLE_START_BUTTON_TEXT_SCALE );
+	m_HudTextRenderer.DrawText(startButtonText,startTextPosition,DirectX::Colors::White,TITLE_START_BUTTON_TEXT_SCALE);
 
-	m_HudTextRenderer.DrawText( exitButtonText, exitTextPosition, DirectX::Colors::White, TITLE_EXIT_BUTTON_TEXT_SCALE );
+	m_HudTextRenderer.DrawText(exitButtonText,exitTextPosition,DirectX::Colors::White,TITLE_EXIT_BUTTON_TEXT_SCALE);
 
-	m_HudTextRenderer.DrawText( L"Enterキーでゲーム開始", DirectX::XMFLOAT2{ 515.0f, 670.0f }, DirectX::Colors::LightGray, 0.70f );
+	m_HudTextRenderer.DrawText(L"Enterキーでゲーム開始",DirectX::XMFLOAT2{515.0f,670.0f},DirectX::Colors::LightGray,0.70f);
 
 	m_HudTextRenderer.End();
 
 	// 次の描画へScreen UI PassのStateを残さない。
-	m_GraphicsSystem.SetRenderPass( e_RenderPass::e_OPAQUE );
+	m_GraphicsSystem.SetRenderPass(e_RenderPass::e_OPAQUE);
 }
 
 // タイトル画面で使用したHUDと文字描画リソースを終了する。

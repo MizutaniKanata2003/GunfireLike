@@ -24,19 +24,19 @@ public:
 
 	//========= 初期化関数=========
 	// Gateの種類、Transform、表示色を初期化する。
-	void Initialize( GateType gateType, const DirectX::XMFLOAT3& position, const DirectX::XMFLOAT3& scale, const DirectX::XMFLOAT4& color );
+	void Initialize(GateType gateType,const DirectX::XMFLOAT3& position,const DirectX::XMFLOAT3& scale,const DirectX::XMFLOAT4& color);
 
 	//========= 更新関数=========
 	// Gateの回転アニメーションを更新する。
-	void Update( float deltaTime );
+	void Update(float deltaTime);
 
 	//========= 判定関数=========
 	// PlayerがGateの操作範囲内にいるかを返す。
-	[[nodiscard]] bool IsPlayerNear( const DirectX::XMFLOAT3& playerPosition, float interactionRadiusSquared ) const;
+	[[nodiscard]] bool IsPlayerNear(const DirectX::XMFLOAT3& playerPosition,float interactionRadiusSquared) const;
 
 	//========= 描画関数=========
 	// GateをOpaque Passで描画する。
-	void Draw( BasicMeshRenderer& basicMeshRenderer, GraphicsSystem& graphicsSystem, const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix ) const;
+	void Draw(BasicMeshRenderer& basicMeshRenderer,GraphicsSystem& graphicsSystem,const DirectX::XMMATRIX& viewMatrix,const DirectX::XMMATRIX& projectionMatrix) const;
 
 	//========= Getter関数=========
 	// Gateの種類を返す。
@@ -46,11 +46,11 @@ public:
 private:
 	//========= Gate状態=========
 	// Gateの遷移先種別。
-	GateType m_GateType { GateType::e_SHOP };
+	GateType m_GateType{GateType::e_SHOP};
 	// Gateの位置、回転、Scaleを管理するTransform。
-	Transform m_Transform {};
+	Transform m_Transform{};
 	// Gateの単色描画に使用する色。
-	DirectX::XMFLOAT4 m_Color { 1.0f, 1.0f, 1.0f, 1.0f };
+	DirectX::XMFLOAT4 m_Color{1.0f,1.0f,1.0f,1.0f};
 	// Gateの回転アニメーションに使用する累計時間。
-	float m_AnimationTime {};
+	float m_AnimationTime{};
 };

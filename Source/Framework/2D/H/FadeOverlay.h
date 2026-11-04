@@ -6,11 +6,11 @@ class FadeOverlay final
 public:
 	//========= フェード制御関数=========
 	// 透明な状態から黒い画面へフェードを開始する。
-	void StartFadeOut( float duration );
+	void StartFadeOut(float duration);
 	// 黒い画面から透明な状態へフェードを開始する。
-	void StartFadeIn( float duration );
+	void StartFadeIn(float duration);
 	// 経過時間に応じてフェードの透明度を更新する。
-	void Update( float deltaTime );
+	void Update(float deltaTime);
 	// 現在の透明度で全画面フェードを描画する。
 	void Draw() const;
 
@@ -31,10 +31,10 @@ private:
 
 	//========= メンバー変数=========
 	// 現在の黒画面の不透明度とフェード開始からの経過時間。
-	float m_Alpha {};
-	float m_ElapsedTime {};
+	float m_Alpha{};
+	float m_ElapsedTime{};
 	// フェードにかける時間を秒で保持する。
-	float m_Duration { 0.35f };
+	float m_Duration{0.35f};
 	// 現在実行中のフェード状態。
-	FadeMode m_Mode { FadeMode::e_NONE };
+	FadeMode m_Mode{FadeMode::e_NONE};
 };

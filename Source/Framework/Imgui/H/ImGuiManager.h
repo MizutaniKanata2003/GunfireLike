@@ -9,7 +9,7 @@ class ImGuiManager final
 public:
 	//========= 初期化・終了関数=========
 	// Dear ImGui本体とWin32・DirectX 11バックエンドを初期化する。
-	bool Init( void* windowHandle, GraphicsSystem& graphics );
+	bool Init(void* windowHandle,GraphicsSystem& graphics);
 	// Dear ImGui本体と各バックエンドを終了する。
 	void Uninit();
 
@@ -21,5 +21,5 @@ public:
 private:
 	//========= 初期化状態=========
 	// Dear ImGui本体とWin32・DirectX 11バックエンドの初期化が完了しているかを保持する。
-	bool m_IsInitialized {};
+	bool m_IsInitialized{};
 };

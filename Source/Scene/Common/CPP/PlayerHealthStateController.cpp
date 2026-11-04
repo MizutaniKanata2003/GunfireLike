@@ -4,23 +4,23 @@
 #include <algorithm>
 
 // Stage開始時の低HP状態を初期化する。
-void PlayerHealthStateController::Initialize( float currentHp, float maxHp, float lowHealthRatioThreshold )
+void PlayerHealthStateController::Initialize(float currentHp,float maxHp,float lowHealthRatioThreshold)
 {
-	const PlayerHealthStateResult initialState = Update( currentHp, maxHp, lowHealthRatioThreshold );
+	const PlayerHealthStateResult initialState = Update(currentHp,maxHp,lowHealthRatioThreshold);
 
 	m_WasLowHealth = initialState.isLowHealth;
 }
 
 // 現在HPから低HP状態の変化と死亡状態を返す。
-PlayerHealthStateResult PlayerHealthStateController::Update( float currentHp, float maxHp, float lowHealthRatioThreshold )
+PlayerHealthStateResult PlayerHealthStateController::Update(float currentHp,float maxHp,float lowHealthRatioThreshold)
 {
-	PlayerHealthStateResult result {};
+	PlayerHealthStateResult result{};
 
-	const float safeMaxHp = std::max( 0.0f, maxHp );
+	const float safeMaxHp = std::max(0.0f,maxHp);
 
-	const float safeCurrentHp = std::max( 0.0f, currentHp );
+	const float safeCurrentHp = std::max(0.0f,currentHp);
 
-	const float safeLowHealthRatioThreshold = std::clamp( lowHealthRatioThreshold, 0.0f, 1.0f );
+	const float safeLowHealthRatioThreshold = std::clamp(lowHealthRatioThreshold,0.0f,1.0f);
 
 	result.isPlayerDead = safeCurrentHp <= 0.0f;
 

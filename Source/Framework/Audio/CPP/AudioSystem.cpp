@@ -53,28 +53,28 @@ class AudioSystem::Impl final
 public:
 	//========= AudioEngine=========
 	// XAudio2を利用した音声エンジン。
-	std::unique_ptr<DirectX::AudioEngine> audioEngine {};
+	std::unique_ptr<DirectX::AudioEngine> audioEngine{};
 
 	//========= BGM=========
 	// 各Sceneで使用するBGM。
-	std::unique_ptr<DirectX::SoundEffect> titleBgm {};
-	std::unique_ptr<DirectX::SoundEffect> shopBgm {};
-	std::unique_ptr<DirectX::SoundEffect> gameBgm {};
-	std::unique_ptr<DirectX::SoundEffect> resultBgm {};
+	std::unique_ptr<DirectX::SoundEffect> titleBgm{};
+	std::unique_ptr<DirectX::SoundEffect> shopBgm{};
+	std::unique_ptr<DirectX::SoundEffect> gameBgm{};
+	std::unique_ptr<DirectX::SoundEffect> resultBgm{};
 
 	//========= SE=========
 	// ゲーム中に再生するSE。
-	std::unique_ptr<DirectX::SoundEffect> gunSe {};
-	std::unique_ptr<DirectX::SoundEffect> warpSe {};
-	std::unique_ptr<DirectX::SoundEffect> lowHpSe {};
-	std::unique_ptr<DirectX::SoundEffect> purchaseSe {};
-	std::unique_ptr<DirectX::SoundEffect> damageSe {};
-	std::unique_ptr<DirectX::SoundEffect> specialSe {};
-	std::unique_ptr<DirectX::SoundEffect> enemyDefeatSe {};
+	std::unique_ptr<DirectX::SoundEffect> gunSe{};
+	std::unique_ptr<DirectX::SoundEffect> warpSe{};
+	std::unique_ptr<DirectX::SoundEffect> lowHpSe{};
+	std::unique_ptr<DirectX::SoundEffect> purchaseSe{};
+	std::unique_ptr<DirectX::SoundEffect> damageSe{};
+	std::unique_ptr<DirectX::SoundEffect> specialSe{};
+	std::unique_ptr<DirectX::SoundEffect> enemyDefeatSe{};
 
 	//========= BGM再生Instance=========
 	// 現在ループ再生しているBGMのInstance。
-	std::unique_ptr<DirectX::SoundEffectInstance> bgmInstance {};
+	std::unique_ptr<DirectX::SoundEffectInstance> bgmInstance{};
 };
 
 // AudioSystemを生成する。
@@ -92,58 +92,56 @@ bool AudioSystem::Initialize()
 	// 二重初期化時に、既存の音声リソースを安全に終了する。
 	Uninit();
 
-	try
-	{
+	try{
 		m_Impl = std::make_unique<Impl>();
 
 		// XAudio2を利用するAudioEngineを生成する。
-		OutputDebugStringW( L"[Audio] Creating AudioEngine...\n" );
-		m_Impl->audioEngine = std::make_unique<DirectX::AudioEngine>( DirectX::AudioEngine_Default, nullptr, nullptr );
+		OutputDebugStringW(L"[Audio] Creating AudioEngine...\n");
+		m_Impl->audioEngine = std::make_unique<DirectX::AudioEngine>(DirectX::AudioEngine_Default,nullptr,nullptr);
 
 		// 各Sceneで使用するBGMを読み込む。
-		OutputDebugStringW( L"[Audio] Loading: Bgm_Title.wav\n" );
-		m_Impl->titleBgm = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), TITLE_BGM_FILE_PATH );
+		OutputDebugStringW(L"[Audio] Loading: Bgm_Title.wav\n");
+		m_Impl->titleBgm = std::make_unique<DirectX::SoundEffect>(m_Impl->audioEngine.get(),TITLE_BGM_FILE_PATH);
 
-		OutputDebugStringW( L"[Audio] Loading: Bgm_Shop.wav\n" );
-		m_Impl->shopBgm = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), SHOP_BGM_FILE_PATH );
+		OutputDebugStringW(L"[Audio] Loading: Bgm_Shop.wav\n");
+		m_Impl->shopBgm = std::make_unique<DirectX::SoundEffect>(m_Impl->audioEngine.get(),SHOP_BGM_FILE_PATH);
 
-		OutputDebugStringW( L"[Audio] Loading: Bgm_Game.wav\n" );
-		m_Impl->gameBgm = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), GAME_BGM_FILE_PATH );
+		OutputDebugStringW(L"[Audio] Loading: Bgm_Game.wav\n");
+		m_Impl->gameBgm = std::make_unique<DirectX::SoundEffect>(m_Impl->audioEngine.get(),GAME_BGM_FILE_PATH);
 
-		OutputDebugStringW( L"[Audio] Loading: Bgm_Result.wav\n" );
-		m_Impl->resultBgm = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), RESULT_BGM_FILE_PATH );
+		OutputDebugStringW(L"[Audio] Loading: Bgm_Result.wav\n");
+		m_Impl->resultBgm = std::make_unique<DirectX::SoundEffect>(m_Impl->audioEngine.get(),RESULT_BGM_FILE_PATH);
 
 		// ゲーム中に使用するSEを読み込む。
-		OutputDebugStringW( L"[Audio] Loading: Se_Gun.wav\n" );
-		m_Impl->gunSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), GUN_SE_FILE_PATH );
+		OutputDebugStringW(L"[Audio] Loading: Se_Gun.wav\n");
+		m_Impl->gunSe = std::make_unique<DirectX::SoundEffect>(m_Impl->audioEngine.get(),GUN_SE_FILE_PATH);
 
-		OutputDebugStringW( L"[Audio] Loading: Se_Warp.wav\n" );
-		m_Impl->warpSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), WARP_SE_FILE_PATH );
+		OutputDebugStringW(L"[Audio] Loading: Se_Warp.wav\n");
+		m_Impl->warpSe = std::make_unique<DirectX::SoundEffect>(m_Impl->audioEngine.get(),WARP_SE_FILE_PATH);
 
-		OutputDebugStringW( L"[Audio] Loading: Se_Lowhp.wav\n" );
-		m_Impl->lowHpSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), LOW_HP_SE_FILE_PATH );
+		OutputDebugStringW(L"[Audio] Loading: Se_Lowhp.wav\n");
+		m_Impl->lowHpSe = std::make_unique<DirectX::SoundEffect>(m_Impl->audioEngine.get(),LOW_HP_SE_FILE_PATH);
 
-		OutputDebugStringW( L"[Audio] Loading: Se_Purchase.wav\n" );
-		m_Impl->purchaseSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), PURCHASE_SE_FILE_PATH );
+		OutputDebugStringW(L"[Audio] Loading: Se_Purchase.wav\n");
+		m_Impl->purchaseSe = std::make_unique<DirectX::SoundEffect>(m_Impl->audioEngine.get(),PURCHASE_SE_FILE_PATH);
 
-		OutputDebugStringW( L"[Audio] Loading: Se_Damage.wav\n" );
-		m_Impl->damageSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), DAMAGE_SE_FILE_PATH );
+		OutputDebugStringW(L"[Audio] Loading: Se_Damage.wav\n");
+		m_Impl->damageSe = std::make_unique<DirectX::SoundEffect>(m_Impl->audioEngine.get(),DAMAGE_SE_FILE_PATH);
 
-		OutputDebugStringW( L"[Audio] Loading: Se_Special.wav\n" );
-		m_Impl->specialSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), SPECIAL_SE_FILE_PATH );
+		OutputDebugStringW(L"[Audio] Loading: Se_Special.wav\n");
+		m_Impl->specialSe = std::make_unique<DirectX::SoundEffect>(m_Impl->audioEngine.get(),SPECIAL_SE_FILE_PATH);
 
-		OutputDebugStringW( L"[Audio] Loading: Se_EnemyDefeat.wav\n" );
-		m_Impl->enemyDefeatSe = std::make_unique<DirectX::SoundEffect>( m_Impl->audioEngine.get(), ENEMY_DEFEAT_SE_FILE_PATH );
+		OutputDebugStringW(L"[Audio] Loading: Se_EnemyDefeat.wav\n");
+		m_Impl->enemyDefeatSe = std::make_unique<DirectX::SoundEffect>(m_Impl->audioEngine.get(),ENEMY_DEFEAT_SE_FILE_PATH);
 
-		OutputDebugStringW( L"[Audio] All sound files loaded.\n" );
+		OutputDebugStringW(L"[Audio] All sound files loaded.\n");
 
 		return true;
 	}
-	catch ( const std::exception& exception )
-	{
-		OutputDebugStringA( "[Audio] Failed to initialize audio.\n" );
-		OutputDebugStringA( exception.what() );
-		OutputDebugStringA( "\n" );
+	catch(const std::exception& exception){
+		OutputDebugStringA("[Audio] Failed to initialize audio.\n");
+		OutputDebugStringA(exception.what());
+		OutputDebugStringA("\n");
 
 		Uninit();
 
@@ -154,29 +152,26 @@ bool AudioSystem::Initialize()
 // AudioEngineの状態を更新し、音声デバイスの状態変化へ対応する。
 void AudioSystem::Update()
 {
-	if ( !m_Impl || !m_Impl->audioEngine ) return;
+	if(!m_Impl || !m_Impl->audioEngine) return;
 
-	try
-	{
-		if ( !m_Impl->audioEngine->Update() ) m_Impl->audioEngine->Reset();
+	try{
+		if(!m_Impl->audioEngine->Update()) m_Impl->audioEngine->Reset();
 	}
-	catch ( const std::exception& exception )
-	{
-		OutputDebugStringA( "[Audio] AudioEngine update/reset failed.\n" );
-		OutputDebugStringA( exception.what() );
-		OutputDebugStringA( "\n" );
+	catch(const std::exception& exception){
+		OutputDebugStringA("[Audio] AudioEngine update/reset failed.\n");
+		OutputDebugStringA(exception.what());
+		OutputDebugStringA("\n");
 	}
 }
 
 // BGM、SE、AudioEngineを安全な順序で終了する。
 void AudioSystem::Uninit()
 {
-	if ( !m_Impl ) return;
+	if(!m_Impl) return;
 
 	// BGMを停止し、AudioEngineより先に再生Instanceを解放する。
-	if ( m_Impl->bgmInstance )
-	{
-		m_Impl->bgmInstance->Stop( true );
+	if(m_Impl->bgmInstance){
+		m_Impl->bgmInstance->Stop(true);
 		m_Impl->bgmInstance.reset();
 	}
 
@@ -205,120 +200,120 @@ void AudioSystem::Uninit()
 // Title用BGMをループ再生する。
 void AudioSystem::PlayTitleBgm()
 {
-	if ( !m_Impl || !m_Impl->titleBgm ) return;
+	if(!m_Impl || !m_Impl->titleBgm) return;
 
 	StopBgm();
 
 	m_Impl->bgmInstance = m_Impl->titleBgm->CreateInstance();
-	if ( !m_Impl->bgmInstance ) return;
+	if(!m_Impl->bgmInstance) return;
 
-	m_Impl->bgmInstance->SetVolume( TITLE_BGM_VOLUME );
-	m_Impl->bgmInstance->Play( true );
+	m_Impl->bgmInstance->SetVolume(TITLE_BGM_VOLUME);
+	m_Impl->bgmInstance->Play(true);
 }
 
 // Shop用BGMをループ再生する。
 void AudioSystem::PlayShopBgm()
 {
-	if ( !m_Impl || !m_Impl->shopBgm ) return;
+	if(!m_Impl || !m_Impl->shopBgm) return;
 
 	StopBgm();
 
 	m_Impl->bgmInstance = m_Impl->shopBgm->CreateInstance();
-	if ( !m_Impl->bgmInstance ) return;
+	if(!m_Impl->bgmInstance) return;
 
-	m_Impl->bgmInstance->SetVolume( SHOP_BGM_VOLUME );
-	m_Impl->bgmInstance->Play( true );
+	m_Impl->bgmInstance->SetVolume(SHOP_BGM_VOLUME);
+	m_Impl->bgmInstance->Play(true);
 }
 
 // Game用BGMをループ再生する。
 void AudioSystem::PlayGameBgm()
 {
-	if ( !m_Impl || !m_Impl->gameBgm ) return;
+	if(!m_Impl || !m_Impl->gameBgm) return;
 
 	StopBgm();
 
 	m_Impl->bgmInstance = m_Impl->gameBgm->CreateInstance();
-	if ( !m_Impl->bgmInstance ) return;
+	if(!m_Impl->bgmInstance) return;
 
-	m_Impl->bgmInstance->SetVolume( GAME_BGM_VOLUME );
-	m_Impl->bgmInstance->Play( true );
+	m_Impl->bgmInstance->SetVolume(GAME_BGM_VOLUME);
+	m_Impl->bgmInstance->Play(true);
 }
 
 // Result用BGMをループ再生する。
 void AudioSystem::PlayResultBgm()
 {
-	if ( !m_Impl || !m_Impl->resultBgm ) return;
+	if(!m_Impl || !m_Impl->resultBgm) return;
 
 	StopBgm();
 
 	m_Impl->bgmInstance = m_Impl->resultBgm->CreateInstance();
-	if ( !m_Impl->bgmInstance ) return;
+	if(!m_Impl->bgmInstance) return;
 
-	m_Impl->bgmInstance->SetVolume( RESULT_BGM_VOLUME );
-	m_Impl->bgmInstance->Play( true );
+	m_Impl->bgmInstance->SetVolume(RESULT_BGM_VOLUME);
+	m_Impl->bgmInstance->Play(true);
 }
 
 // 現在再生しているBGMを即時停止する。
 void AudioSystem::StopBgm()
 {
-	if ( !m_Impl || !m_Impl->bgmInstance ) return;
+	if(!m_Impl || !m_Impl->bgmInstance) return;
 
-	m_Impl->bgmInstance->Stop( true );
+	m_Impl->bgmInstance->Stop(true);
 	m_Impl->bgmInstance.reset();
 }
 
 // 銃の発射SEを再生する。
 void AudioSystem::PlayGunSe()
 {
-	if ( !m_Impl || !m_Impl->gunSe ) return;
+	if(!m_Impl || !m_Impl->gunSe) return;
 
-	m_Impl->gunSe->Play( GUN_SE_VOLUME, 0.0f, 0.0f );
+	m_Impl->gunSe->Play(GUN_SE_VOLUME,0.0f,0.0f);
 }
 
 // ワープSEを再生する。
 void AudioSystem::PlayWarpSe()
 {
-	if ( !m_Impl || !m_Impl->warpSe ) return;
+	if(!m_Impl || !m_Impl->warpSe) return;
 
-	m_Impl->warpSe->Play( WARP_SE_VOLUME, 0.0f, 0.0f );
+	m_Impl->warpSe->Play(WARP_SE_VOLUME,0.0f,0.0f);
 }
 
 // 低HP警告SEを再生する。
 void AudioSystem::PlayLowHpSe()
 {
-	if ( !m_Impl || !m_Impl->lowHpSe ) return;
+	if(!m_Impl || !m_Impl->lowHpSe) return;
 
-	m_Impl->lowHpSe->Play( LOW_HP_SE_VOLUME, 0.0f, 0.0f );
+	m_Impl->lowHpSe->Play(LOW_HP_SE_VOLUME,0.0f,0.0f);
 }
 
 // 購入SEを再生する。
 void AudioSystem::PlayPurchaseSe()
 {
-	if ( !m_Impl || !m_Impl->purchaseSe ) return;
+	if(!m_Impl || !m_Impl->purchaseSe) return;
 
-	m_Impl->purchaseSe->Play( PURCHASE_SE_VOLUME, 0.0f, 0.0f );
+	m_Impl->purchaseSe->Play(PURCHASE_SE_VOLUME,0.0f,0.0f);
 }
 
 // ダメージSEを再生する。
 void AudioSystem::PlayDamageSe()
 {
-	if ( !m_Impl || !m_Impl->damageSe ) return;
+	if(!m_Impl || !m_Impl->damageSe) return;
 
-	m_Impl->damageSe->Play( DAMAGE_SE_VOLUME, 0.0f, 0.0f );
+	m_Impl->damageSe->Play(DAMAGE_SE_VOLUME,0.0f,0.0f);
 }
 
 // 特殊攻撃SEを再生する。
 void AudioSystem::PlaySpecialSe()
 {
-	if ( !m_Impl || !m_Impl->specialSe ) return;
+	if(!m_Impl || !m_Impl->specialSe) return;
 
-	m_Impl->specialSe->Play( SPECIAL_SE_VOLUME, 0.0f, 0.0f );
+	m_Impl->specialSe->Play(SPECIAL_SE_VOLUME,0.0f,0.0f);
 }
 
 // 敵撃破SEを再生する。
 void AudioSystem::PlayEnemyDefeatSe()
 {
-	if ( !m_Impl || !m_Impl->enemyDefeatSe ) return;
+	if(!m_Impl || !m_Impl->enemyDefeatSe) return;
 
-	m_Impl->enemyDefeatSe->Play( ENEMY_DEFEAT_SE_VOLUME, 0.0f, 0.0f );
+	m_Impl->enemyDefeatSe->Play(ENEMY_DEFEAT_SE_VOLUME,0.0f,0.0f);
 }

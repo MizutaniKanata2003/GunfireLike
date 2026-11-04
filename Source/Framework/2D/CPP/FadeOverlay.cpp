@@ -32,50 +32,46 @@ namespace
 }
 
 // 透明な状態から黒い画面へフェードを開始する。
-void FadeOverlay::StartFadeOut( float duration )
+void FadeOverlay::StartFadeOut(float duration)
 {
-	m_Duration = std::max( MIN_FADE_DURATION_SECONDS, duration );
+	m_Duration = std::max(MIN_FADE_DURATION_SECONDS,duration);
 	m_ElapsedTime = FULLY_TRANSPARENT_ALPHA;
 	m_Alpha = FULLY_TRANSPARENT_ALPHA;
 	m_Mode = FadeMode::e_FADE_OUT;
 }
 
 // 黒い画面から透明な状態へフェードを開始する。
-void FadeOverlay::StartFadeIn( float duration )
+void FadeOverlay::StartFadeIn(float duration)
 {
-	m_Duration = std::max( MIN_FADE_DURATION_SECONDS, duration );
+	m_Duration = std::max(MIN_FADE_DURATION_SECONDS,duration);
 	m_ElapsedTime = FULLY_TRANSPARENT_ALPHA;
 	m_Alpha = FULLY_OPAQUE_ALPHA;
 	m_Mode = FadeMode::e_FADE_IN;
 }
 
 // 経過時間に応じてフェードの透明度を更新する。
-void FadeOverlay::Update( float deltaTime )
+void FadeOverlay::Update(float deltaTime)
 {
-	if ( m_Mode == FadeMode::e_NONE ) return;
+	if(m_Mode == FadeMode::e_NONE) return;
 
 	// 経過時間から0.0から1.0のフェード進行率を計算する。
 	m_ElapsedTime += deltaTime;
-	const float progress = std::clamp( m_ElapsedTime / m_Duration, FADE_PROGRESS_MIN, FADE_PROGRESS_MAX );
+	const float progress = std::clamp(m_ElapsedTime / m_Duration,FADE_PROGRESS_MIN,FADE_PROGRESS_MAX);
 
-	if ( m_Mode == FadeMode::e_FADE_OUT )
-	{
+	if(m_Mode == FadeMode::e_FADE_OUT){
 		m_Alpha = progress;
 
-		if ( progress >= FADE_PROGRESS_MAX )
-		{
+		if(progress >= FADE_PROGRESS_MAX){
 			m_Alpha = FULLY_OPAQUE_ALPHA;
 			m_Mode = FadeMode::e_NONE;
 		}
-
 		return;
 	}
 
 	// フェードインでは進行率に応じて黒画面を透明にする。
 	m_Alpha = FULLY_OPAQUE_ALPHA - progress;
 
-	if ( progress >= FADE_PROGRESS_MAX )
-	{
+	if(progress >= FADE_PROGRESS_MAX){
 		m_Alpha = FULLY_TRANSPARENT_ALPHA;
 		m_Mode = FadeMode::e_NONE;
 	}
@@ -84,12 +80,12 @@ void FadeOverlay::Update( float deltaTime )
 // 現在の透明度で全画面フェードを描画する。
 void FadeOverlay::Draw() const
 {
-	if ( m_Alpha <= FULLY_TRANSPARENT_ALPHA ) return;
+	if(m_Alpha <= FULLY_TRANSPARENT_ALPHA) return;
 
 	// メインViewport全体を覆うImGuiウィンドウを設定する。
 	const ImGuiViewport* viewport = ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos( viewport->Pos, ImGuiCond_Always );
-	ImGui::SetNextWindowSize( viewport->Size, ImGuiCond_Always );
+	ImGui::SetNextWindowPos(viewport->Pos,ImGuiCond_Always);
+	ImGui::SetNextWindowSize(viewport->Size,ImGuiCond_Always);
 
 	// フェード専用の操作できない背景ウィンドウを設定する。
 	const ImGuiWindowFlags windowFlags =
@@ -101,13 +97,13 @@ void FadeOverlay::Draw() const
 		ImGuiWindowFlags_NoBringToFrontOnFocus;
 
 	// 黒色と現在のAlpha値で背景を描画する。
-	ImGui::PushStyleColor( ImGuiCol_WindowBg, ImVec4( FADE_COLOR_RED, FADE_COLOR_GREEN, FADE_COLOR_BLUE, m_Alpha ) );
-	ImGui::PushStyleVar( ImGuiStyleVar_WindowRounding, 0.0f );
-	ImGui::PushStyleVar( ImGuiStyleVar_WindowBorderSize, 0.0f );
+	ImGui::PushStyleColor(ImGuiCol_WindowBg,ImVec4(FADE_COLOR_RED,FADE_COLOR_GREEN,FADE_COLOR_BLUE,m_Alpha));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0.0f);
 
-	ImGui::Begin( FADE_OVERLAY_WINDOW_NAME, nullptr, windowFlags );
+	ImGui::Begin(FADE_OVERLAY_WINDOW_NAME,nullptr,windowFlags);
 	ImGui::End();
 
-	ImGui::PopStyleVar( 2 );
+	ImGui::PopStyleVar(2);
 	ImGui::PopStyleColor();
 }

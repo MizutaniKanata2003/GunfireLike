@@ -14,7 +14,7 @@ enum class PlayerAttackType
 // GameSceneがSE、Projectile、HitScan、Damage適用を担当する。
 struct PlayerAttackRequest
 {
-	PlayerAttackType attackType { PlayerAttackType::e_NONE };
+	PlayerAttackType attackType{PlayerAttackType::e_NONE};
 };
 
 // 通常射撃と特殊攻撃の入力・解放条件・Cooldownを管理する。
@@ -28,15 +28,15 @@ public:
 
 	//========= 更新関数=========
 	// 特殊攻撃のCooldownを更新する。
-	void Update( float deltaTime );
+	void Update(float deltaTime);
 
 	//========= 攻撃要求関数=========
 	// 左クリック入力から通常射撃要求を返す。
-	[[nodiscard]] PlayerAttackRequest RequestNormalShot( bool isShootTriggered, bool isCombatActive, bool isEnemyDead ) const;
+	[[nodiscard]] PlayerAttackRequest RequestNormalShot(bool isShootTriggered,bool isCombatActive,bool isEnemyDead) const;
 	// Qキー入力、解放状態、Cooldownから特殊攻撃要求を返す。
 	// 特殊攻撃要求を返した場合はCooldownを開始する。
-	[[nodiscard]] PlayerAttackRequest RequestSpecialAttack( bool isSpecialAttackTriggered, bool isCombatActive,
-	bool isEnemyDead, bool isSpecialAttackUnlocked, float specialAttackCooldown );
+	[[nodiscard]] PlayerAttackRequest RequestSpecialAttack(bool isSpecialAttackTriggered,bool isCombatActive,
+	bool isEnemyDead,bool isSpecialAttackUnlocked,float specialAttackCooldown);
 
 	//========= 取得関数=========
 	// 特殊攻撃が現在使用可能か返す。
@@ -46,5 +46,5 @@ public:
 private:
 	//========= Cooldown状態=========
 	// 特殊攻撃が再使用可能になるまでの残り時間。
-	float m_SpecialAttackCooldownRemainingTime {};
+	float m_SpecialAttackCooldownRemainingTime{};
 };

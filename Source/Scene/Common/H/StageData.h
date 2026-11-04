@@ -15,19 +15,19 @@ namespace StageConstants
 struct StageData
 {
 	// Stage番号と敵の表示名。
-	int stageNumber { StageConstants::FIRST_STAGE_NUMBER };
-	const char* enemyName {};
+	int stageNumber{StageConstants::FIRST_STAGE_NUMBER};
+	const char* enemyName{};
 
 	// 敵の戦闘パラメータと初回クリア報酬。
-	float enemyMaxHp {};
-	float enemyDamage {};
-	float specialAttackInterval {};
-	float specialAttackHitboxRadius {};
-	int clearReward {};
+	float enemyMaxHp{};
+	float enemyDamage{};
+	float specialAttackInterval{};
+	float specialAttackHitboxRadius{};
+	int clearReward{};
 };
 
 //========= Stageデータ=========
-inline constexpr std::array<StageData, StageConstants::MAX_STAGE_COUNT> STAGE_DATA
+inline constexpr std::array<StageData,StageConstants::MAX_STAGE_COUNT> STAGE_DATA
 {
 	StageData
 	{
@@ -38,8 +38,8 @@ inline constexpr std::array<StageData, StageConstants::MAX_STAGE_COUNT> STAGE_DA
 		8.0f,
 		1.0f,
 		20
-	},
-	StageData
+},
+StageData
 	{
 		2,
 		"Sand Raider",
@@ -48,8 +48,8 @@ inline constexpr std::array<StageData, StageConstants::MAX_STAGE_COUNT> STAGE_DA
 		6.5f,
 		1.5f,
 		40
-	},
-	StageData
+},
+StageData
 	{
 		3,
 		"Forest Beast",
@@ -58,8 +58,8 @@ inline constexpr std::array<StageData, StageConstants::MAX_STAGE_COUNT> STAGE_DA
 		5.0f,
 		2.0f,
 		70
-	},
-	StageData
+},
+StageData
 	{
 		4,
 		"Frozen Guardian",
@@ -68,8 +68,8 @@ inline constexpr std::array<StageData, StageConstants::MAX_STAGE_COUNT> STAGE_DA
 		3.5f,
 		2.8f,
 		120
-	},
-	StageData
+},
+StageData
 	{
 		5,
 		"Ancient Destroyer",
@@ -78,5 +78,5 @@ inline constexpr std::array<StageData, StageConstants::MAX_STAGE_COUNT> STAGE_DA
 		2.5f,
 		3.5f,
 		200
-	}
+}
 };

@@ -12,7 +12,7 @@ class FpsCamera final
 public:
 	//========= 更新関数=========
 	// マウス移動量を使ってYawとPitchを更新する。
-	void Update( InputSystem& input );
+	void Update(InputSystem& input);
 
 	//========= Getter関数=========
 	// 現在のカメラ位置を返す。
@@ -30,17 +30,17 @@ public:
 
 	//========= Setter関数=========
 	// カメラを指定したワールド座標へ移動する。
-	void SetPosition( const DirectX::XMFLOAT3& position ) { m_Position = position; }
+	void SetPosition(const DirectX::XMFLOAT3& position) { m_Position = position; }
 private:
 	//========= カメラ操作設定=========
 	// マウス1ピクセルあたりのカメラ回転量をラジアンで保持する。
-	float m_MouseSensitivity { 0.0025f };
+	float m_MouseSensitivity{0.0025f};
 
 	//========= カメラTransform情報=========
 	// カメラのワールド座標を保持する。
-	DirectX::XMFLOAT3 m_Position { 0.0f, 1.6f, -5.0f };
+	DirectX::XMFLOAT3 m_Position{0.0f,1.6f,-5.0f};
 	// Y軸を中心とした水平方向の回転角をラジアンで保持する。
-	float m_Yaw {};
+	float m_Yaw{};
 	// X軸を中心とした垂直方向の回転角をラジアンで保持する。
-	float m_Pitch {};
+	float m_Pitch{};
 };

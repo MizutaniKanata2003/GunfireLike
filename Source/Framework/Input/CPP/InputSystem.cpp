@@ -4,12 +4,12 @@
 #include <cstring>
 
 // 入力対象のウィンドウを登録し、現在と前フレームのキー状態を初期化する。
-void InputSystem::Initialize( HWND windowHandle )
+void InputSystem::Initialize(HWND windowHandle)
 {
 	// 入力対象のウィンドウとキー状態を初期化する。
 	m_WindowHandle = windowHandle;
-	GetKeyboardState( m_CurrentKeys );
-	std::memcpy( m_PreviousKeys, m_CurrentKeys, sizeof( m_CurrentKeys ) );
+	GetKeyboardState(m_CurrentKeys);
+	std::memcpy(m_PreviousKeys,m_CurrentKeys,sizeof(m_CurrentKeys));
 
 	// FPS操作で使用するカーソルの中央座標を計算する。
 	UpdateMouseCenter();
@@ -19,10 +19,10 @@ void InputSystem::Initialize( HWND windowHandle )
 void InputSystem::Update()
 {
 	// 前フレーム状態を保存してから現在のキーボード状態を取得する。
-	std::memcpy( m_PreviousKeys, m_CurrentKeys, sizeof( m_CurrentKeys ) );
-	GetKeyboardState( m_CurrentKeys );
+	std::memcpy(m_PreviousKeys,m_CurrentKeys,sizeof(m_CurrentKeys));
+	GetKeyboardState(m_CurrentKeys);
 
-	if ( !m_IsMouseCaptureEnabled ) return;
+	if(!m_IsMouseCaptureEnabled) return;
 
 	// FPS操作中はカーソルを中央へ戻し、画面端で視点回転が止まらないようにする。
 	UpdateMouseCenter();
@@ -33,43 +33,42 @@ void InputSystem::Update()
 // InputSystemが設定したカーソル制限とマウスキャプチャ状態を解除する。
 void InputSystem::Uninit()
 {
-	SetMouseCaptureEnabled( false );
+	SetMouseCaptureEnabled(false);
 
 	m_WindowHandle = nullptr;
 	m_MouseDelta = {};
 	m_ScreenCenter = {};
 
-	std::memset( m_CurrentKeys, 0, sizeof( m_CurrentKeys ) );
-	std::memset( m_PreviousKeys, 0, sizeof( m_PreviousKeys ) );
+	std::memset(m_CurrentKeys,0,sizeof(m_CurrentKeys));
+	std::memset(m_PreviousKeys,0,sizeof(m_PreviousKeys));
 }
 // WindowProcedureから受け取ったWin32メッセージを処理する。
-void InputSystem::OnWindowMessage( UINT message, WPARAM wParam, LPARAM lParam )
+void InputSystem::OnWindowMessage(UINT message,WPARAM wParam,LPARAM lParam)
 {
-	if ( !m_IsMouseCaptureEnabled ) return;
+	if(!m_IsMouseCaptureEnabled) return;
 
-	switch ( message )
+	switch(message){
+	case WM_MOUSEMOVE:
 	{
-		case WM_MOUSEMOVE:
-		{
-			// クライアント座標のマウス位置をスクリーン座標へ変換して差分を計算する。
-			POINT mousePosition {};
-			mousePosition.x = GET_X_LPARAM( lParam );
-			mousePosition.y = GET_Y_LPARAM( lParam );
+		// クライアント座標のマウス位置をスクリーン座標へ変換して差分を計算する。
+		POINT mousePosition{};
+		mousePosition.x = GET_X_LPARAM(lParam);
+		mousePosition.y = GET_Y_LPARAM(lParam);
 
-			ClientToScreen( m_WindowHandle, &mousePosition );
+		ClientToScreen(m_WindowHandle,&mousePosition);
 
-			m_MouseDelta.x += mousePosition.x - m_ScreenCenter.x;
-			m_MouseDelta.y += mousePosition.y - m_ScreenCenter.y;
-			break;
-		}
+		m_MouseDelta.x += mousePosition.x - m_ScreenCenter.x;
+		m_MouseDelta.y += mousePosition.y - m_ScreenCenter.y;
+		break;
+	}
 
-		case WM_KILLFOCUS:
-			// フォーカスを失った場合はカーソルを解放し、意図しない視点回転を防ぐ。
-			SetMouseCaptureEnabled( false );
-			break;
+	case WM_KILLFOCUS:
+	// フォーカスを失った場合はカーソルを解放し、意図しない視点回転を防ぐ。
+	SetMouseCaptureEnabled(false);
+	break;
 
-		default:
-			break;
+	default:
+	break;
 	}
 }
 
@@ -84,18 +83,17 @@ POINT InputSystem::ConsumeMouseDelta()
 }
 
 // FPS操作モードの有効・無効を切り替える。
-void InputSystem::SetMouseCaptureEnabled( bool isEnabled )
+void InputSystem::SetMouseCaptureEnabled(bool isEnabled)
 {
-	if ( m_IsMouseCaptureEnabled == isEnabled ) return;
+	if(m_IsMouseCaptureEnabled == isEnabled) return;
 
 	// モード切替時に前モードのマウス差分を破棄する。
 	m_IsMouseCaptureEnabled = isEnabled;
 	m_MouseDelta = {};
 
-	if ( m_IsMouseCaptureEnabled )
-	{
+	if(m_IsMouseCaptureEnabled){
 		// FPS操作ではカーソルを非表示にし、中央固定で無限に視点回転できるようにする。
-		while ( ShowCursor( FALSE ) >= 0 ) {}
+		while(ShowCursor(FALSE) >= 0){}
 
 		UpdateMouseCenter();
 		ClipMouseCursor();
@@ -105,24 +103,24 @@ void InputSystem::SetMouseCaptureEnabled( bool isEnabled )
 	}
 
 	// ImGui操作ではカーソルを表示し、ウィンドウ外も自由に移動できるようにする。
-	while ( ShowCursor( TRUE ) < 0 ) {}
+	while(ShowCursor(TRUE) < 0){}
 
-	ClipCursor( nullptr );
+	ClipCursor(nullptr);
 }
 
 // クライアント領域の中央をスクリーン座標へ変換して保持する。
 void InputSystem::UpdateMouseCenter()
 {
 	// クライアント領域の中央をクライアント座標で計算する。
-	RECT clientRect {};
-	GetClientRect( m_WindowHandle, &clientRect );
+	RECT clientRect{};
+	GetClientRect(m_WindowHandle,&clientRect);
 
-	POINT clientCenter {};
-	clientCenter.x = ( clientRect.right - clientRect.left ) / 2;
-	clientCenter.y = ( clientRect.bottom - clientRect.top ) / 2;
+	POINT clientCenter{};
+	clientCenter.x = (clientRect.right - clientRect.left) / 2;
+	clientCenter.y = (clientRect.bottom - clientRect.top) / 2;
 
 	// SetCursorPosと比較できるよう、中央座標をスクリーン座標へ変換する。
-	ClientToScreen( m_WindowHandle, &clientCenter );
+	ClientToScreen(m_WindowHandle,&clientCenter);
 	m_ScreenCenter = clientCenter;
 }
 
@@ -130,16 +128,16 @@ void InputSystem::UpdateMouseCenter()
 void InputSystem::ClipMouseCursor()
 {
 	// クライアント領域の左上と右下をスクリーン座標へ変換する。
-	RECT clientRect {};
-	GetClientRect( m_WindowHandle, &clientRect );
+	RECT clientRect{};
+	GetClientRect(m_WindowHandle,&clientRect);
 
-	POINT clipTopLeft { clientRect.left, clientRect.top };
-	POINT clipBottomRight { clientRect.right, clientRect.bottom };
+	POINT clipTopLeft{clientRect.left,clientRect.top};
+	POINT clipBottomRight{clientRect.right,clientRect.bottom};
 
-	ClientToScreen( m_WindowHandle, &clipTopLeft );
-	ClientToScreen( m_WindowHandle, &clipBottomRight );
+	ClientToScreen(m_WindowHandle,&clipTopLeft);
+	ClientToScreen(m_WindowHandle,&clipBottomRight);
 
-	const RECT clipRect { clipTopLeft.x,clipTopLeft.y,clipBottomRight.x,clipBottomRight.y };
+	const RECT clipRect{clipTopLeft.x,clipTopLeft.y,clipBottomRight.x,clipBottomRight.y};
 
-	ClipCursor( &clipRect );
+	ClipCursor(&clipRect);
 }

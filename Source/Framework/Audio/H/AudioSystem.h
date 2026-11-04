@@ -14,10 +14,10 @@ public:
 	~AudioSystem();
 
 	//========= コピー・ムーブ禁止=========
-	AudioSystem( const AudioSystem& ) = delete;
-	AudioSystem& operator=( const AudioSystem& ) = delete;
-	AudioSystem( AudioSystem&& ) = delete;
-	AudioSystem& operator=( AudioSystem&& ) = delete;
+	AudioSystem(const AudioSystem&) = delete;
+	AudioSystem& operator=(const AudioSystem&) = delete;
+	AudioSystem(AudioSystem&&) = delete;
+	AudioSystem& operator=(AudioSystem&&) = delete;
 
 	//========= 初期化・終了関数=========
 	// AudioEngineと全BGM・SEを読み込み、再生可能な状態にする。
@@ -61,5 +61,5 @@ private:
 
 	//========= メンバー変数=========
 	// AudioEngineとSoundEffect群を保持する実装クラス。
-	std::unique_ptr<Impl> m_Impl {};
+	std::unique_ptr<Impl> m_Impl{};
 };

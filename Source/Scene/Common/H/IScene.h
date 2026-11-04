@@ -14,7 +14,7 @@ public:
 	// 深い初期化を行い、Asset読込など失敗する可能性がある処理を行う。
 	virtual bool Init() = 0;
 	// 1フレーム分のゲームロジックを更新する。
-	virtual void Update( float deltaTime ) = 0;
+	virtual void Update(float deltaTime) = 0;
 	// ImGuiと3Dオブジェクトの描画命令を発行する。
 	virtual void Draw() = 0;
 	// Sceneが所有する下位Resourceを終了順に解放する。

@@ -52,12 +52,12 @@ enum class UpgradeType
 struct PlayerStats
 {
 	// Playerの最大HPと銃ダメージ。
-	float maxHp { GameBalance::INITIAL_MAX_HP };
-	float gunDamage { GameBalance::INITIAL_GUN_DAMAGE };
+	float maxHp{GameBalance::INITIAL_MAX_HP};
+	float gunDamage{GameBalance::INITIAL_GUN_DAMAGE};
 
 	// 特殊攻撃の解放状態とクールダウン秒数。
-	bool isSpecialAttackUnlocked {};
-	float specialAttackCooldown { GameBalance::INITIAL_SPECIAL_ATTACK_COOLDOWN_SECONDS };
+	bool isSpecialAttackUnlocked{};
+	float specialAttackCooldown{GameBalance::INITIAL_SPECIAL_ATTACK_COOLDOWN_SECONDS};
 };
 
 // Sceneをまたいで維持するStage進行、通貨、強化、累計記録を管理する。
@@ -76,24 +76,23 @@ public:
 		m_TotalEnemiesDefeated = {};
 		m_TotalPlayTime = {};
 		m_PlayerStats = {};
-		m_StageCleared.fill( false );
+		m_StageCleared.fill(false);
 	}
 	// 経過時間を累計プレイ時間へ加算する。
-	void Update( float deltaTime ) { m_TotalPlayTime += deltaTime; }
+	void Update(float deltaTime) { m_TotalPlayTime += deltaTime; }
 
 	//========= 通貨・累計記録操作関数=========
 	// 指定した通貨を加算する。
-	void AddCurrency( int amount ) { if ( amount > 0 ) m_Currency += amount; }
+	void AddCurrency(int amount) { if(amount > 0) m_Currency += amount; }
 	// 与えたダメージを累計し、一定量ごとに通貨を加算する。
-	void AddDamageReward( float damage )
+	void AddDamageReward(float damage)
 	{
-		if ( damage <= 0.0f ) return;
+		if(damage <= 0.0f) return;
 
 		m_TotalDamageDealt += damage;
 		m_DamageCurrencyRemainder += damage;
 
-		while ( m_DamageCurrencyRemainder >= GameBalance::DAMAGE_PER_CURRENCY )
-		{
+		while(m_DamageCurrencyRemainder >= GameBalance::DAMAGE_PER_CURRENCY){
 			m_DamageCurrencyRemainder -= GameBalance::DAMAGE_PER_CURRENCY;
 			++m_Currency;
 		}
@@ -114,9 +113,9 @@ public:
 
 	//========= Stage進行操作関数=========
 	// 指定したStageが解放済みの場合に現在Stageへ設定する。
-	bool TrySetCurrentStage( int stageNumber )
+	bool TrySetCurrentStage(int stageNumber)
 	{
-		if ( !IsStageUnlocked( stageNumber ) ) return false;
+		if(!IsStageUnlocked(stageNumber)) return false;
 
 		m_CurrentStage = stageNumber;
 
@@ -125,11 +124,11 @@ public:
 	// 現在Stageを初回クリア済みに設定し、初回設定に成功したかを返す。
 	[[nodiscard]] bool MarkCurrentStageCleared()
 	{
-		const int stageIndex = GetStageIndex( m_CurrentStage );
+		const int stageIndex = GetStageIndex(m_CurrentStage);
 
-		if ( stageIndex < 0 ) return false;
+		if(stageIndex < 0) return false;
 
-		if ( m_StageCleared[stageIndex] ) return false;
+		if(m_StageCleared[stageIndex]) return false;
 
 		m_StageCleared[stageIndex] = true;
 
@@ -140,59 +139,57 @@ public:
 
 	//========= 強化操作関数=========
 	// 指定した強化に必要な通貨を返す。
-	[[nodiscard]] int GetUpgradeCost( UpgradeType upgradeType ) const
+	[[nodiscard]] int GetUpgradeCost(UpgradeType upgradeType) const
 	{
-		switch ( upgradeType )
-		{
-			case UpgradeType::e_MAX_HP:
-				return GameBalance::MAX_HP_UPGRADE_COST;
+		switch(upgradeType){
+		case UpgradeType::e_MAX_HP:
+		return GameBalance::MAX_HP_UPGRADE_COST;
 
-			case UpgradeType::e_GUN_DAMAGE:
-				return GameBalance::GUN_DAMAGE_UPGRADE_COST;
+		case UpgradeType::e_GUN_DAMAGE:
+		return GameBalance::GUN_DAMAGE_UPGRADE_COST;
 
-			case UpgradeType::e_UNLOCK_SPECIAL_ATTACK:
-				return GameBalance::SPECIAL_ATTACK_UNLOCK_COST;
+		case UpgradeType::e_UNLOCK_SPECIAL_ATTACK:
+		return GameBalance::SPECIAL_ATTACK_UNLOCK_COST;
 
-			case UpgradeType::e_SPECIAL_ATTACK_COOLDOWN:
-				return GameBalance::SPECIAL_ATTACK_COOLDOWN_UPGRADE_COST;
+		case UpgradeType::e_SPECIAL_ATTACK_COOLDOWN:
+		return GameBalance::SPECIAL_ATTACK_COOLDOWN_UPGRADE_COST;
 
-			default:
-				return {};
+		default:
+		return {};
 		}
 	}
 	// 通貨と解放条件を満たす場合に指定した恒久強化を購入する。
-	bool TryPurchaseUpgrade( UpgradeType upgradeType )
+	bool TryPurchaseUpgrade(UpgradeType upgradeType)
 	{
-		if ( upgradeType == UpgradeType::e_UNLOCK_SPECIAL_ATTACK && m_PlayerStats.isSpecialAttackUnlocked ) return false;
+		if(upgradeType == UpgradeType::e_UNLOCK_SPECIAL_ATTACK && m_PlayerStats.isSpecialAttackUnlocked) return false;
 
-		if ( upgradeType == UpgradeType::e_SPECIAL_ATTACK_COOLDOWN && !m_PlayerStats.isSpecialAttackUnlocked ) return false;
+		if(upgradeType == UpgradeType::e_SPECIAL_ATTACK_COOLDOWN && !m_PlayerStats.isSpecialAttackUnlocked) return false;
 
-		const int upgradeCost = GetUpgradeCost( upgradeType );
-		if ( m_Currency < upgradeCost ) return false;
+		const int upgradeCost = GetUpgradeCost(upgradeType);
+		if(m_Currency < upgradeCost) return false;
 
 		m_Currency -= upgradeCost;
 
-		switch ( upgradeType )
-		{
-			case UpgradeType::e_MAX_HP:
-				m_PlayerStats.maxHp += GameBalance::MAX_HP_UPGRADE_AMOUNT;
-				break;
+		switch(upgradeType){
+		case UpgradeType::e_MAX_HP:
+		m_PlayerStats.maxHp += GameBalance::MAX_HP_UPGRADE_AMOUNT;
+		break;
 
-			case UpgradeType::e_GUN_DAMAGE:
-				m_PlayerStats.gunDamage += GameBalance::GUN_DAMAGE_UPGRADE_AMOUNT;
-				break;
+		case UpgradeType::e_GUN_DAMAGE:
+		m_PlayerStats.gunDamage += GameBalance::GUN_DAMAGE_UPGRADE_AMOUNT;
+		break;
 
-			case UpgradeType::e_UNLOCK_SPECIAL_ATTACK:
-				m_PlayerStats.isSpecialAttackUnlocked = true;
-				break;
+		case UpgradeType::e_UNLOCK_SPECIAL_ATTACK:
+		m_PlayerStats.isSpecialAttackUnlocked = true;
+		break;
 
-			case UpgradeType::e_SPECIAL_ATTACK_COOLDOWN:
-				m_PlayerStats.specialAttackCooldown = std::max( GameBalance::MIN_SPECIAL_ATTACK_COOLDOWN_SECONDS,
-					m_PlayerStats.specialAttackCooldown - GameBalance::SPECIAL_ATTACK_COOLDOWN_UPGRADE_AMOUNT_SECONDS );
-				break;
+		case UpgradeType::e_SPECIAL_ATTACK_COOLDOWN:
+		m_PlayerStats.specialAttackCooldown = std::max(GameBalance::MIN_SPECIAL_ATTACK_COOLDOWN_SECONDS,
+			m_PlayerStats.specialAttackCooldown - GameBalance::SPECIAL_ATTACK_COOLDOWN_UPGRADE_AMOUNT_SECONDS);
+		break;
 
-			default:
-				return false;
+		default:
+		return false;
 		}
 
 		return true;
@@ -204,29 +201,29 @@ public:
 	// 現在選択しているStageの設定を返す。
 	[[nodiscard]] const StageData& GetCurrentStageData() const
 	{
-		const int stageIndex = GetStageIndex( m_CurrentStage );
+		const int stageIndex = GetStageIndex(m_CurrentStage);
 
-		if ( stageIndex < 0 ) return STAGE_DATA.front();
+		if(stageIndex < 0) return STAGE_DATA.front();
 
 		return STAGE_DATA[stageIndex];
 	}
 	// 指定したStageが初回クリア済みかを返す。
-	[[nodiscard]] bool IsStageCleared( int stageNumber ) const
+	[[nodiscard]] bool IsStageCleared(int stageNumber) const
 	{
-		const int stageIndex = GetStageIndex( stageNumber );
+		const int stageIndex = GetStageIndex(stageNumber);
 
-		if ( stageIndex < 0 ) return false;
+		if(stageIndex < 0) return false;
 
 		return m_StageCleared[stageIndex];
 	}
 	// 指定したStageが移動可能な状態かを返す。
-	[[nodiscard]] bool IsStageUnlocked( int stageNumber ) const
+	[[nodiscard]] bool IsStageUnlocked(int stageNumber) const
 	{
-		const int stageIndex = GetStageIndex( stageNumber );
+		const int stageIndex = GetStageIndex(stageNumber);
 
-		if ( stageIndex < 0 ) return false;
+		if(stageIndex < 0) return false;
 
-		if ( stageIndex == 0 ) return true;
+		if(stageIndex == 0) return true;
 
 		return m_StageCleared[stageIndex - 1];
 	}
@@ -246,36 +243,36 @@ public:
 private:
 	//========= Stage番号補助関数=========
 	// 指定したStage番号をStage配列のIndexへ変換し、範囲外なら-1を返す。
-	[[nodiscard]] int GetStageIndex( int stageNumber ) const
+	[[nodiscard]] int GetStageIndex(int stageNumber) const
 	{
 		const int stageIndex = stageNumber - StageConstants::FIRST_STAGE_NUMBER;
 
-		if ( stageIndex < 0 || stageIndex >= static_cast<int>( m_StageCleared.size() ) ) return -1;
+		if(stageIndex < 0 || stageIndex >= static_cast<int>(m_StageCleared.size())) return -1;
 
 		return stageIndex;
 	}
 
 	//========= Stage進行状態=========
 	// 現在選択しているStage番号。
-	int m_CurrentStage { StageConstants::FIRST_STAGE_NUMBER };
+	int m_CurrentStage{StageConstants::FIRST_STAGE_NUMBER};
 	// 各Stageの初回クリア状態。
-	std::array<bool, StageConstants::MAX_STAGE_COUNT> m_StageCleared {};
+	std::array<bool,StageConstants::MAX_STAGE_COUNT> m_StageCleared{};
 
 	//========= 通貨・累計記録=========
 	// 現在所持している通貨。
-	int m_Currency {};
+	int m_Currency{};
 	// 通貨に変換しきれていない与ダメージの端数。
-	float m_DamageCurrencyRemainder {};
+	float m_DamageCurrencyRemainder{};
 	// 累計で敵へ与えたダメージ。
-	float m_TotalDamageDealt {};
+	float m_TotalDamageDealt{};
 	// 累計死亡回数。
-	int m_TotalDeaths {};
+	int m_TotalDeaths{};
 	// 累計敵撃破数。
-	int m_TotalEnemiesDefeated {};
+	int m_TotalEnemiesDefeated{};
 	// 累計プレイ時間を秒で保持する。
-	float m_TotalPlayTime {};
+	float m_TotalPlayTime{};
 
 	//========= Player恒久強化状態=========
 	// Playerの恒久強化後能力。
-	PlayerStats m_PlayerStats {};
+	PlayerStats m_PlayerStats{};
 };

@@ -9,11 +9,11 @@ class Transform final
 public:
 	//========= Setter関数=========
 	// ObjectのWorld座標を設定する。
-	void SetPosition( const DirectX::XMFLOAT3& position ) { m_Position = position; }
+	void SetPosition(const DirectX::XMFLOAT3& position) { m_Position = position; }
 	// ObjectのEuler角RotationをRadianで設定する。
-	void SetRotation( const DirectX::XMFLOAT3& rotation ) { m_Rotation = rotation; }
+	void SetRotation(const DirectX::XMFLOAT3& rotation) { m_Rotation = rotation; }
 	// Objectの各軸Scaleを設定する。
-	void SetScale( const DirectX::XMFLOAT3& scale ) { m_Scale = scale; }
+	void SetScale(const DirectX::XMFLOAT3& scale) { m_Scale = scale; }
 
 	//========= Getter関数=========
 	// ObjectのWorld座標を返す。
@@ -27,9 +27,9 @@ public:
 private:
 	//========= Transform状態=========
 	// ObjectのWorld座標。
-	DirectX::XMFLOAT3 m_Position {};
+	DirectX::XMFLOAT3 m_Position{};
 	// ObjectのEuler角Rotation。単位はRadian。
-	DirectX::XMFLOAT3 m_Rotation {};
+	DirectX::XMFLOAT3 m_Rotation{};
 	// Objectの各軸Scale。
-	DirectX::XMFLOAT3 m_Scale { 1.0f, 1.0f, 1.0f };
+	DirectX::XMFLOAT3 m_Scale{1.0f,1.0f,1.0f};
 };

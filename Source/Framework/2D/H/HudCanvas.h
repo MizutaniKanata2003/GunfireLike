@@ -15,15 +15,15 @@ public:
 
 	//========= 生成関数=========
 	// 指定したRender TargetサイズからCanvas Scaleと中央寄せOffsetを計算する。
-	HudCanvas( unsigned int renderWidth, unsigned int renderHeight );
+	HudCanvas(unsigned int renderWidth,unsigned int renderHeight);
 
 	//========= 座標変換関数=========
 	// Virtual Canvas座標をRender Target座標へ変換する。
-	[[nodiscard]] DirectX::XMFLOAT2 ToScreenPosition( const DirectX::XMFLOAT2& virtualPosition ) const;
+	[[nodiscard]] DirectX::XMFLOAT2 ToScreenPosition(const DirectX::XMFLOAT2& virtualPosition) const;
 	// Virtual CanvasサイズをRender Targetサイズへ変換する。
-	[[nodiscard]] DirectX::XMFLOAT2 ToScreenSize( const DirectX::XMFLOAT2& virtualSize ) const;
+	[[nodiscard]] DirectX::XMFLOAT2 ToScreenSize(const DirectX::XMFLOAT2& virtualSize) const;
 	// Virtual Canvas基準の文字ScaleをRender Target基準のScaleへ変換する。
-	[[nodiscard]] float ToScreenScale( float virtualScale ) const;
+	[[nodiscard]] float ToScreenScale(float virtualScale) const;
 
 	//========= Getter関数=========
 	// Virtual CanvasをRender Targetへ収める均一Scaleを返す。
@@ -33,7 +33,7 @@ public:
 private:
 	//========= Canvas変換状態=========
 	// Virtual CanvasをRender Targetへ収める均一Scale。
-	float m_Scale {};
+	float m_Scale{};
 	// Render Target内でVirtual Canvasを中央寄せするOffset。
-	DirectX::XMFLOAT2 m_Offset {};
+	DirectX::XMFLOAT2 m_Offset{};
 };

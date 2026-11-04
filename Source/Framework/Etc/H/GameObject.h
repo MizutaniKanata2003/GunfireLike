@@ -10,7 +10,7 @@ public:
 
 	//========= 純粋仮想関数=========
 	// フレームごとのゲームオブジェクト更新処理を行う。
-	virtual void Update( float deltaTime ) = 0;
+	virtual void Update(float deltaTime) = 0;
 	// ゲームオブジェクトを描画する。
 	virtual void Draw() = 0;
 
@@ -32,5 +32,5 @@ public:
 private:
 	//========= 状態管理=========
 	// 管理側がオブジェクトを削除するべきかを示すフラグ。
-	bool m_IsDestroyRequested {};
+	bool m_IsDestroyRequested{};
 };

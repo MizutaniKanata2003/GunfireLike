@@ -14,12 +14,12 @@ class InputSystem;
 class SceneManager;
 
 // タイトル画面の入力、UI描画、BGM、Scene遷移を管理する。
-class TitleScene final : public IScene
+class TitleScene final: public IScene
 {
 public:
 	//========= 生成関数=========
 	// TitleSceneが使用するSceneManagerとFramework Systemを登録する。
-	TitleScene( SceneManager& sceneManager, InputSystem& inputSystem, GraphicsSystem& graphicsSystem, AudioSystem& audioSystem );
+	TitleScene(SceneManager& sceneManager,InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem);
 
 	//========= Sceneライフサイクル関数=========
 	// タイトル画面の入力設定、HUD、文字、BGMを初期化する。
@@ -27,7 +27,7 @@ public:
 	// HUDと文字描画に使用する深い描画Resourceを初期化する。
 	bool Init() override;
 	// タイトル画面の入力を更新する。
-	void Update( float deltaTime ) override;
+	void Update(float deltaTime) override;
 	// タイトル画面の背景、操作説明、ボタンを描画する。
 	void Draw() override;
 	// タイトル画面で使用したHUDと文字描画リソースを終了する。

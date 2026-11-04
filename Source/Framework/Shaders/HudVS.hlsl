@@ -1,41 +1,41 @@
 //========= 定数バッファ=========
-cbuffer HudBuffer : register( b0 )
+cbuffer HudBuffer: register(b0)
 {
-    float4 g_Rectangle;
-    float4 g_Color;
-    float2 g_RenderSize;
-    float2 g_Padding;
+  float4 g_Rectangle;
+  float4 g_Color;
+  float2 g_RenderSize;
+  float2 g_Padding;
 };
 
 //========= Vertex Shader入力=========
 // HudRendererのe_POSITIONに対応する。
 struct VertexInput
 {
-    float2 position : POSITION;
+  float2 position: POSITION;
 };
 
 //========= Pixel Shader入力=========
 struct PixelInput
 {
-    float4 position : SV_POSITION;
-    float4 color : COLOR0;
+  float4 position: SV_POSITION;
+  float4 color: COLOR0;
 };
 
 //========= Vertex Shader=========
-PixelInput main( VertexInput input )
+PixelInput main(VertexInput input)
 {
-    PixelInput output;
+  PixelInput output;
 
     // 0.0から1.0のQuad座標をHUDのピクセル座標へ変換する。
-    const float2 pixelPosition = g_Rectangle.xy + input.position * g_Rectangle.zw;
+  const float2 pixelPosition = g_Rectangle.xy + input.position * g_Rectangle.zw;
 
     // Render Targetサイズを使ってピクセル座標を0.0から1.0へ正規化する。
-    const float2 normalizedPosition = pixelPosition / g_RenderSize;
+  const float2 normalizedPosition = pixelPosition / g_RenderSize;
 
     // 正規化座標をDirectXのクリップ座標へ変換する。
-    output.position = float4( normalizedPosition.x * 2.0f - 1.0f, 1.0f - normalizedPosition.y * 2.0f, 0.0f, 1.0f );
+  output.position = float4(normalizedPosition.x * 2.0f - 1.0f,1.0f - normalizedPosition.y * 2.0f,0.0f,1.0f);
 
-    output.color = g_Color;
+  output.color = g_Color;
 
-    return output;
+  return output;
 }
