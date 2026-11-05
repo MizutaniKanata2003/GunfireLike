@@ -11,7 +11,7 @@
 namespace
 {
 	//========= 移動範囲定数=========
-		// 床の表示範囲に合わせたX軸の移動可能領域。
+	// 床の表示範囲に合わせたX軸の移動可能領域。
 	constexpr float STAGE_MIN_X = -9.5f;
 	constexpr float STAGE_MAX_X = 9.5f;
 
