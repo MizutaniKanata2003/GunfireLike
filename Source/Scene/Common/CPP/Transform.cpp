@@ -1,10 +1,12 @@
 #include "../H/Transform.h"
 
-// Scale、Rotation、Translationを合成したWorld行列を返す。
-DirectX::XMMATRIX Transform::GetWorldMatrix() const
+// Scale、Rotation、Translationの順にWorld行列を合成する。
+// 戻り値: 現在のTransform状態を反映したWorld行列。
+XMMATRIX Transform::GetWorldMatrix() const
 {
+	// 既存の合成順と、XをPitch、YをYaw、ZをRollへ渡す対応を維持する。
 	return
-		DirectX::XMMatrixScaling(m_Scale.x,m_Scale.y,m_Scale.z) *
-		DirectX::XMMatrixRotationRollPitchYaw(m_Rotation.x,m_Rotation.y,m_Rotation.z) *
-		DirectX::XMMatrixTranslation(m_Position.x,m_Position.y,m_Position.z);
+		XMMatrixScaling(m_scale.x,m_scale.y,m_scale.z) *
+		XMMatrixRotationRollPitchYaw(m_rotation.x,m_rotation.y,m_rotation.z) *
+		XMMatrixTranslation(m_position.x,m_position.y,m_position.z);
 }
