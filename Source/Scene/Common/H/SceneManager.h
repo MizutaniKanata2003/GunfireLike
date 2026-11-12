@@ -4,7 +4,6 @@
 #include <memory>
 
 //========= Scene インクルード=========
-#include "GameProgress.h"
 #include "IScene.h"
 
 //========= Framework インクルード=========
@@ -38,15 +37,6 @@ public:
 	template<class TScene>
 	void RequestSceneChange() { m_NextScene = std::make_unique<TScene>(*this,*m_InputSystem,*m_GraphicsSystem,*m_AudioSystem); }
 
-	//========= ゲーム進捗操作関数=========
-	// 新しいゲーム開始時に進捗を初期化する。
-	void StartNewGame() { m_GameProgress.Initialize(); }
-
-	//========= Getter関数=========
-	// Sceneをまたいで維持するゲーム進捗を返す。
-	[[nodiscard]] GameProgress& GetGameProgress() { return m_GameProgress; }
-	// Sceneをまたいで維持する読み取り専用のゲーム進捗を返す。
-	[[nodiscard]] const GameProgress& GetGameProgress() const { return m_GameProgress; }
 private:
 	//========= 補助関数=========
 	// 予約済みSceneを現在Sceneへ反映し、初期化とフェードインを行う。
@@ -65,10 +55,6 @@ private:
 	std::unique_ptr<IScene> m_CurrentScene{};
 	// 次の遷移時に現在Sceneへ切り替えるScene。
 	std::unique_ptr<IScene> m_NextScene{};
-
-	//========= ゲーム進捗=========
-	// Sceneをまたいで維持するゲーム進捗。
-	GameProgress m_GameProgress{};
 
 	//========= Scene遷移演出=========
 	// Scene遷移時に黒画面のフェードを表示する。

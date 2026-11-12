@@ -7,7 +7,6 @@
 #include "Framework/Input/H/InputSystem.h"
 
 //========= Scene インクルード=========
-#include "Scene/GameScene/H/GameScene.h"
 #include "Scene/TitleScene/H/TitleScene.h"
 
 namespace
@@ -33,8 +32,6 @@ void SceneManager::Initialize(InputSystem& inputSystem,GraphicsSystem& graphicsS
 	m_InputSystem = &inputSystem;
 	m_GraphicsSystem = &graphicsSystem;
 	m_AudioSystem = &audioSystem;
-
-	StartNewGame();
 
 	// TitleSceneを生成して初期化し、開始時のフェードインを開始する。
 	RequestSceneChange<TitleScene>();

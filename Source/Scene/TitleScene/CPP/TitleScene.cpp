@@ -65,3 +65,4 @@ void TitleScene::Draw()
 void TitleScene::Finalize()
 {
 	m_hudTextRenderer.Uninit();
+}
