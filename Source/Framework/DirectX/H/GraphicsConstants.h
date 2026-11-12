@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // Shaderへ転送するCamera・Object・Material・Light・PostProcessのCPU側データ構造を定義する。
 // GPU Resourceの生成・更新・Bindは担当しない。フィールド順・型・サイズは対応HLSLと一致させる。
@@ -59,7 +59,7 @@ struct POST_PROCESS_CONSTANTS final
 {
 	// 処理対象画像の幅と高さ。
 	XMFLOAT2 screenSize{};
-	// 処理対象画像の幅と高さの逆数。
+	// 処理対象画像の幅と高さの逆数。値の計算は利用側が担当する。
 	XMFLOAT2 inverseScreenSize{};
 	// 利用側が設定する時間パラメーター。解釈と単位は対応Shaderとの契約で決める。
 	float time{};
@@ -70,7 +70,7 @@ struct POST_PROCESS_CONSTANTS final
 };
 
 //========= 転送サイズ検証=========
-// 型の改名・省略によって既存の転送サイズが変化していないことを確認する。
+// 既存の型サイズを検証する。サイズ一致だけでHLSLのフィールド配置やBind先の正しさは保証しない。
 static_assert(sizeof(CAMERA_CONSTANTS) == 64,"CAMERA_CONSTANTSは64バイトである必要があります。");
 static_assert(sizeof(OBJECT_CONSTANTS) == 80,"OBJECT_CONSTANTSは80バイトである必要があります。");
 static_assert(sizeof(MATERIAL_CONSTANTS) == 32,"MATERIAL_CONSTANTSは32バイトである必要があります。");

@@ -1,4 +1,6 @@
-#include "../H/BasicMeshRenderer.h"
+﻿#include "../H/BasicMeshRenderer.h"
+
+// 面ごとのUVを持つCubeとShader・Texture・Bufferを生成し、外観設定に応じた描画と解放を実装する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <cstddef>
@@ -11,12 +13,13 @@
 #include "Framework/DirectX/H/TextureLoader.h"
 #include "Framework/Etc/H/Logger.h"
 
-// Cubeの生成・Shader/Textureの読込に使う定数と、内部用の失敗ログ処理をまとめる。
+// Cube定義、Assetパス、Input Layoutの定数と、内部用の失敗ログをまとめる。
 namespace
 {
 	//========= Cubeメッシュ定数=========
-	// Cubeの頂点数とIndex数。
+	// 6面に独立した4頂点ずつを割り当てるための頂点数。
 	constexpr unsigned int ns_CUBE_VERTEX_COUNT = 24;
+	// 各面2三角形、各三角形3Indexで構成するIndex数。
 	constexpr unsigned int ns_CUBE_INDEX_COUNT = 36;
 
 	// Cubeの各軸における最小座標と最大座標。
@@ -35,19 +38,21 @@ namespace
 	constexpr wchar_t ns_OBJECT_TEXTURE_PATH[] = L"Assets/Textures/Object.png";
 
 	//========= Input Layout定数=========
-	// VERTEX Shader入力に使用する頂点属性のセマンティック名。
+	// Vertex Shader入力に使用する頂点属性のセマンティック名。
 	constexpr char ns_POSITION_SEMANTIC_NAME[] = "POSITION";
 	constexpr char ns_TEXCOORD_SEMANTIC_NAME[] = "TEXCOORD";
 
 	//========= 補助関数=========
 	// GraphicsカテゴリへResource生成失敗を出力する。
-	// functionName: 失敗した処理を示す有効な文字列。nullptrは渡さない。
+	// functionName: 失敗した処理を示す終端付きワイド文字列。nullptr不可。
 	// result: 16進数8桁で出力するHRESULT。
 	void WriteBasicMeshGraphicsError(const wchar_t* functionName,HRESULT result)
 	{
+		// 処理名へHRESULTを連結するためのログ文字列を用意する。
 		std::wstring message{functionName};
 		message += L" に失敗しました。HRESULT: 0x";
 
+		// HRESULTを4bitずつ上位から取り出し、符号付き表示ではなく16進数として記録する。
 		constexpr wchar_t HEX_DIGITS[]{L"0123456789ABCDEF"};
 		const unsigned long result_value = static_cast<unsigned long>(result);
 
@@ -56,13 +61,16 @@ namespace
 			message += HEX_DIGITS[digit];
 		}
 
+		// 組み立てた一つのメッセージをGraphicsカテゴリへ出力する。
 		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_GRAPHICS,message);
 	}
 }
 
+//========= ライフサイクル・描画関数=========
 // Cubeメッシュ、Shader、Texture、Sampler、定数バッファを初期化する。
 bool BasicMeshRenderer::Initialize(GraphicsSystem& graphicsSystem)
 {
+	// 再初期化時に古いResourceを残さず、以後の失敗経路でも同じUninitで部分解放できる状態にする。
 	Uninit();
 
 	// GPUリソースの生成に使用するDirect3D Deviceを取得する。
@@ -131,11 +139,10 @@ bool BasicMeshRenderer::Initialize(GraphicsSystem& graphicsSystem)
 	vertex_buffer_desc.ByteWidth = static_cast<UINT>(sizeof(vertices));
 	vertex_buffer_desc.Usage = D3D11_USAGE_DEFAULT;
 	vertex_buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-
 	D3D11_SUBRESOURCE_DATA vertex_data{};
 	vertex_data.pSysMem = vertices;
-
 	const HRESULT vertex_buffer_result = device->CreateBuffer(&vertex_buffer_desc,&vertex_data,m_vertexBuffer.GetAddressOf());
+
 	if(FAILED(vertex_buffer_result)){
 		WriteBasicMeshGraphicsError(L"ID3D11Device::CreateBuffer(VertexBuffer)",vertex_buffer_result);
 		Uninit();
@@ -147,18 +154,17 @@ bool BasicMeshRenderer::Initialize(GraphicsSystem& graphicsSystem)
 	index_buffer_desc.ByteWidth = static_cast<UINT>(sizeof(indices));
 	index_buffer_desc.Usage = D3D11_USAGE_DEFAULT;
 	index_buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-
 	D3D11_SUBRESOURCE_DATA index_data{};
 	index_data.pSysMem = indices;
-
 	const HRESULT index_buffer_result = device->CreateBuffer(&index_buffer_desc,&index_data,m_indexBuffer.GetAddressOf());
+
 	if(FAILED(index_buffer_result)){
 		WriteBasicMeshGraphicsError(L"ID3D11Device::CreateBuffer(IndexBuffer)",index_buffer_result);
 		Uninit();
 		return false;
 	}
 
-	// VERTEX ShaderのCSO読込、Shader生成、Input Layout生成を行う。
+	// Vertex ShaderのCSO読込、Shader生成、Input Layout生成を行う。
 	std::vector<char> vertex_shader_binary{};
 
 	if(!ShaderBinaryLoader::Load(ns_BASIC_COLOR_VERTEX_SHADER_CSO_PATH,vertex_shader_binary)){
@@ -166,6 +172,7 @@ bool BasicMeshRenderer::Initialize(GraphicsSystem& graphicsSystem)
 		return false;
 	}
 
+	// 読み込んだバイナリからVertex Shaderを生成する。失敗時は全所有Resourceを終了する。
 	const HRESULT vertex_shader_result = device->CreateVertexShader(vertex_shader_binary.data(),vertex_shader_binary.size(),
 																																	nullptr,m_vertexShader.GetAddressOf());
 
@@ -175,6 +182,7 @@ bool BasicMeshRenderer::Initialize(GraphicsSystem& graphicsSystem)
 		return false;
 	}
 
+	// 3成分Positionと2成分UVを、VERTEX内の実際のOffsetでShader入力へ対応付ける。
 	const D3D11_INPUT_ELEMENT_DESC input_elements[]
 	{
 		{ns_POSITION_SEMANTIC_NAME,0,DXGI_FORMAT_R32G32B32_FLOAT,0,offsetof(VERTEX,position),D3D11_INPUT_PER_VERTEX_DATA,0},
@@ -198,6 +206,7 @@ bool BasicMeshRenderer::Initialize(GraphicsSystem& graphicsSystem)
 		return false;
 	}
 
+	// 読み込んだPixel ShaderバイナリからGPU Resourceを生成する。
 	const HRESULT pixel_shader_result = device->CreatePixelShader(pixel_shader_binary.data(),pixel_shader_binary.size(),
 																																nullptr,m_pixelShader.GetAddressOf());
 
@@ -209,20 +218,25 @@ bool BasicMeshRenderer::Initialize(GraphicsSystem& graphicsSystem)
 
 	// Camera、Object、Material用の定数バッファを生成する。
 	HRESULT camera_buffer_result{};
+
 	if(!m_cameraBuffer.Init(device,camera_buffer_result)){
 		WriteBasicMeshGraphicsError(L"ID3D11Device::CreateBuffer(CAMERA_CONSTANTS)",camera_buffer_result);
 		Uninit();
 		return false;
 	}
 
+	// ObjectのWorld行列と色を転送するBufferを生成する。
 	HRESULT object_buffer_result{};
+
 	if(!m_objectBuffer.Init(device,object_buffer_result)){
 		WriteBasicMeshGraphicsError(L"ID3D11Device::CreateBuffer(OBJECT_CONSTANTS)",object_buffer_result);
 		Uninit();
 		return false;
 	}
 
+	// UV倍率とTexture使用フラグを転送するBufferを生成する。
 	HRESULT material_buffer_result{};
+
 	if(!m_materialBuffer.Init(device,material_buffer_result)){
 		WriteBasicMeshGraphicsError(L"ID3D11Device::CreateBuffer(MATERIAL_CONSTANTS)",material_buffer_result);
 		Uninit();
@@ -231,8 +245,8 @@ bool BasicMeshRenderer::Initialize(GraphicsSystem& graphicsSystem)
 
 	// 床、壁、画像付きオブジェクトに使用するテクスチャを読み込む。
 	if(!TextureLoader::LoadWicTexture(device,ns_FLOOR_TEXTURE_PATH,m_floorTextureView) ||
-		 !TextureLoader::LoadWicTexture(device,ns_WALL_TEXTURE_PATH,m_wallTextureView) ||
-		 !TextureLoader::LoadWicTexture(device,ns_OBJECT_TEXTURE_PATH,m_objectTextureView)){
+	 !TextureLoader::LoadWicTexture(device,ns_WALL_TEXTURE_PATH,m_wallTextureView) ||
+	 !TextureLoader::LoadWicTexture(device,ns_OBJECT_TEXTURE_PATH,m_objectTextureView)){
 		Uninit();
 		return false;
 	}
@@ -246,13 +260,16 @@ bool BasicMeshRenderer::Initialize(GraphicsSystem& graphicsSystem)
 	sampler_description.MinLOD = 0.0f;
 	sampler_description.MaxLOD = D3D11_FLOAT32_MAX;
 
+	// 設定をGPUのSampler Stateとして生成し、失敗時は部分Resourceを終了する。
 	const HRESULT sampler_state_result = device->CreateSamplerState(&sampler_description,m_textureSampler.GetAddressOf());
+
 	if(FAILED(sampler_state_result)){
 		WriteBasicMeshGraphicsError(L"ID3D11Device::CreateSamplerState",sampler_state_result);
 		Uninit();
 		return false;
 	}
 
+	// 全Resource生成の成功後にだけ、描画へ使用するIndex数を確定する。
 	m_indexCount = ns_CUBE_INDEX_COUNT;
 
 	return true;
@@ -262,6 +279,7 @@ bool BasicMeshRenderer::Initialize(GraphicsSystem& graphicsSystem)
 void BasicMeshRenderer::DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const XMMATRIX& viewMatrix,
 																 const XMMATRIX& projectionMatrix,const XMFLOAT4& color,const XMFLOAT2& UVTiling,TextureType textureType)
 {
+	// 描画に必要なResourceとIndex数が揃わない場合は、Context取得やBindを行わない。
 	if(!m_vertexBuffer || !m_indexBuffer || !m_cameraBuffer.IsValid() ||
 	!m_objectBuffer.IsValid() || !m_materialBuffer.IsValid() || !m_vertexShader ||
 	!m_pixelShader || !m_inputLayout || !m_textureSampler || m_indexCount == 0)return;
@@ -274,6 +292,7 @@ void BasicMeshRenderer::DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& 
 	ID3D11ShaderResourceView* texture_view{};
 	float use_texture{};
 
+	// Colorと未定義値では既定のnullptr・使用フラグ0を保つ。各Textureのnull確認は追加しない。
 	switch(textureType){
 	case TextureType::Floor:
 	texture_view = m_floorTextureView.Get();
@@ -299,13 +318,16 @@ void BasicMeshRenderer::DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& 
 	const XMMATRIX view_projection_matrix = XMMatrixTranspose(viewMatrix * projectionMatrix);
 	const XMMATRIX transposed_world_matrix = XMMatrixTranspose(worldMatrix);
 
+	// 転置済みViewProjectionをCamera用の保存型へ格納する。
 	CAMERA_CONSTANTS camera_constants{};
 	XMStoreFloat4x4(&camera_constants.viewProjectionMatrix,view_projection_matrix);
 
+	// 転置済みWorld行列と指定RGBA色をObject用データへ格納する。
 	OBJECT_CONSTANTS object_constants{};
 	XMStoreFloat4x4(&object_constants.worldMatrix,transposed_world_matrix);
 	object_constants.color = color;
 
+	// 既定のbaseColor・paddingを維持し、UV倍率と使用フラグだけを設定する。
 	MATERIAL_CONSTANTS material_constants{};
 	material_constants.uvTiling = UVTiling;
 	material_constants.useTexture = use_texture;
@@ -321,15 +343,18 @@ void BasicMeshRenderer::DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& 
 	ID3D11Buffer* material_buffers[]{m_materialBuffer.Get()};
 	ID3D11SamplerState* samplers[]{m_textureSampler.Get()};
 
+	// Bind前に3種類の定数Bufferを更新し、今回のCubeの変換・外観を反映する。
 	m_cameraBuffer.Update(context,camera_constants);
 	m_objectBuffer.Update(context,object_constants);
 	m_materialBuffer.Update(context,material_constants);
 
+	// 頂点・Index・Input Layout・Topologyを今回のCube描画用に設定する。
 	context->IASetVertexBuffers(0,1,vertex_buffers,&vertex_stride,&vertex_offset);
 	context->IASetIndexBuffer(m_indexBuffer.Get(),DXGI_FORMAT_R16_UINT,0);
 	context->IASetInputLayout(m_inputLayout.Get());
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+	// Shaderを設定し、VSのb0/b1/b2とPSのb1/b2へ既存どおりBufferをBindする。
 	context->VSSetShader(m_vertexShader.Get(),nullptr,0);
 	context->PSSetShader(m_pixelShader.Get(),nullptr,0);
 	context->VSSetConstantBuffers(0,1,camera_buffers);
@@ -365,5 +390,6 @@ void BasicMeshRenderer::Uninit()
 	m_pixelShader.Reset();
 	m_vertexShader.Reset();
 
+	// 解放後にIndex数だけが残らないよう、描画用カウントも0へ戻す。
 	m_indexCount = {};
 }
