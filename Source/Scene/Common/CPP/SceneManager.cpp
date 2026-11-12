@@ -1,4 +1,10 @@
-#include "../H/SceneManager.h"
+﻿#include "../H/SceneManager.h"
+
+// Sceneの所有権移動、初期化成否に応じた切替、フェード進行と終了処理を実装する。
+
+//========= C++標準ライブラリ インクルード=========
+#include <memory>
+#include <utility>
 
 //========= Framework インクルード=========
 #include "Framework/Audio/H/AudioSystem.h"
@@ -9,105 +15,111 @@
 //========= Scene インクルード=========
 #include "Scene/TitleScene/H/TitleScene.h"
 
+// Scene切替の前後に適用するフェード時間をまとめる。
 namespace
 {
 	//========= Scene遷移定数=========
-	// Scene遷移時のフェードにかける秒数。
-	constexpr float SCENE_FADE_DURATION_SECONDS = 0.35f;
+	// フェードイン・アウトそれぞれにかける時間。単位は秒。
+	constexpr float ns_SCENE_FADE_DURATION_SECONDS = 0.35f;
 }
 
-// SceneManagerが保持するSceneを安全に終了する。
+//========= 生成・破棄関数=========
+// 明示的な終了を忘れた場合も、保持するSceneの終了処理を実行する。
 SceneManager::~SceneManager()
 {
+	// SceneのResourceを所有ポインターの破棄より先に終了する。
 	Finalize();
 }
 
-// SceneManagerが使用するFramework Systemを登録し、TitleSceneを開始する。
+//========= ライフサイクル関数=========
+// 既存の管理状態を終了し、登録したSystemを使ってTitleSceneの開始を試行する。
 void SceneManager::Initialize(InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem)
 {
-	// 二重初期化時に既存SceneとFramework参照を安全に解除する。
+	// 再初期化でも以前のSceneを残さず、以前のSystem参照を使って終了を完了させる。
 	Finalize();
 
-	// Scene生成に必要なFramework Systemへの非所有参照を登録する。
-	m_InputSystem = &inputSystem;
-	m_GraphicsSystem = &graphicsSystem;
-	m_AudioSystem = &audioSystem;
+	// Systemの所有権は受け取らず、以後のScene構築に使う参照先だけを登録する。
+	m_inputSystem = &inputSystem;
+	m_graphicsSystem = &graphicsSystem;
+	m_audioSystem = &audioSystem;
 
-	// TitleSceneを生成して初期化し、開始時のフェードインを開始する。
+	// 起動時は黒への待機を挟まずTitleSceneの初期化を試行し、フェードインへ進む。
 	RequestSceneChange<TitleScene>();
 	ApplySceneChange();
 }
 
-// Scene更新、フェード更新、予約済みSceneの切替を行う。
+// フェード状態に応じて現在Sceneの更新と予約Sceneの切替を制御する。
 void SceneManager::Update(float deltaTime)
 {
-	// フェードアウト中は現在Sceneを更新せず、黒画面への遷移中にゲーム操作が進むことを防ぐ。
-	if(!m_FadeOverlay.IsPlaying() && m_CurrentScene)m_CurrentScene->Update(deltaTime);
+	// フェードイン・アウトの再生中はScene更新を止め、遷移演出中のゲーム進行を抑止する。
+	if(!m_fadeOverlay.IsPlaying() && m_currentScene)m_currentScene->Update(deltaTime);
 
-	// 次Sceneが予約され、フェード中でなければ黒へのフェードアウトを開始する。
-	if(m_NextScene && !m_FadeOverlay.IsPlaying())m_FadeOverlay.StartFadeOut(SCENE_FADE_DURATION_SECONDS);
+	// Scene更新内で作られた予約も、このフレームでフェードアウト開始の対象にする。
+	if(m_nextScene && !m_fadeOverlay.IsPlaying())m_fadeOverlay.StartFadeOut(ns_SCENE_FADE_DURATION_SECONDS);
 
-	m_FadeOverlay.Update(deltaTime);
+	// 開始したフレームも含めてフェードを進め、切替判定には更新後のAlphaを使う。
+	m_fadeOverlay.Update(deltaTime);
 
-	// 画面が黒くなった瞬間にだけ予約済みSceneを現在Sceneへ反映する。
-	if(m_NextScene && m_FadeOverlay.IsFadeOutFinished())ApplySceneChange();
+	// 予約があり、黒い終端へ達した場合だけSceneの初期化と所有権の切替を試行する。
+	if(m_nextScene && m_fadeOverlay.IsFadeOutFinished())ApplySceneChange();
 }
 
-// 現在Sceneとフェードを描画する。
+// 現在Sceneとフェードを既存順序で描画する。
 void SceneManager::Draw()
 {
-	if(m_CurrentScene)m_CurrentScene->Draw();
+	// Sceneがない場合もフェードは描けるよう、Sceneの有無はこの描画だけで判定する。
+	if(m_currentScene)m_currentScene->Draw();
 
-	m_FadeOverlay.Draw();
+	// Sceneの描画命令の後にフェードを登録し、遷移演出を重ねる。
+	m_fadeOverlay.Draw();
 }
 
-// 現在Sceneと予約済みSceneを終了し、参照先を解除する。
+// 所有Sceneを終了してから、所有していないSystem参照を解除する。
 void SceneManager::Finalize()
 {
-	// まだ開始していない次Sceneは初期化していないため、そのまま破棄する。
-	m_NextScene.reset();
+	// 通常の予約SceneにはInitialize・Initを行っていないため、Finalizeせず破棄する。
+	m_nextScene.reset();
 
-	// 現在Sceneがある場合だけ、下位Resourceを終了してから破棄する。
-	if(m_CurrentScene){
-		m_CurrentScene->Finalize();
-		m_CurrentScene.reset();
+	// 現在SceneはSystem参照が有効な間にResourceを終了し、その後に実体を破棄する。
+	if(m_currentScene){
+		m_currentScene->Finalize();
+		m_currentScene.reset();
 	}
-	// 所有しないFramework Systemへの参照を解除する。
-	m_InputSystem = nullptr;
-	m_GraphicsSystem = nullptr;
-	m_AudioSystem = nullptr;
+
+	// System自体は終了せず、以後のScene生成に使わないよう非所有ポインターを解除する。
+	m_inputSystem = nullptr;
+	m_graphicsSystem = nullptr;
+	m_audioSystem = nullptr;
 }
 
-// 予約済みSceneを初期化し、成功した場合だけ現在Sceneへ反映してフェードインを開始する。
+//========= 補助関数=========
+// 遷移先を初期化できた場合だけ現在Sceneを終了し、所有権を切り替える。
 void SceneManager::ApplySceneChange()
 {
-	if(!m_NextScene)return;
+	// 切替候補がない場合は、Sceneやフェード状態を変更しない。
+	if(!m_nextScene)return;
 
+	// 予約を一時所有へ移し、遷移先の初期化が成功するまで現在Sceneを保持する。
+	std::unique_ptr<IScene> next_scene = std::move(m_nextScene);
 
-	// 予約済みSceneを一時保持し、初期化成功まで現在Sceneを維持する。
-	std::unique_ptr<IScene> nextScene = std::move(m_NextScene);
-
-	// Scene固有の状態と失敗し得るResourceを順に初期化する。
-	nextScene->Initialize();
-
-	const bool isNextSceneInitialized = nextScene->Init();
-	if(!isNextSceneInitialized){
+	// 初期状態の準備後に失敗し得るResource初期化を行い、falseなら候補だけを終了する。
+	next_scene->Initialize();
+	const bool is_next_scene_initialized = next_scene->Init();
+	if(!is_next_scene_initialized){
+		// 候補の部分Resourceを終了し、保持した現在Sceneへフェードインで戻す。
 		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"次Scene初期化失敗。現在Sceneを維持します。");
-
-		nextScene->Finalize();
-		m_FadeOverlay.StartFadeIn(SCENE_FADE_DURATION_SECONDS);
+		next_scene->Finalize();
+		m_fadeOverlay.StartFadeIn(ns_SCENE_FADE_DURATION_SECONDS);
 		return;
 	}
 
-	// 次Sceneの初期化成功後に現在Sceneの下位Resourceを終了して破棄する。
-	if(m_CurrentScene){
-		m_CurrentScene->Finalize();
-		m_CurrentScene.reset();
+	// 候補の成功後にだけ旧Sceneを終了する。この時点では候補が変更した共有Systemの状態も存在し得る。
+	if(m_currentScene){
+		m_currentScene->Finalize();
+		m_currentScene.reset();
 	}
 
-	// 初期化済みの次Sceneを現在Sceneとして反映する。
-	m_CurrentScene = std::move(nextScene);
-
-	// 実際にSceneを切り替えた直後にフェードインを開始する。
-	m_FadeOverlay.StartFadeIn(SCENE_FADE_DURATION_SECONDS);
+	// 初期化済み候補の所有権を移し、切替後のSceneを黒から表示する。
+	m_currentScene = std::move(next_scene);
+	m_fadeOverlay.StartFadeIn(ns_SCENE_FADE_DURATION_SECONDS);
 }

@@ -1,92 +1,113 @@
-#pragma once
+﻿#pragma once
 
-//========= DirectX インクルード=========
+// Direct3D 11の基盤Resource、描画先、描画Stateを所有し、フレーム処理とResizeを提供する。
+// SceneやMeshの生成・描画命令は呼出側が担当する。Windowは所有しない。
+
+//========= Windows インクルード=========
+#include <windows.h>
+
+//========= 外部ライブラリ インクルード=========
 #include <d3d11.h>
-#include <wrl/client.h>
+
+//========= Framework インクルード=========
+#include "Framework/Etc/H/MathTypes.h"
 
 //========= 列挙型=========
-// 描画対象ごとに適用するDirect3D描画Stateを表す。
+// 描画対象ごとのBlend・Depth・Rasterizer設定を選ぶ。既存の公開型名を互換性のため維持する。
 enum class e_RenderPass
 {
-	// Skyを描画する。
-	e_SKY,
-	// 不透明な3D Objectを描画する。
-	e_OPAQUE,
-	// 半透明な3D Objectを描画する。
-	e_TRANSPARENT,
-	// 画面固定のHUDとTextを描画する。
-	e_SCREEN_UI
+	e_SKY,         // DepthとCullを無効にしたSky用。Alpha Blendは使用しない。
+	e_OPAQUE,      // 既定Depthと背面Cullを使う不透明3D用。
+	e_TRANSPARENT, // Depth書込を止め、Alpha Blendと背面Cullを使う半透明3D用。
+	e_SCREEN_UI    // DepthとCullを無効にし、Alpha Blendを使う画面UI用。
 };
 
-// DirectX 11のDevice、Context、SwapChain、RenderTarget、DepthStencilを管理する。
+// Device・Context・SwapChainと描画先Resourceのライフサイクルを管理する。
 class GraphicsSystem final
 {
 public:
 	//========= ライフサイクル・フレーム制御関数=========
-	// DirectX 11のDevice、Context、SwapChain、RenderTargetを初期化する。
+	// 既存Resourceを終了後、基盤と描画先を生成してOPAQUE Passへ設定する。
+	// windowHandle: SwapChainの表示先となる有効なWindow。所有しない。
+	// width: 初期描画先の幅。単位はpixel。
+	// height: 初期描画先の高さ。単位はpixel。
+	// 戻り値: すべて生成できればtrue。検出した生成失敗ではUninit後にfalse。
+	// Debug構成はDebug Layer付き生成を試し、失敗時は通常生成へ再試行する。
 	bool Init(HWND windowHandle,unsigned int width,unsigned int height);
-	// RenderTargetとDepthStencilをクリアし、フレーム描画を開始する。
+	// BackBufferとDepthをBind・Clearし、OPAQUE Passへ設定する。必要Resourceがなければ何もしない。
+	// clearColor: 有効な4成分RGBA配列。nullptr不可。呼出中だけ参照し、保持しない。
 	void BeginFrame(const float clearColor[4]);
-	// 描画済みフレームをSwapChainへ表示する。
+	// Present(1,0)で表示する。SwapChainがなければ何もしない。失敗はログへ記録する。
 	void EndFrame();
-	// ウィンドウサイズに合わせてRenderTarget、DepthStencil、Viewportを再生成する。
+	// 旧描画先を解放し、BackBufferと描画先を新しい大きさで生成する。
+	// width: 新しい幅。pixel単位。0なら現在状態を変更しない。
+	// height: 新しい高さ。pixel単位。0なら現在状態を変更しない。
+	// SwapChainがなければ何もしない。再生成失敗時に旧描画先を復元する処理は行わない。
 	void Resize(unsigned int width,unsigned int height);
-	// DirectX 11で生成したリソースを解放する。
+	// 描画先、ContextのState、各描画State、SwapChain・Context・Deviceの順で終了する。
+	// 未初期化・部分初期化・終了済みでも呼出可能。呼出側の借用ポインターは使用を終えておく。
 	void Uninit();
 
 	//========= Getter関数=========
-	// DirectX 11 Deviceを返す。
-	[[nodiscard]] ID3D11Device* GetDevice() const { return m_Device.Get(); }
-	// DirectX 11 Device Contextを返す。
-	[[nodiscard]] ID3D11DeviceContext* GetContext() const { return m_Context.Get(); }
-	// 現在のRender Targetの幅を返す。
-	[[nodiscard]] unsigned int GetRenderWidth() const { return m_RenderWidth; }
-	// 現在のRender Targetの高さを返す。
-	[[nodiscard]] unsigned int GetRenderHeight() const { return m_RenderHeight; }
+	// 所有Deviceの借用ポインターを返す。未生成・終了後はnullptr。呼出側へ所有権は移さない。
+	[[nodiscard]] ID3D11Device* GetDevice() const { return m_device.Get(); }
+	// 所有Contextの借用ポインターを返す。未生成・終了後はnullptr。再初期化・終了後は再取得する。
+	[[nodiscard]] ID3D11DeviceContext* GetContext() const { return m_context.Get(); }
+	// 生成済み描画先の幅をpixel単位で返す。ReleaseRenderTargets後は0。
+	[[nodiscard]] unsigned int GetRenderWidth() const { return m_renderWidth; }
+	// 生成済み描画先の高さをpixel単位で返す。ReleaseRenderTargets後は0。
+	[[nodiscard]] unsigned int GetRenderHeight() const { return m_renderHeight; }
 
 	//========= 描画State設定関数=========
-	// 指定した描画Passに必要なBlend、Depth、Rasterizer Stateをまとめて設定する。
+	// Passに応じたBlend・Depth・RasterizerをBindする。以前の状態は保存・復元しない。
+	// renderPass: 適用する公開Pass。未定義値またはContextなしの場合は変更しない。
 	void SetRenderPass(e_RenderPass renderPass);
-	// Alpha Blend Stateの有効・無効を切り替える。
+	// Blend Stateだけを切り替える。Contextがなければ何もしない。
+	// isEnabled: trueで生成済みAlpha Blend、falseで既定のBlendを使用する。
 	void SetAlphaBlendEnabled(bool isEnabled);
-	// Depth Testの有効・無効を切り替える。
+	// Depth Stencil Stateだけを切り替える。Contextがなければ何もしない。
+	// isEnabled: trueで既定Depth、falseでDepth TestとDepth書込の両方を無効にする。
 	void SetDepthTestEnabled(bool isEnabled);
+
 private:
 	//========= 補助関数=========
-	// BackBuffer、RenderTargetView、DepthStencilView、Viewportを生成する。
+	// BackBufferのView、Depth用TextureとViewを生成し、Viewportと保持サイズを設定する。
+	// width: 作成するDepth領域とViewportの幅。pixel単位。
+	// height: 作成するDepth領域とViewportの高さ。pixel単位。
+	// 戻り値: 成功ならtrue。基盤不足ならfalse、検出した生成失敗なら描画先を部分解放してfalse。
 	bool CreateRenderTargets(unsigned int width,unsigned int height);
-	// ウィンドウサイズ変更前にRenderTargetとDepthStencilを解放する。
+	// 描画先Viewを解放して保持サイズを0へ戻す。ContextのBind解除はここでは行わない。
 	void ReleaseRenderTargets();
 
-	//========= Direct3D主要リソース=========
-	// DirectX 11 Deviceを保持する。
-	Microsoft::WRL::ComPtr<ID3D11Device> m_Device{};
-	// 描画コマンドを発行するDevice Context。
-	Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_Context{};
-	// BackBufferの交換と画面表示を行うSwapChain。
-	Microsoft::WRL::ComPtr<IDXGISwapChain> m_SwapChain{};
+	//========= Direct3D主要Resource=========
+	// Resource生成に使用するDeviceを所有する。
+	ComPtr<ID3D11Device> m_device{};
+	// 描画コマンドとState設定を行う即時Contextを所有する。
+	ComPtr<ID3D11DeviceContext> m_context{};
+	// BackBuffer管理と表示を行うSwapChainを所有する。
+	ComPtr<IDXGISwapChain> m_swapChain{};
 
-	//========= RenderTarget・DepthStencil関連=========
-	// BackBufferへ描画するためのRenderTarget View。
-	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_RenderTargetView{};
-	// 3D描画の奥行き判定に使用するDepthStencil View。
-	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_DepthStencilView{};
+	//========= Render Target・Depth Stencil関連=========
+	// BackBufferを描画先に使用するViewを所有する。Resizeで作り直す。
+	ComPtr<ID3D11RenderTargetView> m_renderTargetView{};
+	// 奥行き判定用のViewを所有する。参照するTextureはViewを通して保持する。
+	ComPtr<ID3D11DepthStencilView> m_depthStencilView{};
 
 	//========= Render Targetサイズ=========
-	// 現在生成されているRender Targetの幅。
-	unsigned int m_RenderWidth{};
-	// 現在生成されているRender Targetの高さ。
-	unsigned int m_RenderHeight{};
+	// 最後に生成成功した描画先の幅。単位はpixel。View解放時は0。
+	unsigned int m_renderWidth{};
+	// 最後に生成成功した描画先の高さ。単位はpixel。View解放時は0。
+	unsigned int m_renderHeight{};
 
 	//========= 描画State関連=========
-	// HUDとSkyを描画するときにDepth TestとDepth Writeを無効化するState。
-	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_DepthDisabledState{};
-	// 半透明3D ObjectでDepth Testを維持し、Depth Writeだけ無効化するState。
-	Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_DepthReadOnlyState{};
-	// 半透明HUDなどを描画するときに使用するAlpha Blend State。
-	Microsoft::WRL::ComPtr<ID3D11BlendState> m_AlphaBlendState{};
-	// 不透明3D Objectと半透明3D Objectで背面を除外するRasterizer State。
-	Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_CullBackRasterizerState{};
-	// Skyと画面UIで表裏を除外しないRasterizer State。
-	Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_CullNoneRasterizerState{};
+	// Depth TestとDepth書込を無効にするStateを所有する。
+	ComPtr<ID3D11DepthStencilState> m_depthDisabledState{};
+	// Depth Testを有効にしたまま書込だけを止めるStateを所有する。
+	ComPtr<ID3D11DepthStencilState> m_depthReadOnlyState{};
+	// Src AlphaによるRGB合成に使用するBlend Stateを所有する。
+	ComPtr<ID3D11BlendState> m_alphaBlendState{};
+	// 背面を除外するRasterizer Stateを所有する。
+	ComPtr<ID3D11RasterizerState> m_cullBackRasterizerState{};
+	// 表裏どちらも除外しないRasterizer Stateを所有する。
+	ComPtr<ID3D11RasterizerState> m_cullNoneRasterizerState{};
 };
