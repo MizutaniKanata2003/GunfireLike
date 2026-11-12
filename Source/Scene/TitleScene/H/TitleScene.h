@@ -1,11 +1,12 @@
 #pragma once
 
-//========= Scene インクルード=========
-#include "Scene/Common/H/IScene.h"
+// タイトルから最小構成のGameSceneへ遷移する。
 
 //========= Framework インクルード=========
-#include "Framework/2D/H/HudRenderer.h"
 #include "Framework/2D/H/HudTextRenderer.h"
+
+//========= Scene インクルード=========
+#include "Scene/Common/H/IScene.h"
 
 //========= 前方宣言=========
 class AudioSystem;
@@ -13,43 +14,42 @@ class GraphicsSystem;
 class InputSystem;
 class SceneManager;
 
-// タイトル画面の入力、UI描画、BGM、Scene遷移を管理する。
 class TitleScene final: public IScene
 {
 public:
 	//========= 生成関数=========
-	// TitleSceneが使用するSceneManagerとFramework Systemを登録する。
+	// Sceneが使用する非所有参照を登録する。
+	// sceneManager: Scene遷移の管理先。Sceneより長く生存する。
+	// inputSystem: 入力の取得先。Sceneより長く生存する。
+	// graphicsSystem: 描画の管理先。Sceneより長く生存する。
+	// audioSystem: 音声の管理先。Sceneより長く生存する。
 	TitleScene(SceneManager& sceneManager,InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem);
 
 	//========= Sceneライフサイクル関数=========
-	// タイトル画面の入力設定、HUD、文字、BGMを初期化する。
+	// 初期状態を設定する。Resource生成はInitで行う。
 	void Initialize() override;
-	// HUDと文字描画に使用する深い描画Resourceを初期化する。
+	// 描画Resourceを生成する。失敗時はfalseを返す。
 	bool Init() override;
-	// タイトル画面の入力を更新する。
+	// 入力とScene状態を更新する。
+	// deltaTime: この更新で進める時間。単位は秒。
 	void Update(float deltaTime) override;
-	// タイトル画面の背景、操作説明、ボタンを描画する。
+	// 現在のSceneを描画する。
 	void Draw() override;
-	// タイトル画面で使用したHUDと文字描画リソースを終了する。
+	// 所有する描画Resourceを解放する。繰り返し呼出可能。
 	void Finalize() override;
+
 private:
-	//========= 補助関数=========
-	// 新しいゲームを開始してShopSceneへの遷移を予約する。
-	void StartGame();
+	//========= System・Scene参照=========
+	// Scene遷移に使用する非所有参照。
+	SceneManager& m_sceneManager;
+	// 入力取得に使用する非所有参照。
+	InputSystem& m_inputSystem;
+	// 描画に使用する非所有参照。
+	GraphicsSystem& m_graphicsSystem;
+	// Init成功後のBGM再生に使用する非所有参照。
+	AudioSystem& m_audioSystem;
 
-	//========= Framework・Scene参照=========
-	// Scene遷移とゲーム進捗操作に使用するSceneManager。
-	SceneManager& m_SceneManager;
-	// タイトル画面のキーボード入力に使用するInputSystem。
-	InputSystem& m_InputSystem;
-	// HUDの描画State設定に使用するGraphicsSystem。
-	GraphicsSystem& m_GraphicsSystem;
-	// タイトルBGMとワープSEの再生に使用するAudioSystem。
-	AudioSystem& m_AudioSystem;
-
-	//========= HUD描画=========
-	// 単色Quadを描画するHUDレンダラー。
-	HudRenderer m_HudRenderer{};
-	// タイトル画面の文字列を描画するHUD文字レンダラー。
-	HudTextRenderer m_HudTextRenderer{};
+	//========= Scene所有状態=========
+	// タイトル文字を描画するResourceを所有する。
+	HudTextRenderer m_hudTextRenderer{};
 };
