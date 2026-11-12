@@ -1,7 +1,9 @@
 ﻿#pragma once
 
-// Cubeを使った床・壁・単色Objectの描画と、必要なGPU Resourceの所有を担当する。
-// Scene進行・衝突判定は担当しない。GraphicsSystemは各呼出中だけ参照し、保持しない。
+// 各面に独立したUVを持つCubeと、Shader・Buffer・Texture・Samplerを所有する。
+// 初期化時にCPU側の配列からGPU Resourceを生成し、描画時に変換と外観の定数を転送する。
+// Scene進行やRender Passの選択は担当しない。GraphicsSystemは借用し、参照を保持しない。
+// Init失敗のbool経路と例外伝播の経路を区別する。所有参照の解放はGPUの処理完了待機を意味しない。
 
 //========= 外部ライブラリ インクルード=========
 #include <d3d11.h>
@@ -15,88 +17,96 @@
 //========= 前方宣言=========
 class GraphicsSystem;
 
-// 各面が独立したUVを持つCubeを、指定行列と外観で描画するRenderer。
+// Cubeを使い、床、壁、単色オブジェクトを描画する基本3Dメッシュレンダラー。
 class BasicMeshRenderer final
 {
 public:
 	//========= 列挙型=========
-	// Textureの選択。既存呼出側との互換性のため公開型名・列挙子名・順序を維持する。
+	// Textureの選択。公開型名・列挙子名・列挙順は既存呼出側との互換性のため維持する。
 	enum class TextureType
 	{
-		Floor,  // 床用Textureを参照する。
-		Wall,   // 壁用Textureを参照する。
-		Object, // Object用Textureを参照する。
-		Color   // Textureを参照せず、Object色を出力する。
+		Floor, // 床用SRVを選ぶ。
+		Wall, // 壁用SRVを選ぶ。
+		Object, // Object用SRVを選ぶ。
+		Color // SRVをnullptr、Texture使用フラグを0として単色出力を選ぶ。
 	};
 
 	//========= Getter関数=========
-	// 頂点属性の組合せを返す。実際のStrideとOffsetはVERTEXとInput Layoutが定義する。
+	// Cube描画で使用する頂点形式を返す。
 	[[nodiscard]] VERTEX_FORMAT GetVertexFormat() const { return VERTEX_FORMAT::e_POSITION_TEXTURE; }
 
 	//========= ライフサイクル・描画関数=========
-	// 既存Resourceを終了し、メッシュ・Shader・Texture・Sampler・定数Bufferを生成する。
-	// graphicsSystem: 初期化済みの描画基盤。Device取得用の非所有参照。
-	// 戻り値: 全生成成功ならtrue。Device未取得、検出した読込・生成失敗ではfalse。
-	// 生成途中の失敗ではUninitで部分解放する。下位処理の例外はここでは捕捉しない。
+	// Cubeメッシュ、Shader、Texture、Sampler、定数バッファを初期化する。
+	// graphicsSystem: 初期化済みDeviceの取得先。非所有で、生成Resourceと対応する描画基盤を渡す。
+	// 戻り値: 全生成成功ならtrue。検出した読込・GPU生成失敗では部分ResourceをUninitしてfalse。
+	// 最初に旧Resourceを解放するため、再初期化失敗時の旧状態への復帰は行わない。
+	// 下位処理・メモリ確保などの例外は捕捉しない。例外経路ではbool失敗時と同じ解放を保証しない。
 	bool Initialize(GraphicsSystem& graphicsSystem);
-	// 指定した変換と外観でCubeを描画する。必要Resource・Contextがなければ何もしない。
-	// graphicsSystem: Context取得先。Render Target・Viewport・Render Passは呼出側で準備する。
-	// worldMatrix: LocalからWorldへの行列。転送用transposeは内部で行う。
-	// viewMatrix: WorldからViewへの行列。Projectionと合成して転送する。
-	// projectionMatrix: ViewからClipへの行列。viewMatrixとの乗算順は維持する。
-	// color: ObjectのRGBA色。Texture使用時はShaderでTexture色と乗算する。
-	// UVTiling: UVのU・Vに掛ける倍率。
-	// textureType: Texture選択。Colorまたは未定義値ではTexture使用フラグを0にする。
-	// Shader・Buffer・Texture・SamplerのBind状態を変更し、以前の状態へは戻さない。
-	// 個別Textureのnull確認や、Blend・Depth・Rasterizerの設定はこの関数では行わない。
+	// 指定した行列、色、UVタイリング、テクスチャ種別でCubeを描画する。
+	// graphicsSystem: Context取得先。Render Target・Viewport・Blend・Depth・Rasterizerは呼出側が準備する。
+	// worldMatrix: LocalからWorldへの行列。内部で転置してObject Bufferへ格納する。
+	// viewMatrix: WorldからViewへの行列。Projectionとの積をCamera Bufferへ格納する。
+	// projectionMatrix: ViewからClipへの行列。合成順はviewMatrix * projectionMatrix。
+	// color: RGBA色。BasicColor PSでは単色またはTexture色との成分ごとの積に使用する。
+	// UVTiling: UVのU・Vへ掛ける倍率。
+	// textureType: 選択する画像。Colorまたは未定義値なら単色経路。個別SRVのnull検証は追加しない。
+	// 必須Resource・Context・Index数がない場合は何もしない。
+	// IAの頂点・Index・Layout・Topology、VS/PS、定数Buffer、PSのSRVとSamplerを変更し、元には戻さない。
+	// Bind先はCamera=VS b0、Object=VS/PS b1、Material=VS/PS b2、Texture=PS t0、Sampler=PS s0。
 	void DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const XMMATRIX& viewMatrix,
 								const XMMATRIX& projectionMatrix,const XMFLOAT4& color,const XMFLOAT2& UVTiling,TextureType textureType);
-	// 所有COM参照を解放してIndex数を0へ戻す。未初期化・解放済みでも呼出可能。
-	// ContextのBind状態を解除する処理は行わない。
+	// 描画に使用したDirect3Dリソースを解放する。
+	// メンバーのCOM参照を解放し、Index数を0にする。未初期化・部分初期化・解放済みでも呼出可能。
+	// ContextのBind解除・状態復元・描画完了待機は行わない。Context等が別に保持する参照は残り得る。
 	void Uninit();
 
 private:
 	//========= 構造体=========
-	// POSITIONとTEXCOORDに対応するCube頂点。各面4頂点ずつを独立に保持する。
+	// Cubeの頂点座標とUV座標。
 	struct VERTEX
 	{
-		// Local座標。初期Cubeの各軸は-0.5から0.5。
+		// Local座標のfloat3。POSITIONはDXGI_FORMAT_R32G32B32_FLOATでこのOffsetを読む。
 		XMFLOAT3 position{};
-		// 面ごとのTexture座標。Shaderへ渡す前のUV倍率は含まない。
+		// float2のUV。TEXCOORD0はDXGI_FORMAT_R32G32_FLOATでこのOffsetを読む。
 		XMFLOAT2 UV{};
 	};
 
 	//========= Shader関連=========
-	// Local頂点の変換とUV倍率反映を行うVertex Shaderを所有する。
+	// Cube描画に使用するVertex Shader。
+	// BasicColorVS.csoから生成する所有参照。入力は位置とUVで、法線入力は使用しない。
 	ComPtr<ID3D11VertexShader> m_vertexShader{};
-	// 単色またはTexture色の出力を行うPixel Shaderを所有する。
+	// Cube描画に使用するPixel Shader。
+	// BasicColorPS.csoから生成する所有参照。Texture使用フラグはb2の値で受け取る。
 	ComPtr<ID3D11PixelShader> m_pixelShader{};
-	// VERTEXのPosition・UVをShader入力へ対応付けるLayoutを所有する。
+	// Vertex構造とVertex Shader入力を対応付けるInput Layout。
 	ComPtr<ID3D11InputLayout> m_inputLayout{};
 
 	//========= Texture関連=========
-	// Linear FilterとWrap設定のSamplerを所有する。
+	// テクスチャ参照時のフィルタリングとアドレス指定を行うSampler。
 	ComPtr<ID3D11SamplerState> m_textureSampler{};
-	// 床用TextureのViewを所有する。
+	// 床描画に使用するテクスチャ。
 	ComPtr<ID3D11ShaderResourceView> m_floorTextureView{};
-	// 壁用TextureのViewを所有する。
+	// 壁描画に使用するテクスチャ。
 	ComPtr<ID3D11ShaderResourceView> m_wallTextureView{};
-	// Object用TextureのViewを所有する。
+	// 画像付きオブジェクト描画に使用するテクスチャ。
 	ComPtr<ID3D11ShaderResourceView> m_objectTextureView{};
 
 	//========= Buffer関連=========
-	// Cubeの24頂点を保持するVertex Bufferを所有する。
+	// Cubeの頂点情報を保持するVertex Buffer。
 	ComPtr<ID3D11Buffer> m_vertexBuffer{};
-	// Cubeの36Indexを保持するIndex Bufferを所有する。
+	// Cubeの三角形順序を保持するIndex Buffer。
 	ComPtr<ID3D11Buffer> m_indexBuffer{};
-	// ViewProjectionを転送するCamera Buffer。DrawCubeではVSのb0へBindする。
+	// ViewProjection行列をShaderへ渡す定数バッファ。
+	// 64バイトのCPU転送型に対応する。転置済みViewProjectionをVSのb0へ渡す。
 	ConstantBuffer<CAMERA_CONSTANTS> m_cameraBuffer{};
-	// World行列とRGBA色を転送するObject Buffer。VS・PSのb1へBindする。
+	// World行列と色をShaderへ渡す定数バッファ。
+	// 80バイトのCPU転送型に対応する。転置済みWorld行列と色をVS/PSのb1へ渡す。
 	ConstantBuffer<OBJECT_CONSTANTS> m_objectBuffer{};
-	// UV倍率とTexture使用フラグを転送するMaterial Buffer。VS・PSのb2へBindする。
+	// UVタイリングとTexture使用有無をShaderへ渡す定数バッファ。
+	// 32バイトのCPU転送型に対応する。UV倍率と使用フラグをVS/PSのb2へ渡す。
 	ConstantBuffer<MATERIAL_CONSTANTS> m_materialBuffer{};
 
 	//========= 描画情報=========
-	// DrawIndexedへ渡すIndex数。全生成成功後に36、Uninitで0へ設定する。
+	// DrawIndexedに渡すCubeのIndex数。
 	unsigned int m_indexCount{};
 };
