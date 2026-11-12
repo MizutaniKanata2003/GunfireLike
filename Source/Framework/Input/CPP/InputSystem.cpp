@@ -7,9 +7,9 @@
 void InputSystem::Initialize(HWND windowHandle)
 {
 	// 入力対象のウィンドウとキー状態を初期化する。
-	m_WindowHandle = windowHandle;
-	GetKeyboardState(m_CurrentKeys);
-	std::memcpy(m_PreviousKeys,m_CurrentKeys,sizeof(m_CurrentKeys));
+	m_windowHandle = windowHandle;
+	GetKeyboardState(m_currentKeys);
+	std::memcpy(m_previousKeys,m_currentKeys,sizeof(m_currentKeys));
 
 	// FPS操作で使用するカーソルの中央座標を計算する。
 	UpdateMouseCenter();
@@ -19,10 +19,10 @@ void InputSystem::Initialize(HWND windowHandle)
 void InputSystem::Update()
 {
 	// 前フレーム状態を保存してから現在のキーボード状態を取得する。
-	std::memcpy(m_PreviousKeys,m_CurrentKeys,sizeof(m_CurrentKeys));
-	GetKeyboardState(m_CurrentKeys);
+	std::memcpy(m_previousKeys,m_currentKeys,sizeof(m_currentKeys));
+	GetKeyboardState(m_currentKeys);
 
-	if(!m_IsMouseCaptureEnabled) return;
+	if(!m_isMouseCaptureEnabled)return;
 
 	// FPS操作中はカーソルを中央へ戻し、画面端で視点回転が止まらないようにする。
 	UpdateMouseCenter();
@@ -35,30 +35,31 @@ void InputSystem::Uninit()
 {
 	SetMouseCaptureEnabled(false);
 
-	m_WindowHandle = nullptr;
-	m_MouseDelta = {};
-	m_ScreenCenter = {};
+	m_windowHandle = nullptr;
+	m_mouseDelta = {};
+	m_screenCenter = {};
 
-	std::memset(m_CurrentKeys,0,sizeof(m_CurrentKeys));
-	std::memset(m_PreviousKeys,0,sizeof(m_PreviousKeys));
+	std::memset(m_currentKeys,0,sizeof(m_currentKeys));
+	std::memset(m_previousKeys,0,sizeof(m_previousKeys));
 }
+
 // WindowProcedureから受け取ったWin32メッセージを処理する。
 void InputSystem::OnWindowMessage(UINT message,WPARAM wParam,LPARAM lParam)
 {
-	if(!m_IsMouseCaptureEnabled) return;
+	if(!m_isMouseCaptureEnabled)return;
 
 	switch(message){
 	case WM_MOUSEMOVE:
 	{
 		// クライアント座標のマウス位置をスクリーン座標へ変換して差分を計算する。
-		POINT mousePosition{};
-		mousePosition.x = GET_X_LPARAM(lParam);
-		mousePosition.y = GET_Y_LPARAM(lParam);
+		POINT mouse_position{};
+		mouse_position.x = GET_X_LPARAM(lParam);
+		mouse_position.y = GET_Y_LPARAM(lParam);
 
-		ClientToScreen(m_WindowHandle,&mousePosition);
+		ClientToScreen(m_windowHandle,&mouse_position);
 
-		m_MouseDelta.x += mousePosition.x - m_ScreenCenter.x;
-		m_MouseDelta.y += mousePosition.y - m_ScreenCenter.y;
+		m_mouseDelta.x += mouse_position.x - m_screenCenter.x;
+		m_mouseDelta.y += mouse_position.y - m_screenCenter.y;
 		break;
 	}
 
@@ -76,22 +77,22 @@ void InputSystem::OnWindowMessage(UINT message,WPARAM wParam,LPARAM lParam)
 POINT InputSystem::ConsumeMouseDelta()
 {
 	// 現フレームのマウス差分を返し、次フレームへ持ち越さないようリセットする。
-	const POINT mouseDelta = m_MouseDelta;
-	m_MouseDelta = {};
+	const POINT mouse_delta = m_mouseDelta;
+	m_mouseDelta = {};
 
-	return mouseDelta;
+	return mouse_delta;
 }
 
 // FPS操作モードの有効・無効を切り替える。
 void InputSystem::SetMouseCaptureEnabled(bool isEnabled)
 {
-	if(m_IsMouseCaptureEnabled == isEnabled) return;
+	if(m_isMouseCaptureEnabled == isEnabled)return;
 
 	// モード切替時に前モードのマウス差分を破棄する。
-	m_IsMouseCaptureEnabled = isEnabled;
-	m_MouseDelta = {};
+	m_isMouseCaptureEnabled = isEnabled;
+	m_mouseDelta = {};
 
-	if(m_IsMouseCaptureEnabled){
+	if(m_isMouseCaptureEnabled){
 		// FPS操作ではカーソルを非表示にし、中央固定で無限に視点回転できるようにする。
 		while(ShowCursor(FALSE) >= 0){}
 
@@ -112,32 +113,32 @@ void InputSystem::SetMouseCaptureEnabled(bool isEnabled)
 void InputSystem::UpdateMouseCenter()
 {
 	// クライアント領域の中央をクライアント座標で計算する。
-	RECT clientRect{};
-	GetClientRect(m_WindowHandle,&clientRect);
+	RECT client_rect{};
+	GetClientRect(m_windowHandle,&client_rect);
 
-	POINT clientCenter{};
-	clientCenter.x = (clientRect.right - clientRect.left) / 2;
-	clientCenter.y = (clientRect.bottom - clientRect.top) / 2;
+	POINT client_center{};
+	client_center.x = (client_rect.right - client_rect.left) / 2;
+	client_center.y = (client_rect.bottom - client_rect.top) / 2;
 
 	// SetCursorPosと比較できるよう、中央座標をスクリーン座標へ変換する。
-	ClientToScreen(m_WindowHandle,&clientCenter);
-	m_ScreenCenter = clientCenter;
+	ClientToScreen(m_windowHandle,&client_center);
+	m_screenCenter = client_center;
 }
 
 // FPS操作中にカーソルがウィンドウ外へ出ないよう制限する。
 void InputSystem::ClipMouseCursor()
 {
 	// クライアント領域の左上と右下をスクリーン座標へ変換する。
-	RECT clientRect{};
-	GetClientRect(m_WindowHandle,&clientRect);
+	RECT client_rect{};
+	GetClientRect(m_windowHandle,&client_rect);
 
-	POINT clipTopLeft{clientRect.left,clientRect.top};
-	POINT clipBottomRight{clientRect.right,clientRect.bottom};
+	POINT clip_top_left{client_rect.left,client_rect.top};
+	POINT clip_bottom_right{client_rect.right,client_rect.bottom};
 
-	ClientToScreen(m_WindowHandle,&clipTopLeft);
-	ClientToScreen(m_WindowHandle,&clipBottomRight);
+	ClientToScreen(m_windowHandle,&clip_top_left);
+	ClientToScreen(m_windowHandle,&clip_bottom_right);
 
-	const RECT clipRect{clipTopLeft.x,clipTopLeft.y,clipBottomRight.x,clipBottomRight.y};
+	const RECT clip_rect{clip_top_left.x,clip_top_left.y,clip_bottom_right.x,clip_bottom_right.y};
 
-	ClipCursor(&clipRect);
+	ClipCursor(&clip_rect);
 }

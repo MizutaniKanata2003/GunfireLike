@@ -1,10 +1,10 @@
 #include "../H/Logger.h"
 
+//========= Windows インクルード=========
+#include <windows.h>
+
 //========= C++標準ライブラリ インクルード=========
 #include <string>
-
-//========= Windows インクルード=========
-#include <Windows.h>
 
 namespace
 {
@@ -57,13 +57,13 @@ namespace
 // 指定した重要度、分類、メッセージをデバッグ出力へ書き込む。
 void Logger::Write(e_LogLevel logLevel,e_LogCategory logCategory,std::wstring_view message)
 {
-	std::wstring logMessage{L"["};
-	logMessage += GetLogLevelText(logLevel);
-	logMessage += L"][";
-	logMessage += GetLogCategoryText(logCategory);
-	logMessage += L"] ";
-	logMessage += message;
-	logMessage += L"\n";
+	std::wstring log_message{L"["};
+	log_message += GetLogLevelText(logLevel);
+	log_message += L"][";
+	log_message += GetLogCategoryText(logCategory);
+	log_message += L"] ";
+	log_message += message;
+	log_message += L"\n";
 
-	OutputDebugStringW(logMessage.c_str());
+	OutputDebugStringW(log_message.c_str());
 }

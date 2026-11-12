@@ -11,29 +11,22 @@ public:
 	//========= Setter関数=========
 	// Objectのワールド座標を設定する。
 	// position: 設定するワールド座標。
-	// 戻り値: なし。
 	void SetPosition(const XMFLOAT3& position) { m_position = position; }
 	// ObjectのEuler角を設定する。
 	// rotation: X、Y、Z軸周りの回転角。単位はラジアン。
-	// 戻り値: なし。
 	void SetRotation(const XMFLOAT3& rotation) { m_rotation = rotation; }
 	// Objectの各軸の拡大縮小率を設定する。
 	// scale: X、Y、Z軸方向の拡大縮小率。
-	// 戻り値: なし。
 	void SetScale(const XMFLOAT3& scale) { m_scale = scale; }
 
 	//========= Getter関数=========
-	// Objectのワールド座標を取得する。
-	// 戻り値: 保持しているワールド座標への読み取り専用参照。
+	// 保持しているワールド座標への読み取り専用参照を返す。
 	[[nodiscard]] const XMFLOAT3& GetPosition() const { return m_position; }
-	// ObjectのEuler角を取得する。
-	// 戻り値: 保持しているEuler角への読み取り専用参照。単位はラジアン。
+	// 保持しているEuler角への読み取り専用参照を返す。単位はラジアン。
 	[[nodiscard]] const XMFLOAT3& GetRotation() const { return m_rotation; }
-	// Objectの各軸の拡大縮小率を取得する。
-	// 戻り値: 保持している各軸の拡大縮小率への読み取り専用参照。
+	// 保持している各軸の拡大縮小率への読み取り専用参照を返す。
 	[[nodiscard]] const XMFLOAT3& GetScale() const { return m_scale; }
-	// Scale、Rotation、Translationの順にWorld行列を合成する。
-	// 戻り値: 現在のTransform状態を反映したWorld行列。
+	// Scale、Rotation、Translationの順に合成したWorld行列を返す。
 	[[nodiscard]] XMMATRIX GetWorldMatrix() const;
 
 private:

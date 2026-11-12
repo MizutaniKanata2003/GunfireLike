@@ -10,56 +10,64 @@ class InputSystem final
 public:
 	//========= 初期化・更新関数=========
 	// 入力対象のウィンドウを登録し、現在と前フレームのキー状態を初期化する。
+	// windowHandle: 入力対象の有効なWindow。所有しない。
 	void Initialize(HWND windowHandle);
 	// キー状態、マウスキャプチャ、カーソル位置をフレームごとに更新する。
 	void Update();
 	// InputSystemが設定したカーソル制限とマウスキャプチャ状態を解除する。
 	void Uninit();
 	// WindowProcedureから受け取ったWin32メッセージを処理する。
+	// message: Win32メッセージ番号。
+	// wParam: メッセージ固有の追加情報。
+	// lParam: メッセージ固有の追加情報。
 	void OnWindowMessage(UINT message,WPARAM wParam,LPARAM lParam);
 
 	//========= キー入力Getter関数=========
 	// 指定したキーが現在押され続けているかを返す。
-	[[nodiscard]] bool IsKeyPressed(unsigned char keyCode) const { return (m_CurrentKeys[keyCode] & 0x80) != 0; }
+	// keyCode: 0〜255の仮想キーコード。
+	[[nodiscard]] bool IsKeyPressed(unsigned char keyCode) const { return (m_currentKeys[keyCode] & 0x80) != 0; }
 	// 指定したキーがこのフレームで押された瞬間かを返す。
+	// keyCode: 0〜255の仮想キーコード。
 	[[nodiscard]] bool IsKeyTriggered(unsigned char keyCode) const
 	{
-		return (m_CurrentKeys[keyCode] & 0x80) != 0 && (m_PreviousKeys[keyCode] & 0x80) == 0;
+		return (m_currentKeys[keyCode] & 0x80) != 0 && (m_previousKeys[keyCode] & 0x80) == 0;
 	}
 
 	//========= マウス入力Getter関数=========
 	// WndProcで蓄積したマウス移動量を返し、内部の差分をリセットする。
 	[[nodiscard]] POINT ConsumeMouseDelta();
 	// FPS操作モードが有効かを返す。
-	[[nodiscard]] bool IsMouseCaptureEnabled() const { return m_IsMouseCaptureEnabled; }
+	[[nodiscard]] bool IsMouseCaptureEnabled() const { return m_isMouseCaptureEnabled; }
 
 	//========= マウス操作設定関数=========
 	// FPS操作モードの有効・無効を切り替える。
+	// isEnabled: trueでカーソルを非表示・中央固定し、falseで解除する。
 	void SetMouseCaptureEnabled(bool isEnabled);
+
 private:
 	//========= 補助関数=========
 	// クライアント領域の中央をスクリーン座標へ変換して保持する。
 	void UpdateMouseCenter();
 	// FPS操作中にカーソルをクライアント領域中央へ戻す。
-	void ResetMousePosition() { SetCursorPos(m_ScreenCenter.x,m_ScreenCenter.y); }
+	void ResetMousePosition() { SetCursorPos(m_screenCenter.x,m_screenCenter.y); }
 	// FPS操作中にカーソルがウィンドウ外へ出ないよう制限する。
 	void ClipMouseCursor();
 
 	//========= ウィンドウ情報=========
 	// 入力対象として登録したWin32ウィンドウ。
-	HWND m_WindowHandle{};
+	HWND m_windowHandle{};
 
 	//========= キーボード状態=========
 	// 現フレームのキーボード状態。
-	BYTE m_CurrentKeys[256]{};
+	BYTE m_currentKeys[256]{};
 	// 前フレームのキーボード状態。
-	BYTE m_PreviousKeys[256]{};
+	BYTE m_previousKeys[256]{};
 
 	//========= マウス状態=========
 	// WndProcから蓄積した中央座標基準のマウス移動量。
-	POINT m_MouseDelta{};
+	POINT m_mouseDelta{};
 	// クライアント領域中央のスクリーン座標。
-	POINT m_ScreenCenter{};
+	POINT m_screenCenter{};
 	// FPS操作としてカーソルを非表示・固定するかを示すフラグ。
-	bool m_IsMouseCaptureEnabled{};
+	bool m_isMouseCaptureEnabled{};
 };

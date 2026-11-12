@@ -18,8 +18,7 @@ namespace
 	// Pitchの最大角度。単位は度。
 	constexpr float ns_MAX_PITCH_DEGREES = 89.0f;
 	// Pitchとして許可する最大回転角。単位はラジアン。
-	constexpr float ns_MAX_PITCH_RADIANS = ::XMConvertToRadians(ns_MAX_PITCH_DEGREES);
-
+	constexpr float ns_MAX_PITCH_RADIANS = XMConvertToRadians(ns_MAX_PITCH_DEGREES);
 }
 
 // Mouse Capture中のマウス移動量からYawとPitchを更新する。
@@ -60,13 +59,13 @@ XMFLOAT3 FpsCamera::GetRight() const
 {
 	// 保存用ベクトルを演算用ベクトルへ読み込み、上方向との外積を正規化する。
 	const XMFLOAT3 forward = GetForward();
-	const XMVECTOR up_vector = ::XMVectorSet(0.0f,1.0f,0.0f,0.0f);
-	const XMVECTOR forward_vector = DirectX::XMLoadFloat3(&forward);
-	const XMVECTOR right_vector = ::XMVector3Normalize(DirectX::XMVector3Cross(up_vector,forward_vector));
+	const XMVECTOR up_vector = XMVectorSet(0.0f,1.0f,0.0f,0.0f);
+	const XMVECTOR forward_vector = XMLoadFloat3(&forward);
+	const XMVECTOR right_vector = XMVector3Normalize(XMVector3Cross(up_vector,forward_vector));
 
 	// 演算結果を保存用ベクトルへ書き戻す。
 	XMFLOAT3 right{};
-	::XMStoreFloat3(&right,right_vector);
+	XMStoreFloat3(&right,right_vector);
 	return right;
 }
 
@@ -75,10 +74,10 @@ XMFLOAT3 FpsCamera::GetRight() const
 XMMATRIX FpsCamera::GetViewMatrix() const
 {
 	// 現在位置、前方向、ワールド上方向からView行列を生成する。
-	const XMVECTOR position_vector = DirectX::XMLoadFloat3(&m_position);
+	const XMVECTOR position_vector = XMLoadFloat3(&m_position);
 	const XMFLOAT3 forward = GetForward();
-	const XMVECTOR forward_vector = DirectX::XMLoadFloat3(&forward);
-	const XMVECTOR up_vector = ::XMVectorSet(0.0f,1.0f,0.0f,0.0f);
+	const XMVECTOR forward_vector = XMLoadFloat3(&forward);
+	const XMVECTOR up_vector = XMVectorSet(0.0f,1.0f,0.0f,0.0f);
 
-	return ::XMMatrixLookToLH(position_vector,forward_vector,up_vector);
+	return XMMatrixLookToLH(position_vector,forward_vector,up_vector);
 }
