@@ -1,50 +1,52 @@
 #pragma once
 
-// 1280×720のVirtual CanvasをRender Target内へ収める座標・サイズ・文字倍率の変換を提供する。
-// 縦横比を保った均一倍率と中央寄せOffsetを保持する。描画やGPU Resourceの所有は担当しない。
+// 1280×720のVirtual CanvasをRender Targetへ収める、位置・サイズ・文字倍率の変換を提供する。
+// 縦横共通の倍率と中央寄せOffsetを保持する。描画、Viewport設定、GPU Resource所有、余白の塗りつぶしは行わない。
+// 作成時の描画先サイズで変換値を確定し、Resizeを自動追跡しない。新サイズでは利用側が作り直す。
 
 //========= Framework インクルード=========
 #include "Framework/Etc/H/MathTypes.h"
 
-// HUDの基準座標と現在の描画サイズの間を変換する。
-// Render Targetのサイズ変更後は、新しいサイズを渡して作り直す。
+// HUDの基準座標を、縦横比を保って実描画先のpixel座標へ変換する。
 class HudCanvas final
 {
 public:
 	//========= Canvas定数=========
-	// HUDとScene UIが使用する基準幅。既存の公開定数名との互換性のため名称を維持する。
+	// 基準幅1280。座標・幅の基準単位であり、リサイズ後の実描画先のpixel幅を表す値ではない。
+	// 公開名VIRTUAL_WIDTHは既存参照との互換性のため維持し、m_付き定数名への移行は今回行わない。
 	static constexpr float VIRTUAL_WIDTH = 1280.0f;
-	// HUDとScene UIが使用する基準高さ。既存の公開定数名との互換性のため名称を維持する。
+	// 基準高さ720。幅と合わせた基準比率は16:9。具体値の採用経緯は未確認のため既存設定を維持する。
+	// 公開名VIRTUAL_HEIGHTも維持する。AppConfigの起動サイズと自動連動する定数ではない。
 	static constexpr float VIRTUAL_HEIGHT = 720.0f;
 
 	//========= 生成関数=========
-	// Render Target内に基準領域全体が収まる均一倍率と、中央寄せOffsetを計算する。
-	// renderWidth: Render Targetの幅。単位はpixel。
-	// renderHeight: Render Targetの高さ。単位はpixel。
-	// どちらかが0の場合は倍率とOffsetを0のままにし、各変換結果も0になる。
+	// 基準領域全体が収まる均一倍率を計算し、残る余白を両側へ均等配置するOffsetを保持する。
+	// renderWidth: Render Target全体の幅。単位はpixel。Viewportの部分領域を別に指定する引数ではない。
+	// renderHeight: Render Target全体の高さ。単位はpixel。
+	// どちらかが0なら倍率0・Offset(0,0)のまま戻る。例外や成功フラグによる通知、代替サイズの選択は行わない。
 	HudCanvas(unsigned int renderWidth,unsigned int renderHeight);
 
 	//========= 座標変換関数=========
-	// 基準座標へ倍率と中央寄せOffsetを反映し、Render Target座標を返す。
-	// virtualPosition: 左上を原点とし、右向きX・下向きYで表すVirtual Canvas座標。範囲外も制限しない。
+	// 基準位置へ倍率とOffsetを反映し、描画先pixel座標を値で返す。Clip座標への変換は行わない。
+	// virtualPosition: 左上原点、右向きX・下向きYのCanvas座標。範囲外や非有限値の検証・clampは行わない。
 	[[nodiscard]] XMFLOAT2 ToScreenPosition(const XMFLOAT2& virtualPosition) const;
-	// 基準サイズへ倍率だけを反映し、Render Target上のサイズを返す。
-	// virtualSize: Virtual Canvas基準の幅と高さ。負値や範囲外も制限しない。
+	// サイズへ倍率だけを掛け、描画先でのpixel寸法を返す。位置用Offsetは加えない。
+	// virtualSize: Canvas基準の幅・高さ。負値もそのまま計算し、描画可否は利用側で判断する。
 	[[nodiscard]] XMFLOAT2 ToScreenSize(const XMFLOAT2& virtualSize) const;
-	// 基準倍率にCanvasの倍率を掛け、Render Target用の文字倍率を返す。
-	// virtualScale: Virtual Canvas基準の文字倍率。0以下も制限せず計算する。
+	// 文字等の基準倍率へCanvas倍率を掛ける。Fontサイズの計測や画像の生成は行わない。
+	// virtualScale: 単位なしの基準文字倍率。0以下も検証せず計算する。引数は保持しない。
 	[[nodiscard]] float ToScreenScale(float virtualScale) const;
 
 	//========= Getter関数=========
-	// 基準領域全体をRender Target内へ収める均一倍率を返す。サイズ無効時は0。
+	// 構築時に確定した均一倍率を返す。無効寸法なら0。以後の描画先Resizeで自動更新はされない。
 	[[nodiscard]] float GetScale() const { return m_scale; }
-	// 中央寄せOffsetをpixel単位で返す。参照の有効期間はこのCanvasの寿命まで。
+	// 中央寄せOffsetをpixel単位の読み取り専用参照で返す。参照先はこの実体の寿命まで有効。
 	[[nodiscard]] const XMFLOAT2& GetOffset() const { return m_offset; }
 
 private:
 	//========= Canvas変換状態=========
-	// 座標・サイズ・文字倍率の変換へ適用する、縦横共通の倍率。単位なし。
+	// 縦横共通の単位なし倍率。既定0は無効寸法で構築した場合にも維持する値で、等倍を表す1ではない。
 	float m_scale{};
-	// 描画先の余白を左右・上下へ均等に分けるための移動量。単位はpixel。
+	// 基準領域の左上を描画先中央へ配置する移動量。既定(0,0)、成分の単位はpixel。
 	XMFLOAT2 m_offset{};
 };

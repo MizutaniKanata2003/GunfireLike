@@ -1,83 +1,81 @@
 ﻿#pragma once
 
-// Win32のキー状態と、FPS操作用のマウス差分・カーソル表示・移動制限を管理する。
-// Windowは所有せず、メッセージ転送とフレームごとのUpdateは呼出側が担当する。
+// Win32のキー状態を保存し、FPS操作用の中央基準マウス差分とカーソルの表示・位置・領域制限を管理する。
+// Windowは所有しない。メッセージ転送とフレーム更新は呼出側の責務で、Win32 APIの成否は検証しない。
 
 //========= Windows インクルード=========
-#include <windows.h>
-#include <windowsx.h>
+#include <windows.h> // HWND・POINT・BYTE等の型と、キー取得・座標変換・カーソル操作のWin32 APIを使用する。
+#include <windowsx.h> // cppのGET_X_LPARAM・GET_Y_LPARAMで、マウスメッセージから符号付き座標を取り出す。
 
-// 現在・前回のキー状態による押下判定と、中央座標基準のマウス入力を提供する。
+// キーの押下・立ち上がり判定と、FPSカメラへ渡すマウス差分の消費を提供する。
 class InputSystem final
 {
 public:
 	//========= 初期化・更新関数=========
-	// Windowと現在のキー状態を登録し、前回状態へ同じ値をコピーして中央座標を計算する。
-	// windowHandle: 有効な入力対象Window。所有しない。入力処理中は有効であること。
-	// FPS操作フラグや蓄積済み差分をリセットする処理は行わない。
+	// 入力先を登録し、現在キーを前回キーにもコピーして中央位置を計算する。差分やCapture設定はリセットしない。
+	// windowHandle: 入力対象の有効なWindow。所有しない。入力・カーソル操作中は呼出側が有効に保つ。
 	void Initialize(HWND windowHandle);
-	// 前回・現在のキー状態を更新し、FPS操作中だけ中央座標・移動制限・カーソル位置を更新する。
-	// Sceneでキーのトリガー判定を行う前に、毎フレーム呼び出す。
+	// 前回値を保存して新しいキー状態を取得する。Capture中は中央・制限領域・カーソル位置も更新する。
+	// Sceneがトリガーを判定する前に毎フレーム呼ぶ。蓄積したマウス差分はここではクリアしない。
 	void Update();
-	// FPS操作を解除し、Window参照・マウス差分・中央座標・両キー配列をクリアする。
-	// Windowの破棄やSystem自身の破棄は行わない。
+	// Captureを解除し、Window登録・差分・中央・両キー配列をクリアする。Window自体は破棄しない。
+	// Captureが既にfalseならカーソル制御は再実行しない。OS全体の設定を無条件に復元する処理ではない。
 	void Uninit();
-	// FPS操作中のマウス移動を蓄積し、フォーカス喪失時にはFPS操作を解除する。
-	// message: WindowProcedureから渡すWin32メッセージ番号。
-	// wParam: メッセージ固有情報。現行実装では参照しないが公開引数を維持する。
-	// lParam: WM_MOUSEMOVEではクライアント座標のX・Yを取り出す。
-	// FPS操作解除中はすべてのメッセージを処理せず戻る。
+	// Capture中のマウス移動を蓄積し、フォーカス喪失で設定を解除する。解除中は全メッセージを無視する。
+	// message: WindowProcedureから転送するWin32メッセージ番号。
+	// wParam: 公開契約を維持するメッセージ追加情報。現行処理では使用しない。
+	// lParam: WM_MOUSEMOVEでクライアント座標のX・Yを抽出する値。ここでは他メッセージの追加情報に使わない。
 	void OnWindowMessage(UINT message,WPARAM wParam,LPARAM lParam);
 
 	//========= キー入力Getter関数=========
-	// 現在のキー状態の上位bitが立っている場合にtrueを返す。
-	// keyCode: 0〜255の仮想キーコード。Updateで取得した状態を参照する。
+	// 保存済み現在値の上位bit(0x80)が立っていれば押下中。下位のトグル状態は判定しない。
+	// keyCode: 256要素の配列へ対応する0〜255の仮想キーコード。状態を消費しない。
 	[[nodiscard]] bool IsKeyPressed(unsigned char keyCode) const { return (m_currentKeys[keyCode] & 0x80) != 0; }
-	// 現在は押下中で、前回は押下されていなかった場合にtrueを返す。
-	// keyCode: 0〜255の仮想キーコード。判定によってキー状態を消費しない。
+	// 現在は押下中かつ前回は非押下ならtrue。繰り返し呼んでも判定結果を消費しない。
+	// keyCode: 比較する0〜255の仮想キーコード。Update前後の保存値を使用する。
 	[[nodiscard]] bool IsKeyTriggered(unsigned char keyCode) const
 	{
-		// 上位bitだけを比較し、押下の立ち上がりを検出する。
+		// 0x80のマスクで上位bitだけを取り出し、現在の押下と前回の非押下を組み合わせる。
 		return (m_currentKeys[keyCode] & 0x80) != 0 && (m_previousKeys[keyCode] & 0x80) == 0;
 	}
 
 	//========= マウス入力Getter関数=========
-	// メッセージ処理で蓄積した差分を返し、その場で両成分を0へ戻す。
-	// 戻り値: スクリーン座標の中央基準の累積差分。消費後に再度呼べば新規入力がない限り0。
+	// 中央基準で蓄積した差分を値で返し、内部差分を0へ戻す。新規入力がなければ次の取得は(0,0)。
+	// 戻り値: スクリーン座標へ変換したマウス位置と中央との差の累積値。右向きX・下向きY、単位はpixel。
 	[[nodiscard]] POINT ConsumeMouseDelta();
-	// FPS操作としてカーソル非表示・中央固定・領域制限を行う設定ならtrueを返す。
+	// FPS操作用の表示・中央固定・領域制限を要求している設定かを返す。OS操作の成功を保証する値ではない。
 	[[nodiscard]] bool IsMouseCaptureEnabled() const { return m_isMouseCaptureEnabled; }
 
 	//========= マウス操作設定関数=========
-	// FPS操作と自由なカーソル操作を切り替える。同じ設定値なら何もしない。
-	// isEnabled: trueで非表示・中央固定・領域制限、falseで表示と領域制限解除を行う。
-	// 切替時は蓄積差分を破棄する。OSのSetCapture・ReleaseCaptureは呼ばない。
+	// 設定変更時だけ差分を破棄し、カーソル表示・中央固定・領域制限を切り替える。
+	// isEnabled: trueで非表示・中央合わせ・領域制限、falseで表示と領域制限解除。同値なら何もしない。
+	// OSのSetCapture・ReleaseCaptureは使用しない。Win32 API失敗時の設定巻き戻しも行わない。
 	void SetMouseCaptureEnabled(bool isEnabled);
 
 private:
 	//========= 補助関数=========
-	// クライアント領域中央を求め、スクリーン座標へ変換して保持する。有効なWindowが前提。
+	// クライアント領域の整数中央を計算し、スクリーン座標に変換して保持する。有効なWindowが前提。
 	void UpdateMouseCenter();
-	// 計算済みのスクリーン座標へカーソルを移動する。中央座標の再計算は行わない。
+	// 保持済みスクリーン座標へ移動を要求する。中央の再計算・成否判定・マウス差分のクリアは行わない。
 	void ResetMousePosition() { SetCursorPos(m_screenCenter.x,m_screenCenter.y); }
-	// Windowのクライアント領域をスクリーン座標へ変換し、カーソルの移動可能領域に設定する。
+	// クライアント矩形の両端をスクリーン座標へ変換し、ClipCursorへ渡す。以前の制限矩形は保存しない。
 	void ClipMouseCursor();
 
 	//========= ウィンドウ情報=========
-	// 入力対象Windowへの非所有ハンドル。Initializeで登録し、Uninitでnullptrへ戻す。
+	// Initializeで借用するWindowハンドル。既定は未登録、Uninitでnullptrへ戻す。
 	HWND m_windowHandle{};
 
 	//========= キーボード状態=========
-	// 最後に取得した256キー分の状態。上位bitを押下判定へ使用する。
+	// 仮想キー0〜255に対応する256バイトの最新状態。既定は全0。押下判定では各要素の上位bitだけを使う。
 	BYTE m_currentKeys[256]{};
-	// Update直前のキー状態。現在値との比較によりトリガーを判定する。
+	// 新しい状態を取得する直前のコピー。初期登録時は現在値と同一、Uninitでは全0にする。
 	BYTE m_previousKeys[256]{};
 
 	//========= マウス状態=========
-	// 中央座標からの移動差分の累積値。ConsumeMouseDeltaまたはモード切替でクリアする。
+	// 各WM_MOUSEMOVEの中央基準差分を加算する。既定は(0,0)、消費・設定変更・Uninitでクリアする。
 	POINT m_mouseDelta{};
-	// FPS操作の基準となるクライアント領域中央。スクリーン座標で保持する。
+	// クライアント領域中央をスクリーン座標のpixelで保持する。既定は(0,0)、生成や表示サイズを表す値ではない。
 	POINT m_screenCenter{};
-	// FPS操作を有効にする設定。OSのWindow Capture取得状態そのものではない。
+	// 既定falseは自由カーソル操作。Window Captureの取得状態やOS操作の成否を表すものではない。
 	bool m_isMouseCaptureEnabled{};
 };
