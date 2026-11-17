@@ -42,9 +42,10 @@ void InputSystem::Uninit()
 	// ハンドルを消す前にモードを解除する。既にfalseの場合は同値判定によりOS操作を繰り返さない。
 	SetMouseCaptureEnabled(false);
 
-	// Windowを所有していないため破棄せず、登録と座標状態だけを空にする。
+	// Windowを所有していないため破棄せず、登録と座標・ホイール状態だけを空にする。
 	m_windowHandle = nullptr;
 	m_mouseDelta = {};
+	m_mouseWheelDelta = 0;
 	m_screenCenter = {};
 
 	// 保存した押下状態を終了後へ持ち越さないよう、各配列の全バイトを0にする。
@@ -52,13 +53,13 @@ void InputSystem::Uninit()
 	std::memset(m_previousKeys,0,sizeof(m_previousKeys));
 }
 
-// WindowProcedureが転送したメッセージのうち、FPS操作用の移動とフォーカス喪失だけを処理する。
+// WindowProcedureが転送したメッセージのうち、FPS操作用の移動・ホイール回転とフォーカス喪失だけを処理する。
 void InputSystem::OnWindowMessage(UINT message,WPARAM wParam,LPARAM lParam)
 {
-	// 自由カーソル操作中は移動差分を蓄積しない。他のメッセージもここでは扱わない。wParamは未使用。
+	// 自由カーソル操作中は移動差分とホイール回転量を蓄積しない。他のメッセージもここでは扱わない。
 	if(!m_isMouseCaptureEnabled)return;
 
-	// 移動通知は差分へ取り込み、フォーカス喪失は操作解除へ振り分ける。
+	// 移動通知とホイール通知は蓄積へ取り込み、フォーカス喪失は操作解除へ振り分ける。
 	switch(message){
 		// マウス移動は符号付きクライアント座標からスクリーン座標へ揃えて扱う。
 	case WM_MOUSEMOVE:
@@ -76,7 +77,13 @@ void InputSystem::OnWindowMessage(UINT message,WPARAM wParam,LPARAM lParam)
 		break;
 	}
 
-	// フォーカスを失った場合は表示・領域制限を解除し、蓄積差分も破棄する。
+	// ホイール回転は、WPARAMの上位ワードに入った符号付き回転量を累積へ加算する。
+	case WM_MOUSEWHEEL:
+	// GET_WHEEL_DELTA_WPARAMで上位16bitを符号付きの値として取り出す。標準のマウスでは1ノッチが120で、正は奥への回転。
+	m_mouseWheelDelta += GET_WHEEL_DELTA_WPARAM(wParam);
+	break;
+
+	// フォーカスを失った場合は表示・領域制限を解除し、蓄積差分とホイール回転量も破棄する。
 	case WM_KILLFOCUS:
 	SetMouseCaptureEnabled(false);
 	break;
@@ -97,6 +104,15 @@ POINT InputSystem::ConsumeMouseDelta()
 	return mouse_delta;
 }
 
+// 累積したホイール回転量を一度取り出し、次の消費へ同じ値を持ち越さない。
+int InputSystem::ConsumeMouseWheelDelta()
+{
+	// 返却用コピーを先に作る。先に0へ戻すと今回の入力を失うため、マウス差分と同じ順序にする。
+	const int mouse_wheel_delta = m_mouseWheelDelta;
+	m_mouseWheelDelta = 0;
+	return mouse_wheel_delta;
+}
+
 //========= マウス操作設定関数=========
 // 表示カウンターを調整し、FPS操作用の制限・中央合わせと自由操作を切り替える。
 void InputSystem::SetMouseCaptureEnabled(bool isEnabled)
@@ -104,9 +120,10 @@ void InputSystem::SetMouseCaptureEnabled(bool isEnabled)
 	// 同じ設定なら差分も消去しない。表示カウンターへの重複操作や領域の再設定を行わず戻る。
 	if(m_isMouseCaptureEnabled == isEnabled)return;
 
-	// 設定を先に反映して、前モードの累積差分を破棄する。後続OS操作の成否による巻き戻しはしない。
+	// 設定を先に反映して、前モードの累積差分とホイール回転量を破棄する。後続OS操作の成否による巻き戻しはしない。
 	m_isMouseCaptureEnabled = isEnabled;
 	m_mouseDelta = {};
+	m_mouseWheelDelta = 0;
 
 	// 有効化時は非表示にしてから中央・制限領域を更新する。この経路は最後にreturnし、解除処理へ進まない。
 	if(m_isMouseCaptureEnabled){

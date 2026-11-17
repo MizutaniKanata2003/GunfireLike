@@ -1,13 +1,13 @@
 ﻿#pragma once
 
-// Win32のキー状態を保存し、FPS操作用の中央基準マウス差分とカーソルの表示・位置・領域制限を管理する。
+// Win32のキー状態を保存し、FPS操作用の中央基準マウス差分・ホイール回転量と、カーソルの表示・位置・領域制限を管理する。
 // Windowは所有しない。メッセージ転送とフレーム更新は呼出側の責務で、Win32 APIの成否は検証しない。
 
 //========= Windows インクルード=========
 #include <windows.h> // HWND・POINT・BYTE等の型と、キー取得・座標変換・カーソル操作のWin32 APIを使用する。
 #include <windowsx.h> // cppのGET_X_LPARAM・GET_Y_LPARAMで、マウスメッセージから符号付き座標を取り出す。
 
-// キーの押下・立ち上がり判定と、FPSカメラへ渡すマウス差分の消費を提供する。
+// キーの押下・立ち上がり判定と、FPSカメラへ渡すマウス差分・ホイール回転量の消費を提供する。
 class InputSystem final
 {
 public:
@@ -16,14 +16,14 @@ public:
 	// windowHandle: 入力対象の有効なWindow。所有しない。入力・カーソル操作中は呼出側が有効に保つ。
 	void Initialize(HWND windowHandle);
 	// 前回値を保存して新しいキー状態を取得する。Capture中は中央・制限領域・カーソル位置も更新する。
-	// Sceneがトリガーを判定する前に毎フレーム呼ぶ。蓄積したマウス差分はここではクリアしない。
+	// Sceneがトリガーを判定する前に毎フレーム呼ぶ。蓄積したマウス差分とホイール回転量はここではクリアしない。
 	void Update();
-	// Captureを解除し、Window登録・差分・中央・両キー配列をクリアする。Window自体は破棄しない。
+	// Captureを解除し、Window登録・差分・ホイール回転量・中央・両キー配列をクリアする。Window自体は破棄しない。
 	// Captureが既にfalseならカーソル制御は再実行しない。OS全体の設定を無条件に復元する処理ではない。
 	void Uninit();
-	// Capture中のマウス移動を蓄積し、フォーカス喪失で設定を解除する。解除中は全メッセージを無視する。
+	// Capture中のマウス移動とホイール回転を蓄積し、フォーカス喪失で設定を解除する。解除中は全メッセージを無視する。
 	// message: WindowProcedureから転送するWin32メッセージ番号。
-	// wParam: 公開契約を維持するメッセージ追加情報。現行処理では使用しない。
+	// wParam: WM_MOUSEWHEELで上位ワードの符号付きホイール回転量を抽出する値。他のメッセージでは使用しない。
 	// lParam: WM_MOUSEMOVEでクライアント座標のX・Yを抽出する値。ここでは他メッセージの追加情報に使わない。
 	void OnWindowMessage(UINT message,WPARAM wParam,LPARAM lParam);
 
@@ -43,11 +43,14 @@ public:
 	// 中央基準で蓄積した差分を値で返し、内部差分を0へ戻す。新規入力がなければ次の取得は(0,0)。
 	// 戻り値: スクリーン座標へ変換したマウス位置と中央との差の累積値。右向きX・下向きY、単位はpixel。
 	[[nodiscard]] POINT ConsumeMouseDelta();
+	// 蓄積したホイール回転量を値で返し、内部の累積を0へ戻す。新規入力がなければ次の取得は0。
+	// 戻り値: ホイール回転量の累積値。正は奥（画面側）への回転、負は手前への回転。標準では1ノッチが120。
+	[[nodiscard]] int ConsumeMouseWheelDelta();
 	// FPS操作用の表示・中央固定・領域制限を要求している設定かを返す。OS操作の成功を保証する値ではない。
 	[[nodiscard]] bool IsMouseCaptureEnabled() const { return m_isMouseCaptureEnabled; }
 
 	//========= マウス操作設定関数=========
-	// 設定変更時だけ差分を破棄し、カーソル表示・中央固定・領域制限を切り替える。
+	// 設定変更時だけ差分とホイール回転量を破棄し、カーソル表示・中央固定・領域制限を切り替える。
 	// isEnabled: trueで非表示・中央合わせ・領域制限、falseで表示と領域制限解除。同値なら何もしない。
 	// OSのSetCapture・ReleaseCaptureは使用しない。Win32 API失敗時の設定巻き戻しも行わない。
 	void SetMouseCaptureEnabled(bool isEnabled);
@@ -74,6 +77,8 @@ private:
 	//========= マウス状態=========
 	// 各WM_MOUSEMOVEの中央基準差分を加算する。既定は(0,0)、消費・設定変更・Uninitでクリアする。
 	POINT m_mouseDelta{};
+	// 各WM_MOUSEWHEELの回転量を加算する。既定は0、消費・設定変更・Uninitでクリアする。正は奥、負は手前への回転。
+	int m_mouseWheelDelta{};
 	// クライアント領域中央をスクリーン座標のpixelで保持する。既定は(0,0)、生成や表示サイズを表す値ではない。
 	POINT m_screenCenter{};
 	// 既定falseは自由カーソル操作。Window Captureの取得状態やOS操作の成否を表すものではない。
