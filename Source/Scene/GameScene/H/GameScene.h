@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-// 移動・視点操作と、設定表から生成した床・壁の描画、入力の確認表示を行う最小構成のGameSceneを宣言する。
-// プレイヤーとカメラの更新を仲介し、共有Rendererと生成したObjectを所有する。Scene切替はManagerへ予約する。
+// 移動・視点操作と、設定表から生成した床・壁の描画、Collisionの可視化、入力の確認表示を行う最小構成のGameSceneを宣言する。
+// プレイヤーとカメラの更新を仲介し、共有Renderer・生成したObject・CollisionWorldを所有する。Scene切替はManagerへ予約する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <vector> // 設定表から生成したSceneObjectを、表の順に保持する可変長配列として使用する。
@@ -10,6 +10,10 @@
 #include "Debug/H/DebugPlayer.h"
 
 //========= Framework インクルード=========
+#include "Framework/3D/H/DebugLineRenderer.h"
+#include "Framework/Collision/H/CollisionDebugDrawer.h"
+#include "Framework/Collision/H/CollisionShapes.h"
+#include "Framework/Collision/H/CollisionWorld.h"
 #include "Framework/Input/H/FpsCamera.h"
 
 //========= Scene インクルード=========
@@ -36,23 +40,29 @@ public:
 	GameScene(SceneManager& sceneManager,InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem);
 
 	//========= Sceneライフサイクル関数=========
-	// プレイヤー・カメラ・入力確認表示を初期状態へ戻し、生成済みObjectを空にして、範囲補正後の位置へカメラを合わせる。
+	// プレイヤー・カメラ・Collision・入力確認表示を初期状態へ戻し、生成済みObjectを空にして、範囲補正後の位置へカメラを合わせる。
 	void Initialize() override;
-	// 共有Rendererを初期化し、設定表から床と壁を生成して、成功後にFPS操作とGame用BGMを有効にする。
-	// 戻り値: Registry初期化とObject生成が成功したらtrue。falseを検出した場合はFinalize後にfalseを返す。
+	// 共有Rendererと線描画Rendererを初期化し、設定表から床と壁（とそのCollider）を生成して、成功後にFPS操作とGame用BGMを有効にする。
+	// 戻り値: Registry初期化・線描画の初期化・Object生成が成功したらtrue。falseを検出した場合はFinalize後にfalseを返す。
 	// 下位処理の例外は捕捉しない。
 	bool Init() override;
-	// F2の遷移予約、F1のCapture切替、視点・プレイヤー位置の更新、入力確認用のホイール回転量の取得を行う。
+	// F2の遷移予約、F3のCollision可視化の切替、F1のCapture切替、視点・プレイヤー位置の更新、視線のRay判定、ホイール回転量の取得を行う。
 	// deltaTime: プレイヤー更新へ渡す経過時間。単位は秒。
 	// Capture解除中は視点・移動更新を行わない。F2で予約した場合は後続処理を行わない。
 	void Update(float deltaTime) override;
-	// 描画先サイズに合わせて行列を作り、生成済みのObjectを表の順に描画して、読み取り専用のデバッグUIを描画する。
+	// 描画先サイズに合わせて行列を作り、生成済みのObjectを表の順に描画して、Collisionの可視化と読み取り専用のデバッグUIを描画する。
 	// 幅または高さが0なら何もしない。ImGuiフレーム開始後、描画データ確定前に呼ぶ。
 	void Draw() override;
-	// 生成したObjectを先に破棄し、その後に共有Rendererを解放する。繰り返し呼出可能。CaptureやBGMは変更しない。
+	// 生成したObjectを先に破棄し、その後に共有Rendererと線描画Renderer、Collisionを解放する。繰り返し呼出可能。CaptureやBGMは変更しない。
 	void Finalize() override;
 
 private:
+	//========= 補助関数=========
+	// 登録中のColliderと、視線のRayの結果を線分へ変換し、深度比較なしで描画する。描画後は深度比較を既定へ戻す。
+	// viewMatrix: World空間からView空間への変換行列。
+	// projectionMatrix: View空間からClip空間への変換行列。
+	void DrawCollisionDebug(const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix);
+
 	//========= System・Scene参照=========
 	// Scene遷移の予約先となる非所有参照。
 	SceneManager& m_sceneManager;
@@ -74,6 +84,26 @@ private:
 	ModelRegistry m_modelRegistry{};
 	// STAGE_LAYOUTの表から生成した床と壁。Rendererを借用するだけで所有しない。表の順が描画順になる。
 	std::vector<SceneObject> m_stageObjects{};
+
+	//========= Collision=========
+	// 床・壁のAABBと、テスト用の球を登録するCollision。
+	CollisionWorld m_collisionWorld{};
+	// Collisionの形状を表示する線分を蓄え、色ごとに描画する。
+	CollisionDebugDrawer m_collisionDebugDrawer{};
+	// 線分の描画に使うGPU Resourceを所有する。
+	DebugLineRenderer m_debugLineRenderer{};
+
+	//========= Collision可視化の状態=========
+	// Collisionの可視化を表示するか。F3で切り替え、既定は非表示。
+	bool m_isCollisionDebugVisible{};
+	// 表示中にUpdateで求めた、カメラから視線方向へのRay。
+	COLLISION_RAY m_debugRay{};
+	// m_debugRayがColliderへ命中したか。表示中だけUpdateで更新する。
+	bool m_hasDebugRayHit{};
+	// 命中した場合の距離・命中点・法線。m_hasDebugRayHitがtrueの間だけ有効。
+	COLLISION_RAY_HIT m_debugRayHit{};
+	// 命中したColliderの情報。m_hasDebugRayHitがtrueの間だけ有効。
+	COLLISION_HIT_INFO m_debugRayHitInfo{};
 
 	//========= 入力確認表示=========
 	// デバッグ表示用のホイール回転量の累計。標準では1ノッチが120で、正は奥、負は手前への回転。ゲーム操作には使用しない。

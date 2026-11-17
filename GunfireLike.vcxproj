@@ -190,7 +190,11 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="External\imgui\imgui_tables.cpp" />
     <ClCompile Include="External\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Source\Framework\2D\CPP\HudCanvas.cpp" />
+    <ClCompile Include="Source\Framework\3D\CPP\DebugLineRenderer.cpp" />
     <ClCompile Include="Source\Framework\Audio\CPP\AudioSystem.cpp" />
+    <ClCompile Include="Source\Framework\Collision\CPP\CollisionDebugDrawer.cpp" />
+    <ClCompile Include="Source\Framework\Collision\CPP\CollisionMath.cpp" />
+    <ClCompile Include="Source\Framework\Collision\CPP\CollisionWorld.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\ShaderBinaryLoader.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\TextureLoader.cpp" />
     <ClCompile Include="Source\Framework\Etc\CPP\GameTimer.cpp" />
@@ -223,8 +227,13 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="External\imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="External\imgui\imgui.h" />
     <ClInclude Include="Source\Framework\2D\H\HudCanvas.h" />
+    <ClInclude Include="Source\Framework\3D\H\DebugLineRenderer.h" />
     <ClInclude Include="Source\Framework\Audio\H\AudioSystem.h" />
     <ClInclude Include="Source\Framework\2D\H\FadeOverlay.h" />
+    <ClInclude Include="Source\Framework\Collision\H\CollisionDebugDrawer.h" />
+    <ClInclude Include="Source\Framework\Collision\H\CollisionMath.h" />
+    <ClInclude Include="Source\Framework\Collision\H\CollisionShapes.h" />
+    <ClInclude Include="Source\Framework\Collision\H\CollisionWorld.h" />
     <ClInclude Include="Source\Framework\DirectX\H\ConstantBuffer.h" />
     <ClInclude Include="Source\Framework\DirectX\H\GraphicsConstants.h" />
     <ClInclude Include="Source\Framework\DirectX\H\ShaderBinaryLoader.h" />

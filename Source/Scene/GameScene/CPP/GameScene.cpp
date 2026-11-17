@@ -1,9 +1,9 @@
 ﻿#include "../H/GameScene.h"
 
-// テストSceneの初期化、入力に応じた状態更新、設定表から生成した床・壁と入力確認を含むデバッグUIの描画、Resource終了を実装する。
+// テストSceneの初期化、入力に応じた状態更新、設定表から生成した床・壁とCollision可視化・デバッグUIの描画、Resource終了を実装する。
 
 //========= Windows インクルード=========
-#include <windows.h> // VK_F1・VK_F2などの仮想キーコードで、Capture切替・タイトル遷移・入力確認表示のキーを指定する。
+#include <windows.h> // VK_F1・VK_F2・VK_F3などの仮想キーコードで、Capture切替・タイトル遷移・可視化切替・入力確認表示のキーを指定する。
 
 //========= 外部ライブラリ インクルード=========
 #include <DirectXMath.h>
@@ -22,7 +22,7 @@
 #include "Scene/Common/H/StageLayout.h"
 #include "Scene/TitleScene/H/TitleScene.h"
 
-// このSceneの透視投影と、入力確認表示に使用する固定設定をまとめる。
+// このSceneの透視投影、Collision可視化、入力確認表示に使用する固定設定をまとめる。
 namespace
 {
 	//========= Projection設定=========
@@ -32,6 +32,30 @@ namespace
 	constexpr float ns_NEAR_CLIP = 0.1f;
 	// View空間での遠距離Clip面の距離。単位はワールド距離単位。これより遠い物は描画されない。
 	constexpr float ns_FAR_CLIP = 1000.0f;
+
+	//========= Collisionテスト設定=========
+	// 動作確認用に配置する、敵レイヤーの球。中心はワールド座標(0,1,6)で、床の中央付近の正面。半径は1。
+	constexpr COLLISION_SPHERE ns_TEST_TARGET_SPHERE{{0.0f,1.0f,6.0f},1.0f};
+	// 視線のRayを調べる最大距離。単位はワールド距離単位。ステージの奥行き（約20）より十分長い値を使う。
+	constexpr float ns_DEBUG_RAY_MAX_DISTANCE = 100.0f;
+
+	//========= Rayの表示設定=========
+	// 命中しない場合に、Rayの表示線を伸ばす長さ。単位はワールド距離単位。
+	constexpr float ns_DEBUG_RAY_DISPLAY_LENGTH = 30.0f;
+	// Rayの表示線の始点を、カメラ位置から右方向へずらす量。画面中央の1点に線が重ならないようにする。単位はワールド距離単位。
+	constexpr float ns_DEBUG_RAY_OFFSET_RIGHT = 0.25f;
+	// Rayの表示線の始点を、カメラ位置から下方向（-Y）へずらす量。単位はワールド距離単位。
+	constexpr float ns_DEBUG_RAY_OFFSET_DOWN = 0.3f;
+	// 命中点の十字の、中心から端までの長さ。単位はワールド距離単位。
+	constexpr float ns_DEBUG_HIT_CROSS_HALF_SIZE = 0.2f;
+	// 命中点から伸ばす法線の線の長さ。単位はワールド距離単位。
+	constexpr float ns_DEBUG_NORMAL_LENGTH = 0.5f;
+	// Rayの表示線の色。黄色。
+	constexpr XMFLOAT4 ns_DEBUG_RAY_COLOR{1.0f,1.0f,0.0f,1.0f};
+	// 命中点の十字の色。白。
+	constexpr XMFLOAT4 ns_DEBUG_HIT_CROSS_COLOR{1.0f,1.0f,1.0f,1.0f};
+	// 命中点の法線の線の色。水色。
+	constexpr XMFLOAT4 ns_DEBUG_NORMAL_COLOR{0.0f,1.0f,1.0f,1.0f};
 
 	//========= 入力確認表示の型=========
 	// 入力確認表示に並べるキー1個分の設定。
@@ -64,11 +88,14 @@ GameScene::GameScene(SceneManager& sceneManager,InputSystem& inputSystem,Graphic
 // GPU Resource生成の前に、操作と配置の初期状態を準備する。
 void GameScene::Initialize()
 {
-	// プレイヤーとカメラと入力確認表示を既定状態へ戻し、前回の生成Objectを空にする。Rendererの生成と表からのObject生成はInitで行う。
+	// プレイヤー・カメラ・入力確認表示・Collisionの状態を既定へ戻し、前回の生成Objectを空にする。Rendererの生成と表からのObject生成はInitで行う。
 	m_debugPlayer = DebugPlayer{};
 	m_FPSCamera = FpsCamera{};
 	m_debugWheelTotal = 0;
 	m_stageObjects.clear();
+	m_collisionWorld.Clear();
+	m_isCollisionDebugVisible = false;
+	m_hasDebugRayHit = false;
 
 	// 0秒の更新でも位置のclampは適用されるため、初回描画前に床範囲内へ補正する。
 	// 補正後にカメラ位置を合わせ、プレイヤーと視点の開始位置を一致させる。
@@ -86,12 +113,23 @@ bool GameScene::Init()
 		return false;
 	}
 
-	// 設定表から床と4面の壁を、表の順に生成する。全件成功しなければ、生成済みのRendererを含めて終了して失敗を返す。
-	if(!SceneObjectFactory::Build(STAGE_LAYOUT::ns_OBJECTS,STAGE_LAYOUT::ns_OBJECT_COUNT,m_modelRegistry,m_stageObjects)){
+	// Collision可視化に使う線描画Rendererの初期化失敗を検出したら、生成済みのRendererを含めて終了して失敗を返す。
+	if(!m_debugLineRenderer.Initialize(m_graphicsSystem)){
+		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの線描画Renderer初期化に失敗しました。");
+		Finalize();
+		return false;
+	}
+
+	// 設定表から床と4面の壁を、表の順に生成し、壁のAABB ColliderをCollisionWorldへ登録する。
+	// 全件成功しなければ、生成済みのRendererを含めて終了して失敗を返す。
+	if(!SceneObjectFactory::Build(STAGE_LAYOUT::ns_OBJECTS,STAGE_LAYOUT::ns_OBJECT_COUNT,m_modelRegistry,&m_collisionWorld,m_stageObjects)){
 		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneのステージObject生成に失敗しました。");
 		Finalize();
 		return false;
 	}
+
+	// 動作確認用の球Colliderを敵レイヤーで登録する。識別用の値は使わないため0にする。
+	m_collisionWorld.AddSphere(ns_TEST_TARGET_SPHERE,COLLISION_LAYER::ns_ENEMY,0);
 
 	// Resource生成とObject生成が成功してからCaptureとBGMを変更し、false返却時には変更しない。
 	m_inputSystem.SetMouseCaptureEnabled(true);
@@ -113,6 +151,11 @@ void GameScene::Update(float deltaTime)
 		m_inputSystem.SetMouseCaptureEnabled(!m_inputSystem.IsMouseCaptureEnabled());
 	}
 
+	// F3が押された瞬間は、Collision可視化の表示を反転する。Capture解除中も切り替えられるよう、Captureの判定より前に処理する。
+	if(m_inputSystem.IsKeyTriggered(VK_F3)){
+		m_isCollisionDebugVisible = !m_isCollisionDebugVisible;
+	}
+
 	// マウスを解放している間は、カメラとプレイヤーの操作更新をまとめて停止し、ここで戻る。
 	if(!m_inputSystem.IsMouseCaptureEnabled())return;
 
@@ -123,6 +166,13 @@ void GameScene::Update(float deltaTime)
 	m_FPSCamera.Update(m_inputSystem);
 	m_debugPlayer.Update(deltaTime,m_inputSystem,m_FPSCamera);
 	m_FPSCamera.SetPosition(m_debugPlayer.GetPosition());
+
+	// Collision可視化の表示中だけ、移動後のカメラ位置から視線方向へRayを飛ばし、最も近い命中を調べる。表示しない間は判定を行わない。
+	if(m_isCollisionDebugVisible){
+		m_debugRay.origin = m_FPSCamera.GetPosition();
+		m_debugRay.direction = m_FPSCamera.GetForward();
+		m_hasDebugRayHit = m_collisionWorld.Raycast(m_debugRay,ns_DEBUG_RAY_MAX_DISTANCE,COLLISION_LAYER::ns_ALL,m_debugRayHit,m_debugRayHitInfo);
+	}
 }
 
 // 現在の描画先サイズと視点から3D描画を行い、操作状態と入力確認をデバッグUIへ表示する。
@@ -148,13 +198,24 @@ void GameScene::Draw()
 		object.Draw(m_graphicsSystem,view_matrix,projection_matrix);
 	}
 
+	// Collision可視化が有効なら、Objectの描画後に、Colliderの線とRayの線を重ねて描画する。
+	if(m_isCollisionDebugVisible){
+		DrawCollisionDebug(view_matrix,projection_matrix);
+	}
+
 	// UIは操作案内と値の表示だけに限定し、Draw内ではScene予約やゲーム進行を変更しない。
 	const XMFLOAT3& player_position = m_debugPlayer.GetPosition();
 	ImGui::Begin("Minimal Game Scene");
 	ImGui::TextUnformatted("WASD: Move / Mouse: Look");
-	ImGui::TextUnformatted("F1: Toggle mouse capture / F2: Title / Escape: Exit");
+	ImGui::TextUnformatted("F1: Toggle mouse capture / F2: Title / F3: Collision debug / Escape: Exit");
 	ImGui::Text("Position: %.2f, %.2f, %.2f",player_position.x,player_position.y,player_position.z);
 	ImGui::Text("Mouse capture: %s",m_inputSystem.IsMouseCaptureEnabled() ? "ON" : "OFF");
+	ImGui::Text("Collision debug: %s",m_isCollisionDebugVisible ? "ON" : "OFF");
+
+	// 可視化の表示中でRayが命中している場合だけ、命中したColliderのレイヤーのbitと距離を表示する。
+	if(m_isCollisionDebugVisible && m_hasDebugRayHit){
+		ImGui::Text("Ray hit: layer bit=%u distance=%.2f",m_debugRayHitInfo.layer,m_debugRayHit.distance);
+	}
 
 	// 入力確認用に、各キーの押下状態とホイールの累計を、読み取り専用の一覧として追加する。
 	ImGui::Separator();
@@ -167,11 +228,59 @@ void GameScene::Draw()
 	ImGui::End();
 }
 
-// Sceneが所有するObjectと、共有Rendererだけを終了する。
+// Sceneが所有するObject・共有Renderer・線描画Renderer・Collisionを終了する。
 void GameScene::Finalize()
 {
 	// 遷移先のInit後に呼ばれても、遷移先が設定したCaptureやBGMを上書きしない。
 	// Objectが借用しているRendererを解放する前に、Objectを先に破棄する。
 	m_stageObjects.clear();
 	m_modelRegistry.Uninit();
+
+	// 線描画Rendererを解放し、登録したColliderと蓄えた線分を空にする。
+	m_debugLineRenderer.Uninit();
+	m_collisionWorld.Clear();
+	m_collisionDebugDrawer.Clear();
+}
+
+//========= 補助関数=========
+// 登録中のColliderと視線のRayの結果を線分へ変換し、深度比較なしで描画する。
+void GameScene::DrawCollisionDebug(const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix)
+{
+	// 前フレームの線を捨て、登録中の全Colliderをレイヤーごとの色で追加する。
+	m_collisionDebugDrawer.Clear();
+	m_collisionDebugDrawer.AddWorld(m_collisionWorld);
+
+	// Rayの表示線の始点を求める。カメラ位置のままでは画面中央の1点に重なり線が見えないため、右方向と下方向（-Y）へずらす。
+	// 右方向はカメラの右ベクトルに距離を掛け、下方向はワールドのY座標から引く。
+	const XMFLOAT3& camera_position = m_FPSCamera.GetPosition();
+	const XMFLOAT3 camera_right = m_FPSCamera.GetRight();
+	const XMFLOAT3 line_start{camera_position.x + camera_right.x * ns_DEBUG_RAY_OFFSET_RIGHT,
+		camera_position.y + camera_right.y * ns_DEBUG_RAY_OFFSET_RIGHT - ns_DEBUG_RAY_OFFSET_DOWN,
+		camera_position.z + camera_right.z * ns_DEBUG_RAY_OFFSET_RIGHT};
+
+	// 表示線の終点を決める。
+	XMFLOAT3 line_end{};
+	// 命中している場合は、終点を命中点にして、命中点の十字と、命中面の法線の線も追加する。
+	if(m_hasDebugRayHit){
+		line_end = m_debugRayHit.point;
+		m_collisionDebugDrawer.AddCross(m_debugRayHit.point,ns_DEBUG_HIT_CROSS_HALF_SIZE,ns_DEBUG_HIT_CROSS_COLOR);
+		m_collisionDebugDrawer.AddLine(m_debugRayHit.point,
+																	 XMFLOAT3{m_debugRayHit.point.x + m_debugRayHit.normal.x * ns_DEBUG_NORMAL_LENGTH,
+																						m_debugRayHit.point.y + m_debugRayHit.normal.y * ns_DEBUG_NORMAL_LENGTH,
+																						m_debugRayHit.point.z + m_debugRayHit.normal.z * ns_DEBUG_NORMAL_LENGTH},
+																						ns_DEBUG_NORMAL_COLOR);
+	}
+	// 命中していない場合は、カメラ位置から視線方向へ表示用の長さだけ進んだ点を終点にする。
+	else{
+		const XMFLOAT3 camera_forward = m_FPSCamera.GetForward();
+		line_end = XMFLOAT3{camera_position.x + camera_forward.x * ns_DEBUG_RAY_DISPLAY_LENGTH,
+			camera_position.y + camera_forward.y * ns_DEBUG_RAY_DISPLAY_LENGTH,
+			camera_position.z + camera_forward.z * ns_DEBUG_RAY_DISPLAY_LENGTH};
+	}
+	m_collisionDebugDrawer.AddLine(line_start,line_end,ns_DEBUG_RAY_COLOR);
+
+	// 壁面と同じ位置のAABBが深度比較でちらつかないよう、深度比較を切って描画し、描画後に既定へ戻す。
+	m_graphicsSystem.SetDepthTestEnabled(false);
+	m_collisionDebugDrawer.Draw(m_graphicsSystem,m_debugLineRenderer,viewMatrix,projectionMatrix);
+	m_graphicsSystem.SetDepthTestEnabled(true);
 }
