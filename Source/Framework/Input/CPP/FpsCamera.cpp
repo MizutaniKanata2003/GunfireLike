@@ -1,7 +1,7 @@
 ﻿#include "../H/FpsCamera.h"
 
 // マウス差分を視線角度へ変換し、方向ベクトルと左手系View行列を計算する。
-// 感度・回転符号・Pitch制限・外積順・行列生成を維持し、条件・値・計算の意味を補完する。
+// 感度・回転符号・Pitch制限・外積順・行列生成を維持し、条件・値・計算の意味を補完する。反動の回転量の加算も行う。
 
 //========= Windows インクルード=========
 #include <windows.h> // ConsumeMouseDeltaが返すPOINTのX・Yを受け取り、視線更新の入力に使用する。
@@ -42,6 +42,17 @@ void FpsCamera::Update(InputSystem& input)
 	m_pitch = std::clamp(m_pitch,-ns_MAX_PITCH_RADIANS,ns_MAX_PITCH_RADIANS);
 }
 
+// 反動の回転量を、現在の向きへ直接加える。
+void FpsCamera::ApplyRecoil(float yawRadians,float pitchRadians)
+{
+	// YawとPitchへ、引数の回転量をそのまま加える。マウス感度は掛けない。
+	m_yaw += yawRadians;
+	m_pitch += pitchRadians;
+
+	// 加算後のPitchを、Updateと同じ上下限へ収める。反動が上限を超える場合も視線が反転しないようにする。
+	m_pitch = std::clamp(m_pitch,-ns_MAX_PITCH_RADIANS,ns_MAX_PITCH_RADIANS);
+}
+
 //========= Getter関数=========
 // 保持角度から前方向を生成する。位置を加えないため、注視点ではなく方向ベクトルを返す。
 XMFLOAT3 FpsCamera::GetForward() const
@@ -59,7 +70,7 @@ XMFLOAT3 FpsCamera::GetForward() const
 // 前方向とワールド上方向から、水平移動に使う単位右方向を求める。
 XMFLOAT3 FpsCamera::GetRight() const
 {
-	// up×forwardの順で右方向を求める。順序を逆にすると符号が反転し、DebugPlayerの左右移動も反転する。
+	// up×forwardの順で右方向を求める。順序を逆にすると符号が反転し、左右移動も反転する。
 	const XMFLOAT3 forward = GetForward();
 	const XMVECTOR up_vector = XMVectorSet(0.0f,1.0f,0.0f,0.0f); // ワールドの+Yを上とする。Wは0で方向として用意する。
 	const XMVECTOR forward_vector = XMLoadFloat3(&forward); // 保存用float3をSIMD演算用ベクトルへ読み込む。

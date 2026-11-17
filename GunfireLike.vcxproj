@@ -194,6 +194,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Framework\Audio\CPP\AudioSystem.cpp" />
     <ClCompile Include="Source\Framework\Collision\CPP\CollisionDebugDrawer.cpp" />
     <ClCompile Include="Source\Framework\Collision\CPP\CollisionMath.cpp" />
+    <ClCompile Include="Source\Framework\Collision\CPP\CollisionResolver.cpp" />
     <ClCompile Include="Source\Framework\Collision\CPP\CollisionWorld.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\ShaderBinaryLoader.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\TextureLoader.cpp" />
@@ -215,11 +216,14 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Scene\Common\CPP\Transform.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\GraphicsSystem.cpp" />
     <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\Scene\GameScene\CPP\Enemy.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameScene.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\SceneManager.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="Source\Scene\GameScene\CPP\PlayerController.cpp" />
+    <ClCompile Include="Source\Scene\GameScene\CPP\WeaponSystem.cpp" />
     <ClCompile Include="Source\Scene\TitleScene\CPP\TitleScene.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -232,6 +236,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\2D\H\FadeOverlay.h" />
     <ClInclude Include="Source\Framework\Collision\H\CollisionDebugDrawer.h" />
     <ClInclude Include="Source\Framework\Collision\H\CollisionMath.h" />
+    <ClInclude Include="Source\Framework\Collision\H\CollisionResolver.h" />
     <ClInclude Include="Source\Framework\Collision\H\CollisionShapes.h" />
     <ClInclude Include="Source\Framework\Collision\H\CollisionWorld.h" />
     <ClInclude Include="Source\Framework\DirectX\H\ConstantBuffer.h" />
@@ -260,9 +265,13 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\Common\H\StageLayout.h" />
     <ClInclude Include="Source\Scene\Common\H\Transform.h" />
     <ClInclude Include="Source\Framework\DirectX\H\GraphicsSystem.h" />
+    <ClInclude Include="Source\Scene\GameScene\H\Enemy.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameScene.h" />
     <ClInclude Include="Source\Scene\Common\H\IScene.h" />
     <ClInclude Include="Source\Scene\Common\H\SceneManager.h" />
+    <ClInclude Include="Source\Scene\GameScene\H\PlayerController.h" />
+    <ClInclude Include="Source\Scene\GameScene\H\WeaponSystem.h" />
+    <ClInclude Include="Source\Scene\GameScene\H\WeaponTable.h" />
     <ClInclude Include="Source\Scene\TitleScene\H\TitleScene.h" />
   </ItemGroup>
   <ItemGroup>
