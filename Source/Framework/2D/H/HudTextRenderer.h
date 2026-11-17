@@ -1,15 +1,15 @@
 #pragma once
 
-// SpriteBatchとSpriteFontを所有し、Virtual Canvas座標での文字列描画と文字サイズの計測を提供する。
-// Scene進行や描画先の設定は担当しない。描画サイズ取得用のGraphicsSystemは非所有で参照する。
+// SpriteBatchとSpriteFontを所有し、Virtual Canvas上の文字描画とFont基準の寸法計測を提供する。
+// Scene進行、描画先・Viewportの準備、Presentは担当しない。GraphicsSystemへの参照は非所有で保持する。
 
 //========= C++標準ライブラリ インクルード=========
-#include <memory>
-#include <string>
+#include <memory> // std::unique_ptrでBatchとFontを所有し、Uninitまたは自身の破棄で解放する。
+#include <string> // 描画・計測する終端付きワイド文字列をstd::wstring参照で受け取る。
 
 //========= 外部ライブラリ インクルード=========
-#include <SpriteBatch.h>
-#include <SpriteFont.h>
+#include <SpriteBatch.h> // DirectXTKの2D描画受付・終了を行うBatch型を使用する。
+#include <SpriteFont.h> // SpriteFont形式の読込、DrawString、MeasureStringを使用する。
 
 //========= Framework インクルード=========
 #include "Framework/Etc/H/MathTypes.h"
@@ -18,55 +18,54 @@
 //========= 前方宣言=========
 class GraphicsSystem;
 
-// DirectXTKを使用して、ImGuiに依存しないHUD文字列を描画する。
+// ImGuiに依存せず文字を描くRenderer。公開名HudTextRendererは既存参照との互換性のため維持する。
 class HudTextRenderer final
 {
 public:
 	//========= 初期化関数=========
-	// SpriteBatchとSpriteFontを生成し、描画サイズの取得先を登録する。
-	// graphicsSystem: DeviceとContextを取得する描画基盤。Uninitまで有効な実体を渡す。
-	// 戻り値: DeviceまたはContextが未取得ならfalse、両Resourceを生成できればtrue。
-	// 注意: 生成時の例外は捕捉しない。再初期化する場合は先にUninitを呼んでおく。
+	// Batch→Fontの順に生成し、両生成後だけサイズ取得用Systemを登録する。再初期化前はUninitを呼ぶこと。
+	// graphicsSystem: Device・Contextと描画先サイズの取得元。登録後Uninitまで実体を有効に保つ。
+	// 戻り値: DeviceかContextがなければfalse、両生成を完了すればtrue。生成・読込例外は捕捉しない。
+	// Font生成で例外になれば、先に代入したBatchはメンバーへ残る。例外をfalse経路と同じ後始末とは扱わない。
 	bool Initialize(GraphicsSystem& graphicsSystem);
 
 	//========= 描画関数=========
-	// 文字列描画の受付を開始する。SpriteBatch未生成なら何もしない。
-	// 正常に開始した後はEndを1回呼ぶ。Beginの多重呼出は行わない。
-	// Render Target・Viewport・適切なRender Passは呼出側で準備する。
+	// Batchがあれば描画受付を開始する。正常に開始した後はEndを対応させ、多重Beginは行わない。
+	// 開始状態を追跡する専用フラグはない。利用側がRender Target・Viewport等を準備してから使う。
 	void Begin();
-	// BeginからEndまでの間に、Virtual Canvas座標へ文字列を描画登録する。
-	// text: 描画する文字列。空文字列なら何もしない。参照自体は保持しない。
-	// position: Virtual Canvas上の左上座標。右向きX・下向きY。Canvasによる中央寄せを反映する。
-	// color: DirectXMathのRGBA色。型名は既存APIと外部ライブラリの契約を維持する。
-	// scale: Virtual Canvas基準の文字倍率。0以下なら描画しない。省略時は1。
-	// Resource未生成・描画基盤未登録・描画先サイズ0の場合は何もしない。
+	// Begin/End間にCanvas位置・倍率を変換して文字描画を登録する。文字列参照は保持しない。
+	// text: 描くワイド文字列。空なら何もしない。DrawStringへc_str()を渡し、埋込NULLの独自検査はしない。
+	// position: 基準Canvasの位置。左上原点、右向きX・下向きY。内部で倍率と中央寄せOffsetを適用する。
+	// color: RGBA色。外部型XMVECTORF32を維持し、値のclampや独自のAlpha加工は行わない。
+	// scale: Font元サイズへ掛けるCanvas基準倍率。既定1は等倍指定で、描画時にさらにCanvas倍率が掛かる。
+	// 必須Resource・登録Systemなし、空文字列、scale<=0、描画先寸法0では何もしない。Begin済みかは検証しない。
 	void DrawText(const std::wstring& text,const XMFLOAT2& position,const XMVECTORF32& color,float scale = 1.0f);
 
 	//========= 計測関数=========
-	// フォントから計測した幅と高さへ指定倍率を反映して返す。Canvas倍率は掛けない。
-	// text: 計測する文字列。空文字列なら幅・高さとも0を返す。
-	// scale: フォントの元サイズへ掛ける倍率。0以下なら幅・高さとも0。省略時は1。
-	// 戻り値: Virtual Canvas基準の幅と高さ。Font未生成時は両成分0。
+	// Font計測値に引数Scaleだけを掛ける。DrawTextと違いCanvas倍率を含まないため、実画面のpixel寸法とは区別する。
+	// text: 計測する文字列。空なら(0,0)。MeasureStringへc_str()を渡す。
+	// scale: Font元寸法に掛ける倍率。0以下なら(0,0)、既定は1。追加の有限性検証は行わない。
+	// 戻り値: Canvas基準の幅・高さ。Font未生成なら(0,0)。System登録や描画区間の開始を必要としない。
 	[[nodiscard]] XMFLOAT2 MeasureText(const std::wstring& text,float scale = 1.0f) const;
 
 	//========= 描画終了関数=========
-	// Beginで開始した文字列描画を終了する。SpriteBatch未生成なら何もしない。
-	// SpriteBatchが設定する描画状態は、このクラスでは元へ戻さない。
+	// BatchがあればEndを渡す。未開始Endを自動で防止する処理はないため、利用側でBegin/Endを対応させる。
+	// このクラス独自のState保存・復元や、SwapChainのPresentは行わない。
 	void End();
 
 	//========= 終了関数=========
-	// Font、Batchを解放し、描画基盤への非所有ポインターを解除する。
-	// BeginからEndまでの途中では呼ばない。解放済み状態で再度呼び出してもよい。
+	// Font→Batchを解放し、最後に非所有Systemを解除する。Begin/Endの区間を終えてから呼ぶ。
+	// 解放済みでも呼出可能。System本体は終了しない。Device/Contextは依存する描画Resourceの利用終了まで有効に保つ。
 	void Uninit();
 
 private:
 	//========= 所有する文字描画Resource=========
-	// 文字列をまとめて描画するBatchを所有する。Uninitまたは自身の破棄で解放する。
+	// Contextを使って構築するBatchを所有する。既定は空、Uninitまたは自身の破棄で解放する。
 	std::unique_ptr<SpriteBatch> m_spriteBatch{};
-	// 字形とTextureを使用するSpriteFontを所有する。Batchより先に解放する。
+	// 字形と描画用Textureを扱うFontを所有する。明示終了時はBatchより先に解放する。
 	std::unique_ptr<SpriteFont> m_spriteFont{};
 
 	//========= 非所有の描画基盤参照=========
-	// 現在のRender Targetサイズを取得する参照先。Initialize成功後からUninitまで有効であること。
+	// 描画時に現在のRender Target寸法を取得する借用先。既定は未登録、成功後に登録し、Uninitで解除する。
 	GraphicsSystem* m_graphicsSystem{};
 };

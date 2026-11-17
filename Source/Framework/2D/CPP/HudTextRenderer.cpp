@@ -1,103 +1,99 @@
 ﻿#include "../H/HudTextRenderer.h"
 
-// SpriteBatchとSpriteFontの生成・解放、Canvas変換を伴う文字描画、フォント基準の計測を実装する。
-// 復元元: d65e80e61cbddaf9b076465163b7beb19bffad1c。処理は維持し、コメントと書式だけを現行規約へ合わせる。
+// 誤置換前の文字描画実装を基準に、Batch/Font生成、Canvas変換、計測、明示終了を実装する。
+// 復元元d65e80e61cbddaf9b076465163b7beb19bffad1cの処理を維持し、コメントと書式だけを整理する。
 
 //========= C++標準ライブラリ インクルード=========
-#include <memory> // std::make_uniqueでBatchとFontを生成し、メンバーのunique_ptrへ所有を渡す。
+#include <memory> // std::make_uniqueでBatchとFontを生成し、メンバーunique_ptrへ所有を渡す。
 
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/GraphicsSystem.h"
 
-// HUD文字列描画に使用するAssetの固定パスをまとめる。
+// HUD文字描画が読み込むFont Assetの固定パスをまとめる。
 namespace
 {
 	//========= Assetパス定数=========
-	// 読み込むSpriteFontファイル。相対パスは実行時の作業ディレクトリを基準とする。既存パスを維持する。
+	// SpriteFont形式のファイル。作業ディレクトリ基準の相対パスで、実行時に別Fontへ自動切替はしない。
 	constexpr const wchar_t* ns_HUD_FONT_PATH = L"Assets/Fonts/GunfireFont.spritefont";
 }
 
 //========= 初期化関数=========
-// ContextでBatch、DeviceでFontを生成し、サイズ取得用のGraphicsSystemを登録する。
+// 描画基盤から借用したContextとDeviceを使い、文字描画Resourceを生成する。
 bool HudTextRenderer::Initialize(GraphicsSystem& graphicsSystem)
 {
-	// 描画基盤から生成用ポインターを借用する。この関数の先頭では既存Resourceを自動解放しない。
+	// 生成に必要なDeviceとContextを取得する。関数先頭でUninitはせず、再初期化前の解放は利用側に求める。
 	ID3D11Device* device = graphicsSystem.GetDevice();
 	ID3D11DeviceContext* context = graphicsSystem.GetContext();
-	// どちらかが未取得なら生成もSystem登録も行わずfalseを返す。保持済みのメンバーは変更しない。
+	// どちらかがなければメンバーを変更せずfalse。既存Resourceの解放やSystem登録を行わない。
 	if(device == nullptr || context == nullptr)return false;
 
-	// Batchを先に生成してからFontを読み込む。両者はメンバーのunique_ptrで所有する。
-	// 生成・読込の例外は捕捉しない。Font生成で例外になれば、先に代入したBatchはメンバーへ残る。
-	// 再初期化前は呼出側でUninitを済ませ、使用する描画基盤とResourceの対応を維持する。
+	// Batchを先に生成し、次にFontを読み込む。失敗時のC++例外は捕捉せず、先に代入済みのBatchはメンバーへ残る。
 	m_spriteBatch = std::make_unique<SpriteBatch>(context);
 	m_spriteFont = std::make_unique<SpriteFont>(device,ns_HUD_FONT_PATH);
 
-	// 両生成後にだけ非所有Systemを登録する。描画時にサイズを取得するため、Uninitまで参照先を有効に保つ。
+	// 両生成後だけ非所有Systemを登録し成功を返す。以後のDrawTextが現在の描画サイズを取得する。
 	m_graphicsSystem = &graphicsSystem;
 	return true;
 }
 
 //========= 描画関数=========
-// Batchの文字描画受付を開始する。呼出側がBeginとEndの対応を管理する。
+// 利用側が準備した描画先に対し、文字描画のBatch受付を開始する。
 void HudTextRenderer::Begin()
 {
-	// Batchがある場合だけ開始する。多重Beginを防ぐ状態フラグや例外捕捉は、このクラスでは追加しない。
+	// Batchがあれば開始する。多重Beginや未初期化Fontを別途検査する処理は追加しない。
 	if(m_spriteBatch)m_spriteBatch->Begin();
 }
 
-// 基準Canvas上の位置と文字倍率を現在の描画先へ変換し、Batchへ文字列を渡す。
+// 文字列位置と倍率を実描画先へ変換し、FontからBatchへ描画を登録する。
 void HudTextRenderer::DrawText(const std::wstring& text,const XMFLOAT2& position,const XMVECTORF32& color,float scale)
 {
-	// 必須Resource・Systemがない場合、空文字列、0以下の倍率では描画しない。Begin済みかの検証は行わない。
+	// ResourceかSystemがない、本文が空、倍率が非正なら描画登録を省く。有限値・Begin済み状態の追加検証はしない。
 	if(!m_spriteBatch || !m_spriteFont || m_graphicsSystem == nullptr || text.empty() || scale <= 0.0f)return;
 
-	// 保持するSystemから現在のRender Targetサイズをpixel単位で取得する。
+	// 借用Systemから描画時のRender Target寸法をpixel単位で取得する。
 	const unsigned int render_width = m_graphicsSystem->GetRenderWidth();
 	const unsigned int render_height = m_graphicsSystem->GetRenderHeight();
-	// 幅または高さが0ならCanvas変換と描画登録を省く。Viewport・Render Target自体の設定は呼出側が行う。
+	// 片方でも0ならCanvas変換もDrawStringも行わない。借用System自体の寿命は利用側が維持する。
 	if(render_width == 0 || render_height == 0)return;
 
-	// 位置には均一倍率と中央寄せOffset、文字倍率にはCanvas倍率だけを反映する。
-	// この関数は描画ごとにCanvasを作るため、保持サイズの変更が次のDrawTextに反映される。
+	// 描画ごとにCanvasを作る。位置は均一倍率とOffsetで実pixelへ変換し、文字倍率にはCanvas倍率だけを掛ける。
 	const HudCanvas HUD_canvas{render_width,render_height};
 	const XMFLOAT2 screen_position = HUD_canvas.ToScreenPosition(position);
 	const float screen_scale = HUD_canvas.ToScreenScale(scale);
 
-	// 位置はRender Targetのpixel座標、回転は0ラジアン、文字の原点は(0,0)。色と倍率は既存どおり渡す。
-	// 文字列への参照は保持せず、終端付きポインターを呼出中に渡す。Batch/Fontの所有はメンバーに残る。
+	// 回転0ラジアン・原点(0,0)の既存設定で描く。Font・Batchの所有はメンバーへ残し、文字列参照は保持しない。
+	// このクラスは描画先やBlend等を保存・復元しない。Batchの受付終了は対応するEndで行う。
 	m_spriteFont->DrawString(m_spriteBatch.get(),text.c_str(),screen_position,color,0.0f,XMFLOAT2{},screen_scale);
 }
 
 //========= 計測関数=========
-// Fontの元サイズへ引数倍率だけを掛けた幅・高さを返す。Canvas倍率はここでは適用しない。
+// Fontの元寸法に指定倍率だけを掛け、Canvas上の配置計算に使う幅・高さを返す。
 XMFLOAT2 HudTextRenderer::MeasureText(const std::wstring& text,float scale) const
 {
-	// Font未生成、空文字列、0以下の倍率なら、計測せず両成分0を返す。
+	// Font未生成、空本文、非正倍率なら計測を行わず0サイズを返す。BatchやSystemの登録はこの判定に含めない。
 	if(!m_spriteFont || text.empty() || scale <= 0.0f)return {};
 
-	// MeasureStringのX・Y成分を幅・高さとして取り出し、呼出側のScaleだけを反映する。
-	// DrawText側でCanvas倍率を適用するため、ここで重ねて掛けない。戻り値は実画面のpixel寸法とは区別する。
+	// SIMD計測値のX=幅・Y=高さを取り出す。DrawText側でCanvas変換するため、ここへCanvas倍率を二重適用しない。
 	const XMVECTOR text_size = m_spriteFont->MeasureString(text.c_str());
 	return XMFLOAT2{XMVectorGetX(text_size) * scale,XMVectorGetY(text_size) * scale};
 }
 
 //========= 描画終了関数=========
-// Beginで開始したBatchを終了する。このクラスでは描画状態を保存・復元しない。
+// Beginで開始したBatchを終了する。Begin/Endの正しい対応は利用側が管理する。
 void HudTextRenderer::End()
 {
-	// Batchがある場合だけEndを渡す。未開始Endの抑止は実装せず、正しい呼出順は呼出側の前提とする。
+	// BatchがあればEndを渡す。未開始Endの抑止や例外捕捉は追加しない。
 	if(m_spriteBatch)m_spriteBatch->End();
 }
 
 //========= 終了関数=========
-// Font、Batchの順に所有を解放し、最後に非所有Systemの登録を解除する。
+// 文字描画Resourceと非所有Systemを解除する。
 void HudTextRenderer::Uninit()
 {
-	// 既存の解放順を維持する。Begin/End区間を終了させてから呼ぶ。GPU完了待機やContextの状態復元は行わない。
+	// Font→Batchの既存順で所有を解放する。描画受付区間の途中では呼ばず、GPU完了待機やContext復元も行わない。
 	m_spriteFont.reset();
 	m_spriteBatch.reset();
 
-	// System本体を破棄せず参照だけ解除し、以後のDrawTextを未登録として扱う。
+	// 借用先本体は破棄せず、以後のDrawTextが未登録として戻るようポインターを解除する。
 	m_graphicsSystem = nullptr;
 }
