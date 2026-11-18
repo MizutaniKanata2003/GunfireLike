@@ -11,8 +11,8 @@
 #include "Framework/Etc/H/MathTypes.h"
 
 //========= Scene インクルード=========
+#include "Scene/Common/H/EnemyWaveTable.h"
 #include "Scene/Common/H/Transform.h"
-#include "Scene/GameScene/H/EnemyWaveTable.h"
 
 //========= 前方宣言=========
 class BasicMeshRenderer;

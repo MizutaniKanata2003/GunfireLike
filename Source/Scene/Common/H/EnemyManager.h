@@ -9,8 +9,8 @@
 
 //========= Scene インクルード=========
 #include "Scene/GameScene/H/CombatResolver.h"
-#include "Scene/GameScene/H/Enemy.h"
-#include "Scene/GameScene/H/EnemyWaveTable.h"
+#include "Scene/Common/H/Enemy.h"
+#include "Scene/Common/H/EnemyWaveTable.h"
 
 // ウェーブ内の敵を所有する。終了時はRegistryとCollisionWorldの解放前にClearを呼ぶ。
 class EnemyManager final

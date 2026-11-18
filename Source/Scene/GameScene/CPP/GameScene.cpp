@@ -26,10 +26,10 @@
 #include "Framework/Input/H/InputSystem.h"
 
 //========= Scene インクルード=========
-#include "Scene/GameScene/H/EnemyApproach.h"
-#include "Scene/GameScene/H/EnemyAreaBehavior.h"
-#include "Scene/GameScene/H/EnemyRangedBehavior.h"
+#include "Scene/Common/H/EnemyApproach.h"
+#include "Scene/Common/H/EnemyAreaBehavior.h"
 #include "Scene/Common/H/SceneManager.h"
+#include "Scene/Common/H/EnemyRangedBehavior.h"
 #include "Scene/Common/H/SceneObjectFactory.h"
 #include "Scene/Common/H/StageLayout.h"
 #include "Scene/GameScene/H/CombatResolver.h"

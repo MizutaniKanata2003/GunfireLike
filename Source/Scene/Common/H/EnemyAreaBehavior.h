@@ -8,7 +8,7 @@
 #include <cmath> // std::isfiniteで経過時間を検証し、std::sqrtで水平距離を求める。
 
 //========= Scene インクルード=========
-#include "Scene/GameScene/H/Enemy.h"
+#include "Scene/Common/H/Enemy.h"
 
 // 範囲攻撃型の移動・攻撃の数値と、接近の移動をまとめる。
 namespace ENEMY_AREA

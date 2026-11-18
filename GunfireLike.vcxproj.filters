@@ -123,7 +123,7 @@
     <ClCompile Include="Source\Framework\Collision\CPP\CollisionWorld.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Scene\GameScene\CPP\Enemy.cpp">
+    <ClCompile Include="Source\Scene\Common\CPP\Enemy.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Source\Scene\Common\CPP\PlayerController.cpp">
@@ -144,16 +144,16 @@
     <ClCompile Include="Source\Scene\GameScene\CPP\CombatResolver.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Scene\GameScene\CPP\RoomController.cpp">
+    <ClCompile Include="Source\Scene\Common\CPP\RoomController.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Scene\GameScene\CPP\ExitDoor.cpp">
+    <ClCompile Include="Source\Scene\Common\CPP\ExitDoor.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Scene\GameScene\CPP\EnemyProjectile.cpp">
+    <ClCompile Include="Source\Scene\Common\CPP\EnemyProjectile.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Scene\GameScene\CPP\AreaTelegraph.cpp">
+    <ClCompile Include="Source\Scene\Common\CPP\AreaTelegraph.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Source\Debug\CPP\GameDebugUi.cpp">
@@ -290,7 +290,7 @@
     <ClInclude Include="Source\Framework\Collision\H\CollisionWorld.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\Enemy.h">
+    <ClInclude Include="Source\Scene\Common\H\Enemy.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Source\Scene\Common\H\PlayerController.h">
@@ -329,34 +329,34 @@
     <ClInclude Include="Source\Scene\Common\H\PlayerActionTable.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\RoomController.h">
+    <ClInclude Include="Source\Scene\Common\H\RoomController.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\EnemyWaveTable.h">
+    <ClInclude Include="Source\Scene\Common\H\EnemyWaveTable.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\EnemyManager.h">
+    <ClInclude Include="Source\Scene\Common\H\EnemyManager.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\EnemyApproach.h">
+    <ClInclude Include="Source\Scene\Common\H\EnemyApproach.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\ExitDoor.h">
+    <ClInclude Include="Source\Scene\Common\H\ExitDoor.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\EnemyTable.h">
+    <ClInclude Include="Source\Scene\Common\H\EnemyTable.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\EnemyRangedBehavior.h">
+    <ClInclude Include="Source\Scene\Common\H\EnemyRangedBehavior.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\EnemyProjectile.h">
+    <ClInclude Include="Source\Scene\Common\H\EnemyProjectile.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\AreaTelegraph.h">
+    <ClInclude Include="Source\Scene\Common\H\AreaTelegraph.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\EnemyAreaBehavior.h">
+    <ClInclude Include="Source\Scene\Common\H\EnemyAreaBehavior.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Source\Debug\H\CollisionDebugView.h">
