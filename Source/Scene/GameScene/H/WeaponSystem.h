@@ -54,6 +54,13 @@ public:
 	// 戻り値: この更新で起きた射撃の結果。リロード中は発射しない。
 	[[nodiscard]] WEAPON_UPDATE_RESULT Update(float deltaTime,const InputSystem& input,bool isAiming,bool isShootingAllowed,FpsCamera& camera,
 																						const CollisionWorld& collisionWorld);
+	// リロードを途中でやめる。弾は補充せず、装填弾数と予備弾薬は変わらない。殴打など、リロードをキャンセルする動作から呼ぶ。
+	// リロード中でなければ何もしない。
+	void CancelReload()
+	{
+		m_isReloading = false;
+		m_reloadElapsedSeconds = 0.0f;
+	}
 
 	//========= Getter関数=========
 	// 現在の装填弾数を返す。
