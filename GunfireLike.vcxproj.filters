@@ -153,6 +153,9 @@
     <ClCompile Include="Source\Scene\GameScene\CPP\RoomController.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Scene\GameScene\CPP\ExitDoor.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Framework\Imgui\H\ImGuiManager.h">
@@ -338,6 +341,9 @@
     <ClInclude Include="Source\Scene\GameScene\H\EnemyApproach.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Scene\GameScene\H\ExitDoor.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Source\Framework\Shaders\BasicColorVS.hlsl" />
@@ -348,5 +354,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="..\..\..\..\..\Downloads\D7以降_細分化タスク一覧_2026-11-18.md" />
   </ItemGroup>
 </Project>

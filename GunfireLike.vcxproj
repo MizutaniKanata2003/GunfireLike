@@ -220,6 +220,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Scene\GameScene\CPP\CollisionDebugView.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\CombatResolver.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\Enemy.cpp" />
+    <ClCompile Include="Source\Scene\GameScene\CPP\ExitDoor.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameDebugUi.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameHud.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameScene.cpp" />
@@ -281,6 +282,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\GameScene\H\EnemyApproach.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EnemyManager.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EnemyWaveTable.h" />
+    <ClInclude Include="Source\Scene\GameScene\H\ExitDoor.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameDebugUi.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameHud.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameScene.h" />
@@ -343,6 +345,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\..\..\..\Downloads\D7以降_細分化タスク一覧_2026-11-18.md" />
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

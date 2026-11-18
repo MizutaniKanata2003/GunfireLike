@@ -1,13 +1,13 @@
 ﻿#include "../H/GameScene.h"
 
-// テストSceneの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、設定表から生成した床・壁と敵・画像のHUD・デバッグUIの描画、Resource終了を実装する。
+// テストSceneの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、部屋ごとの敵と出口、設定表から生成した床・壁・画像のHUD・デバッグUIの描画、Resource終了を実装する。
 
 //========= Windows インクルード=========
 #include <windows.h> // VK_F1〜VK_F9の仮想キーコードで、Capture切替・タイトル遷移・可視化切替・最初の部屋からの再開・確認操作のキーを指定する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで残り時間を0未満にせず、std::minで視野角の補間割合を1以下に制限する。
-#include <cstdint> // std::uint32_tで、敵のColliderへ付ける識別値を保持する。
+#include <cstdint> // std::uint32_tで、スライディングで転倒させた敵の記録のビットを扱う。
 
 //========= 外部ライブラリ インクルード=========
 #include <DirectXMath.h>
@@ -81,12 +81,13 @@ void GameScene::Initialize()
 	m_weaponSystem.Initialize(WEAPON_TABLE::ns_ASSAULT_RIFLE);
 	m_fovDegrees = ns_FOV_DEGREES;
 
-	// 判定・時間・接触・表示の状態を既定へ戻し、前回の生成ObjectとColliderを空にする。Rendererの生成、表からのObject生成、敵の配置はInitで行う。
-	m_dodgeJudge.Initialize();
-	ResetEnemyMelee();
 	// 進行状態を第1部屋の第1ウェーブへ戻し、前回の生成失敗を引き継がない。
 	m_roomController.Initialize();
 	m_hasWaveSpawnFailed = false;
+
+	// 判定・時間・接触・表示の状態を既定へ戻し、前回の生成ObjectとColliderを空にする。Rendererの生成、表からのObject生成、出口と敵の配置はInitで行う。
+	m_dodgeJudge.Initialize();
+	ResetEnemyMelee();
 	m_lastJudgeResult = DODGE_JUDGE_RESULT::e_NONE;
 	m_slowMotionRemainingSeconds = 0.0f;
 	m_hitStopRemainingSeconds = 0.0f;
@@ -133,6 +134,13 @@ bool GameScene::Init()
 		return false;
 	}
 
+	// 閉じた状態の出口を登録する。Cube Rendererを借用できなければ、生成済みのResourceを含めて終了して失敗を返す。
+	if(!m_exitDoor.Initialize(m_modelRegistry,m_collisionWorld)){
+		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの出口の初期化に失敗しました。");
+		Finalize();
+		return false;
+	}
+
 	// 現在の部屋とウェーブの生成に失敗したら、残っているSceneのResourceも解放して初期化失敗を返す。
 	if(!TrySpawnCurrentWave()){
 		Finalize();
@@ -172,6 +180,13 @@ void GameScene::Update(float deltaTime)
 		m_slideKnockedDownEnemyMask = 0;
 	}
 
+	// F9が押された瞬間、出口が開いていれば次の部屋へ進める。出口の通過判定の実装までの暫定の操作。
+	if(m_inputSystem.IsKeyTriggered(VK_F9) && m_roomController.TryAdvanceRoom()){
+		// 次の部屋へ進んだら、プレイヤーを開始位置へ戻し、カメラ位置を合わせる。
+		m_playerController.Initialize(ns_PLAYER_START_POSITION);
+		m_FPSCamera.SetPosition(m_playerController.GetPosition());
+	}
+
 	// F5が押された瞬間は、HPバーと低HP警告の確認のため、プレイヤーへ確認用のダメージを与える。ヒットストップや怯みは与えない。
 	if(m_inputSystem.IsKeyTriggered(VK_F5)){
 		m_playerHealth.ApplyDamage(COMBAT_TABLE::ns_DEBUG_DAMAGE);
@@ -190,13 +205,6 @@ void GameScene::Update(float deltaTime)
 	// F8が押された瞬間は、回復アイテムを1個増やす。入手の実装までの暫定の操作。上限を超えない。
 	if(m_inputSystem.IsKeyTriggered(VK_F8)){
 		m_healItems.Add(1);
-	}
-
-	// F9が押された瞬間、出口が開いていれば次の部屋へ進める。出口の表示と通過判定の実装までの暫定の操作。
-	if(m_inputSystem.IsKeyTriggered(VK_F9) && m_roomController.TryAdvanceRoom()){
-		// 次の部屋へ進んだら、プレイヤーを開始位置へ戻し、カメラ位置を合わせる。
-		m_playerController.Initialize(ns_PLAYER_START_POSITION);
-		m_FPSCamera.SetPosition(m_playerController.GetPosition());
 	}
 
 	// ヒットストップ中かを、この更新の開始時点の残り時間で決め、残り時間を実時間で減らす。ヒットストップ中は、プレイヤーと敵の時間を止める。
@@ -219,9 +227,13 @@ void GameScene::Update(float deltaTime)
 	if(m_roomController.GetPhase() == ROOM_PHASE::e_NEEDS_SPAWN && !m_hasWaveSpawnFailed){
 		m_hasWaveSpawnFailed = !TrySpawnCurrentWave();
 	}
-
 	// 生存中の敵がいなければウェーブまたは部屋を進める。生成待ちの間は、空の敵一覧を全滅と扱わない。
 	m_roomController.Update(m_enemyManager.HasLivingEnemies());
+
+	// 部屋の進行状態に合わせて、出口を開閉する。出口開放中と攻略完了後は開き、それ以外は閉じる。F4・F9で戻った場合も、この更新で閉じる。
+	const ROOM_PHASE room_phase = m_roomController.GetPhase();
+	m_exitDoor.SetOpen(room_phase == ROOM_PHASE::e_EXIT_OPEN || room_phase == ROOM_PHASE::e_COMPLETE,m_collisionWorld);
+
 	m_healItems.Update(gameplay_delta_time);
 	m_collisionDebugView.Update(deltaTime);
 	m_hitMarkerRemainingSeconds = std::max(0.0f,m_hitMarkerRemainingSeconds - deltaTime);
@@ -295,7 +307,7 @@ void GameScene::Draw()
 	const XMMATRIX projection_matrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fovDegrees),aspect_ratio,ns_NEAR_CLIP,ns_FAR_CLIP);
 	const XMMATRIX view_matrix = m_FPSCamera.GetViewMatrix();
 
-	// 床・壁・敵はOPAQUE Passで描画するため、描画前にPassを設定する。
+	// 床・壁・出口・敵はOPAQUE Passで描画するため、描画前にPassを設定する。
 	m_graphicsSystem.SetRenderPass(e_RenderPass::e_OPAQUE);
 
 	// 生成済みの全Objectを、表の順（床→左壁→右壁→手前壁→奥壁）に描画する。
@@ -303,7 +315,9 @@ void GameScene::Draw()
 		object.Draw(m_graphicsSystem,view_matrix,projection_matrix);
 	}
 
-	// 地形の後に全枠を出現順に描画する。死亡枠はEnemy::Drawが描画を省略する。
+	// 地形の後に出口を描画する。
+	m_exitDoor.Draw(m_graphicsSystem,view_matrix,projection_matrix);
+	// 続けて全枠の敵を出現順に描画する。死亡枠はEnemy::Drawが描画を省略する。
 	for(const Enemy& enemy : m_enemyManager.GetEnemies()){
 		enemy.Draw(m_graphicsSystem,view_matrix,projection_matrix);
 	}
@@ -355,12 +369,13 @@ void GameScene::Draw()
 	GameDebugUi::Draw(debug_info);
 }
 
-// Sceneが所有する敵・Object・共有Renderer・HUD・Collision可視化・Collisionを終了する。
+// Sceneが所有する敵・出口・Object・共有Renderer・HUD・Collision可視化・Collisionを終了する。
 void GameScene::Finalize()
 {
 	// 遷移先のInit後に呼ばれても、遷移先が設定したCaptureやBGMを上書きしない。
-	// 敵とObjectは、Collisionと共有Rendererを借用しているため、それらを解放する前に先に終了する。
+	// 敵・出口・Objectは、Collisionと共有Rendererを借用しているため、それらを解放する前に先に終了する。
 	m_enemyManager.Clear(m_collisionWorld);
+	m_exitDoor.Uninit(m_collisionWorld);
 	m_stageObjects.clear();
 	m_modelRegistry.Uninit();
 
@@ -519,6 +534,7 @@ void GameScene::UpdateMelee()
 
 	// 当たる瞬間に、視点から射程と範囲の内で最も近い生存中の敵を選ぶ。いなければ空振りとして何もしない。
 	Enemy* const target_enemy = m_enemyManager.FindMeleeTarget(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),false);
+	// 対象がいない場合は、空振りとして効果を与えずに戻る。
 	if(target_enemy == nullptr)return;
 
 	// 蹴りはダメージだけを与える。殴打はダメージを与えた後に、転倒させる。ダメージで死亡した場合、転倒は何も起こらない。
