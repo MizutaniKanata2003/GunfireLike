@@ -7,7 +7,9 @@
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで残り時間を0未満にせず、std::minで視野角の補間割合を1以下に制限する。
+#include <cmath> // std::sqrtで、射撃型とプレイヤーの水平距離を求める。
 #include <cstdint> // std::uint32_tで、スライディングで転倒させた敵の記録のビットを扱う。
+#include <string> // std::wstringとstd::to_wstringで、射撃型が発射のタイミングに達した枠の番号を含むログ文字列を組み立てる。
 
 //========= 外部ライブラリ インクルード=========
 #include <DirectXMath.h>
@@ -22,6 +24,7 @@
 
 //========= Scene インクルード=========
 #include "Scene/GameScene/H/EnemyApproach.h"
+#include "Scene/GameScene/H/EnemyRangedBehavior.h"
 #include "Scene/Common/H/SceneManager.h"
 #include "Scene/Common/H/SceneObjectFactory.h"
 #include "Scene/Common/H/StageLayout.h"
@@ -281,8 +284,8 @@ void GameScene::Update(float deltaTime)
 	UpdateContact(gameplay_delta_time);
 	UpdateHeal();
 	UpdateShooting(gameplay_delta_time);
-	// 当フレームの回避・移動・敵への怯みを反映してから、敵の攻撃を判定する。
-	UpdateEnemyMelee(world_delta_time);
+	// 当フレームの回避・移動・敵への怯みを反映してから、敵の行動と攻撃を判定する。
+	UpdateEnemyActions(world_delta_time);
 
 	// 更新後のカメラから、Collision可視化の視線のRayを更新する。非表示の間は判定を行わない。
 	m_collisionDebugView.UpdateRay(m_FPSCamera,m_collisionWorld);
@@ -403,25 +406,40 @@ void GameScene::UpdateDodgeJudge(float worldDeltaTime)
 	}
 }
 
-// 全枠を出現順に更新し、各敵が自分の予告と再攻撃待ちで追従・攻撃する。
-void GameScene::UpdateEnemyMelee(float worldDeltaTime)
+// 全枠を出現順に、種類に応じた更新へ振り分け、更新の後に予告中の表示を敵へ反映する。
+void GameScene::UpdateEnemyActions(float worldDeltaTime)
 {
 	// 全枠を先頭から更新する。死亡枠や行動不能の敵は、枠ごとの更新の中で予告を中断する。
 	for(std::size_t slot_index = 0; slot_index < m_enemyMeleeJudges.size(); ++slot_index){
+		// 敵の種類ごとに、対応する更新を呼ぶ。
+		switch(m_enemyManager.GetEnemies()[slot_index].GetKind()){
+			// 接近型は、追従と近接の攻撃予告・命中を更新する。
+		case ENEMY_KIND::e_MELEE:
 		UpdateEnemyMeleeSlot(slot_index,worldDeltaTime);
+		break;
+
+		// 射撃型は、距離維持の移動と、発射の予告を更新する。
+		case ENEMY_KIND::e_RANGED:
+		UpdateEnemyRangedSlot(slot_index,worldDeltaTime);
+		break;
+
+		// 範囲攻撃型は、行動を実装するまで、静止させ、何も更新しない。
+		case ENEMY_KIND::e_AREA:
+		break;
+		}
+
+		// 予告の状態を、その敵の表示へ反映する。死亡・怯みなどで予告が中断された場合は、解除される。
+		m_enemyManager.GetEnemies()[slot_index].SetTelegraphing(m_enemyMeleeJudges[slot_index].HasIncomingAttack());
 	}
 }
 
-// 接近型の敵だけ、予告中は追従を止め、予告が終わったフレームで一度だけ命中を判定する。
+// 予告中は追従を止め、予告が終わったフレームで一度だけ命中を判定する。
 void GameScene::UpdateEnemyMeleeSlot(std::size_t slotIndex,float worldDeltaTime)
 {
 	// この枠の敵と、その敵専用の予告・再攻撃待ちを参照する。
 	Enemy& enemy = m_enemyManager.GetEnemies()[slotIndex];
 	JustDodgeJudge& judge = m_enemyMeleeJudges[slotIndex];
 	float& recovery_seconds = m_enemyMeleeRecoverySeconds[slotIndex];
-
-	// 接近型以外は、射撃型・範囲攻撃型の行動を実装するまで、静止させ、予告も開始しない。
-	if(enemy.GetKind() != ENEMY_KIND::e_MELEE)return;
 
 	// 戦闘不能になった敵の予告は、時間停止中でも取り消して持ち越さない。
 	if(!enemy.IsAlive() || enemy.IsFlinching() || enemy.IsKnockedDown() || m_playerHealth.IsDead()){
@@ -481,6 +499,67 @@ void GameScene::UpdateEnemyMeleeSlot(std::size_t slotIndex,float worldDeltaTime)
 	// 射程内では待ち時間が終わってから、次の攻撃を予告する。
 	if(recovery_seconds <= 0.0f){
 		judge.StartIncomingAttack(COMBAT_TABLE::ns_ENEMY_MELEE_WINDUP_SECONDS);
+	}
+}
+
+// 予告中は移動せず、予告が終わったフレームで発射のタイミングに達したことを記録する。予告以外では、距離を保つ。
+void GameScene::UpdateEnemyRangedSlot(std::size_t slotIndex,float worldDeltaTime)
+{
+	// この枠の敵と、その敵専用の予告・再攻撃待ちを参照する。
+	Enemy& enemy = m_enemyManager.GetEnemies()[slotIndex];
+	JustDodgeJudge& judge = m_enemyMeleeJudges[slotIndex];
+	float& recovery_seconds = m_enemyMeleeRecoverySeconds[slotIndex];
+
+	// 戦闘不能になった敵の予告は、時間停止中でも取り消して持ち越さない。
+	if(!enemy.IsAlive() || enemy.IsFlinching() || enemy.IsKnockedDown() || m_playerHealth.IsDead()){
+		// 予告中断時だけ再攻撃待ちを設定し、行動不能が続いても毎回は設定しない。
+		if(judge.HasIncomingAttack()){
+			judge.Initialize();
+			recovery_seconds = ENEMY_RANGED::ns_RECOVERY_SECONDS;
+		}
+		return;
+	}
+
+	// ヒットストップで敵側の時間が進まない場合は、移動も新しい予告も始めない。
+	if(worldDeltaTime <= 0.0f)return;
+
+	// 敵とプレイヤーの水平距離を求める。高さは使わない。
+	const XMFLOAT3 enemy_position = enemy.GetBodySphere().center;
+	const XMFLOAT3& player_position = m_playerController.GetPosition();
+	const float offset_x = player_position.x - enemy_position.x;
+	const float offset_z = player_position.z - enemy_position.z;
+	const float distance = std::sqrt(offset_x * offset_x + offset_z * offset_z);
+
+	// 予告中はその場に立ち止まり、予告の終わりだけ、発射のタイミングに達した旨を受け取る。
+	if(judge.HasIncomingAttack()){
+		// 射撃型は回避の判定を使わないため、無敵でない状態と、十分に大きい回避からの経過時間を渡し、予告の終わりだけを検出する。
+		const DODGE_JUDGE_RESULT result = judge.Update(worldDeltaTime,false,ENEMY_RANGED::ns_UNUSED_DODGE_AGE_SECONDS);
+		// 予告が続いている間は、何も起こさない。
+		if(result == DODGE_JUDGE_RESULT::e_NONE)return;
+
+		// 予告の終わりで、再攻撃待ちに入り、発射のタイミングに達したことを記録する。弾の生成は、次の工程で追加する。
+		recovery_seconds = ENEMY_RANGED::ns_RECOVERY_SECONDS;
+		Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_GAME,std::wstring(L"射撃型（枠") + std::to_wstring(slotIndex + 1) + L"）が発射のタイミングに達しました。");
+		return;
+	}
+
+	// 再攻撃待ちは敵側の時間で減らす。残り時間が負にならないようにする。
+	recovery_seconds = std::max(0.0f,recovery_seconds - worldDeltaTime);
+
+	// 遠すぎる間は近づき、近すぎる間は離れる。移動した更新では、予告を始めない。
+	if(distance > ENEMY_RANGED::ns_FAR_DISTANCE){
+		ENEMY_RANGED::Move(enemy,player_position,1.0f,worldDeltaTime,m_collisionWorld);
+		return;
+	}
+	// 近すぎる場合は、プレイヤーから離れる。
+	if(distance < ENEMY_RANGED::ns_NEAR_DISTANCE){
+		ENEMY_RANGED::Move(enemy,player_position,-1.0f,worldDeltaTime,m_collisionWorld);
+		return;
+	}
+
+	// 適切な距離にいて、再攻撃待ちが終わっていれば、立ち止まったまま、次の攻撃を予告する。
+	if(recovery_seconds <= 0.0f){
+		judge.StartIncomingAttack(ENEMY_RANGED::ns_WINDUP_SECONDS);
 	}
 }
 

@@ -26,7 +26,9 @@ namespace
 	constexpr float ns_KNOCKDOWN_HEIGHT_SCALE = 0.4f;
 
 	//========= 状態の色=========
-	// 怯み中の色。橙で、Object画像の色へ乗算して色味を変える。種類の色より優先する。
+	// 攻撃の予告中の色。黄で、Object画像の色へ乗算して色味を変える。種類の色より優先し、怯みの色より後にする。
+	constexpr XMFLOAT4 ns_TELEGRAPH_COLOR{1.0f,1.0f,0.3f,1.0f};
+	// 怯み中の色。橙で、Object画像の色へ乗算して色味を変える。予告の色より優先する。
 	constexpr XMFLOAT4 ns_FLINCH_COLOR{1.0f,0.5f,0.2f,1.0f};
 	// 転倒中の色。青みがかった灰色で、Object画像の色へ乗算して色味を変える。怯みの色より優先する。
 	constexpr XMFLOAT4 ns_KNOCKDOWN_COLOR{0.5f,0.6f,1.0f,1.0f};
@@ -54,6 +56,7 @@ bool Enemy::Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,EN
 	m_currentHP = params.maxHP;
 	m_flinchRemainingSeconds = 0.0f;
 	m_knockdownRemainingSeconds = 0.0f;
+	m_isTelegraphing = false;
 	m_isAlive = true;
 	m_colliderHandle = collisionWorld.AddSphere(COLLISION_SPHERE{position,params.colliderRadius},COLLISION_LAYER::ns_ENEMY,enemyId);
 	return true;
@@ -74,6 +77,7 @@ void Enemy::Uninit(CollisionWorld& collisionWorld)
 	m_currentHP = 0.0f;
 	m_flinchRemainingSeconds = 0.0f;
 	m_knockdownRemainingSeconds = 0.0f;
+	m_isTelegraphing = false;
 }
 
 //========= 更新・描画関数=========
@@ -141,6 +145,10 @@ void Enemy::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const
 	else if(IsFlinching()){
 		color = ns_FLINCH_COLOR;
 	}
+	// 攻撃の予告中は、黄色にする。転倒・怯みの表示を優先する。
+	else if(m_isTelegraphing){
+		color = ns_TELEGRAPH_COLOR;
+	}
 
 	m_cubeRenderer->DrawCube(graphicsSystem,draw_transform.GetWorldMatrix(),viewMatrix,projectionMatrix,color,XMFLOAT2{1.0f,1.0f},
 													 BasicMeshRenderer::TextureType::Object);
@@ -186,11 +194,12 @@ void Enemy::Respawn(CollisionWorld& collisionWorld)
 	// 未初期化（Rendererを借用していない）の場合は、生き返らせる対象がないため戻る。
 	if(m_cubeRenderer == nullptr)return;
 
-	// HPを満タンにして、怯みと転倒を解除する。
+	// HPを満タンにして、怯みと転倒と、攻撃の予告の表示を解除する。
 	const ENEMY_PARAMS& params = ENEMY_TABLE::GetParams(m_kind);
 	m_currentHP = params.maxHP;
 	m_flinchRemainingSeconds = 0.0f;
 	m_knockdownRemainingSeconds = 0.0f;
+	m_isTelegraphing = false;
 
 	// 死亡中だった場合だけ、Colliderを同じ位置へ登録し直して生きている状態にする。生きている場合は二重登録しない。
 	if(!m_isAlive){

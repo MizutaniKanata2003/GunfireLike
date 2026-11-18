@@ -281,6 +281,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\GameScene\H\Enemy.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EnemyApproach.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EnemyManager.h" />
+    <ClInclude Include="Source\Scene\GameScene\H\EnemyRangedBehavior.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EnemyTable.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EnemyWaveTable.h" />
     <ClInclude Include="Source\Scene\GameScene\H\ExitDoor.h" />

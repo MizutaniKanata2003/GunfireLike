@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// 敵1体の状態（種類・HP・怯み・転倒・生死）と、球のColliderの登録、Cubeでの仮表示を担当する。
+// 敵1体の状態（種類・HP・怯み・転倒・攻撃予告の表示・生死）と、球のColliderの登録、Cubeでの仮表示を担当する。
 // 種類ごとの数値はEnemyTableから読む。敵の行動（移動・攻撃）は持たない。複数体の管理は、EnemyManagerが担当する。
 
 //========= C++標準ライブラリ インクルード=========
@@ -46,7 +46,7 @@ public:
 	// collisionWorld: この敵のColliderを登録したCollisionWorld。
 	// 戻り値: Colliderと描画位置を更新できればtrue。死亡中または更新失敗時はfalse。
 	[[nodiscard]] bool TryMoveTo(const XMFLOAT3& targetPosition,CollisionWorld& collisionWorld);
-	// 生きている場合だけ、Cubeで描画する。通常は種類の色、怯み中・転倒中は色を変え、転倒中は低く潰して描く。
+	// 生きている場合だけ、Cubeで描画する。通常は種類の色、攻撃の予告中は黄、怯み中・転倒中は色を変え、転倒中は低く潰して描く。
 	// graphicsSystem: Rendererが使う描画基盤。
 	// viewMatrix: World空間からView空間への変換行列。
 	// projectionMatrix: View空間からClip空間への変換行列。
@@ -61,9 +61,12 @@ public:
 	// 転倒させる。転倒中は怯みも解除され、蹴りの対象にならない。すでに転倒中、または死亡している場合は何もしない。
 	// 戻り値: 新しく転倒させたらtrue。何もしなかった場合はfalse。
 	bool ApplyKnockdown();
-	// HPを満タンへ戻して怯みと転倒を解除する。死亡していた場合はColliderを登録し直して生き返らせる。
+	// HPを満タンへ戻して怯みと転倒を解除する。死亡していた場合はColliderを登録し直して生き返らせる。攻撃の予告の表示も解除する。
 	// collisionWorld: Initializeで渡したのと同じCollisionWorld。
 	void Respawn(CollisionWorld& collisionWorld);
+	// 攻撃の予告中の表示を切り替える。予告の状態そのものは、呼出側が管理し、毎回の更新で現在の状態を渡す。
+	// isTelegraphing: trueなら、通常時の色の代わりに予告の色で描く。怯み・転倒の色の方が優先される。
+	void SetTelegraphing(bool isTelegraphing) { m_isTelegraphing = isTelegraphing; }
 
 	//========= Getter関数=========
 	// 生きているかを返す。
@@ -72,6 +75,8 @@ public:
 	[[nodiscard]] bool IsFlinching() const { return m_flinchRemainingSeconds > 0.0f; }
 	// 転倒中かを返す。転倒は一定時間続き、その間は蹴れない。
 	[[nodiscard]] bool IsKnockedDown() const { return m_knockdownRemainingSeconds > 0.0f; }
+	// 攻撃の予告中の表示になっているかを返す。
+	[[nodiscard]] bool IsTelegraphing() const { return m_isTelegraphing; }
 	// 現在のHPを返す。
 	[[nodiscard]] float GetCurrentHP() const { return m_currentHP; }
 	// 最大HPを返す。種類の表の値。
@@ -89,6 +94,8 @@ private:
 	BasicMeshRenderer* m_cubeRenderer{};
 	// 位置と大きさを保持し、World行列を作るTransform。
 	Transform m_transform{};
+	// 攻撃の予告中の表示か。呼出側がSetTelegraphingで毎回設定する。
+	bool m_isTelegraphing{};
 
 	//========= 種類=========
 	// 敵の種類。Initializeで設定する。未初期化の間は接近型として扱う。

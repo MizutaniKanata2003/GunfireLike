@@ -68,13 +68,17 @@ private:
 	// 確認用の攻撃が当たる瞬間を判定し、結果に応じてプレイヤーへのダメージとスローを反映する。
 	// worldDeltaTime: スローを反映した経過時間。単位は秒。ヒットストップ中は0。
 	void UpdateDodgeJudge(float worldDeltaTime);
-	// 全枠の接近型を出現順に更新し、各敵の追従・攻撃予告・命中候補を処理する。
+	// 全枠の敵を出現順に、種類に応じて更新し、予告中の敵の表示を切り替える。範囲攻撃型は、行動を実装するまで何もしない。
 	// worldDeltaTime: 敵側の経過時間。単位は秒。スローとヒットストップ反映済み。
-	void UpdateEnemyMelee(float worldDeltaTime);
+	void UpdateEnemyActions(float worldDeltaTime);
 	// 指定した1枠の接近型について、追従・攻撃予告・命中候補を更新する。
 	// slotIndex: EnemyManagerの固定枠の番号。0始まりで、攻撃状態の配列と同じ範囲であること。
 	// worldDeltaTime: 敵側の経過時間。単位は秒。
 	void UpdateEnemyMeleeSlot(std::size_t slotIndex,float worldDeltaTime);
+	// 指定した1枠の射撃型について、距離維持の移動・攻撃予告・発射のタイミングを更新する。弾の生成は、まだ行わない。
+	// slotIndex: EnemyManagerの固定枠の番号。0始まりで、攻撃状態の配列と同じ範囲であること。
+	// worldDeltaTime: 敵側の経過時間。単位は秒。
+	void UpdateEnemyRangedSlot(std::size_t slotIndex,float worldDeltaTime);
 	// 全枠の攻撃予告と再攻撃待ちを破棄する。初期化と再配置で、旧ウェーブの状態を持ち越さないために使う。
 	void ResetEnemyMelee();
 	// 現在の部屋とウェーブの敵を生成し、全枠の攻撃状態を初期化して、進行管理へ生成完了を通知する。
@@ -132,7 +136,7 @@ private:
 	//========= 判定・時間の状態=========
 	// 確認用に発生させた攻撃の、命中の瞬間の判定（無敵・ジャスト回避）。
 	JustDodgeJudge m_dodgeJudge{};
-	// 敵の固定枠ごとの攻撃予告と、命中時の回避判定。F7の判定とは状態を共有しない。
+	// 敵の固定枠ごとの攻撃予告。接近型は命中時の回避判定に、射撃型は発射のタイミングの計測に使う。F7の判定とは状態を共有しない。
 	std::array<JustDodgeJudge,ENEMY_WAVE_TABLE::ns_SLOT_COUNT> m_enemyMeleeJudges{};
 	// 敵の固定枠ごとの、次の攻撃を予告できるまでの残り時間。単位は敵側の秒。初期状態は待ち時間なし。
 	std::array<float,ENEMY_WAVE_TABLE::ns_SLOT_COUNT> m_enemyMeleeRecoverySeconds{};
