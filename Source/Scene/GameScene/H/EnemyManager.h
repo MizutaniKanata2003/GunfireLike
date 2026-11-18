@@ -17,12 +17,12 @@ class EnemyManager final
 {
 public:
 	//========= 生成・終了関数=========
-	// 旧ウェーブを解除し、編成表から指定ウェーブを、種類と位置のとおりに登録する。
+	// 旧ウェーブを解除し、編成表から指定ウェーブを、種類と位置のとおりに、編成の敵の数だけ登録する。使わない枠は、未登録のまま残す。
 	// roomNumber: 1始まりの部屋番号。
 	// waveNumber: 1始まりのウェーブ番号。
 	// registry: 初期化済みの共有Rendererの所有者。Clearまで有効であること。
 	// collisionWorld: Colliderの登録先。旧ウェーブがある場合は登録に使ったものと同じ実体。
-	// 戻り値: 全枠の登録が成功した場合にtrue。範囲外では旧状態を維持し、生成失敗では空にする。
+	// 戻り値: 全ての敵の登録が成功した場合にtrue。番号が範囲外、または編成の敵の数が枠の数を超える場合は旧状態を維持してfalse、生成失敗では空にしてfalse。
 	[[nodiscard]] bool SpawnWave(int roomNumber,int waveNumber,ModelRegistry& registry,CollisionWorld& collisionWorld)
 	{
 		// 番号が正でない場合は、0始まりへの変換や旧ウェーブの解除を行わない。
@@ -34,14 +34,18 @@ public:
 		// 短絡評価で、部屋の添字が有効な場合だけ対応するウェーブ行の要素数を調べる。
 		if(room_index >= ENEMY_WAVE_TABLE::ns_ROOMS.size() || wave_index >= ENEMY_WAVE_TABLE::ns_ROOMS[room_index].size())return false;
 
+		// 対象のウェーブの編成を参照する。
+		const ENEMY_WAVE_TABLE::WAVE_DEFINITION& wave = ENEMY_WAVE_TABLE::ns_ROOMS[room_index][wave_index];
+		// 編成の敵の数が、枠の数を超える場合は、配列の外を読まないよう、旧ウェーブを解除せずに失敗とする。
+		if(wave.enemyCount > wave.spawns.size() || wave.enemyCount > m_enemies.size())return false;
+
 		// 同じIDを再利用する前に、旧ウェーブのColliderを解除する。
 		Clear(collisionWorld);
-		const auto& spawns = ENEMY_WAVE_TABLE::ns_ROOMS[room_index][wave_index];
-		// 編成表の先頭から順に全枠を登録し、枠番号に1を足した値をウェーブ内で一意のIDにする。
-		for(std::size_t slot_index = 0; slot_index < spawns.size(); ++slot_index){
+		// 編成の先頭から順に、敵の数だけ登録し、枠番号に1を足した値をウェーブ内で一意のIDにする。
+		for(std::size_t slot_index = 0; slot_index < wave.enemyCount; ++slot_index){
 			const auto enemy_ID = static_cast<std::uint32_t>(slot_index + 1);
 			// 敵の初期化がfalseなら、先に成功した枠も解除し、空の状態を返す。例外は捕捉しない。
-			if(!m_enemies[slot_index].Initialize(registry,collisionWorld,spawns[slot_index].kind,spawns[slot_index].position,enemy_ID)){
+			if(!m_enemies[slot_index].Initialize(registry,collisionWorld,wave.spawns[slot_index].kind,wave.spawns[slot_index].position,enemy_ID)){
 				Clear(collisionWorld);
 				return false;
 			}
@@ -69,7 +73,7 @@ public:
 		}
 	}
 
-	// 固定枠にある敵を出現順に変更可能な形で受け取る。死亡中の枠も含む。
+	// 固定枠にある敵を出現順に変更可能な形で受け取る。死亡中・未登録の枠も含む。
 	// 戻り値: 管理中の固定配列への参照。Managerの寿命を超えて保持しない。
 	[[nodiscard]] std::array<Enemy,ENEMY_WAVE_TABLE::ns_SLOT_COUNT>& GetEnemies()
 	{
@@ -127,7 +131,7 @@ public:
 		return m_enemies.front();
 	}
 
-	// 固定枠にある敵を出現順に読み取る。死亡中の枠も含む。
+	// 固定枠にある敵を出現順に読み取る。死亡中・未登録の枠も含む。
 	// 戻り値: 管理中の固定配列の読み取り専用参照。Managerの寿命を超えて保持しない。
 	[[nodiscard]] const std::array<Enemy,ENEMY_WAVE_TABLE::ns_SLOT_COUNT>& GetEnemies() const
 	{
