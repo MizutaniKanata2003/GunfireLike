@@ -87,6 +87,8 @@ void GameScene::Initialize()
 
 	// 判定・時間・接触・表示の状態を既定へ戻し、前回の生成ObjectとColliderを空にする。Rendererの生成、表からのObject生成、敵の配置はInitで行う。
 	m_dodgeJudge.Initialize();
+	m_enemyMeleeJudge.Initialize();
+	m_enemyMeleeRecoverySeconds = 0.0f;
 	m_lastJudgeResult = DODGE_JUDGE_RESULT::e_NONE;
 	m_slowMotionRemainingSeconds = 0.0f;
 	m_hitStopRemainingSeconds = 0.0f;
@@ -261,6 +263,8 @@ void GameScene::Update(float deltaTime)
 	UpdateContact(gameplay_delta_time);
 	UpdateHeal();
 	UpdateShooting(gameplay_delta_time);
+	// 当フレームの回避・移動・敵への怯みを反映してから、敵の攻撃を判定する。
+	UpdateEnemyMelee(world_delta_time);
 
 	// 更新後のカメラから、Collision可視化の視線のRayを更新する。非表示の間は判定を行わない。
 	m_collisionDebugView.UpdateRay(m_FPSCamera,m_collisionWorld);
@@ -369,6 +373,70 @@ void GameScene::UpdateDodgeJudge(float worldDeltaTime)
 	// ジャスト回避の場合は、スローを開始する。連続した場合は、時間を数え直す。
 	else if(judge_result == DODGE_JUDGE_RESULT::e_JUST_DODGED){
 		m_slowMotionRemainingSeconds = COMBAT_TABLE::ns_SLOW_MOTION_SECONDS;
+	}
+}
+
+// 予告中は追従を止め、予告が終わったフレームで一度だけ命中を判定する。
+void GameScene::UpdateEnemyMelee(float worldDeltaTime)
+{
+	// 戦闘不能になった敵の予告は、時間停止中でも取り消して持ち越さない。
+	if(!m_enemy.IsAlive() || m_enemy.IsFlinching() || m_enemy.IsKnockedDown() || m_playerHealth.IsDead()){
+		// 予告中断時だけ再攻撃待ちを設定し、行動不能が続いても毎回は設定しない。
+		if(m_enemyMeleeJudge.HasIncomingAttack()){
+			m_enemyMeleeJudge.Initialize();
+			m_enemyMeleeRecoverySeconds = COMBAT_TABLE::ns_ENEMY_MELEE_RECOVERY_SECONDS;
+		}
+		return;
+	}
+
+	// ヒットストップで敵側の時間が進まない場合は、新しい予告も始めない。
+	if(worldDeltaTime <= 0.0f)return;
+
+	// 追従の停止距離と同じXZ平面で測る。二乗同士を比較し、平方根を取らずに範囲を求める。
+	const XMFLOAT3 enemy_position = m_enemy.GetBodySphere().center;
+	const XMFLOAT3& player_position = m_playerController.GetPosition();
+	const float offset_x = player_position.x - enemy_position.x;
+	const float offset_z = player_position.z - enemy_position.z;
+	const float reach = COMBAT_TABLE::ns_ENEMY_MELEE_REACH;
+	const bool is_in_reach = offset_x * offset_x + offset_z * offset_z <= reach * reach;
+
+	// 予告中は追従せず、判定が返るまで敵側の時間で予告を進める。
+	if(m_enemyMeleeJudge.HasIncomingAttack()){
+		// 回避以外の無敵も被弾を防ぐが、回避開始時刻としては使わない。
+		const bool is_dodging = m_playerController.GetActionState() == PLAYER_ACTION_STATE::e_DODGE;
+		const float dodge_age_seconds = is_dodging ? m_playerController.GetSecondsSinceDodgeStart() : COMBAT_TABLE::ns_ENEMY_MELEE_RECOVERY_SECONDS;
+		const bool is_invincible = m_playerController.IsInvincible();
+		const DODGE_JUDGE_RESULT result = m_enemyMeleeJudge.Update(worldDeltaTime,is_invincible,dodge_age_seconds);
+		// 予告が続いている間は、命中も再攻撃待ちの開始も行わない。
+		if(result == DODGE_JUDGE_RESULT::e_NONE)return;
+
+		// 予告を消費したので、範囲外の空振りでも再攻撃待ちに入る。
+		m_enemyMeleeRecoverySeconds = COMBAT_TABLE::ns_ENEMY_MELEE_RECOVERY_SECONDS;
+		// 予告終了時点で範囲外なら、被弾もジャスト回避のスローも発生しない。
+		if(!is_in_reach)return;
+
+		// 範囲内で無敵でなければ、既存の被弾反応にHP・怯み・ヒットストップを任せる。
+		if(result == DODGE_JUDGE_RESULT::e_HIT){
+			ApplyPlayerHitReaction(COMBAT_TABLE::ns_ENEMY_MELEE_DAMAGE,COMBAT_TABLE::ns_DAMAGE_HIT_STOP_SECONDS);
+		}
+		// 実際に回避中のジャスト回避だけがスローを開始する。
+		else if(is_dodging && result == DODGE_JUDGE_RESULT::e_JUST_DODGED){
+			m_slowMotionRemainingSeconds = COMBAT_TABLE::ns_SLOW_MOTION_SECONDS;
+		}
+		return;
+	}
+
+	// 再攻撃待ちは敵側の時間で減らす。残り時間が負にならないようにする。
+	m_enemyMeleeRecoverySeconds = std::max(0.0f,m_enemyMeleeRecoverySeconds - worldDeltaTime);
+	// 射程外では追従だけを行い、予告の開始は次の更新で判定する。
+	if(!is_in_reach){
+		ENEMY_APPROACH::Update(m_enemy,player_position,worldDeltaTime,m_collisionWorld);
+		return;
+	}
+
+	// 射程内では待ち時間が終わってから、次の攻撃を予告する。
+	if(m_enemyMeleeRecoverySeconds <= 0.0f){
+		m_enemyMeleeJudge.StartIncomingAttack(COMBAT_TABLE::ns_ENEMY_MELEE_WINDUP_SECONDS);
 	}
 }
 

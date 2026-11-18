@@ -63,6 +63,9 @@ private:
 	// 確認用の攻撃が当たる瞬間を判定し、結果に応じてプレイヤーへのダメージとスローを反映する。
 	// worldDeltaTime: スローを反映した経過時間。単位は秒。ヒットストップ中は0。
 	void UpdateDodgeJudge(float worldDeltaTime);
+	// 検証用の敵1体の追従・攻撃予告・命中候補を更新する。
+	// worldDeltaTime: 敵側の経過時間。単位は秒。スローとヒットストップ反映済み。
+	void UpdateEnemyMelee(float worldDeltaTime);
 	// プレイヤーへ被弾の反応（ダメージ・怯み・ヒットストップ）を与える。
 	// damage: 与えるダメージ。接触の場合は0。
 	// hitStopSeconds: 設定するヒットストップの長さ。単位は秒。
@@ -107,6 +110,10 @@ private:
 	//========= 判定・時間の状態=========
 	// 確認用に発生させた攻撃の、命中の瞬間の判定（無敵・ジャスト回避）。
 	JustDodgeJudge m_dodgeJudge{};
+	// 接近型の予告と命中時の回避判定。F7の判定とは状態を共有しない。
+	JustDodgeJudge m_enemyMeleeJudge{};
+	// 次の攻撃を予告できるまでの残り時間。単位は敵側の秒。初期状態は待ち時間なし。
+	float m_enemyMeleeRecoverySeconds{};
 	// 直近の判定結果。デバッグUIへの表示に使う。
 	DODGE_JUDGE_RESULT m_lastJudgeResult{DODGE_JUDGE_RESULT::e_NONE};
 	// スローの残り時間。単位は実時間の秒。0より大きい間、プレイヤー以外の時間の進みが遅くなる。
