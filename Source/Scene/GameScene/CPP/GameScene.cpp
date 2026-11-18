@@ -55,10 +55,10 @@ namespace
 	//========= 配置の設定=========
 	// プレイヤーの開始位置。ワールド座標(0,1.6,0)で、床の手前寄りの中央。Yは立っている時のカメラの高さ。壁の内側にある。
 	constexpr XMFLOAT3 ns_PLAYER_START_POSITION{0.0f,1.6f,0.0f};
-	// 検証用の敵の位置。ワールド座標(0,1,6)で、プレイヤー開始位置の正面。
-	constexpr XMFLOAT3 ns_ENEMY_POSITION{0.0f,1.0f,6.0f};
-	// 検証用の敵のColliderへ付ける識別値。命中結果のuserDataと照合する。
-	constexpr std::uint32_t ns_ENEMY_ID = 1;
+	// 試遊に使う編成表の部屋番号。1始まりで、第1部屋を選ぶ。
+	constexpr int ns_TEST_ROOM_NUMBER = 1;
+	// 試遊に使う編成表のウェーブ番号。1始まりで、接近型2体の編成を選ぶ。
+	constexpr int ns_TEST_WAVE_NUMBER = 1;
 
 	//========= 射撃の表示設定=========
 	// 命中しない場合に、弾道の線を伸ばす長さ。単位はワールド距離単位。
@@ -135,9 +135,9 @@ bool GameScene::Init()
 		return false;
 	}
 
-	// 検証用の敵を配置し、球のColliderを登録する。Cube Rendererを借用できなければ、生成済みのResourceを含めて終了して失敗を返す。
-	if(!m_enemy.Initialize(m_modelRegistry,m_collisionWorld,ns_ENEMY_POSITION,ns_ENEMY_ID)){
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの敵の配置に失敗しました。");
+	// 固定編成の生成に失敗したら、残っているSceneのResourceも解放して初期化失敗を返す。
+	if(!m_enemyManager.SpawnWave(ns_TEST_ROOM_NUMBER,ns_TEST_WAVE_NUMBER,m_modelRegistry,m_collisionWorld)){
+		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの検証用ウェーブの生成に失敗しました。");
 		Finalize();
 		return false;
 	}
@@ -167,9 +167,16 @@ void GameScene::Update(float deltaTime)
 		m_collisionDebugView.ToggleVisible();
 	}
 
-	// F4が押された瞬間は、検証用の敵を満タンのHPで同じ位置へ再配置する。
+	// F4では旧予告を破棄し、固定編成を初期位置から作り直す。
 	if(m_inputSystem.IsKeyTriggered(VK_F4)){
-		m_enemy.Respawn(m_collisionWorld);
+		m_enemyMeleeJudge.Initialize();
+		m_enemyMeleeRecoverySeconds = 0.0f;
+		m_hasSlideKnockedDownEnemy = false;
+
+		// 再生成が失敗した場合は生成済みの敵を残さず、Sceneは維持して失敗を記録する。
+		if(!m_enemyManager.SpawnWave(ns_TEST_ROOM_NUMBER,ns_TEST_WAVE_NUMBER,m_modelRegistry,m_collisionWorld)){
+			Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの検証用ウェーブの再生成に失敗しました。");
+		}
 	}
 
 	// F5が押された瞬間は、HPバーと低HP警告の確認のため、プレイヤーへ確認用のダメージを与える。ヒットストップや怯みは与えない。
@@ -206,11 +213,11 @@ void GameScene::Update(float deltaTime)
 
 	// 確認用の攻撃の判定、敵の怯み・転倒、回復アイテムの間隔、表示用の残り時間を、Captureに関係なく進める。表示用は実時間で、0未満にしない。
 	UpdateDodgeJudge(world_delta_time);
-	m_enemy.Update(world_delta_time);
+	m_enemyManager.GetFirstEnemy().Update(world_delta_time);
 
 	// Capture中だけ検証用の敵を追従させ、マウス解放中は位置を変えない。
 	if(m_inputSystem.IsMouseCaptureEnabled()){
-		ENEMY_APPROACH::Update(m_enemy,m_playerController.GetPosition(),world_delta_time,m_collisionWorld);
+		ENEMY_APPROACH::Update(m_enemyManager.GetFirstEnemy(),m_playerController.GetPosition(),world_delta_time,m_collisionWorld);
 	}
 	m_healItems.Update(gameplay_delta_time);
 	m_collisionDebugView.Update(deltaTime);
@@ -224,7 +231,7 @@ void GameScene::Update(float deltaTime)
 
 	// 視線を先に更新し、その向きで、蹴れる敵がいるかを調べてから、プレイヤーを更新する。ヒットストップ中も視線は動かせる。
 	m_FPSCamera.Update(m_inputSystem);
-	const bool can_kick = CombatResolver::CanKickEnemy(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),m_enemy);
+	const bool can_kick = CombatResolver::CanKickEnemy(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),m_enemyManager.GetFirstEnemy());
 	m_playerController.Update(gameplay_delta_time,m_inputSystem,m_FPSCamera,m_collisionWorld,can_kick);
 	m_FPSCamera.SetPosition(m_playerController.GetPosition());
 
@@ -293,8 +300,10 @@ void GameScene::Draw()
 		object.Draw(m_graphicsSystem,view_matrix,projection_matrix);
 	}
 
-	// 地形の後に、検証用の敵を描画する。死亡している間は何も描かれない。表示中なら、その後にCollisionの線を重ねる。
-	m_enemy.Draw(m_graphicsSystem,view_matrix,projection_matrix);
+	// 地形の後に全枠を出現順に描画する。死亡枠はEnemy::Drawが描画を省略する。
+	for(const Enemy& enemy : m_enemyManager.GetEnemies()){
+		enemy.Draw(m_graphicsSystem,view_matrix,projection_matrix);
+	}
 	m_collisionDebugView.Draw(m_graphicsSystem,m_collisionWorld,m_FPSCamera,view_matrix,projection_matrix);
 
 	// 3Dの上に画像のHUDを重ねるため、深度比較なし・アルファ合成の画面UI用Passへ切り替え、現在の値をHUDへ渡して描画する。
@@ -320,11 +329,11 @@ void GameScene::Draw()
 	debug_info.isInvincible = m_playerController.IsInvincible();
 	debug_info.isPlayerFlinching = m_playerController.IsFlinching();
 	debug_info.healItemCount = m_healItems.GetCount();
-	debug_info.isEnemyAlive = m_enemy.IsAlive();
-	debug_info.enemyHP = m_enemy.GetCurrentHP();
-	debug_info.enemyMaxHP = m_enemy.GetMaxHP();
-	debug_info.isEnemyFlinching = m_enemy.IsFlinching();
-	debug_info.isEnemyKnockedDown = m_enemy.IsKnockedDown();
+	debug_info.isEnemyAlive = m_enemyManager.GetFirstEnemy().IsAlive();
+	debug_info.enemyHP = m_enemyManager.GetFirstEnemy().GetCurrentHP();
+	debug_info.enemyMaxHP = m_enemyManager.GetFirstEnemy().GetMaxHP();
+	debug_info.isEnemyFlinching = m_enemyManager.GetFirstEnemy().IsFlinching();
+	debug_info.isEnemyKnockedDown = m_enemyManager.GetFirstEnemy().IsKnockedDown();
 	debug_info.isHitMarkerActive = m_hitMarkerRemainingSeconds > 0.0f;
 	debug_info.isCaptureEnabled = m_inputSystem.IsMouseCaptureEnabled();
 	debug_info.isHitStopActive = m_hitStopRemainingSeconds > 0.0f;
@@ -344,7 +353,7 @@ void GameScene::Finalize()
 {
 	// 遷移先のInit後に呼ばれても、遷移先が設定したCaptureやBGMを上書きしない。
 	// 敵とObjectは、Collisionと共有Rendererを借用しているため、それらを解放する前に先に終了する。
-	m_enemy.Uninit(m_collisionWorld);
+	m_enemyManager.Clear(m_collisionWorld);
 	m_stageObjects.clear();
 	m_modelRegistry.Uninit();
 
@@ -380,7 +389,8 @@ void GameScene::UpdateDodgeJudge(float worldDeltaTime)
 void GameScene::UpdateEnemyMelee(float worldDeltaTime)
 {
 	// 戦闘不能になった敵の予告は、時間停止中でも取り消して持ち越さない。
-	if(!m_enemy.IsAlive() || m_enemy.IsFlinching() || m_enemy.IsKnockedDown() || m_playerHealth.IsDead()){
+	if(!m_enemyManager.GetFirstEnemy().IsAlive()
+		 || m_enemyManager.GetFirstEnemy().IsFlinching() || m_enemyManager.GetFirstEnemy().IsKnockedDown() || m_playerHealth.IsDead()){
 		// 予告中断時だけ再攻撃待ちを設定し、行動不能が続いても毎回は設定しない。
 		if(m_enemyMeleeJudge.HasIncomingAttack()){
 			m_enemyMeleeJudge.Initialize();
@@ -393,7 +403,7 @@ void GameScene::UpdateEnemyMelee(float worldDeltaTime)
 	if(worldDeltaTime <= 0.0f)return;
 
 	// 追従の停止距離と同じXZ平面で測る。二乗同士を比較し、平方根を取らずに範囲を求める。
-	const XMFLOAT3 enemy_position = m_enemy.GetBodySphere().center;
+	const XMFLOAT3 enemy_position = m_enemyManager.GetFirstEnemy().GetBodySphere().center;
 	const XMFLOAT3& player_position = m_playerController.GetPosition();
 	const float offset_x = player_position.x - enemy_position.x;
 	const float offset_z = player_position.z - enemy_position.z;
@@ -430,7 +440,7 @@ void GameScene::UpdateEnemyMelee(float worldDeltaTime)
 	m_enemyMeleeRecoverySeconds = std::max(0.0f,m_enemyMeleeRecoverySeconds - worldDeltaTime);
 	// 射程外では追従だけを行い、予告の開始は次の更新で判定する。
 	if(!is_in_reach){
-		ENEMY_APPROACH::Update(m_enemy,player_position,worldDeltaTime,m_collisionWorld);
+		ENEMY_APPROACH::Update(m_enemyManager.GetFirstEnemy(),player_position,worldDeltaTime,m_collisionWorld);
 		return;
 	}
 
@@ -462,16 +472,16 @@ void GameScene::UpdateMelee()
 	if(!m_playerController.TryConsumeMeleeImpact(melee_type))return;
 
 	// 当たる瞬間に、敵が射程と範囲の外なら、空振りとして何もしない。
-	if(!CombatResolver::IsEnemyInMeleeReach(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),m_enemy))return;
+	if(!CombatResolver::IsEnemyInMeleeReach(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),m_enemyManager.GetFirstEnemy()))return;
 
 	// 蹴りはダメージだけを与える。殴打はダメージを与えた後に、転倒させる。ダメージで死亡した場合、転倒は何も起こらない。
 	if(melee_type == PLAYER_MELEE_TYPE::e_KICK){
-		m_enemy.ApplyDamage(COMBAT_TABLE::ns_KICK_DAMAGE,m_collisionWorld);
+		m_enemyManager.GetFirstEnemy().ApplyDamage(COMBAT_TABLE::ns_KICK_DAMAGE,m_collisionWorld);
 	}
 	// 殴打の場合は、ダメージを与えた後に転倒させる。
 	else{
-		m_enemy.ApplyDamage(COMBAT_TABLE::ns_PUNCH_DAMAGE,m_collisionWorld);
-		m_enemy.ApplyKnockdown();
+		m_enemyManager.GetFirstEnemy().ApplyDamage(COMBAT_TABLE::ns_PUNCH_DAMAGE,m_collisionWorld);
+		m_enemyManager.GetFirstEnemy().ApplyKnockdown();
 	}
 
 	// 当たった手応えとして、短いヒットストップを与える。
@@ -492,12 +502,13 @@ void GameScene::UpdateContact(float gameplayDeltaTime)
 	}
 
 	// 敵が死亡している、または体が重なっていない場合は、接触していないため何もしない。
-	if(!m_enemy.IsAlive() || !CollisionMath::IntersectSphereSphere(m_playerController.GetBodySphere(),m_enemy.GetBodySphere()))return;
+	if(!m_enemyManager.GetFirstEnemy().IsAlive()
+		 || !CollisionMath::IntersectSphereSphere(m_playerController.GetBodySphere(),m_enemyManager.GetFirstEnemy().GetBodySphere()))return;
 
 	// スライディング中は、まだ転倒させていない場合だけ、敵を転倒させる。同じスライディングで同じ敵を繰り返し転倒させず、接触の反応もない。
 	if(action_state == PLAYER_ACTION_STATE::e_SLIDE){
 		// 転倒させられた場合だけ、このスライディングでは転倒させた記録を付ける。すでに転倒中なら、何もしない。
-		if(!m_hasSlideKnockedDownEnemy && m_enemy.ApplyKnockdown()){
+		if(!m_hasSlideKnockedDownEnemy && m_enemyManager.GetFirstEnemy().ApplyKnockdown()){
 			m_hasSlideKnockedDownEnemy = true;
 		}
 		return;
@@ -505,7 +516,7 @@ void GameScene::UpdateContact(float gameplayDeltaTime)
 
 	// 殴打中・蹴り中・無敵中・敵が転倒中・反応の間隔が残っている間は、接触の反応を与えない。
 	if(action_state == PLAYER_ACTION_STATE::e_PUNCH || action_state == PLAYER_ACTION_STATE::e_KICK || m_playerController.IsInvincible() ||
-		 m_enemy.IsKnockedDown() || m_contactCooldownRemainingSeconds > 0.0f)return;
+		 m_enemyManager.GetFirstEnemy().IsKnockedDown() || m_contactCooldownRemainingSeconds > 0.0f)return;
 
 	// 条件を満たした接触は、ダメージなしの怯みとヒットストップを与え、次の反応までの間隔を設定する。
 	ApplyPlayerHitReaction(0.0f,COMBAT_TABLE::ns_CONTACT_HIT_STOP_SECONDS);
@@ -535,10 +546,14 @@ void GameScene::UpdateShooting(float gameplayDeltaTime)
 		}
 	}
 
-	// 弾が敵のColliderへ命中した場合だけ、敵へダメージを与え、命中の表示時間を数え直す。地形への命中ではダメージを与えない。
-	if(weapon_result.didHit && weapon_result.hitInfo.layer == COLLISION_LAYER::ns_ENEMY && weapon_result.hitInfo.userData == m_enemy.GetEnemyId()){
-		m_enemy.ApplyDamage(WEAPON_TABLE::ns_ASSAULT_RIFLE.damage,m_collisionWorld);
-		m_hitMarkerRemainingSeconds = ns_HIT_MARKER_SECONDS;
+	// 敵レイヤーに命中した場合だけ、Colliderの識別値からダメージを与える相手を探す。
+	if(weapon_result.didHit && weapon_result.hitInfo.layer == COLLISION_LAYER::ns_ENEMY){
+		Enemy* const hit_enemy = m_enemyManager.FindLivingEnemy(weapon_result.hitInfo.userData);
+		// 対応する生存中の敵が見つかった場合だけ、ダメージと命中表示を反映する。
+		if(hit_enemy != nullptr){
+			hit_enemy->ApplyDamage(WEAPON_TABLE::ns_ASSAULT_RIFLE.damage,m_collisionWorld);
+			m_hitMarkerRemainingSeconds = ns_HIT_MARKER_SECONDS;
+		}
 	}
 }
 

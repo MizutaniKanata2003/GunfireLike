@@ -15,7 +15,7 @@
 #include "Scene/Common/H/ModelRegistry.h"
 #include "Scene/Common/H/SceneObject.h"
 #include "Scene/GameScene/H/CollisionDebugView.h"
-#include "Scene/GameScene/H/Enemy.h"
+#include "Scene/GameScene/H/EnemyManager.h"
 #include "Scene/GameScene/H/GameHud.h"
 #include "Scene/GameScene/H/HealItems.h"
 #include "Scene/GameScene/H/JustDodgeJudge.h"
@@ -102,8 +102,8 @@ private:
 	FpsCamera m_FPSCamera{};
 	// 弾薬・連射・リロード・射撃判定を管理する武器。
 	WeaponSystem m_weaponSystem{};
-	// 検証用の敵1体。ModelRegistryとCollisionWorldを借用するため、Finalizeでそれらより先にUninitを呼ぶ。
-	Enemy m_enemy{};
+	// 固定の試遊編成を所有する。Finalizeで登録先のCollisionWorldより先に解除する。
+	EnemyManager m_enemyManager{};
 	// 現在の視野角。単位は度。構え・ダッシュの状態に応じた目標値へ滑らかに近づく。
 	float m_fovDegrees{};
 
