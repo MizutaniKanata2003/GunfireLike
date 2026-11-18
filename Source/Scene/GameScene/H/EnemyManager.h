@@ -17,7 +17,7 @@ class EnemyManager final
 {
 public:
 	//========= 生成・終了関数=========
-	// 旧ウェーブを解除し、編成表から指定ウェーブを登録する。
+	// 旧ウェーブを解除し、編成表から指定ウェーブを、種類と位置のとおりに登録する。
 	// roomNumber: 1始まりの部屋番号。
 	// waveNumber: 1始まりのウェーブ番号。
 	// registry: 初期化済みの共有Rendererの所有者。Clearまで有効であること。
@@ -41,7 +41,7 @@ public:
 		for(std::size_t slot_index = 0; slot_index < spawns.size(); ++slot_index){
 			const auto enemy_ID = static_cast<std::uint32_t>(slot_index + 1);
 			// 敵の初期化がfalseなら、先に成功した枠も解除し、空の状態を返す。例外は捕捉しない。
-			if(!m_enemies[slot_index].Initialize(registry,collisionWorld,spawns[slot_index].position,enemy_ID)){
+			if(!m_enemies[slot_index].Initialize(registry,collisionWorld,spawns[slot_index].kind,spawns[slot_index].position,enemy_ID)){
 				Clear(collisionWorld);
 				return false;
 			}

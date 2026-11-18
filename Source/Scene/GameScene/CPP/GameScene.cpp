@@ -412,13 +412,16 @@ void GameScene::UpdateEnemyMelee(float worldDeltaTime)
 	}
 }
 
-// 予告中は追従を止め、予告が終わったフレームで一度だけ命中を判定する。
+// 接近型の敵だけ、予告中は追従を止め、予告が終わったフレームで一度だけ命中を判定する。
 void GameScene::UpdateEnemyMeleeSlot(std::size_t slotIndex,float worldDeltaTime)
 {
 	// この枠の敵と、その敵専用の予告・再攻撃待ちを参照する。
 	Enemy& enemy = m_enemyManager.GetEnemies()[slotIndex];
 	JustDodgeJudge& judge = m_enemyMeleeJudges[slotIndex];
 	float& recovery_seconds = m_enemyMeleeRecoverySeconds[slotIndex];
+
+	// 接近型以外は、射撃型・範囲攻撃型の行動を実装するまで、静止させ、予告も開始しない。
+	if(enemy.GetKind() != ENEMY_KIND::e_MELEE)return;
 
 	// 戦闘不能になった敵の予告は、時間停止中でも取り消して持ち越さない。
 	if(!enemy.IsAlive() || enemy.IsFlinching() || enemy.IsKnockedDown() || m_playerHealth.IsDead()){

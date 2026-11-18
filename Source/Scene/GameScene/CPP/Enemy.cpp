@@ -1,7 +1,7 @@
 ﻿#include "../H/Enemy.h"
 
 // 敵1体のHP・怯み・転倒・Collider登録・Cube表示を実装する。
-// HPや怯み・転倒の数値は、このファイルの定数にまとめた仮値。
+// 種類ごとのHP・当たり・大きさ・色はEnemyTableから読み、怯みと転倒の時間と状態の色は、このファイルの定数にまとめた仮値。
 
 //========= Framework インクルード=========
 #include "Framework/3D/H/BasicMeshRenderer.h"
@@ -10,57 +10,52 @@
 
 //========= Scene インクルード=========
 #include "Scene/Common/H/ModelRegistry.h"
+#include "Scene/GameScene/H/EnemyTable.h"
 
-// 検証用の敵の数値と見た目をまとめる。企画書で未確定の数値は仮値。
+// 検証用の敵の状態の数値と色をまとめる。企画書で未確定の数値は仮値。
 namespace
 {
 	//========= 戦闘の仮値=========
-	// 最大HP。企画書で敵のHPは未確定のため、検証用の仮値。
-	constexpr float ns_MAX_HP = 100.0f;
 	// 被弾後に怯む時間。単位は秒。企画書では「命中時に敵によって怯む」とだけ定められており、具体値は未確定の仮値。
 	constexpr float ns_FLINCH_SECONDS = 0.3f;
 	// 転倒している時間。単位は秒。企画書で未確定の仮値。
 	constexpr float ns_KNOCKDOWN_SECONDS = 1.5f;
 
 	//========= 形状=========
-	// 被弾判定の球の半径。単位はワールド距離単位。
-	constexpr float ns_COLLIDER_RADIUS = 0.8f;
-	// 表示するCubeの1辺の長さ。単位はワールド距離単位。球の内側に収まる大きさを目安にした仮の大きさ。
-	constexpr float ns_CUBE_SIZE = 1.0f;
 	// 転倒中のCubeの高さの倍率。1辺に掛けて低く潰し、倒れたことを示す。足元の位置は変えず、中心を下げる。仮値。
 	constexpr float ns_KNOCKDOWN_HEIGHT_SCALE = 0.4f;
 
-	//========= 色=========
-	// 通常時の色。白で、Object画像の色をそのまま出す。
-	constexpr XMFLOAT4 ns_NORMAL_COLOR{1.0f,1.0f,1.0f,1.0f};
-	// 怯み中の色。橙で、Object画像の色へ乗算して色味を変える。
+	//========= 状態の色=========
+	// 怯み中の色。橙で、Object画像の色へ乗算して色味を変える。種類の色より優先する。
 	constexpr XMFLOAT4 ns_FLINCH_COLOR{1.0f,0.5f,0.2f,1.0f};
-	// 転倒中の色。青みがかった灰色で、Object画像の色へ乗算して色味を変える。
+	// 転倒中の色。青みがかった灰色で、Object画像の色へ乗算して色味を変える。怯みの色より優先する。
 	constexpr XMFLOAT4 ns_KNOCKDOWN_COLOR{0.5f,0.6f,1.0f,1.0f};
 }
 
 //========= 初期化・終了関数=========
-// Cube Rendererを借用し、HP・位置を設定して、球のColliderを登録する。
-bool Enemy::Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,const XMFLOAT3& position,std::uint32_t enemyId)
+// Cube Rendererを借用し、種類の表からHPと大きさを設定して、球のColliderを登録する。
+bool Enemy::Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,ENEMY_KIND kind,const XMFLOAT3& position,std::uint32_t enemyId)
 {
 	// 共有のCube Rendererを借用する。
 	m_cubeRenderer = registry.GetCubeRenderer();
 	// Registryが未初期化ならnullptrが返るため、Colliderを登録せず失敗とする。
 	if(m_cubeRenderer == nullptr)return false;
 
-	// 位置・識別値・大きさを設定する。Cubeは1辺1のため、倍率がそのまま1辺の長さになる。
+	// 種類・位置・識別値・大きさを設定する。Cubeは1辺1のため、倍率がそのまま1辺の長さになる。
+	const ENEMY_PARAMS& params = ENEMY_TABLE::GetParams(kind);
+	m_kind = kind;
 	m_position = position;
 	m_enemyId = enemyId;
 	m_transform.SetPosition(position);
 	m_transform.SetRotation(XMFLOAT3{});
-	m_transform.SetScale(XMFLOAT3{ns_CUBE_SIZE,ns_CUBE_SIZE,ns_CUBE_SIZE});
+	m_transform.SetScale(XMFLOAT3{params.cubeSize,params.cubeSize,params.cubeSize});
 
 	// HPを満タンにして生きている状態にし、球のColliderを敵レイヤーで登録する。
-	m_currentHP = ns_MAX_HP;
+	m_currentHP = params.maxHP;
 	m_flinchRemainingSeconds = 0.0f;
 	m_knockdownRemainingSeconds = 0.0f;
 	m_isAlive = true;
-	m_colliderHandle = collisionWorld.AddSphere(COLLISION_SPHERE{position,ns_COLLIDER_RADIUS},COLLISION_LAYER::ns_ENEMY,enemyId);
+	m_colliderHandle = collisionWorld.AddSphere(COLLISION_SPHERE{position,params.colliderRadius},COLLISION_LAYER::ns_ENEMY,enemyId);
 	return true;
 }
 
@@ -130,15 +125,16 @@ void Enemy::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const
 	// 死亡している、またはRendererを借用していない場合は、描画しない。
 	if(!m_isAlive || m_cubeRenderer == nullptr)return;
 
-	// 描画用のTransformと色を決める。通常は保持しているTransformと白。
+	// 描画用のTransformと色を決める。通常は保持しているTransformと、種類の色。
+	const ENEMY_PARAMS& params = ENEMY_TABLE::GetParams(m_kind);
 	Transform draw_transform = m_transform;
-	XMFLOAT4 color = ns_NORMAL_COLOR;
+	XMFLOAT4 color = params.normalColor;
 
 	// 転倒中は、高さを低く潰し、足元の位置が変わらないよう中心を下げて、色を変える。中心を下げる量は、潰した高さの分の半分。
 	if(IsKnockedDown()){
-		const float squashed_height = ns_CUBE_SIZE * ns_KNOCKDOWN_HEIGHT_SCALE;
-		draw_transform.SetScale(XMFLOAT3{ns_CUBE_SIZE,squashed_height,ns_CUBE_SIZE});
-		draw_transform.SetPosition(XMFLOAT3{m_position.x,m_position.y - (ns_CUBE_SIZE - squashed_height) * 0.5f,m_position.z});
+		const float squashed_height = params.cubeSize * ns_KNOCKDOWN_HEIGHT_SCALE;
+		draw_transform.SetScale(XMFLOAT3{params.cubeSize,squashed_height,params.cubeSize});
+		draw_transform.SetPosition(XMFLOAT3{m_position.x,m_position.y - (params.cubeSize - squashed_height) * 0.5f,m_position.z});
 		color = ns_KNOCKDOWN_COLOR;
 	}
 	// 怯み中は、橙色にする。転倒中の表示を優先する。
@@ -191,13 +187,14 @@ void Enemy::Respawn(CollisionWorld& collisionWorld)
 	if(m_cubeRenderer == nullptr)return;
 
 	// HPを満タンにして、怯みと転倒を解除する。
-	m_currentHP = ns_MAX_HP;
+	const ENEMY_PARAMS& params = ENEMY_TABLE::GetParams(m_kind);
+	m_currentHP = params.maxHP;
 	m_flinchRemainingSeconds = 0.0f;
 	m_knockdownRemainingSeconds = 0.0f;
 
 	// 死亡中だった場合だけ、Colliderを同じ位置へ登録し直して生きている状態にする。生きている場合は二重登録しない。
 	if(!m_isAlive){
-		m_colliderHandle = collisionWorld.AddSphere(COLLISION_SPHERE{m_position,ns_COLLIDER_RADIUS},COLLISION_LAYER::ns_ENEMY,m_enemyId);
+		m_colliderHandle = collisionWorld.AddSphere(COLLISION_SPHERE{m_position,params.colliderRadius},COLLISION_LAYER::ns_ENEMY,m_enemyId);
 		m_isAlive = true;
 	}
 }
@@ -206,11 +203,11 @@ void Enemy::Respawn(CollisionWorld& collisionWorld)
 // 最大HPを返す。
 float Enemy::GetMaxHP() const
 {
-	return ns_MAX_HP;
+	return ENEMY_TABLE::GetParams(m_kind).maxHP;
 }
 
 // 敵の位置を中心にした、Colliderと同じ半径の球を返す。
 COLLISION_SPHERE Enemy::GetBodySphere() const
 {
-	return COLLISION_SPHERE{m_position,ns_COLLIDER_RADIUS};
+	return COLLISION_SPHERE{m_position,ENEMY_TABLE::GetParams(m_kind).colliderRadius};
 }
