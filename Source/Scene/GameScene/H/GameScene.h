@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// 移動・ダッシュ・しゃがみ・スライディング・回避・蹴り・殴打・視点・構え・射撃・リロード・回復と、設定表から生成した床・壁、部屋ごとの敵、出口、画像のHUD、Collisionの可視化を行う最小構成のGameSceneを宣言する。
+// 移動・ダッシュ・しゃがみ・スライディング・回避・蹴り・殴打・視点・構え・射撃・リロード・回復と、設定表から生成した床・壁、部屋ごとの敵と敵の弾、出口、画像のHUD、Collisionの可視化を行う最小構成のGameSceneを宣言する。
 // 各クラスの更新を仲介し、共有Renderer・生成したObject・CollisionWorldを所有する。Scene切替はManagerへ予約する。
 
 //========= C++標準ライブラリ インクルード=========
@@ -19,6 +19,7 @@
 #include "Scene/Common/H/SceneObject.h"
 #include "Scene/GameScene/H/CollisionDebugView.h"
 #include "Scene/GameScene/H/EnemyManager.h"
+#include "Scene/GameScene/H/EnemyProjectile.h"
 #include "Scene/GameScene/H/ExitDoor.h"
 #include "Scene/GameScene/H/GameHud.h"
 #include "Scene/GameScene/H/HealItems.h"
@@ -47,20 +48,20 @@ public:
 	GameScene(SceneManager& sceneManager,InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem);
 
 	//========= Sceneライフサイクル関数=========
-	// プレイヤー・カメラ・武器・HP・回復アイテム・Collision・判定の状態・部屋の進行・表示状態を初期状態へ戻し、生成済みObjectを空にして、カメラをプレイヤー位置へ合わせる。
+	// プレイヤー・カメラ・武器・HP・回復アイテム・Collision・判定の状態・部屋の進行・敵の弾・表示状態を初期状態へ戻し、生成済みObjectを空にして、カメラをプレイヤー位置へ合わせる。
 	void Initialize() override;
-	// 共有Renderer・HUD・Collision可視化を初期化し、設定表から床と壁（とそのCollider）、出口、第1部屋の敵を生成して、成功後にFPS操作とGame用BGMを有効にする。
+	// 共有Renderer・HUD・Collision可視化を初期化し、設定表から床と壁（とそのCollider）、出口、敵の弾、第1部屋の敵を生成して、成功後にFPS操作とGame用BGMを有効にする。
 	// 戻り値: 各初期化・Object生成・敵の配置が成功したらtrue。falseを検出した場合はFinalize後にfalseを返す。
 	// 下位処理の例外は捕捉しない。
 	bool Init() override;
-	// F2の遷移予約、F3〜F8の確認操作、F1のCapture切替、ヒットストップ・スローの管理、部屋の進行、出口の通過、視点・移動・動作・射撃・近接攻撃・回復・接触の更新と反映を行う。
+	// F2の遷移予約、F3〜F8の確認操作、F1のCapture切替、ヒットストップ・スローの管理、部屋の進行、出口の通過、視点・移動・動作・射撃・近接攻撃・回復・接触・敵の行動と弾の更新と反映を行う。
 	// deltaTime: 各更新へ渡す経過時間。単位は秒。ヒットストップ中は0、スロー中はプレイヤー以外へ縮めた値を、それぞれの更新へ渡す。
-	// Capture解除中は視点・移動・射撃・出口の通過の更新を行わない。F2で予約した場合は後続処理を行わない。
+	// Capture解除中は視点・移動・射撃・出口の通過・敵の行動の更新を行わない。F2で予約した場合は後続処理を行わない。
 	void Update(float deltaTime) override;
-	// 描画先サイズに合わせて行列を作り、生成済みのObject・出口・敵・Collisionの可視化を描画し、続けて画像のHUDと読み取り専用のデバッグUIを描画する。
+	// 描画先サイズに合わせて行列を作り、生成済みのObject・出口・敵・敵の弾・Collisionの可視化を描画し、続けて画像のHUDと読み取り専用のデバッグUIを描画する。
 	// 幅または高さが0なら何もしない。ImGuiフレーム開始後、描画データ確定前に呼ぶ。
 	void Draw() override;
-	// 敵・出口・生成したObjectを先に破棄し、その後に共有Renderer・HUD・Collision可視化・Collisionを解放する。繰り返し呼出可能。CaptureやBGMは変更しない。
+	// 敵・敵の弾・出口・生成したObjectを先に破棄し、その後に共有Renderer・HUD・Collision可視化・Collisionを解放する。繰り返し呼出可能。CaptureやBGMは変更しない。
 	void Finalize() override;
 
 private:
@@ -75,13 +76,16 @@ private:
 	// slotIndex: EnemyManagerの固定枠の番号。0始まりで、攻撃状態の配列と同じ範囲であること。
 	// worldDeltaTime: 敵側の経過時間。単位は秒。
 	void UpdateEnemyMeleeSlot(std::size_t slotIndex,float worldDeltaTime);
-	// 指定した1枠の射撃型について、距離維持の移動・攻撃予告・発射のタイミングを更新する。弾の生成は、まだ行わない。
+	// 指定した1枠の射撃型について、距離維持の移動・攻撃予告・発射を更新する。発射のタイミングに達したら、弾を生成する。
 	// slotIndex: EnemyManagerの固定枠の番号。0始まりで、攻撃状態の配列と同じ範囲であること。
 	// worldDeltaTime: 敵側の経過時間。単位は秒。
 	void UpdateEnemyRangedSlot(std::size_t slotIndex,float worldDeltaTime);
+	// 敵の弾を進め、プレイヤーへの命中・回避の結果に応じて、ダメージ・怯み・ヒットストップ・スローを反映する。
+	// worldDeltaTime: 敵側の経過時間。単位は秒。スローとヒットストップ反映済み。
+	void UpdateEnemyProjectiles(float worldDeltaTime);
 	// 全枠の攻撃予告と再攻撃待ちを破棄する。初期化と再配置で、旧ウェーブの状態を持ち越さないために使う。
 	void ResetEnemyMelee();
-	// 現在の部屋とウェーブの敵を生成し、全枠の攻撃状態を初期化して、進行管理へ生成完了を通知する。
+	// 現在の部屋とウェーブの敵を生成し、全枠の攻撃状態と敵の弾を初期化して、進行管理へ生成完了を通知する。
 	// 戻り値: 登録に成功したらtrue。失敗した場合はEnemyManagerが空にし、進行管理には通知しない。
 	[[nodiscard]] bool TrySpawnCurrentWave();
 	// 出口が開いていて、プレイヤーが通過範囲に入った場合だけ、次の部屋へ進め、プレイヤーを開始位置へ戻す。
@@ -124,6 +128,8 @@ private:
 	WeaponSystem m_weaponSystem{};
 	// 現在のウェーブの敵を所有する。Finalizeで登録先のCollisionWorldより先に解除する。
 	EnemyManager m_enemyManager{};
+	// 射撃型の敵が撃った、飛行中の弾。Cube Rendererを借用するため、Finalizeで共有Rendererより先に解除する。
+	EnemyProjectileManager m_enemyProjectiles{};
 	// 3部屋×2ウェーブの進行状態。敵の生成と全滅判定は、GameSceneが仲介する。
 	RoomController m_roomController{};
 	// 現在のウェーブの生成に失敗したか。trueの間は生成を再試行せず、F4で最初からやり直す。
@@ -154,7 +160,7 @@ private:
 	PLAYER_ACTION_STATE m_previousActionState{PLAYER_ACTION_STATE::e_NORMAL};
 
 	//========= 描画ResourceとObject=========
-	// Cube・OBJの共有Rendererを所有する。m_stageObjects・m_enemyManager・m_exitDoorが借用するため、このメンバーを先に宣言し、後に破棄する。
+	// Cube・OBJの共有Rendererを所有する。m_stageObjects・m_enemyManager・m_enemyProjectiles・m_exitDoorが借用するため、このメンバーを先に宣言し、後に破棄する。
 	ModelRegistry m_modelRegistry{};
 	// STAGE_LAYOUTの表から生成した床と壁。Rendererを借用するだけで所有しない。表の順が描画順になる。
 	std::vector<SceneObject> m_stageObjects{};

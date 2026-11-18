@@ -220,6 +220,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Scene\GameScene\CPP\CollisionDebugView.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\CombatResolver.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\Enemy.cpp" />
+    <ClCompile Include="Source\Scene\GameScene\CPP\EnemyProjectile.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\ExitDoor.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameDebugUi.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameHud.cpp" />
@@ -281,6 +282,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\GameScene\H\Enemy.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EnemyApproach.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EnemyManager.h" />
+    <ClInclude Include="Source\Scene\GameScene\H\EnemyProjectile.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EnemyRangedBehavior.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EnemyTable.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EnemyWaveTable.h" />
