@@ -87,8 +87,7 @@ void GameScene::Initialize()
 
 	// 判定・時間・接触・表示の状態を既定へ戻し、前回の生成ObjectとColliderを空にする。Rendererの生成、表からのObject生成、敵の配置はInitで行う。
 	m_dodgeJudge.Initialize();
-	m_enemyMeleeJudge.Initialize();
-	m_enemyMeleeRecoverySeconds = 0.0f;
+	ResetEnemyMelee();
 	m_lastJudgeResult = DODGE_JUDGE_RESULT::e_NONE;
 	m_slowMotionRemainingSeconds = 0.0f;
 	m_hitStopRemainingSeconds = 0.0f;
@@ -169,8 +168,7 @@ void GameScene::Update(float deltaTime)
 
 	// F4では旧予告を破棄し、固定編成を初期位置から作り直す。
 	if(m_inputSystem.IsKeyTriggered(VK_F4)){
-		m_enemyMeleeJudge.Initialize();
-		m_enemyMeleeRecoverySeconds = 0.0f;
+		ResetEnemyMelee();
 		m_slideKnockedDownEnemyMask = 0;
 
 		// 再生成が失敗した場合は生成済みの敵を残さず、Sceneは維持して失敗を記録する。
@@ -381,16 +379,29 @@ void GameScene::UpdateDodgeJudge(float worldDeltaTime)
 	}
 }
 
-// 予告中は追従を止め、予告が終わったフレームで一度だけ命中を判定する。
+// 全枠を出現順に更新し、各敵が自分の予告と再攻撃待ちで追従・攻撃する。
 void GameScene::UpdateEnemyMelee(float worldDeltaTime)
 {
+	// 全枠を先頭から更新する。死亡枠や行動不能の敵は、枠ごとの更新の中で予告を中断する。
+	for(std::size_t slot_index = 0; slot_index < m_enemyMeleeJudges.size(); ++slot_index){
+		UpdateEnemyMeleeSlot(slot_index,worldDeltaTime);
+	}
+}
+
+// 予告中は追従を止め、予告が終わったフレームで一度だけ命中を判定する。
+void GameScene::UpdateEnemyMeleeSlot(std::size_t slotIndex,float worldDeltaTime)
+{
+	// この枠の敵と、その敵専用の予告・再攻撃待ちを参照する。
+	Enemy& enemy = m_enemyManager.GetEnemies()[slotIndex];
+	JustDodgeJudge& judge = m_enemyMeleeJudges[slotIndex];
+	float& recovery_seconds = m_enemyMeleeRecoverySeconds[slotIndex];
+
 	// 戦闘不能になった敵の予告は、時間停止中でも取り消して持ち越さない。
-	if(!m_enemyManager.GetFirstEnemy().IsAlive()
-		 || m_enemyManager.GetFirstEnemy().IsFlinching() || m_enemyManager.GetFirstEnemy().IsKnockedDown() || m_playerHealth.IsDead()){
+	if(!enemy.IsAlive() || enemy.IsFlinching() || enemy.IsKnockedDown() || m_playerHealth.IsDead()){
 		// 予告中断時だけ再攻撃待ちを設定し、行動不能が続いても毎回は設定しない。
-		if(m_enemyMeleeJudge.HasIncomingAttack()){
-			m_enemyMeleeJudge.Initialize();
-			m_enemyMeleeRecoverySeconds = COMBAT_TABLE::ns_ENEMY_MELEE_RECOVERY_SECONDS;
+		if(judge.HasIncomingAttack()){
+			judge.Initialize();
+			recovery_seconds = COMBAT_TABLE::ns_ENEMY_MELEE_RECOVERY_SECONDS;
 		}
 		return;
 	}
@@ -399,7 +410,7 @@ void GameScene::UpdateEnemyMelee(float worldDeltaTime)
 	if(worldDeltaTime <= 0.0f)return;
 
 	// 追従の停止距離と同じXZ平面で測る。二乗同士を比較し、平方根を取らずに範囲を求める。
-	const XMFLOAT3 enemy_position = m_enemyManager.GetFirstEnemy().GetBodySphere().center;
+	const XMFLOAT3 enemy_position = enemy.GetBodySphere().center;
 	const XMFLOAT3& player_position = m_playerController.GetPosition();
 	const float offset_x = player_position.x - enemy_position.x;
 	const float offset_z = player_position.z - enemy_position.z;
@@ -407,17 +418,17 @@ void GameScene::UpdateEnemyMelee(float worldDeltaTime)
 	const bool is_in_reach = offset_x * offset_x + offset_z * offset_z <= reach * reach;
 
 	// 予告中は追従せず、判定が返るまで敵側の時間で予告を進める。
-	if(m_enemyMeleeJudge.HasIncomingAttack()){
+	if(judge.HasIncomingAttack()){
 		// 回避以外の無敵も被弾を防ぐが、回避開始時刻としては使わない。
 		const bool is_dodging = m_playerController.GetActionState() == PLAYER_ACTION_STATE::e_DODGE;
 		const float dodge_age_seconds = is_dodging ? m_playerController.GetSecondsSinceDodgeStart() : COMBAT_TABLE::ns_ENEMY_MELEE_RECOVERY_SECONDS;
 		const bool is_invincible = m_playerController.IsInvincible();
-		const DODGE_JUDGE_RESULT result = m_enemyMeleeJudge.Update(worldDeltaTime,is_invincible,dodge_age_seconds);
+		const DODGE_JUDGE_RESULT result = judge.Update(worldDeltaTime,is_invincible,dodge_age_seconds);
 		// 予告が続いている間は、命中も再攻撃待ちの開始も行わない。
 		if(result == DODGE_JUDGE_RESULT::e_NONE)return;
 
 		// 予告を消費したので、範囲外の空振りでも再攻撃待ちに入る。
-		m_enemyMeleeRecoverySeconds = COMBAT_TABLE::ns_ENEMY_MELEE_RECOVERY_SECONDS;
+		recovery_seconds = COMBAT_TABLE::ns_ENEMY_MELEE_RECOVERY_SECONDS;
 		// 予告終了時点で範囲外なら、被弾もジャスト回避のスローも発生しない。
 		if(!is_in_reach)return;
 
@@ -433,17 +444,27 @@ void GameScene::UpdateEnemyMelee(float worldDeltaTime)
 	}
 
 	// 再攻撃待ちは敵側の時間で減らす。残り時間が負にならないようにする。
-	m_enemyMeleeRecoverySeconds = std::max(0.0f,m_enemyMeleeRecoverySeconds - worldDeltaTime);
+	recovery_seconds = std::max(0.0f,recovery_seconds - worldDeltaTime);
 	// 射程外では追従だけを行い、予告の開始は次の更新で判定する。
 	if(!is_in_reach){
-		ENEMY_APPROACH::Update(m_enemyManager.GetFirstEnemy(),player_position,worldDeltaTime,m_collisionWorld);
+		ENEMY_APPROACH::Update(enemy,player_position,worldDeltaTime,m_collisionWorld);
 		return;
 	}
 
 	// 射程内では待ち時間が終わってから、次の攻撃を予告する。
-	if(m_enemyMeleeRecoverySeconds <= 0.0f){
-		m_enemyMeleeJudge.StartIncomingAttack(COMBAT_TABLE::ns_ENEMY_MELEE_WINDUP_SECONDS);
+	if(recovery_seconds <= 0.0f){
+		judge.StartIncomingAttack(COMBAT_TABLE::ns_ENEMY_MELEE_WINDUP_SECONDS);
 	}
+}
+
+// 全枠の予告と再攻撃待ちを初期状態へ戻す。
+void GameScene::ResetEnemyMelee()
+{
+	// 全枠の攻撃予告を破棄し、再配置後の敵が旧予告で攻撃しないようにする。
+	for(JustDodgeJudge& judge : m_enemyMeleeJudges){
+		judge.Initialize();
+	}
+	m_enemyMeleeRecoverySeconds.fill(0.0f);
 }
 
 // 被弾・接触の反応として、ダメージ（あれば）・怯み・ヒットストップを与える。

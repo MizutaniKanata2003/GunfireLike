@@ -4,6 +4,8 @@
 // 各クラスの更新を仲介し、共有Renderer・生成したObject・CollisionWorldを所有する。Scene切替はManagerへ予約する。
 
 //========= C++標準ライブラリ インクルード=========
+#include <array> // 敵の固定枠ごとの攻撃予告と再攻撃待ちを、枠数と同じ長さの配列で保持する。
+#include <cstddef> // std::size_tで、敵の固定枠の番号を受け取る。
 #include <cstdint> // std::uint32_tで、スライディングで転倒させた敵のID別の記録を保持する。
 #include <vector> // 設定表から生成したSceneObjectを、表の順に保持する可変長配列として使用する。
 
@@ -64,9 +66,15 @@ private:
 	// 確認用の攻撃が当たる瞬間を判定し、結果に応じてプレイヤーへのダメージとスローを反映する。
 	// worldDeltaTime: スローを反映した経過時間。単位は秒。ヒットストップ中は0。
 	void UpdateDodgeJudge(float worldDeltaTime);
-	// 検証用の敵1体の追従・攻撃予告・命中候補を更新する。
+	// 全枠の接近型を出現順に更新し、各敵の追従・攻撃予告・命中候補を処理する。
 	// worldDeltaTime: 敵側の経過時間。単位は秒。スローとヒットストップ反映済み。
 	void UpdateEnemyMelee(float worldDeltaTime);
+	// 指定した1枠の接近型について、追従・攻撃予告・命中候補を更新する。
+	// slotIndex: EnemyManagerの固定枠の番号。0始まりで、攻撃状態の配列と同じ範囲であること。
+	// worldDeltaTime: 敵側の経過時間。単位は秒。
+	void UpdateEnemyMeleeSlot(std::size_t slotIndex,float worldDeltaTime);
+	// 全枠の攻撃予告と再攻撃待ちを破棄する。初期化と再配置で、旧ウェーブの状態を持ち越さないために使う。
+	void ResetEnemyMelee();
 	// プレイヤーへ被弾の反応（ダメージ・怯み・ヒットストップ）を与える。
 	// damage: 与えるダメージ。接触の場合は0。
 	// hitStopSeconds: 設定するヒットストップの長さ。単位は秒。
@@ -111,10 +119,10 @@ private:
 	//========= 判定・時間の状態=========
 	// 確認用に発生させた攻撃の、命中の瞬間の判定（無敵・ジャスト回避）。
 	JustDodgeJudge m_dodgeJudge{};
-	// 接近型の予告と命中時の回避判定。F7の判定とは状態を共有しない。
-	JustDodgeJudge m_enemyMeleeJudge{};
-	// 次の攻撃を予告できるまでの残り時間。単位は敵側の秒。初期状態は待ち時間なし。
-	float m_enemyMeleeRecoverySeconds{};
+	// 敵の固定枠ごとの攻撃予告と、命中時の回避判定。F7の判定とは状態を共有しない。
+	std::array<JustDodgeJudge,ENEMY_WAVE_TABLE::ns_SLOT_COUNT> m_enemyMeleeJudges{};
+	// 敵の固定枠ごとの、次の攻撃を予告できるまでの残り時間。単位は敵側の秒。初期状態は待ち時間なし。
+	std::array<float,ENEMY_WAVE_TABLE::ns_SLOT_COUNT> m_enemyMeleeRecoverySeconds{};
 	// 直近の判定結果。デバッグUIへの表示に使う。
 	DODGE_JUDGE_RESULT m_lastJudgeResult{DODGE_JUDGE_RESULT::e_NONE};
 	// スローの残り時間。単位は実時間の秒。0より大きい間、プレイヤー以外の時間の進みが遅くなる。
