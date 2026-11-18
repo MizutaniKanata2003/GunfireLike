@@ -176,11 +176,11 @@ bool Enemy::ApplyDamage(float damage,CollisionWorld& collisionWorld)
 	return true;
 }
 
-// 転倒させ、怯みを解除する。
+// 転倒させ、怯みを解除する。範囲攻撃型は、転倒しない。
 bool Enemy::ApplyKnockdown()
 {
-	// 死亡している、またはすでに転倒中の場合は、同じ転倒を重ねないため何もしない。
-	if(!m_isAlive || IsKnockedDown())return false;
+	// 死亡している、すでに転倒中、または範囲攻撃型（転倒しない種類）の場合は、転倒させず何もしない。
+	if(!m_isAlive || IsKnockedDown() || m_kind == ENEMY_KIND::e_AREA)return false;
 
 	// 転倒の時間を設定し、怯みは転倒へ置き換えるため解除する。
 	m_knockdownRemainingSeconds = ns_KNOCKDOWN_SECONDS;

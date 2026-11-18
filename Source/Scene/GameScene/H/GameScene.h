@@ -49,13 +49,13 @@ public:
 	GameScene(SceneManager& sceneManager,InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem);
 
 	//========= Sceneライフサイクル関数=========
-	// プレイヤー・カメラ・武器・HP・回復アイテム・Collision・判定の状態・部屋の進行・敵の弾と範囲の予告・表示状態を初期状態へ戻し、生成済みObjectを空にして、カメラをプレイヤー位置へ合わせる。
+	// プレイヤー・カメラ・武器・HP・回復アイテム・Collision・判定の状態・部屋の進行・敵の弾と範囲の予告・デバッグ設定・表示状態を初期状態へ戻し、生成済みObjectを空にして、カメラをプレイヤー位置へ合わせる。
 	void Initialize() override;
 	// 共有Renderer・HUD・Collision可視化を初期化し、設定表から床と壁（とそのCollider）、出口、敵の弾、範囲の予告、第1部屋の敵を生成して、成功後にFPS操作とGame用BGMを有効にする。
 	// 戻り値: 各初期化・Object生成・敵の配置が成功したらtrue。falseを検出した場合はFinalize後にfalseを返す。
 	// 下位処理の例外は捕捉しない。
 	bool Init() override;
-	// F2の遷移予約、F3〜F8の確認操作、F1のCapture切替、ヒットストップ・スローの管理、部屋の進行、出口の通過、視点・移動・動作・射撃・近接攻撃・回復・接触・敵の行動と弾の更新と反映を行う。
+	// F2の遷移予約、F3〜F9・F11の確認操作、F1のCapture切替、ヒットストップ・スローの管理、部屋の進行、出口の通過、視点・移動・動作・射撃・近接攻撃・回復・接触・敵の行動と弾の更新と反映を行う。
 	// deltaTime: 各更新へ渡す経過時間。単位は秒。ヒットストップ中は0、スロー中はプレイヤー以外へ縮めた値を、それぞれの更新へ渡す。
 	// Capture解除中は視点・移動・射撃・出口の通過・敵の行動の更新を行わない。F2で予約した場合は後続処理を行わない。
 	void Update(float deltaTime) override;
@@ -81,7 +81,7 @@ private:
 	// slotIndex: EnemyManagerの固定枠の番号。0始まりで、攻撃状態の配列と同じ範囲であること。
 	// worldDeltaTime: 敵側の経過時間。単位は秒。
 	void UpdateEnemyRangedSlot(std::size_t slotIndex,float worldDeltaTime);
-	// 指定した1枠の範囲攻撃型について、接近・範囲の予告を更新する。予告の終わりでは、範囲の判定をまだ行わない。
+	// 指定した1枠の範囲攻撃型について、接近・範囲の予告・予告の終わりの範囲の判定を更新する。
 	// slotIndex: EnemyManagerの固定枠の番号。0始まりで、攻撃状態の配列と同じ範囲であること。
 	// worldDeltaTime: 敵側の経過時間。単位は秒。
 	void UpdateEnemyAreaSlot(std::size_t slotIndex,float worldDeltaTime);
@@ -93,6 +93,12 @@ private:
 	// 現在の部屋とウェーブの敵を生成し、全枠の攻撃状態・敵の弾・範囲の予告を初期化して、進行管理へ生成完了を通知する。
 	// 戻り値: 登録に成功したらtrue。失敗した場合はEnemyManagerが空にし、進行管理には通知しない。
 	[[nodiscard]] bool TrySpawnCurrentWave();
+	// デバッグ用に、現在のウェーブの生きている敵を全て倒し、敵の予告・弾・範囲の予告を消す。次の更新の全滅判定で、次のウェーブまたは出口の開放へ進む。
+	void SkipCurrentWave();
+	// プレイヤーの攻撃が敵へ与えるダメージを返す。一撃で倒す設定が有効なら、その敵の残りHPを返し、無効なら基本のダメージを返す。
+	// baseDamage: 設定が無効の場合に使う、攻撃の基本のダメージ。
+	// target: ダメージを受ける敵。
+	[[nodiscard]] float GetPlayerAttackDamage(float baseDamage,const Enemy& target) const;
 	// 出口が開いていて、プレイヤーが通過範囲に入った場合だけ、次の部屋へ進め、プレイヤーを開始位置へ戻す。
 	void UpdateExitPass();
 	// プレイヤーへ被弾の反応（ダメージ・怯み・ヒットストップ）を与える。
@@ -146,10 +152,14 @@ private:
 	// 現在の視野角。単位は度。構え・ダッシュの状態に応じた目標値へ滑らかに近づく。
 	float m_fovDegrees{};
 
+	//========= デバッグ設定=========
+	// 一撃で敵を倒す設定が有効か。F9で切り替える。有効の間、プレイヤーの射撃・蹴り・殴打が、敵の残りHPと同じダメージを与える。
+	bool m_isOneHitKillEnabled{};
+
 	//========= 判定・時間の状態=========
 	// 確認用に発生させた攻撃の、命中の瞬間の判定（無敵・ジャスト回避）。
 	JustDodgeJudge m_dodgeJudge{};
-	// 敵の固定枠ごとの攻撃予告。接近型は命中時の回避判定に、射撃型・範囲攻撃型は発射・判定のタイミングの計測に使う。F7の判定とは状態を共有しない。
+	// 敵の固定枠ごとの攻撃予告。接近型は命中時の回避判定に、射撃型は発射のタイミングの計測に、範囲攻撃型は範囲の判定のタイミングの計測に使う。F7の判定とは状態を共有しない。
 	std::array<JustDodgeJudge,ENEMY_WAVE_TABLE::ns_SLOT_COUNT> m_enemyMeleeJudges{};
 	// 敵の固定枠ごとの、次の攻撃を予告できるまでの残り時間。単位は敵側の秒。初期状態は待ち時間なし。
 	std::array<float,ENEMY_WAVE_TABLE::ns_SLOT_COUNT> m_enemyMeleeRecoverySeconds{};

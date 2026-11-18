@@ -52,6 +52,20 @@ struct GAME_DEBUG_INFO
 	// スロー中か。
 	bool isSlowMotionActive{};
 
+	//========= 部屋の進行=========
+	// 現在の部屋番号。1始まり。
+	int roomNumber{};
+	// 現在のウェーブ番号。1始まり。
+	int waveNumber{};
+	// 現在の進行状態。
+	ROOM_PHASE roomPhase{ROOM_PHASE::e_NEEDS_SPAWN};
+	// 現在のウェーブの生成に失敗して、再試行を止めているか。
+	bool hasWaveSpawnFailed{};
+
+	//========= デバッグ操作=========
+	// 一撃で敵を倒す設定が有効か。有効の間、プレイヤーの射撃・蹴り・殴打が、敵の残りHPと同じダメージを与える。
+	bool isOneHitKillEnabled{};
+
 	//========= 確認用の攻撃の判定=========
 	// 確認用の攻撃を予告中か。
 	bool hasIncomingAttack{};
@@ -69,16 +83,6 @@ struct GAME_DEBUG_INFO
 	unsigned int rayHitLayer{};
 	// Rayの命中までの距離。hasRayHitがtrueの間だけ有効。
 	float rayHitDistance{};
-
-	//========= 部屋の進行=========
-	// 現在の部屋番号。1始まり。
-	int roomNumber{};
-	// 現在のウェーブ番号。1始まり。
-	int waveNumber{};
-	// 現在の進行状態。
-	ROOM_PHASE roomPhase{ROOM_PHASE::e_NEEDS_SPAWN};
-	// 現在のウェーブの生成に失敗して、再試行を止めているか。
-	bool hasWaveSpawnFailed{};
 };
 
 // デバッグ情報をImGuiで表示する静的関数。

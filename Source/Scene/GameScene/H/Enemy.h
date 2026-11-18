@@ -58,7 +58,7 @@ public:
 	// collisionWorld: Initializeで渡したのと同じCollisionWorld。死亡時にColliderを解除する。
 	// 戻り値: このダメージで死亡したらtrue。すでに死亡している場合はダメージを受けずfalse。
 	bool ApplyDamage(float damage,CollisionWorld& collisionWorld);
-	// 転倒させる。転倒中は怯みも解除され、蹴りの対象にならない。すでに転倒中、または死亡している場合は何もしない。
+	// 転倒させる。転倒中は怯みも解除され、蹴りの対象にならない。すでに転倒中、死亡している、または範囲攻撃型（転倒しない種類）の場合は何もしない。
 	// 戻り値: 新しく転倒させたらtrue。何もしなかった場合はfalse。
 	bool ApplyKnockdown();
 	// HPを満タンへ戻して怯みと転倒を解除する。死亡していた場合はColliderを登録し直して生き返らせる。攻撃の予告の表示も解除する。

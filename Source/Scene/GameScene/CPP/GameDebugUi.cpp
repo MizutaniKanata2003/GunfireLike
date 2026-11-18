@@ -117,10 +117,12 @@ void GameDebugUi::Draw(const GAME_DEBUG_INFO& info)
 	ImGui::TextUnformatted("Shift (hold): Dash / C (hold): Crouch / C while dashing: Slide / Space + WASD: Dodge");
 	ImGui::TextUnformatted("F: Kick (flinching enemy only) / E: Punch (cancels reload, knocks down)");
 	ImGui::TextUnformatted("F1: Capture / F2: Title / F3: Collision / F4: Restart rooms / F5: Damage / F6: Heal full / F7: Incoming attack / F8: +Heal item");
+	ImGui::TextUnformatted("F9: One-hit kill ON/OFF / F11: Skip wave (defeat all enemies)");
 
-	// 部屋・ウェーブの進行と、生成失敗の有無を表示する。
+	// 部屋・ウェーブの進行と、生成失敗の有無と、一撃で倒す設定を表示する。
 	ImGui::Separator();
 	ImGui::Text("Room: %d / 3  Wave: %d / 2  Phase: %s",info.roomNumber,info.waveNumber,GetRoomPhaseName(info.roomPhase));
+	ImGui::Text("One-hit kill: %s",info.isOneHitKillEnabled ? "ON" : "OFF");
 	// 生成失敗で再試行を止めている場合だけ、F4で再開できることを表示する。
 	if(info.hasWaveSpawnFailed){
 		ImGui::TextUnformatted("Wave spawn failed (F4: restart rooms)");

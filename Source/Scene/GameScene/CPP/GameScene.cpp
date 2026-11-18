@@ -3,11 +3,11 @@
 // テストSceneの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、部屋ごとの敵と敵の弾と範囲の予告と出口、設定表から生成した床・壁・画像のHUD・デバッグUIの描画、Resource終了を実装する。
 
 //========= Windows インクルード=========
-#include <windows.h> // VK_F1〜VK_F8の仮想キーコードで、Capture切替・タイトル遷移・可視化切替・最初の部屋からの再開・確認操作のキーを指定する。
+#include <windows.h> // VK_F1〜VK_F9とVK_F11の仮想キーコードで、Capture切替・タイトル遷移・可視化切替・最初の部屋からの再開・確認操作・デバッグ操作のキーを指定する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで残り時間を0未満にせず、std::minで視野角の補間割合を1以下に制限する。
-#include <cmath> // std::sqrtで、射撃型・範囲攻撃型とプレイヤーの水平距離を求める。
+#include <cmath> // std::sqrtで射撃型・範囲攻撃型とプレイヤーの水平距離を求め、std::fabsで範囲の中心からのずれの大きさを求める。
 #include <cstdint> // std::uint32_tで、スライディングで転倒させた敵の記録のビットを扱う。
 #include <vector> // 敵の弾の判定結果を、std::vectorで受け取る。
 
@@ -85,9 +85,10 @@ void GameScene::Initialize()
 	m_weaponSystem.Initialize(WEAPON_TABLE::ns_ASSAULT_RIFLE);
 	m_fovDegrees = ns_FOV_DEGREES;
 
-	// 進行状態を第1部屋の第1ウェーブへ戻し、前回の生成失敗を引き継がない。
+	// 進行状態を第1部屋の第1ウェーブへ戻し、前回の生成失敗とデバッグ設定を引き継がない。
 	m_roomController.Initialize();
 	m_hasWaveSpawnFailed = false;
+	m_isOneHitKillEnabled = false;
 
 	// 判定・時間・接触・表示の状態を既定へ戻し、前回の生成ObjectとColliderを空にする。Rendererの生成、表からのObject生成、出口と敵の配置はInitで行う。
 	m_dodgeJudge.Initialize();
@@ -220,6 +221,16 @@ void GameScene::Update(float deltaTime)
 	// F8が押された瞬間は、回復アイテムを1個増やす。入手の実装までの暫定の操作。上限を超えない。
 	if(m_inputSystem.IsKeyTriggered(VK_F8)){
 		m_healItems.Add(1);
+	}
+
+	// F9が押された瞬間は、デバッグ用に、一撃で敵を倒す設定を切り替える。Capture解除中も切り替えられるよう、Captureの判定より前に処理する。
+	if(m_inputSystem.IsKeyTriggered(VK_F9)){
+		m_isOneHitKillEnabled = !m_isOneHitKillEnabled;
+	}
+
+	// F11が押された瞬間は、デバッグ用に、現在のウェーブの敵を全て倒して、次のウェーブまたは出口の開放へ進める。
+	if(m_inputSystem.IsKeyTriggered(VK_F11)){
+		SkipCurrentWave();
 	}
 
 	// ヒットストップ中かを、この更新の開始時点の残り時間で決め、残り時間を実時間で減らす。ヒットストップ中は、プレイヤーと敵の時間を止める。
@@ -373,6 +384,7 @@ void GameScene::Draw()
 	debug_info.waveNumber = m_roomController.GetWaveNumber();
 	debug_info.roomPhase = m_roomController.GetPhase();
 	debug_info.hasWaveSpawnFailed = m_hasWaveSpawnFailed;
+	debug_info.isOneHitKillEnabled = m_isOneHitKillEnabled;
 	debug_info.isEnemyAlive = m_enemyManager.GetFirstEnemy().IsAlive();
 	debug_info.enemyHP = m_enemyManager.GetFirstEnemy().GetCurrentHP();
 	debug_info.enemyMaxHP = m_enemyManager.GetFirstEnemy().GetMaxHP();
@@ -449,7 +461,7 @@ void GameScene::UpdateEnemyActions(float worldDeltaTime)
 		UpdateEnemyRangedSlot(slot_index,worldDeltaTime);
 		break;
 
-		// 範囲攻撃型は、接近と、床の範囲の予告を更新する。
+		// 範囲攻撃型は、接近と、床の範囲の予告と、予告の終わりの範囲の判定を更新する。
 		case ENEMY_KIND::e_AREA:
 		UpdateEnemyAreaSlot(slot_index,worldDeltaTime);
 		break;
@@ -590,7 +602,7 @@ void GameScene::UpdateEnemyRangedSlot(std::size_t slotIndex,float worldDeltaTime
 	}
 }
 
-// 予告中は移動せず、予告の間、床の範囲を表示し続ける。予告以外では、攻撃を始める距離まで近づく。
+// 予告中は移動せず、予告の終わりに、固定した範囲の内にいるプレイヤーへ判定する。予告以外では、攻撃を始める距離まで近づく。
 void GameScene::UpdateEnemyAreaSlot(std::size_t slotIndex,float worldDeltaTime)
 {
 	// この枠の敵と、その敵専用の予告・再攻撃待ちを参照する。
@@ -612,16 +624,40 @@ void GameScene::UpdateEnemyAreaSlot(std::size_t slotIndex,float worldDeltaTime)
 	// ヒットストップで敵側の時間が進まない場合は、移動も新しい予告も始めない。
 	if(worldDeltaTime <= 0.0f)return;
 
+	// 敵とプレイヤーの位置を取得する。範囲の判定にも、接近の判断にも使う。
+	const XMFLOAT3 enemy_position = enemy.GetBodySphere().center;
+	const XMFLOAT3& player_position = m_playerController.GetPosition();
+
 	// 予告中はその場に立ち止まり、予告の終わりだけを受け取る。範囲の中心は、予告を始めた時点で固定した位置のままにする。
 	if(judge.HasIncomingAttack()){
-		// 範囲攻撃型は回避の判定をこの工程では使わないため、無敵でない状態と、十分に大きい回避からの経過時間を渡し、予告の終わりだけを検出する。
-		const DODGE_JUDGE_RESULT result = judge.Update(worldDeltaTime,false,ENEMY_AREA::ns_UNUSED_DODGE_AGE_SECONDS);
+		// 回避以外の無敵も被弾を防ぐが、回避開始時刻としては使わない。
+		const bool is_dodging = m_playerController.GetActionState() == PLAYER_ACTION_STATE::e_DODGE;
+		const float dodge_age_seconds = is_dodging ? m_playerController.GetSecondsSinceDodgeStart() : ENEMY_AREA::ns_NON_DODGE_AGE_SECONDS;
+		const DODGE_JUDGE_RESULT result = judge.Update(worldDeltaTime,m_playerController.IsInvincible(),dodge_age_seconds);
 		// 予告が続いている間は、範囲を表示したまま、何も起こさない。
 		if(result == DODGE_JUDGE_RESULT::e_NONE)return;
 
-		// 予告の終わりで、再攻撃待ちに入り、範囲の表示を終える。範囲内のプレイヤーへの判定は、次の工程で追加する。
+		// 予告の終わりで、再攻撃待ちに入り、固定した範囲の中心を取り出して、範囲の表示を終える。
 		recovery_seconds = ENEMY_AREA::ns_RECOVERY_SECONDS;
+		const XMFLOAT3 area_center = m_areaTelegraph.GetCenter(slotIndex);
 		m_areaTelegraph.End(slotIndex);
+
+		// 範囲は正方形で、高さを使わない。中心からX・Z方向とも半分の大きさ以内なら、範囲の内とする。しゃがんでも範囲の内にいれば、避けられない。
+		const bool is_in_area = std::fabs(player_position.x - area_center.x) <= AREA_TELEGRAPH::ns_HALF_SIZE &&
+			std::fabs(player_position.z - area_center.z) <= AREA_TELEGRAPH::ns_HALF_SIZE;
+		// 範囲の外にいる場合は、被弾もジャスト回避のスローも発生しない。
+		if(!is_in_area)return;
+
+		// 範囲の内にいた場合の結果を、表示用に記録する。
+		m_lastJudgeResult = result;
+		// 無敵でなければ、命中として、ダメージ・怯み・ヒットストップを与える。
+		if(result == DODGE_JUDGE_RESULT::e_HIT){
+			ApplyPlayerHitReaction(ENEMY_AREA::ns_DAMAGE,COMBAT_TABLE::ns_DAMAGE_HIT_STOP_SECONDS);
+		}
+		// 実際に回避中のジャスト回避だけがスローを開始する。
+		else if(is_dodging && result == DODGE_JUDGE_RESULT::e_JUST_DODGED){
+			m_slowMotionRemainingSeconds = COMBAT_TABLE::ns_SLOW_MOTION_SECONDS;
+		}
 		return;
 	}
 
@@ -629,8 +665,6 @@ void GameScene::UpdateEnemyAreaSlot(std::size_t slotIndex,float worldDeltaTime)
 	recovery_seconds = std::max(0.0f,recovery_seconds - worldDeltaTime);
 
 	// 敵とプレイヤーの水平距離を求める。高さは使わない。
-	const XMFLOAT3 enemy_position = enemy.GetBodySphere().center;
-	const XMFLOAT3& player_position = m_playerController.GetPosition();
 	const float offset_x = player_position.x - enemy_position.x;
 	const float offset_z = player_position.z - enemy_position.z;
 	const float distance = std::sqrt(offset_x * offset_x + offset_z * offset_z);
@@ -702,6 +736,29 @@ bool GameScene::TrySpawnCurrentWave()
 	return true;
 }
 
+// 生きている全ての敵を、残りHPと同じダメージで倒し、敵の予告・弾・範囲の予告を消す。
+void GameScene::SkipCurrentWave()
+{
+	// 全枠を先頭から調べ、生きている敵だけを倒す。倒された敵のColliderは、ApplyDamageの中で解除される。
+	for(Enemy& enemy : m_enemyManager.GetEnemies()){
+		// 死亡中の敵は、倒す対象がないため次の枠へ進む。
+		if(!enemy.IsAlive())continue;
+
+		enemy.ApplyDamage(enemy.GetCurrentHP(),m_collisionWorld);
+	}
+
+	// 倒された敵の予告・飛行中の弾・範囲の予告を消す。全滅の判定は、次の更新で進行管理が行う。
+	ResetEnemyMelee();
+	m_enemyProjectiles.Clear();
+	m_areaTelegraph.Clear();
+}
+
+// 一撃で倒す設定が有効なら敵の残りHPを、無効なら基本のダメージを返す。
+float GameScene::GetPlayerAttackDamage(float baseDamage,const Enemy& target) const
+{
+	return m_isOneHitKillEnabled ? target.GetCurrentHP() : baseDamage;
+}
+
 // 通過範囲に入ったプレイヤーを、次の部屋の開始位置へ移す。
 void GameScene::UpdateExitPass()
 {
@@ -744,11 +801,11 @@ void GameScene::UpdateMelee()
 
 	// 蹴りはダメージだけを与える。殴打はダメージを与えた後に、転倒させる。ダメージで死亡した場合、転倒は何も起こらない。
 	if(melee_type == PLAYER_MELEE_TYPE::e_KICK){
-		target_enemy->ApplyDamage(COMBAT_TABLE::ns_KICK_DAMAGE,m_collisionWorld);
+		target_enemy->ApplyDamage(GetPlayerAttackDamage(COMBAT_TABLE::ns_KICK_DAMAGE,*target_enemy),m_collisionWorld);
 	}
-	// 殴打の場合は、ダメージを与えた後に転倒させる。
+	// 殴打の場合は、ダメージを与えた後に転倒させる。範囲攻撃型は、転倒しない。
 	else{
-		target_enemy->ApplyDamage(COMBAT_TABLE::ns_PUNCH_DAMAGE,m_collisionWorld);
+		target_enemy->ApplyDamage(GetPlayerAttackDamage(COMBAT_TABLE::ns_PUNCH_DAMAGE,*target_enemy),m_collisionWorld);
 		target_enemy->ApplyKnockdown();
 	}
 
@@ -774,10 +831,10 @@ void GameScene::UpdateContact(float gameplayDeltaTime)
 		// 死亡中、または体が重なっていない敵は、接触していないため次の枠へ進む。
 		if(!enemy.IsAlive() || !CollisionMath::IntersectSphereSphere(m_playerController.GetBodySphere(),enemy.GetBodySphere()))continue;
 
-		// スライディング中は、この敵をまだ転倒させていない場合だけ転倒させる。接触の反応は与えず、他の敵の判定を続ける。
+		// スライディング中は、この敵をまだ転倒させていない場合だけ転倒させる。接触の反応は与えず、他の敵の判定を続ける。範囲攻撃型は、転倒しない。
 		if(action_state == PLAYER_ACTION_STATE::e_SLIDE){
 			const std::uint32_t enemy_bit = 1u << enemy.GetEnemyId();
-			// 未記録で、実際に転倒させられた場合だけ、この敵への記録を付ける。すでに転倒中なら何もしない。
+			// 未記録で、実際に転倒させられた場合だけ、この敵への記録を付ける。すでに転倒中や、転倒しない種類なら何もしない。
 			if((m_slideKnockedDownEnemyMask & enemy_bit) == 0 && enemy.ApplyKnockdown()){
 				m_slideKnockedDownEnemyMask |= enemy_bit;
 			}
@@ -822,7 +879,7 @@ void GameScene::UpdateShooting(float gameplayDeltaTime)
 		Enemy* const hit_enemy = m_enemyManager.FindLivingEnemy(weapon_result.hitInfo.userData);
 		// 対応する生存中の敵が見つかった場合だけ、ダメージと命中表示を反映する。
 		if(hit_enemy != nullptr){
-			hit_enemy->ApplyDamage(WEAPON_TABLE::ns_ASSAULT_RIFLE.damage,m_collisionWorld);
+			hit_enemy->ApplyDamage(GetPlayerAttackDamage(WEAPON_TABLE::ns_ASSAULT_RIFLE.damage,*hit_enemy),m_collisionWorld);
 			m_hitMarkerRemainingSeconds = ns_HIT_MARKER_SECONDS;
 		}
 	}
