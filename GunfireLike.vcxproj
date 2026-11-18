@@ -217,6 +217,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Scene\Common\CPP\Transform.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\GraphicsSystem.cpp" />
     <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\Scene\GameScene\CPP\AreaTelegraph.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\CollisionDebugView.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\CombatResolver.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\Enemy.cpp" />
@@ -276,11 +277,13 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\Common\H\Transform.h" />
     <ClInclude Include="Source\Framework\DirectX\H\GraphicsSystem.h" />
     <ClInclude Include="Source\Scene\Common\H\UiLayout.h" />
+    <ClInclude Include="Source\Scene\GameScene\H\AreaTelegraph.h" />
     <ClInclude Include="Source\Scene\GameScene\H\CollisionDebugView.h" />
     <ClInclude Include="Source\Scene\GameScene\H\CombatResolver.h" />
     <ClInclude Include="Source\Scene\GameScene\H\CombatTable.h" />
     <ClInclude Include="Source\Scene\GameScene\H\Enemy.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EnemyApproach.h" />
+    <ClInclude Include="Source\Scene\GameScene\H\EnemyAreaBehavior.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EnemyManager.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EnemyProjectile.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EnemyRangedBehavior.h" />

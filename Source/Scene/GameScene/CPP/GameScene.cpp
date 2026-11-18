@@ -1,13 +1,13 @@
 ﻿#include "../H/GameScene.h"
 
-// テストSceneの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、部屋ごとの敵と敵の弾と出口、設定表から生成した床・壁・画像のHUD・デバッグUIの描画、Resource終了を実装する。
+// テストSceneの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、部屋ごとの敵と敵の弾と範囲の予告と出口、設定表から生成した床・壁・画像のHUD・デバッグUIの描画、Resource終了を実装する。
 
 //========= Windows インクルード=========
 #include <windows.h> // VK_F1〜VK_F8の仮想キーコードで、Capture切替・タイトル遷移・可視化切替・最初の部屋からの再開・確認操作のキーを指定する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで残り時間を0未満にせず、std::minで視野角の補間割合を1以下に制限する。
-#include <cmath> // std::sqrtで、射撃型とプレイヤーの水平距離を求める。
+#include <cmath> // std::sqrtで、射撃型・範囲攻撃型とプレイヤーの水平距離を求める。
 #include <cstdint> // std::uint32_tで、スライディングで転倒させた敵の記録のビットを扱う。
 #include <vector> // 敵の弾の判定結果を、std::vectorで受け取る。
 
@@ -24,6 +24,7 @@
 
 //========= Scene インクルード=========
 #include "Scene/GameScene/H/EnemyApproach.h"
+#include "Scene/GameScene/H/EnemyAreaBehavior.h"
 #include "Scene/GameScene/H/EnemyRangedBehavior.h"
 #include "Scene/Common/H/SceneManager.h"
 #include "Scene/Common/H/SceneObjectFactory.h"
@@ -92,6 +93,7 @@ void GameScene::Initialize()
 	m_dodgeJudge.Initialize();
 	ResetEnemyMelee();
 	m_enemyProjectiles.Clear();
+	m_areaTelegraph.Clear();
 	m_lastJudgeResult = DODGE_JUDGE_RESULT::e_NONE;
 	m_slowMotionRemainingSeconds = 0.0f;
 	m_hitStopRemainingSeconds = 0.0f;
@@ -152,6 +154,13 @@ bool GameScene::Init()
 		return false;
 	}
 
+	// 範囲の予告の描画に使うCube Rendererを借用する。借用できなければ、生成済みのResourceを含めて終了して失敗を返す。
+	if(!m_areaTelegraph.Initialize(m_modelRegistry)){
+		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの範囲の予告の初期化に失敗しました。");
+		Finalize();
+		return false;
+	}
+
 	// 現在の部屋とウェーブの生成に失敗したら、残っているSceneのResourceも解放して初期化失敗を返す。
 	if(!TrySpawnCurrentWave()){
 		Finalize();
@@ -183,12 +192,13 @@ void GameScene::Update(float deltaTime)
 		m_collisionDebugView.ToggleVisible();
 	}
 
-	// F4では最初の部屋から作り直す。旧ウェーブと旧ウェーブの弾は、同じ更新の生成処理で置き換わる。
+	// F4では最初の部屋から作り直す。旧ウェーブと、旧ウェーブの弾・範囲の予告は、同じ更新の生成処理で置き換わる。
 	if(m_inputSystem.IsKeyTriggered(VK_F4)){
 		m_roomController.Initialize();
 		m_hasWaveSpawnFailed = false;
 		ResetEnemyMelee();
 		m_enemyProjectiles.Clear();
+		m_areaTelegraph.Clear();
 		m_slideKnockedDownEnemyMask = 0;
 	}
 
@@ -316,7 +326,7 @@ void GameScene::Draw()
 	const XMMATRIX projection_matrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fovDegrees),aspect_ratio,ns_NEAR_CLIP,ns_FAR_CLIP);
 	const XMMATRIX view_matrix = m_FPSCamera.GetViewMatrix();
 
-	// 床・壁・出口・敵・敵の弾はOPAQUE Passで描画するため、描画前にPassを設定する。
+	// 床・壁・範囲の予告・出口・敵・敵の弾はOPAQUE Passで描画するため、描画前にPassを設定する。
 	m_graphicsSystem.SetRenderPass(e_RenderPass::e_OPAQUE);
 
 	// 生成済みの全Objectを、表の順（床→左壁→右壁→手前壁→奥壁）に描画する。
@@ -324,7 +334,9 @@ void GameScene::Draw()
 		object.Draw(m_graphicsSystem,view_matrix,projection_matrix);
 	}
 
-	// 地形の後に出口を描画する。
+	// 床の上に、範囲の予告を描画する。床の後に描き、敵や出口より先に描くことで、敵の体が予告の上に重なる。
+	m_areaTelegraph.Draw(m_graphicsSystem,view_matrix,projection_matrix);
+	// 続けて出口を描画する。
 	m_exitDoor.Draw(m_graphicsSystem,view_matrix,projection_matrix);
 	// 続けて全枠の敵を出現順に描画する。死亡枠はEnemy::Drawが描画を省略する。
 	for(const Enemy& enemy : m_enemyManager.GetEnemies()){
@@ -380,13 +392,14 @@ void GameScene::Draw()
 	GameDebugUi::Draw(debug_info);
 }
 
-// Sceneが所有する敵・敵の弾・出口・Object・共有Renderer・HUD・Collision可視化・Collisionを終了する。
+// Sceneが所有する敵・敵の弾・範囲の予告・出口・Object・共有Renderer・HUD・Collision可視化・Collisionを終了する。
 void GameScene::Finalize()
 {
 	// 遷移先のInit後に呼ばれても、遷移先が設定したCaptureやBGMを上書きしない。
-	// 敵・敵の弾・出口・Objectは、Collisionと共有Rendererを借用しているため、それらを解放する前に先に終了する。
+	// 敵・敵の弾・範囲の予告・出口・Objectは、Collisionと共有Rendererを借用しているため、それらを解放する前に先に終了する。
 	m_enemyManager.Clear(m_collisionWorld);
 	m_enemyProjectiles.Uninit();
+	m_areaTelegraph.Uninit();
 	m_exitDoor.Uninit(m_collisionWorld);
 	m_stageObjects.clear();
 	m_modelRegistry.Uninit();
@@ -436,8 +449,9 @@ void GameScene::UpdateEnemyActions(float worldDeltaTime)
 		UpdateEnemyRangedSlot(slot_index,worldDeltaTime);
 		break;
 
-		// 範囲攻撃型は、行動を実装するまで、静止させ、何も更新しない。
+		// 範囲攻撃型は、接近と、床の範囲の予告を更新する。
 		case ENEMY_KIND::e_AREA:
+		UpdateEnemyAreaSlot(slot_index,worldDeltaTime);
 		break;
 		}
 
@@ -576,6 +590,64 @@ void GameScene::UpdateEnemyRangedSlot(std::size_t slotIndex,float worldDeltaTime
 	}
 }
 
+// 予告中は移動せず、予告の間、床の範囲を表示し続ける。予告以外では、攻撃を始める距離まで近づく。
+void GameScene::UpdateEnemyAreaSlot(std::size_t slotIndex,float worldDeltaTime)
+{
+	// この枠の敵と、その敵専用の予告・再攻撃待ちを参照する。
+	Enemy& enemy = m_enemyManager.GetEnemies()[slotIndex];
+	JustDodgeJudge& judge = m_enemyMeleeJudges[slotIndex];
+	float& recovery_seconds = m_enemyMeleeRecoverySeconds[slotIndex];
+
+	// 戦闘不能になった敵の予告と、床の範囲の表示は、時間停止中でも取り消して持ち越さない。
+	if(!enemy.IsAlive() || enemy.IsFlinching() || enemy.IsKnockedDown() || m_playerHealth.IsDead()){
+		// 予告中断時だけ再攻撃待ちを設定し、行動不能が続いても毎回は設定しない。
+		if(judge.HasIncomingAttack()){
+			judge.Initialize();
+			recovery_seconds = ENEMY_AREA::ns_RECOVERY_SECONDS;
+		}
+		m_areaTelegraph.End(slotIndex);
+		return;
+	}
+
+	// ヒットストップで敵側の時間が進まない場合は、移動も新しい予告も始めない。
+	if(worldDeltaTime <= 0.0f)return;
+
+	// 予告中はその場に立ち止まり、予告の終わりだけを受け取る。範囲の中心は、予告を始めた時点で固定した位置のままにする。
+	if(judge.HasIncomingAttack()){
+		// 範囲攻撃型は回避の判定をこの工程では使わないため、無敵でない状態と、十分に大きい回避からの経過時間を渡し、予告の終わりだけを検出する。
+		const DODGE_JUDGE_RESULT result = judge.Update(worldDeltaTime,false,ENEMY_AREA::ns_UNUSED_DODGE_AGE_SECONDS);
+		// 予告が続いている間は、範囲を表示したまま、何も起こさない。
+		if(result == DODGE_JUDGE_RESULT::e_NONE)return;
+
+		// 予告の終わりで、再攻撃待ちに入り、範囲の表示を終える。範囲内のプレイヤーへの判定は、次の工程で追加する。
+		recovery_seconds = ENEMY_AREA::ns_RECOVERY_SECONDS;
+		m_areaTelegraph.End(slotIndex);
+		return;
+	}
+
+	// 再攻撃待ちは敵側の時間で減らす。残り時間が負にならないようにする。
+	recovery_seconds = std::max(0.0f,recovery_seconds - worldDeltaTime);
+
+	// 敵とプレイヤーの水平距離を求める。高さは使わない。
+	const XMFLOAT3 enemy_position = enemy.GetBodySphere().center;
+	const XMFLOAT3& player_position = m_playerController.GetPosition();
+	const float offset_x = player_position.x - enemy_position.x;
+	const float offset_z = player_position.z - enemy_position.z;
+	const float distance = std::sqrt(offset_x * offset_x + offset_z * offset_z);
+
+	// 攻撃を始める距離より遠い間は近づく。近づいた更新では、予告を始めない。
+	if(distance > ENEMY_AREA::ns_ENGAGE_DISTANCE){
+		ENEMY_AREA::Approach(enemy,player_position,worldDeltaTime,m_collisionWorld);
+		return;
+	}
+
+	// 攻撃を始める距離の内で、再攻撃待ちが終わっていれば、プレイヤーのいる位置へ範囲を固定して予告を始める。範囲は、プレイヤーが動いても追わない。
+	if(recovery_seconds <= 0.0f){
+		m_areaTelegraph.Begin(slotIndex,player_position);
+		judge.StartIncomingAttack(ENEMY_AREA::ns_WINDUP_SECONDS);
+	}
+}
+
 // 弾を進め、プレイヤーへ命中・回避した弾の結果を、ダメージ・スロー・表示用の記録へ反映する。
 void GameScene::UpdateEnemyProjectiles(float worldDeltaTime)
 {
@@ -621,9 +693,10 @@ bool GameScene::TrySpawnCurrentWave()
 		return false;
 	}
 
-	// 新しい敵が旧予告・旧ウェーブの弾・スライディングの転倒記録を引き継がないよう初期化し、全滅判定を開始する。
+	// 新しい敵が旧予告・旧ウェーブの弾と範囲の予告・スライディングの転倒記録を引き継がないよう初期化し、全滅判定を開始する。
 	ResetEnemyMelee();
 	m_enemyProjectiles.Clear();
+	m_areaTelegraph.Clear();
 	m_slideKnockedDownEnemyMask = 0;
 	m_roomController.NotifyWaveSpawned();
 	return true;
