@@ -3,7 +3,7 @@
 // テストSceneの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、設定表から生成した床・壁と敵・画像のHUD・デバッグUIの描画、Resource終了を実装する。
 
 //========= Windows インクルード=========
-#include <windows.h> // VK_F1〜VK_F8の仮想キーコードで、Capture切替・タイトル遷移・可視化切替・敵の再配置・確認操作のキーを指定する。
+#include <windows.h> // VK_F1〜VK_F9の仮想キーコードで、Capture切替・タイトル遷移・可視化切替・最初の部屋からの再開・確認操作のキーを指定する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで残り時間を0未満にせず、std::minで視野角の補間割合を1以下に制限する。
@@ -55,10 +55,6 @@ namespace
 	//========= 配置の設定=========
 	// プレイヤーの開始位置。ワールド座標(0,1.6,0)で、床の手前寄りの中央。Yは立っている時のカメラの高さ。壁の内側にある。
 	constexpr XMFLOAT3 ns_PLAYER_START_POSITION{0.0f,1.6f,0.0f};
-	// 試遊に使う編成表の部屋番号。1始まりで、第1部屋を選ぶ。
-	constexpr int ns_TEST_ROOM_NUMBER = 1;
-	// 試遊に使う編成表のウェーブ番号。1始まりで、接近型2体の編成を選ぶ。
-	constexpr int ns_TEST_WAVE_NUMBER = 1;
 
 	//========= 射撃の表示設定=========
 	// 命中しない場合に、弾道の線を伸ばす長さ。単位はワールド距離単位。
@@ -88,6 +84,9 @@ void GameScene::Initialize()
 	// 判定・時間・接触・表示の状態を既定へ戻し、前回の生成ObjectとColliderを空にする。Rendererの生成、表からのObject生成、敵の配置はInitで行う。
 	m_dodgeJudge.Initialize();
 	ResetEnemyMelee();
+	// 進行状態を第1部屋の第1ウェーブへ戻し、前回の生成失敗を引き継がない。
+	m_roomController.Initialize();
+	m_hasWaveSpawnFailed = false;
 	m_lastJudgeResult = DODGE_JUDGE_RESULT::e_NONE;
 	m_slowMotionRemainingSeconds = 0.0f;
 	m_hitStopRemainingSeconds = 0.0f;
@@ -134,9 +133,8 @@ bool GameScene::Init()
 		return false;
 	}
 
-	// 固定編成の生成に失敗したら、残っているSceneのResourceも解放して初期化失敗を返す。
-	if(!m_enemyManager.SpawnWave(ns_TEST_ROOM_NUMBER,ns_TEST_WAVE_NUMBER,m_modelRegistry,m_collisionWorld)){
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの検証用ウェーブの生成に失敗しました。");
+	// 現在の部屋とウェーブの生成に失敗したら、残っているSceneのResourceも解放して初期化失敗を返す。
+	if(!TrySpawnCurrentWave()){
 		Finalize();
 		return false;
 	}
@@ -166,15 +164,12 @@ void GameScene::Update(float deltaTime)
 		m_collisionDebugView.ToggleVisible();
 	}
 
-	// F4では旧予告を破棄し、固定編成を初期位置から作り直す。
+	// F4では最初の部屋から作り直す。旧ウェーブは、同じ更新の生成処理で第1ウェーブに置き換わる。
 	if(m_inputSystem.IsKeyTriggered(VK_F4)){
+		m_roomController.Initialize();
+		m_hasWaveSpawnFailed = false;
 		ResetEnemyMelee();
 		m_slideKnockedDownEnemyMask = 0;
-
-		// 再生成が失敗した場合は生成済みの敵を残さず、Sceneは維持して失敗を記録する。
-		if(!m_enemyManager.SpawnWave(ns_TEST_ROOM_NUMBER,ns_TEST_WAVE_NUMBER,m_modelRegistry,m_collisionWorld)){
-			Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの検証用ウェーブの再生成に失敗しました。");
-		}
 	}
 
 	// F5が押された瞬間は、HPバーと低HP警告の確認のため、プレイヤーへ確認用のダメージを与える。ヒットストップや怯みは与えない。
@@ -197,6 +192,13 @@ void GameScene::Update(float deltaTime)
 		m_healItems.Add(1);
 	}
 
+	// F9が押された瞬間、出口が開いていれば次の部屋へ進める。出口の表示と通過判定の実装までの暫定の操作。
+	if(m_inputSystem.IsKeyTriggered(VK_F9) && m_roomController.TryAdvanceRoom()){
+		// 次の部屋へ進んだら、プレイヤーを開始位置へ戻し、カメラ位置を合わせる。
+		m_playerController.Initialize(ns_PLAYER_START_POSITION);
+		m_FPSCamera.SetPosition(m_playerController.GetPosition());
+	}
+
 	// ヒットストップ中かを、この更新の開始時点の残り時間で決め、残り時間を実時間で減らす。ヒットストップ中は、プレイヤーと敵の時間を止める。
 	const bool is_hit_stopped = m_hitStopRemainingSeconds > 0.0f;
 	m_hitStopRemainingSeconds = std::max(0.0f,m_hitStopRemainingSeconds - deltaTime);
@@ -213,6 +215,13 @@ void GameScene::Update(float deltaTime)
 	UpdateDodgeJudge(world_delta_time);
 	m_enemyManager.Update(world_delta_time);
 
+	// 生成待ちなら現在のウェーブを生成する。失敗した場合は再試行せず、F4で最初からやり直すまで敵なしで待つ。
+	if(m_roomController.GetPhase() == ROOM_PHASE::e_NEEDS_SPAWN && !m_hasWaveSpawnFailed){
+		m_hasWaveSpawnFailed = !TrySpawnCurrentWave();
+	}
+
+	// 生存中の敵がいなければウェーブまたは部屋を進める。生成待ちの間は、空の敵一覧を全滅と扱わない。
+	m_roomController.Update(m_enemyManager.HasLivingEnemies());
 	m_healItems.Update(gameplay_delta_time);
 	m_collisionDebugView.Update(deltaTime);
 	m_hitMarkerRemainingSeconds = std::max(0.0f,m_hitMarkerRemainingSeconds - deltaTime);
@@ -323,6 +332,10 @@ void GameScene::Draw()
 	debug_info.isInvincible = m_playerController.IsInvincible();
 	debug_info.isPlayerFlinching = m_playerController.IsFlinching();
 	debug_info.healItemCount = m_healItems.GetCount();
+	debug_info.roomNumber = m_roomController.GetRoomNumber();
+	debug_info.waveNumber = m_roomController.GetWaveNumber();
+	debug_info.roomPhase = m_roomController.GetPhase();
+	debug_info.hasWaveSpawnFailed = m_hasWaveSpawnFailed;
 	debug_info.isEnemyAlive = m_enemyManager.GetFirstEnemy().IsAlive();
 	debug_info.enemyHP = m_enemyManager.GetFirstEnemy().GetCurrentHP();
 	debug_info.enemyMaxHP = m_enemyManager.GetFirstEnemy().GetMaxHP();
@@ -465,6 +478,22 @@ void GameScene::ResetEnemyMelee()
 		judge.Initialize();
 	}
 	m_enemyMeleeRecoverySeconds.fill(0.0f);
+}
+
+// 現在の部屋とウェーブを生成し、成功した場合だけ敵の攻撃状態と進行状態を新しい編成に合わせる。
+bool GameScene::TrySpawnCurrentWave()
+{
+	// 登録に失敗した場合は、EnemyManagerが生成済みの枠を解除して空にする。進行管理へ生成完了を通知せず、失敗を返す。
+	if(!m_enemyManager.SpawnWave(m_roomController.GetRoomNumber(),m_roomController.GetWaveNumber(),m_modelRegistry,m_collisionWorld)){
+		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの部屋ウェーブの生成に失敗しました。");
+		return false;
+	}
+
+	// 新しい敵が旧予告やスライディングの転倒記録を引き継がないよう初期化し、全滅判定を開始する。
+	ResetEnemyMelee();
+	m_slideKnockedDownEnemyMask = 0;
+	m_roomController.NotifyWaveSpawned();
+	return true;
 }
 
 // 被弾・接触の反応として、ダメージ（あれば）・怯み・ヒットストップを与える。

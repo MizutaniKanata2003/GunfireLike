@@ -78,6 +78,34 @@ namespace
 	}
 }
 
+// 部屋の進行状態を、デバッグUIに表示する名前へ変換する。
+// roomPhase: 変換する進行状態。
+// 戻り値: 状態の名前。静的な文字列定数。未定義の値ではUNKNOWN。
+const char* GetRoomPhaseName(ROOM_PHASE roomPhase)
+{
+	// 状態ごとに名前を選ぶ。
+	switch(roomPhase){
+		// 生成待ち。
+	case ROOM_PHASE::e_NEEDS_SPAWN:
+	return "NEEDS_SPAWN";
+
+	// 戦闘中。
+	case ROOM_PHASE::e_FIGHTING:
+	return "FIGHTING";
+
+	// 出口開放。
+	case ROOM_PHASE::e_EXIT_OPEN:
+	return "EXIT_OPEN (F9: next room)";
+
+	// 攻略完了。
+	case ROOM_PHASE::e_COMPLETE:
+	return "COMPLETE";
+	}
+
+	// 未定義の値は、不明として扱う。
+	return "UNKNOWN";
+}
+
 //========= 描画関数=========
 // 操作案内・プレイヤー・敵・判定結果を、1つのウィンドウに表示する。
 void GameDebugUi::Draw(const GAME_DEBUG_INFO& info)
@@ -88,10 +116,16 @@ void GameDebugUi::Draw(const GAME_DEBUG_INFO& info)
 	ImGui::TextUnformatted("WASD: Move / Mouse: Look / Left click: Shoot / Right click (hold): Aim / R: Reload / Q: Heal");
 	ImGui::TextUnformatted("Shift (hold): Dash / C (hold): Crouch / C while dashing: Slide / Space + WASD: Dodge");
 	ImGui::TextUnformatted("F: Kick (flinching enemy only) / E: Punch (cancels reload, knocks down)");
-	ImGui::TextUnformatted("F1: Capture / F2: Title / F3: Collision / F4: Respawn enemy / F5: Damage / F6: Heal full / F7: Incoming attack / F8: +Heal item");
+	ImGui::TextUnformatted("F1: Capture / F2: Title / F3: Collision / F4: Restart rooms / F5: Damage / F6: Heal full / F7: Incoming attack / F8: +Heal item / F9: Next room");
 
 	// プレイヤーの位置・HP・動作・無敵・怯み・回復アイテム数を表示する。
 	ImGui::Separator();
+	// 部屋・ウェーブの進行と、生成失敗の有無を表示する。
+	ImGui::Text("Room: %d / 3  Wave: %d / 2  Phase: %s",info.roomNumber,info.waveNumber,GetRoomPhaseName(info.roomPhase));
+	// 生成失敗で再試行を止めている場合だけ、F4で再開できることを表示する。
+	if(info.hasWaveSpawnFailed){
+		ImGui::TextUnformatted("Wave spawn failed (F4: restart rooms)");
+	}
 	ImGui::Text("Position: %.2f, %.2f, %.2f",info.playerPosition.x,info.playerPosition.y,info.playerPosition.z);
 	ImGui::Text("Player HP: %.0f / %.0f   Heal items: %d",info.playerHP,info.playerMaxHP,info.healItemCount);
 	ImGui::Text("Action: %s%s%s",GetActionStateName(info.actionState),info.isInvincible ? " (INVINCIBLE)" : "",info.isPlayerFlinching ? " (FLINCH)" : "");

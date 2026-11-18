@@ -24,6 +24,7 @@
 #include "Scene/GameScene/H/JustDodgeJudge.h"
 #include "Scene/GameScene/H/PlayerController.h"
 #include "Scene/GameScene/H/PlayerHealth.h"
+#include "Scene/GameScene/H/RoomController.h"
 #include "Scene/GameScene/H/WeaponSystem.h"
 
 //========= 前方宣言=========
@@ -69,6 +70,9 @@ private:
 	// 全枠の接近型を出現順に更新し、各敵の追従・攻撃予告・命中候補を処理する。
 	// worldDeltaTime: 敵側の経過時間。単位は秒。スローとヒットストップ反映済み。
 	void UpdateEnemyMelee(float worldDeltaTime);
+	// 現在の部屋・ウェーブの敵を生成し、全枠の攻撃状態を初期化して、進行管理へ生成完了を通知する。
+	// 戻り値: 登録に成功したらtrue。失敗した場合はEnemyManagerが空にし、進行管理には通知しない。
+	[[nodiscard]] bool TrySpawnCurrentWave();
 	// 指定した1枠の接近型について、追従・攻撃予告・命中候補を更新する。
 	// slotIndex: EnemyManagerの固定枠の番号。0始まりで、攻撃状態の配列と同じ範囲であること。
 	// worldDeltaTime: 敵側の経過時間。単位は秒。
@@ -113,6 +117,10 @@ private:
 	WeaponSystem m_weaponSystem{};
 	// 固定の試遊編成を所有する。Finalizeで登録先のCollisionWorldより先に解除する。
 	EnemyManager m_enemyManager{};
+	// 3部屋×2ウェーブの進行状態。敵の生成と全滅判定は、GameSceneが仲介する。
+	RoomController m_roomController{};
+	// 現在のウェーブの生成に失敗したか。trueの間は生成を再試行せず、F4で最初からやり直す。
+	bool m_hasWaveSpawnFailed{};
 	// 現在の視野角。単位は度。構え・ダッシュの状態に応じた目標値へ滑らかに近づく。
 	float m_fovDegrees{};
 
