@@ -6,8 +6,8 @@
 #include <cmath> // std::sqrtで、視点から敵の中心までの距離を求める。
 
 //========= Scene インクルード=========
+#include "Scene/Common/H/CombatTable.h"
 #include "Scene/Common/H/Enemy.h"
-#include "Scene/GameScene/H/CombatTable.h"
 
 //========= 判定関数=========
 // 敵の中心への向きと距離を求め、射程と、視線方向との角度の範囲で判定する。

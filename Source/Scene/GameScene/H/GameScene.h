@@ -23,14 +23,14 @@
 #include "Scene/Common/H/ExitDoor.h"
 #include "Scene/Common/H/HealItems.h"
 #include "Scene/Common/H/IScene.h"
+#include "Scene/Common/H/JustDodgeJudge.h"
 #include "Scene/Common/H/ModelRegistry.h"
 #include "Scene/Common/H/PlayerController.h"
 #include "Scene/Common/H/PlayerHealth.h"
 #include "Scene/Common/H/SceneObject.h"
 #include "Scene/Common/H/RoomController.h"
+#include "Scene/Common/H/WeaponSystem.h"
 #include "Scene/GameScene/H/GameHud.h"
-#include "Scene/GameScene/H/JustDodgeJudge.h"
-#include "Scene/GameScene/H/WeaponSystem.h"
 
 //========= 前方宣言=========
 class AudioSystem;

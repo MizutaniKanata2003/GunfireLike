@@ -26,15 +26,15 @@
 #include "Framework/Input/H/InputSystem.h"
 
 //========= Scene インクルード=========
+#include "Scene/Common/H/CombatResolver.h"
+#include "Scene/Common/H/CombatTable.h"
 #include "Scene/Common/H/EnemyApproach.h"
 #include "Scene/Common/H/EnemyAreaBehavior.h"
 #include "Scene/Common/H/SceneManager.h"
 #include "Scene/Common/H/EnemyRangedBehavior.h"
 #include "Scene/Common/H/SceneObjectFactory.h"
 #include "Scene/Common/H/StageLayout.h"
-#include "Scene/GameScene/H/CombatResolver.h"
-#include "Scene/GameScene/H/CombatTable.h"
-#include "Scene/GameScene/H/WeaponTable.h"
+#include "Scene/Common/H/WeaponTable.h"
 #include "Scene/TitleScene/H/TitleScene.h"
 
 // このSceneの視野角、開始位置、射撃の表示に使用する固定設定をまとめる。戦闘の数値はCombatTableにある。

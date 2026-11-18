@@ -11,7 +11,7 @@
 #include "Framework/Etc/H/MathTypes.h"
 
 //========= Scene インクルード=========
-#include "Scene/GameScene/H/WeaponTable.h"
+#include "Scene/Common/H/WeaponTable.h"
 
 //========= 前方宣言=========
 class CollisionWorld;

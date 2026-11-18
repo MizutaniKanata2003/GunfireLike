@@ -8,7 +8,7 @@
 #include <cstdint> // std::uint32_tで命中判定用の敵IDを扱う。
 
 //========= Scene インクルード=========
-#include "Scene/GameScene/H/CombatResolver.h"
+#include "Scene/Common/H/CombatResolver.h"
 #include "Scene/Common/H/Enemy.h"
 #include "Scene/Common/H/EnemyWaveTable.h"
 

@@ -129,7 +129,7 @@
     <ClCompile Include="Source\Scene\Common\CPP\PlayerController.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Scene\GameScene\CPP\WeaponSystem.cpp">
+    <ClCompile Include="Source\Scene\Common\CPP\WeaponSystem.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\2D\CPP\HudSpriteRenderer.cpp">
@@ -138,10 +138,10 @@
     <ClCompile Include="Source\Scene\GameScene\CPP\GameHud.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Scene\GameScene\CPP\JustDodgeJudge.cpp">
+    <ClCompile Include="Source\Scene\Common\CPP\JustDodgeJudge.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Scene\GameScene\CPP\CombatResolver.cpp">
+    <ClCompile Include="Source\Scene\Common\CPP\CombatResolver.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Source\Scene\Common\CPP\RoomController.cpp">
@@ -296,10 +296,10 @@
     <ClInclude Include="Source\Scene\Common\H\PlayerController.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\WeaponSystem.h">
+    <ClInclude Include="Source\Scene\Common\H\WeaponSystem.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\WeaponTable.h">
+    <ClInclude Include="Source\Scene\Common\H\WeaponTable.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\2D\H\HudSpriteRenderer.h">
@@ -314,13 +314,13 @@
     <ClInclude Include="Source\Scene\Common\H\UiLayout.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\JustDodgeJudge.h">
+    <ClInclude Include="Source\Scene\Common\H\JustDodgeJudge.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\CombatResolver.h">
+    <ClInclude Include="Source\Scene\Common\H\CombatResolver.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\CombatTable.h">
+    <ClInclude Include="Source\Scene\Common\H\CombatTable.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Source\Scene\Common\H\HealItems.h">
