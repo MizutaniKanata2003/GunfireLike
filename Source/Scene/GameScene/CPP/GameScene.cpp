@@ -40,6 +40,10 @@ namespace
 	constexpr float ns_AIM_FOV_DEGREES = 45.0f;
 	// ダッシュ中の垂直方向の視野角。単位は度。通常より広くして、速さを出す。仮値。
 	constexpr float ns_DASH_FOV_DEGREES = 66.0f;
+	// スライディング中の垂直方向の視野角。単位は度。ダッシュよりさらに広くして、滑る速さと低さを出し、しゃがみとの違いを分かりやすくする。仮値。
+	constexpr float ns_SLIDE_FOV_DEGREES = 78.0f;
+	// しゃがみ中の垂直方向の視野角。単位は度。通常より少し狭くして、慎重な状態を示し、スライディングとの違いを分かりやすくする。仮値。
+	constexpr float ns_CROUCH_FOV_DEGREES = 56.0f;
 	// 視野角が目標値へ近づく速さ。1秒あたりに差の何倍を縮めるかを表し、大きいほど速い。仮値。
 	constexpr float ns_FOV_SMOOTHING_RATE = 12.0f;
 	// View空間での近距離Clip面の距離。単位はワールド距離単位。これより近い物は描画されない。
@@ -204,6 +208,9 @@ void GameScene::Update(float deltaTime)
 	m_collisionDebugView.Update(deltaTime);
 	m_hitMarkerRemainingSeconds = std::max(0.0f,m_hitMarkerRemainingSeconds - deltaTime);
 
+	// 反動によるカメラのずれを、実時間で目標へ滑らかに近づけ、射撃をやめて少し経つと、元の視線へ戻す。Captureに関係なく進める。
+	m_FPSCamera.UpdateRecoil(deltaTime);
+
 	// マウスを解放している間は、カメラ・移動・戦闘の操作更新をまとめて停止し、ここで戻る。
 	if(!m_inputSystem.IsMouseCaptureEnabled())return;
 
@@ -221,16 +228,24 @@ void GameScene::Update(float deltaTime)
 	}
 	m_previousActionState = action_state;
 
-	// 動作の状態に応じた視野角の目標値へ、滑らかに近づける。ダッシュは広く、構えは狭く、それ以外は通常。
+	// 動作の状態に応じた視野角の目標値へ、滑らかに近づける。スライディングが最も広く、次にダッシュ。構えは狭く、しゃがみは少し狭い。それ以外は通常。
 	// 1回の更新で差を超えないよう、近づく割合は1以下に制限する。
 	float target_fov_degrees = ns_FOV_DEGREES;
+	// スライディング中は、視野角を最も広げる。
+	if(action_state == PLAYER_ACTION_STATE::e_SLIDE){
+		target_fov_degrees = ns_SLIDE_FOV_DEGREES;
+	}
 	// ダッシュ中は、視野角を広げる。
-	if(action_state == PLAYER_ACTION_STATE::e_DASH){
+	else if(action_state == PLAYER_ACTION_STATE::e_DASH){
 		target_fov_degrees = ns_DASH_FOV_DEGREES;
 	}
-	// 構えている間は、視野角を狭める。
+	// 構えている間は、視野角を狭める。しゃがみ中でも、構えを優先する。
 	else if(m_playerController.IsAiming()){
 		target_fov_degrees = ns_AIM_FOV_DEGREES;
+	}
+	// しゃがみ中は、視野角を少し狭める。
+	else if(action_state == PLAYER_ACTION_STATE::e_CROUCH){
+		target_fov_degrees = ns_CROUCH_FOV_DEGREES;
 	}
 	const float fov_blend = std::min(1.0f,ns_FOV_SMOOTHING_RATE * deltaTime);
 	m_fovDegrees += (target_fov_degrees - m_fovDegrees) * fov_blend;

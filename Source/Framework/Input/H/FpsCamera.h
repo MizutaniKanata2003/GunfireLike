@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// 一人称視点の位置・Yaw・Pitchを保持し、方向ベクトルと左手系View行列を生成する。
+// 一人称視点の位置・Yaw・Pitchと、射撃の反動による一時的な視線のずれを保持し、方向ベクトルと左手系View行列を生成する。
 // 移動位置の決定や描画は担当しない。位置の追従は呼出側がSetPositionで反映する。
 
 //========= Framework インクルード=========
@@ -14,23 +14,26 @@ class FpsCamera final
 {
 public:
 	//========= 更新関数=========
-	// FPS操作中のマウス差分を消費し、YawとPitchを更新する。位置は変更しない。
+	// FPS操作中のマウス差分を消費し、YawとPitchを更新する。位置は変更しない。反動によるずれは変更しない。
 	// input: FPS操作状態と累積差分の取得先。ConsumeMouseDeltaで取得先の差分をクリアする。
 	// 解除中は何もしない。回転量にdeltaTimeは掛けず、Pitchだけを±89度へ制限する。
 	void Update(InputSystem& input);
-	// 射撃の反動など、マウス入力とは別の視線の回転量を加える。位置は変更しない。
-	// yawRadians: Yawへ加える角度。単位はラジアン。正は右向き。
-	// pitchRadians: Pitchへ加える角度。単位はラジアン。正は上向き。加算後のPitchは、Updateと同じ制限範囲へ収める。
+	// 反動によるずれを、目標へ滑らかに近づけ、射撃をやめてしばらく経つと、元の視線へ戻す。毎フレーム呼ぶ。
+	// deltaTime: この更新で進める経過時間。単位は秒。0なら何も進めない。
+	void UpdateRecoil(float deltaTime);
+	// 射撃の反動として、視線を動かす目標を加える。実際の視線は、UpdateRecoilで目標へ滑らかに近づく。位置とマウスで決めた向きは変更しない。
+	// yawRadians: 目標へ加えるYawの角度。単位はラジアン。正は右向き。累積は上限を超えない。
+	// pitchRadians: 目標へ加えるPitchの角度。単位はラジアン。正は上向き。累積は上限を超えない。
 	void ApplyRecoil(float yawRadians,float pitchRadians);
 
 	//========= Getter関数=========
 	// 保持するワールド座標への読み取り専用参照を返す。参照先の寿命はこのCameraの寿命まで。
 	[[nodiscard]] const XMFLOAT3& GetPosition() const { return m_position; }
-	// Y軸周りの水平方向の回転角をラジアンで返す。周期内へ折り返す処理は行わない。
+	// マウスで決めたY軸周りの水平方向の回転角をラジアンで返す。反動によるずれを含まない。周期内へ折り返す処理は行わない。
 	[[nodiscard]] float GetYaw() const { return m_yaw; }
-	// 垂直方向の回転角をラジアンで返す。正値は上向きの視線に対応する。
+	// マウスで決めた垂直方向の回転角をラジアンで返す。反動によるずれを含まない。正値は上向きの視線に対応する。
 	[[nodiscard]] float GetPitch() const { return m_pitch; }
-	// YawとPitchを反映した単位前方向ベクトルを返す。両角度が0なら+Z方向。
+	// YawとPitchに反動によるずれを加えた、単位前方向ベクトルを返す。全てが0なら+Z方向。
 	[[nodiscard]] XMFLOAT3 GetForward() const;
 	// ワールド上方向と前方向の外積を正規化した右方向ベクトルを返す。
 	[[nodiscard]] XMFLOAT3 GetRight() const;
@@ -50,8 +53,20 @@ private:
 	//========= カメラTransform情報=========
 	// カメラのワールド座標。既定値はプレイヤー追従反映前の初期位置。
 	XMFLOAT3 m_position{0.0f,1.6f,-5.0f};
-	// 水平方向の回転角。単位はラジアン。
+	// マウスで決めた水平方向の回転角。単位はラジアン。
 	float m_yaw{};
-	// 垂直方向の回転角。単位はラジアン。Updateで制限する。
+	// マウスで決めた垂直方向の回転角。単位はラジアン。Updateで制限する。
 	float m_pitch{};
+
+	//========= 反動の状態=========
+	// 反動によるYawのずれの目標。単位はラジアン。射撃で増え、射撃をやめて少し経つと0へ戻る。
+	float m_recoilTargetYaw{};
+	// 反動によるPitchのずれの目標。単位はラジアン。射撃で増え、射撃をやめて少し経つと0へ戻る。
+	float m_recoilTargetPitch{};
+	// 実際に視線へ加えているYawのずれ。単位はラジアン。目標へ滑らかに近づく。
+	float m_recoilYaw{};
+	// 実際に視線へ加えているPitchのずれ。単位はラジアン。目標へ滑らかに近づく。
+	float m_recoilPitch{};
+	// 最後に反動を加えてからの経過時間。単位は秒。一定時間を過ぎると、目標が0へ戻り始める。
+	float m_secondsSinceRecoil{1000.0f};
 };

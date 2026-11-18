@@ -1,20 +1,20 @@
 ﻿#include "../H/FpsCamera.h"
 
-// マウス差分を視線角度へ変換し、方向ベクトルと左手系View行列を計算する。
-// 感度・回転符号・Pitch制限・外積順・行列生成を維持し、条件・値・計算の意味を補完する。反動の回転量の加算も行う。
+// マウス差分を視線角度へ変換し、反動によるずれの補間と復帰、方向ベクトルと左手系View行列の計算を行う。
+// 感度・回転符号・Pitch制限・外積順・行列生成を維持し、条件・値・計算の意味を補完する。
 
 //========= Windows インクルード=========
 #include <windows.h> // ConsumeMouseDeltaが返すPOINTのX・Yを受け取り、視線更新の入力に使用する。
 
 //========= C++標準ライブラリ インクルード=========
-#include <algorithm> // std::clampでPitchを上下の制限角内に収める。
-#include <cmath> // std::sin・std::cosでYawとPitchから前方向の各成分を計算する。
+#include <algorithm> // std::clampでPitchと反動のずれを上下限内に収め、std::minで補間の割合を1以下に制限する。
+#include <cmath> // std::sin・std::cosでYawとPitchから前方向の各成分を計算し、std::fabsで反動のずれの大きさを調べる。
 
 //========= Framework インクルード=========
 #include "Framework/Etc/H/MathTypes.h"
 #include "Framework/Input/H/InputSystem.h"
 
-// 視線の上下回転を真上・真下の手前に収める、既存のPitch制限値をまとめる。
+// 視線の上下回転の制限と、反動の補間・復帰の数値をまとめる。反動の数値は企画書で未確定の仮値。
 namespace
 {
 	//========= Pitch制限定数=========
@@ -23,6 +23,20 @@ namespace
 	constexpr float ns_MAX_PITCH_DEGREES = 89.0f;
 	// 三角関数と保持角度がラジアンを使うため、同じ上限を度から変換する。感度や時間を掛ける値ではない。
 	constexpr float ns_MAX_PITCH_RADIANS = XMConvertToRadians(ns_MAX_PITCH_DEGREES);
+
+	//========= 反動の補間・復帰=========
+	// 実際のずれが目標へ近づく速さ。1秒あたりに差の何倍を縮めるかを表し、大きいほど速く、小さいほど滑らかに見える。仮値。
+	constexpr float ns_RECOIL_FOLLOW_RATE = 16.0f;
+	// 最後の反動から、目標が0へ戻り始めるまでの時間。単位は秒。連射の間は戻り始めないよう、連射の間隔より短い仮値。
+	constexpr float ns_RECOIL_RECOVERY_DELAY_SECONDS = 0.15f;
+	// 目標が0へ戻る速さ。1秒あたりに残りの何倍を縮めるかを表す。仮値。
+	constexpr float ns_RECOIL_RECOVERY_RATE = 6.0f;
+	// 反動のずれの目標のPitchの上限。単位はラジアン。連射で視線が上へ上がり続けないための仮値で、12度。
+	constexpr float ns_MAX_RECOIL_PITCH_RADIANS = XMConvertToRadians(12.0f);
+	// 反動のずれの目標のYawの上限。単位はラジアン。左右へ振れ続けないための仮値で、6度。
+	constexpr float ns_MAX_RECOIL_YAW_RADIANS = XMConvertToRadians(6.0f);
+	// この大きさ（ラジアン）より小さいずれは、0とみなして0へ揃える。指数的な復帰が、いつまでも0にならないことを防ぐ。
+	constexpr float ns_RECOIL_SNAP_EPSILON = 0.0002f;
 }
 
 //========= 更新関数=========
@@ -42,28 +56,69 @@ void FpsCamera::Update(InputSystem& input)
 	m_pitch = std::clamp(m_pitch,-ns_MAX_PITCH_RADIANS,ns_MAX_PITCH_RADIANS);
 }
 
-// 反動の回転量を、現在の向きへ直接加える。
+// 反動の目標を、時間が経つと0へ戻し、実際のずれを目標へ滑らかに近づける。
+void FpsCamera::UpdateRecoil(float deltaTime)
+{
+	// 最後の反動からの経過時間を進める。
+	m_secondsSinceRecoil += deltaTime;
+
+	// 最後の反動から一定時間が過ぎたら、目標を0へ向けて指数的に縮める。連射中は経過時間が0へ戻るため、縮まない。
+	if(m_secondsSinceRecoil > ns_RECOIL_RECOVERY_DELAY_SECONDS){
+		const float recovery_blend = std::min(1.0f,ns_RECOIL_RECOVERY_RATE * deltaTime);
+		m_recoilTargetYaw -= m_recoilTargetYaw * recovery_blend;
+		m_recoilTargetPitch -= m_recoilTargetPitch * recovery_blend;
+
+		// 十分に小さくなった目標は0へ揃え、完全に元の視線へ戻す。
+		if(std::fabs(m_recoilTargetYaw) < ns_RECOIL_SNAP_EPSILON){
+			m_recoilTargetYaw = 0.0f;
+		}
+		// Pitchの目標も同様に、十分に小さければ0へ揃える。
+		if(std::fabs(m_recoilTargetPitch) < ns_RECOIL_SNAP_EPSILON){
+			m_recoilTargetPitch = 0.0f;
+		}
+	}
+
+	// 実際のずれを、目標へ滑らかに近づける。1回の更新で差を超えないよう、近づく割合は1以下に制限する。
+	const float follow_blend = std::min(1.0f,ns_RECOIL_FOLLOW_RATE * deltaTime);
+	m_recoilYaw += (m_recoilTargetYaw - m_recoilYaw) * follow_blend;
+	m_recoilPitch += (m_recoilTargetPitch - m_recoilPitch) * follow_blend;
+
+	// 目標が0で、実際のずれも十分に小さければ、0へ揃える。目標が残っている間は揃えない。
+	if(m_recoilTargetYaw == 0.0f && std::fabs(m_recoilYaw) < ns_RECOIL_SNAP_EPSILON){
+		m_recoilYaw = 0.0f;
+	}
+	// Pitchも同様に、目標が0で十分に小さければ0へ揃える。
+	if(m_recoilTargetPitch == 0.0f && std::fabs(m_recoilPitch) < ns_RECOIL_SNAP_EPSILON){
+		m_recoilPitch = 0.0f;
+	}
+}
+
+// 反動の目標へ、引数の回転量を加え、上限を超えないよう制限して、経過時間を0へ戻す。
 void FpsCamera::ApplyRecoil(float yawRadians,float pitchRadians)
 {
-	// YawとPitchへ、引数の回転量をそのまま加える。マウス感度は掛けない。
-	m_yaw += yawRadians;
-	m_pitch += pitchRadians;
+	// 目標へ加え、上限の内に収める。実際の視線は、UpdateRecoilで目標へ近づく。
+	m_recoilTargetYaw = std::clamp(m_recoilTargetYaw + yawRadians,-ns_MAX_RECOIL_YAW_RADIANS,ns_MAX_RECOIL_YAW_RADIANS);
+	m_recoilTargetPitch = std::clamp(m_recoilTargetPitch + pitchRadians,-ns_MAX_RECOIL_PITCH_RADIANS,ns_MAX_RECOIL_PITCH_RADIANS);
 
-	// 加算後のPitchを、Updateと同じ上下限へ収める。反動が上限を超える場合も視線が反転しないようにする。
-	m_pitch = std::clamp(m_pitch,-ns_MAX_PITCH_RADIANS,ns_MAX_PITCH_RADIANS);
+	// 反動を加えた直後は、目標が0へ戻り始めないよう、経過時間を0へ戻す。
+	m_secondsSinceRecoil = 0.0f;
 }
 
 //========= Getter関数=========
-// 保持角度から前方向を生成する。位置を加えないため、注視点ではなく方向ベクトルを返す。
+// 保持角度と反動のずれから前方向を生成する。位置を加えないため、注視点ではなく方向ベクトルを返す。
 XMFLOAT3 FpsCamera::GetForward() const
 {
+	// マウスで決めた角度に、反動のずれを加える。Pitchは、反動を加えた後も、上下限の内に収める。
+	const float yaw = m_yaw + m_recoilYaw;
+	const float pitch = std::clamp(m_pitch + m_recoilPitch,-ns_MAX_PITCH_RADIANS,ns_MAX_PITCH_RADIANS);
+
 	// Pitchが上下へ傾くほど水平成分を縮め、Yへsin(Pitch)を使う。角度はラジアンで解釈する。
-	const float cos_pitch = std::cos(m_pitch);
+	const float cos_pitch = std::cos(pitch);
 	return
 	{
-		std::sin(m_yaw) * cos_pitch, // X: Yawの左右成分へ水平面への投影倍率を掛ける。
-		std::sin(m_pitch), // Y: Pitchの正値は上向き、負値は下向きの成分になる。
-		std::cos(m_yaw) * cos_pitch // Z: Yaw=0かつPitch=0で+Zを向く。追加の正規化は行わない。
+		std::sin(yaw) * cos_pitch, // X: Yawの左右成分へ水平面への投影倍率を掛ける。
+		std::sin(pitch), // Y: Pitchの正値は上向き、負値は下向きの成分になる。
+		std::cos(yaw) * cos_pitch // Z: Yaw=0かつPitch=0で+Zを向く。追加の正規化は行わない。
 	};
 }
 
@@ -88,7 +143,7 @@ XMMATRIX FpsCamera::GetViewMatrix() const
 {
 	// LookToは注視点ではなく方向を受け取るため、位置を足さずGetForwardの結果をそのまま読み込む。
 	const XMVECTOR position_vector = XMLoadFloat3(&m_position); // 視点のワールド座標を演算用型へ読み込む。
-	const XMFLOAT3 forward = GetForward(); // YawとPitchを反映した前方向を求める。
+	const XMFLOAT3 forward = GetForward(); // YawとPitchと反動のずれを反映した前方向を求める。
 	const XMVECTOR forward_vector = XMLoadFloat3(&forward); // 同じ前方向を行列生成へ渡せる型へ変換する。
 	const XMVECTOR up_vector = XMVectorSet(0.0f,1.0f,0.0f,0.0f); // ワールド上方向を使い、Roll回転は加えない。
 	return XMMatrixLookToLH(position_vector,forward_vector,up_vector);

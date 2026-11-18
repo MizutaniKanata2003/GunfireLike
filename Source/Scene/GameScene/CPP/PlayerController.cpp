@@ -5,7 +5,7 @@
 // 数値はPlayerActionTable.hの表にまとめた。
 
 //========= Windows インクルード=========
-#include <windows.h> // VK_SHIFT・VK_CONTROL・VK_SPACE・VK_LBUTTON・VK_RBUTTONで、ダッシュ・しゃがみ・回避・構え・射撃の入力を判定する。
+#include <windows.h> // VK_SHIFT・VK_SPACE・VK_LBUTTON・VK_RBUTTONで、ダッシュ・回避・構え・射撃の入力を判定する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::minで視点の高さを近づける割合とスライディングの進み具合を1以下に制限し、std::maxで怯みの残り時間を0以上にする。
@@ -103,7 +103,8 @@ void PlayerController::Update(float deltaTime,const InputSystem& input,const Fps
 
 	// 蹴り・殴打の当たる時刻を迎えていれば、当たりを通知できる状態にする。当たる時刻は、動作の種類で異なる。
 	if(m_isMeleeImpactPending){
-		const float impact_seconds = m_actionState == PLAYER_ACTION_STATE::e_KICK ? PLAYER_ACTION_TABLE::ns_KICK_IMPACT_SECONDS : PLAYER_ACTION_TABLE::ns_PUNCH_IMPACT_SECONDS;
+		const float impact_seconds = m_actionState == PLAYER_ACTION_STATE::e_KICK ? PLAYER_ACTION_TABLE::ns_KICK_IMPACT_SECONDS :
+			PLAYER_ACTION_TABLE::ns_PUNCH_IMPACT_SECONDS;
 		// 動作の開始から当たる時刻に達していれば、待ち状態を終えて、当たりを通知できる状態にする。
 		if(m_stateElapsedSeconds >= impact_seconds){
 			m_isMeleeImpactPending = false;
@@ -137,7 +138,7 @@ void PlayerController::Update(float deltaTime,const InputSystem& input,const Fps
 	target_eye_height = PLAYER_ACTION_TABLE::ns_CROUCH_EYE_HEIGHT;
 	break;
 
-	// スライディングは、固定した方向へ、時間に比例して減速しながら進み、視点を低くする。入力の方向は使わない。
+	// スライディングは、固定した方向へ、時間に比例して減速しながら進み、しゃがみより視点を低くする。入力の方向は使わない。
 	case PLAYER_ACTION_STATE::e_SLIDE:
 	{
 		// 開始から終了までの進み具合を0〜1で求め、開始速度から終了速度へ直線的に補間する。
@@ -269,9 +270,9 @@ void PlayerController::EnterState(PLAYER_ACTION_STATE newState)
 // 回避・スライディング・蹴り・殴打は時間で終わる。それ以外は、入力から、回避・殴打・蹴り・スライディング・ダッシュ・しゃがみの順に切替を判断する。
 void PlayerController::UpdateActionState(const InputSystem& input,bool hasMoveInput,float moveX,float moveZ,float forwardX,float forwardZ,bool canKick)
 {
-	// 左ShiftとCtrlの押下状態を取得し、左Shiftを離していれば、ダッシュの禁止を解く。
+	// 左ShiftとCキーの押下状態を取得し、左Shiftを離していれば、ダッシュの禁止を解く。
 	const bool is_shift_pressed = input.IsKeyPressed(VK_SHIFT);
-	const bool is_control_pressed = input.IsKeyPressed(VK_CONTROL);
+	const bool is_crouch_pressed = input.IsKeyPressed(PLAYER_ACTION_TABLE::ns_CROUCH_KEY);
 	// 左Shiftを離している間は、構えや射撃で終えたダッシュを、次の押下から再開できるようにする。
 	if(!is_shift_pressed){
 		m_isDashLocked = false;
@@ -287,11 +288,11 @@ void PlayerController::UpdateActionState(const InputSystem& input,bool hasMoveIn
 	}
 	return;
 
-	// スライディングは、長さを超えたら、Ctrlを押し続けていればしゃがみ、そうでなければ通常へ戻る。
+	// スライディングは、長さを超えたら、Cキーを押し続けていればしゃがみ、そうでなければ通常へ戻る。
 	case PLAYER_ACTION_STATE::e_SLIDE:
-	// スライディングの長さを超えていれば、Ctrlの押下状態に応じた状態へ移る。
+	// スライディングの長さを超えていれば、Cキーの押下状態に応じた状態へ移る。
 	if(m_stateElapsedSeconds >= PLAYER_ACTION_TABLE::ns_SLIDE_SECONDS){
-		EnterState(is_control_pressed ? PLAYER_ACTION_STATE::e_CROUCH : PLAYER_ACTION_STATE::e_NORMAL);
+		EnterState(is_crouch_pressed ? PLAYER_ACTION_STATE::e_CROUCH : PLAYER_ACTION_STATE::e_NORMAL);
 	}
 	return;
 
@@ -339,8 +340,8 @@ void PlayerController::UpdateActionState(const InputSystem& input,bool hasMoveIn
 		return;
 	}
 
-	// ダッシュ中にCtrlを押した瞬間は、直近の移動方向を固定して、スライディングを始める。
-	if(m_actionState == PLAYER_ACTION_STATE::e_DASH && input.IsKeyTriggered(VK_CONTROL)){
+	// ダッシュ中にCキーを押した瞬間は、直近の移動方向を固定して、スライディングを始める。
+	if(m_actionState == PLAYER_ACTION_STATE::e_DASH && input.IsKeyTriggered(PLAYER_ACTION_TABLE::ns_CROUCH_KEY)){
 		m_fixedDirectionX = m_lastMoveDirectionX;
 		m_fixedDirectionZ = m_lastMoveDirectionZ;
 		EnterState(PLAYER_ACTION_STATE::e_SLIDE);
@@ -363,12 +364,12 @@ void PlayerController::UpdateActionState(const InputSystem& input,bool hasMoveIn
 		EnterState(PLAYER_ACTION_STATE::e_DASH);
 	}
 
-	// 通常でCtrlを押している間はしゃがみへ、しゃがみでCtrlを離したら通常へ移る。ダッシュ中は、しゃがみへ移らない。
-	if(m_actionState == PLAYER_ACTION_STATE::e_NORMAL && is_control_pressed){
+	// 通常でCキーを押している間はしゃがみへ、しゃがみでCキーを離したら通常へ移る。ダッシュ中は、しゃがみへ移らない。
+	if(m_actionState == PLAYER_ACTION_STATE::e_NORMAL && is_crouch_pressed){
 		EnterState(PLAYER_ACTION_STATE::e_CROUCH);
 	}
-	// しゃがみ中にCtrlを離したら、通常へ戻る。
-	else if(m_actionState == PLAYER_ACTION_STATE::e_CROUCH && !is_control_pressed){
+	// しゃがみ中にCキーを離したら、通常へ戻る。
+	else if(m_actionState == PLAYER_ACTION_STATE::e_CROUCH && !is_crouch_pressed){
 		EnterState(PLAYER_ACTION_STATE::e_NORMAL);
 	}
 }
