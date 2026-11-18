@@ -39,6 +39,11 @@ public:
 	// 怯みと転倒の残り時間を進める。
 	// deltaTime: この更新で進める経過時間。単位は秒。
 	void Update(float deltaTime);
+	// 地形との重なりを補正し、登録済みの球Colliderと描画位置を更新する。
+	// targetPosition: 移動先候補のワールド座標。呼出側で1回の移動距離を制限する。
+	// collisionWorld: この敵のColliderを登録したCollisionWorld。
+	// 戻り値: Colliderと描画位置を更新できればtrue。死亡中または更新失敗時はfalse。
+	[[nodiscard]] bool TryMoveTo(const XMFLOAT3& targetPosition,CollisionWorld& collisionWorld);
 	// 生きている場合だけ、Cubeで描画する。怯み中・転倒中は色を変え、転倒中は低く潰して描く。
 	// graphicsSystem: Rendererが使う描画基盤。
 	// viewMatrix: World空間からView空間への変換行列。

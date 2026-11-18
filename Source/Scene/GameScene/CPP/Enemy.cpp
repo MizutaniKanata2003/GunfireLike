@@ -5,6 +5,7 @@
 
 //========= Framework インクルード=========
 #include "Framework/3D/H/BasicMeshRenderer.h"
+#include "Framework/Collision/H/CollisionResolver.h"
 #include "Framework/Collision/H/CollisionWorld.h"
 
 //========= Scene インクルード=========
@@ -101,6 +102,26 @@ void Enemy::Update(float deltaTime)
 			m_knockdownRemainingSeconds = 0.0f;
 		}
 	}
+}
+
+// 移動先の球を地形から押し戻し、Colliderの更新に成功した座標を描画にも使う。
+bool Enemy::TryMoveTo(const XMFLOAT3& targetPosition,CollisionWorld& collisionWorld)
+{
+	// 死亡した敵には有効なColliderがないため、位置を変更しない。
+	if(!m_isAlive)return false;
+
+	// 現在の球から半径を引き継ぎ、移動先の中心を地形のAABBから押し戻す。
+	COLLISION_SPHERE body_sphere = GetBodySphere();
+	body_sphere.center = targetPosition;
+	body_sphere.center = CollisionResolver::ResolveSphere(collisionWorld,body_sphere,COLLISION_LAYER::ns_STATIC);
+
+	// 登録済みの球を更新できなければ、保持座標も描画用Transformも変更しない。
+	if(!collisionWorld.UpdateSphere(m_colliderHandle,body_sphere))return false;
+
+	// 判定に反映された中心を、敵の保持座標と描画の両方に反映する。
+	m_position = body_sphere.center;
+	m_transform.SetPosition(m_position);
+	return true;
 }
 
 // 生きている間だけ、Cubeを描く。
