@@ -7,8 +7,8 @@
 #include "Framework/Etc/H/MathTypes.h"
 
 //========= Scene インクルード=========
+#include "Scene/Common/H/PlayerController.h"
 #include "Scene/GameScene/H/JustDodgeJudge.h"
-#include "Scene/GameScene/H/PlayerController.h"
 #include "Scene/GameScene/H/RoomController.h"
 
 // デバッグ表示に必要な、ゲームの状態の値。

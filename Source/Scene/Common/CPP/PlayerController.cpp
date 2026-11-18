@@ -18,7 +18,7 @@
 #include "Framework/Input/H/InputSystem.h"
 
 //========= Scene インクルード=========
-#include "Scene/GameScene/H/PlayerActionTable.h"
+#include "Scene/Common/H/PlayerActionTable.h"
 
 //========= 初期化・更新関数=========
 // 開始位置を設定し、動作の状態を通常へ戻す。

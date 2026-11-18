@@ -126,7 +126,7 @@
     <ClCompile Include="Source\Scene\GameScene\CPP\Enemy.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Scene\GameScene\CPP\PlayerController.cpp">
+    <ClCompile Include="Source\Scene\Common\CPP\PlayerController.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Source\Scene\GameScene\CPP\WeaponSystem.cpp">
@@ -293,7 +293,7 @@
     <ClInclude Include="Source\Scene\GameScene\H\Enemy.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\PlayerController.h">
+    <ClInclude Include="Source\Scene\Common\H\PlayerController.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Source\Scene\GameScene\H\WeaponSystem.h">
@@ -308,7 +308,7 @@
     <ClInclude Include="Source\Scene\GameScene\H\GameHud.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\PlayerHealth.h">
+    <ClInclude Include="Source\Scene\Common\H\PlayerHealth.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Source\Scene\Common\H\UiLayout.h">
@@ -323,10 +323,10 @@
     <ClInclude Include="Source\Scene\GameScene\H\CombatTable.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\HealItems.h">
+    <ClInclude Include="Source\Scene\Common\H\HealItems.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\PlayerActionTable.h">
+    <ClInclude Include="Source\Scene\Common\H\PlayerActionTable.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Source\Scene\GameScene\H\RoomController.h">

@@ -231,7 +231,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="Source\Scene\GameScene\CPP\JustDodgeJudge.cpp" />
-    <ClCompile Include="Source\Scene\GameScene\CPP\PlayerController.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\PlayerController.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\RoomController.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\WeaponSystem.cpp" />
     <ClCompile Include="Source\Scene\TitleScene\CPP\TitleScene.cpp" />
@@ -295,11 +295,11 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\GameScene\H\GameScene.h" />
     <ClInclude Include="Source\Scene\Common\H\IScene.h" />
     <ClInclude Include="Source\Scene\Common\H\SceneManager.h" />
-    <ClInclude Include="Source\Scene\GameScene\H\HealItems.h" />
+    <ClInclude Include="Source\Scene\Common\H\HealItems.h" />
     <ClInclude Include="Source\Scene\GameScene\H\JustDodgeJudge.h" />
-    <ClInclude Include="Source\Scene\GameScene\H\PlayerActionTable.h" />
-    <ClInclude Include="Source\Scene\GameScene\H\PlayerController.h" />
-    <ClInclude Include="Source\Scene\GameScene\H\PlayerHealth.h" />
+    <ClInclude Include="Source\Scene\Common\H\PlayerActionTable.h" />
+    <ClInclude Include="Source\Scene\Common\H\PlayerController.h" />
+    <ClInclude Include="Source\Scene\Common\H\PlayerHealth.h" />
     <ClInclude Include="Source\Scene\GameScene\H\RoomController.h" />
     <ClInclude Include="Source\Scene\GameScene\H\WeaponSystem.h" />
     <ClInclude Include="Source\Scene\GameScene\H\WeaponTable.h" />
