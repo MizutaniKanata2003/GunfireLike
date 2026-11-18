@@ -8,6 +8,7 @@
 #include <cstdint> // std::uint32_tで命中判定用の敵IDを扱う。
 
 //========= Scene インクルード=========
+#include "Scene/GameScene/H/CombatResolver.h"
 #include "Scene/GameScene/H/Enemy.h"
 #include "Scene/GameScene/H/EnemyWaveTable.h"
 
@@ -56,6 +57,55 @@ public:
 		for(Enemy& enemy : m_enemies){
 			enemy.Uninit(collisionWorld);
 		}
+	}
+
+	// 全枠の怯み・転倒の残り時間を進める。死亡枠や未登録枠も、Enemy側の条件に従う。
+	// deltaTime: 敵側の経過時間。単位は秒。
+	void Update(float deltaTime)
+	{
+		// 全枠を先頭から更新し、第1枠だけでなく全ての敵の怯み・転倒を同じ時間で進める。
+		for(Enemy& enemy : m_enemies){
+			enemy.Update(deltaTime);
+		}
+	}
+
+	// 固定枠にある敵を出現順に変更可能な形で受け取る。死亡中の枠も含む。
+	// 戻り値: 管理中の固定配列への参照。Managerの寿命を超えて保持しない。
+	[[nodiscard]] std::array<Enemy,ENEMY_WAVE_TABLE::ns_SLOT_COUNT>& GetEnemies()
+	{
+		return m_enemies;
+	}
+
+	// 視点と視線から近接攻撃の射程と範囲に入る、最も近い生存中の敵を探す。
+	// eyePosition: プレイヤーの視点のワールド座標。
+	// forward: 視線方向の単位ベクトル。
+	// requiresKickable: trueなら蹴れる状態（怯み中で転倒していない敵）に限る。
+	// 戻り値: 対象の敵への非所有ポインター。対象なしはnullptr。次のClearやSpawnWaveをまたいで保持しない。
+	[[nodiscard]] Enemy* FindMeleeTarget(const XMFLOAT3& eyePosition,const XMFLOAT3& forward,bool requiresKickable)
+	{
+		Enemy* nearest_enemy = nullptr;
+		float nearest_distance_squared = 0.0f;
+
+		// 全枠を先頭から調べ、条件を満たす敵の中で視点からの距離が最も短いものを残す。
+		for(Enemy& enemy : m_enemies){
+			const bool is_target = requiresKickable ? CombatResolver::CanKickEnemy(eyePosition,forward,enemy) :
+				CombatResolver::IsEnemyInMeleeReach(eyePosition,forward,enemy);
+			// 範囲外・死亡・蹴れない敵は候補に入れず、次の枠へ進む。
+			if(!is_target)continue;
+
+			// 比較だけに使うため、平方根を取らず距離の二乗で近さを決める。
+			const XMFLOAT3 center = enemy.GetBodySphere().center;
+			const float offset_x = center.x - eyePosition.x;
+			const float offset_y = center.y - eyePosition.y;
+			const float offset_z = center.z - eyePosition.z;
+			const float distance_squared = offset_x * offset_x + offset_y * offset_y + offset_z * offset_z;
+			// 最初の候補、またはより近い候補だけを保持する。同じ距離なら先に調べた枠を残す。
+			if(nearest_enemy == nullptr || distance_squared < nearest_distance_squared){
+				nearest_enemy = &enemy;
+				nearest_distance_squared = distance_squared;
+			}
+		}
+		return nearest_enemy;
 	}
 
 	//========= 問い合わせ関数=========

@@ -93,7 +93,7 @@ void GameScene::Initialize()
 	m_slowMotionRemainingSeconds = 0.0f;
 	m_hitStopRemainingSeconds = 0.0f;
 	m_contactCooldownRemainingSeconds = 0.0f;
-	m_hasSlideKnockedDownEnemy = false;
+	m_slideKnockedDownEnemyMask = 0;
 	m_previousActionState = PLAYER_ACTION_STATE::e_NORMAL;
 	m_hitMarkerRemainingSeconds = 0.0f;
 	m_stageObjects.clear();
@@ -171,7 +171,7 @@ void GameScene::Update(float deltaTime)
 	if(m_inputSystem.IsKeyTriggered(VK_F4)){
 		m_enemyMeleeJudge.Initialize();
 		m_enemyMeleeRecoverySeconds = 0.0f;
-		m_hasSlideKnockedDownEnemy = false;
+		m_slideKnockedDownEnemyMask = 0;
 
 		// 再生成が失敗した場合は生成済みの敵を残さず、Sceneは維持して失敗を記録する。
 		if(!m_enemyManager.SpawnWave(ns_TEST_ROOM_NUMBER,ns_TEST_WAVE_NUMBER,m_modelRegistry,m_collisionWorld)){
@@ -213,12 +213,8 @@ void GameScene::Update(float deltaTime)
 
 	// 確認用の攻撃の判定、敵の怯み・転倒、回復アイテムの間隔、表示用の残り時間を、Captureに関係なく進める。表示用は実時間で、0未満にしない。
 	UpdateDodgeJudge(world_delta_time);
-	m_enemyManager.GetFirstEnemy().Update(world_delta_time);
+	m_enemyManager.Update(world_delta_time);
 
-	// Capture中だけ検証用の敵を追従させ、マウス解放中は位置を変えない。
-	if(m_inputSystem.IsMouseCaptureEnabled()){
-		ENEMY_APPROACH::Update(m_enemyManager.GetFirstEnemy(),m_playerController.GetPosition(),world_delta_time,m_collisionWorld);
-	}
 	m_healItems.Update(gameplay_delta_time);
 	m_collisionDebugView.Update(deltaTime);
 	m_hitMarkerRemainingSeconds = std::max(0.0f,m_hitMarkerRemainingSeconds - deltaTime);
@@ -231,7 +227,7 @@ void GameScene::Update(float deltaTime)
 
 	// 視線を先に更新し、その向きで、蹴れる敵がいるかを調べてから、プレイヤーを更新する。ヒットストップ中も視線は動かせる。
 	m_FPSCamera.Update(m_inputSystem);
-	const bool can_kick = CombatResolver::CanKickEnemy(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),m_enemyManager.GetFirstEnemy());
+	const bool can_kick = m_enemyManager.FindMeleeTarget(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),true) != nullptr;
 	m_playerController.Update(gameplay_delta_time,m_inputSystem,m_FPSCamera,m_collisionWorld,can_kick);
 	m_FPSCamera.SetPosition(m_playerController.GetPosition());
 
@@ -471,17 +467,18 @@ void GameScene::UpdateMelee()
 	// 当たりが発生していなければ、何もしない。
 	if(!m_playerController.TryConsumeMeleeImpact(melee_type))return;
 
-	// 当たる瞬間に、敵が射程と範囲の外なら、空振りとして何もしない。
-	if(!CombatResolver::IsEnemyInMeleeReach(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),m_enemyManager.GetFirstEnemy()))return;
+	// 当たる瞬間に、視点から射程と範囲の内で最も近い生存中の敵を選ぶ。いなければ空振りとして何もしない。
+	Enemy* const target_enemy = m_enemyManager.FindMeleeTarget(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),false);
+	if(target_enemy == nullptr)return;
 
 	// 蹴りはダメージだけを与える。殴打はダメージを与えた後に、転倒させる。ダメージで死亡した場合、転倒は何も起こらない。
 	if(melee_type == PLAYER_MELEE_TYPE::e_KICK){
-		m_enemyManager.GetFirstEnemy().ApplyDamage(COMBAT_TABLE::ns_KICK_DAMAGE,m_collisionWorld);
+		target_enemy->ApplyDamage(COMBAT_TABLE::ns_KICK_DAMAGE,m_collisionWorld);
 	}
 	// 殴打の場合は、ダメージを与えた後に転倒させる。
 	else{
-		m_enemyManager.GetFirstEnemy().ApplyDamage(COMBAT_TABLE::ns_PUNCH_DAMAGE,m_collisionWorld);
-		m_enemyManager.GetFirstEnemy().ApplyKnockdown();
+		target_enemy->ApplyDamage(COMBAT_TABLE::ns_PUNCH_DAMAGE,m_collisionWorld);
+		target_enemy->ApplyKnockdown();
 	}
 
 	// 当たった手応えとして、短いヒットストップを与える。
@@ -498,29 +495,32 @@ void GameScene::UpdateContact(float gameplayDeltaTime)
 	const PLAYER_ACTION_STATE action_state = m_playerController.GetActionState();
 	// スライディングでなくなったら、次のスライディングで再び転倒させられるよう、記録を戻す。
 	if(action_state != PLAYER_ACTION_STATE::e_SLIDE){
-		m_hasSlideKnockedDownEnemy = false;
+		m_slideKnockedDownEnemyMask = 0;
 	}
 
-	// 敵が死亡している、または体が重なっていない場合は、接触していないため何もしない。
-	if(!m_enemyManager.GetFirstEnemy().IsAlive()
-		 || !CollisionMath::IntersectSphereSphere(m_playerController.GetBodySphere(),m_enemyManager.GetFirstEnemy().GetBodySphere()))return;
+	// 全枠を出現順に調べ、体が重なった敵ごとに、スライディングの転倒か接触の反応を判定する。
+	for(Enemy& enemy : m_enemyManager.GetEnemies()){
+		// 死亡中、または体が重なっていない敵は、接触していないため次の枠へ進む。
+		if(!enemy.IsAlive() || !CollisionMath::IntersectSphereSphere(m_playerController.GetBodySphere(),enemy.GetBodySphere()))continue;
 
-	// スライディング中は、まだ転倒させていない場合だけ、敵を転倒させる。同じスライディングで同じ敵を繰り返し転倒させず、接触の反応もない。
-	if(action_state == PLAYER_ACTION_STATE::e_SLIDE){
-		// 転倒させられた場合だけ、このスライディングでは転倒させた記録を付ける。すでに転倒中なら、何もしない。
-		if(!m_hasSlideKnockedDownEnemy && m_enemyManager.GetFirstEnemy().ApplyKnockdown()){
-			m_hasSlideKnockedDownEnemy = true;
+		// スライディング中は、この敵をまだ転倒させていない場合だけ転倒させる。接触の反応は与えず、他の敵の判定を続ける。
+		if(action_state == PLAYER_ACTION_STATE::e_SLIDE){
+			const std::uint32_t enemy_bit = 1u << enemy.GetEnemyId();
+			// 未記録で、実際に転倒させられた場合だけ、この敵への記録を付ける。すでに転倒中なら何もしない。
+			if((m_slideKnockedDownEnemyMask & enemy_bit) == 0 && enemy.ApplyKnockdown()){
+				m_slideKnockedDownEnemyMask |= enemy_bit;
+			}
+			continue;
 		}
-		return;
+
+		// 殴打中・蹴り中・無敵中・敵が転倒中・反応の間隔が残っている間は、接触の反応を与えない。
+		if(action_state == PLAYER_ACTION_STATE::e_PUNCH || action_state == PLAYER_ACTION_STATE::e_KICK || m_playerController.IsInvincible() ||
+			 enemy.IsKnockedDown() || m_contactCooldownRemainingSeconds > 0.0f)continue;
+
+		// 条件を満たした接触は、ダメージなしの怯みとヒットストップを与え、間隔を設定する。以後の枠は、間隔が残るため反応しない。
+		ApplyPlayerHitReaction(0.0f,COMBAT_TABLE::ns_CONTACT_HIT_STOP_SECONDS);
+		m_contactCooldownRemainingSeconds = COMBAT_TABLE::ns_CONTACT_COOLDOWN_SECONDS;
 	}
-
-	// 殴打中・蹴り中・無敵中・敵が転倒中・反応の間隔が残っている間は、接触の反応を与えない。
-	if(action_state == PLAYER_ACTION_STATE::e_PUNCH || action_state == PLAYER_ACTION_STATE::e_KICK || m_playerController.IsInvincible() ||
-		 m_enemyManager.GetFirstEnemy().IsKnockedDown() || m_contactCooldownRemainingSeconds > 0.0f)return;
-
-	// 条件を満たした接触は、ダメージなしの怯みとヒットストップを与え、次の反応までの間隔を設定する。
-	ApplyPlayerHitReaction(0.0f,COMBAT_TABLE::ns_CONTACT_HIT_STOP_SECONDS);
-	m_contactCooldownRemainingSeconds = COMBAT_TABLE::ns_CONTACT_COOLDOWN_SECONDS;
 }
 
 // 射撃・リロードを更新し、敵へ命中していればダメージを与える。

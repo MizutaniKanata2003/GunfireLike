@@ -4,6 +4,7 @@
 // 各クラスの更新を仲介し、共有Renderer・生成したObject・CollisionWorldを所有する。Scene切替はManagerへ予約する。
 
 //========= C++標準ライブラリ インクルード=========
+#include <cstdint> // std::uint32_tで、スライディングで転倒させた敵のID別の記録を保持する。
 #include <vector> // 設定表から生成したSceneObjectを、表の順に保持する可変長配列として使用する。
 
 //========= Framework インクルード=========
@@ -122,8 +123,8 @@ private:
 	float m_hitStopRemainingSeconds{};
 	// 敵への接触の反応が、次に起きるまでの残り時間。単位は秒。0なら起きる。
 	float m_contactCooldownRemainingSeconds{};
-	// 現在のスライディングで、すでに敵を転倒させたか。同じスライディングで、同じ敵を繰り返し転倒させないための記録。
-	bool m_hasSlideKnockedDownEnemy{};
+	// 現在のスライディングで転倒させた敵の記録。ビット番号が敵IDに対応し、同じスライディングで同じ敵を繰り返し転倒させない。
+	std::uint32_t m_slideKnockedDownEnemyMask{};
 	// 1回前の更新での、プレイヤーの動作の状態。殴打の開始を検出するために使う。
 	PLAYER_ACTION_STATE m_previousActionState{PLAYER_ACTION_STATE::e_NORMAL};
 
