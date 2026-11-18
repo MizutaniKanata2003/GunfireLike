@@ -1,9 +1,9 @@
 ﻿#include "../H/GameScene.h"
 
-// テストSceneの初期化、入力に応じた状態更新、射撃の反映、設定表から生成した床・壁と敵・Collision可視化・デバッグUIの描画、Resource終了を実装する。
+// テストSceneの初期化、入力に応じた状態更新、射撃・回避の反映、設定表から生成した床・壁と敵・画像のHUD・デバッグUIの描画、Resource終了を実装する。
 
 //========= Windows インクルード=========
-#include <windows.h> // VK_F1〜VK_F4の仮想キーコードで、Capture切替・タイトル遷移・可視化切替・敵の再配置のキーを指定する。
+#include <windows.h> // VK_F1〜VK_F7の仮想キーコードで、Capture切替・タイトル遷移・可視化切替・敵の再配置・HPと回避の確認操作のキーを指定する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで表示用の残り時間を0未満にせず、std::minで視野角の補間割合を1以下に制限する。
@@ -27,14 +27,16 @@
 #include "Scene/GameScene/H/WeaponTable.h"
 #include "Scene/TitleScene/H/TitleScene.h"
 
-// このSceneの視野角、開始位置、Collision可視化、射撃の表示に使用する固定設定をまとめる。
+// このSceneの視野角、開始位置、HP、確認用の攻撃、スロー、射撃の表示に使用する固定設定と、表示用の補助関数をまとめる。
 namespace
 {
 	//========= Projection設定=========
-	// 構えていない時の垂直方向の視野角。単位は度。行列生成時にラジアンへ変換する。
+	// 通常時の垂直方向の視野角。単位は度。行列生成時にラジアンへ変換する。
 	constexpr float ns_FOV_DEGREES = 60.0f;
 	// 構えている時の垂直方向の視野角。単位は度。通常より狭くして、拡大して見える。企画書で未確定の仮値。
 	constexpr float ns_AIM_FOV_DEGREES = 45.0f;
+	// ダッシュ中の垂直方向の視野角。単位は度。通常より広くして、速さを出す。仮値。
+	constexpr float ns_DASH_FOV_DEGREES = 66.0f;
 	// 視野角が目標値へ近づく速さ。1秒あたりに差の何倍を縮めるかを表し、大きいほど速い。仮値。
 	constexpr float ns_FOV_SMOOTHING_RATE = 12.0f;
 	// View空間での近距離Clip面の距離。単位はワールド距離単位。これより近い物は描画されない。
@@ -43,40 +45,95 @@ namespace
 	constexpr float ns_FAR_CLIP = 1000.0f;
 
 	//========= 配置の設定=========
-	// プレイヤーの開始位置。ワールド座標(0,1.6,0)で、床の手前寄りの中央。Yはカメラの高さ。壁の内側にある。
+	// プレイヤーの開始位置。ワールド座標(0,1.6,0)で、床の手前寄りの中央。Yは立っている時のカメラの高さ。壁の内側にある。
 	constexpr XMFLOAT3 ns_PLAYER_START_POSITION{0.0f,1.6f,0.0f};
 	// 検証用の敵の位置。ワールド座標(0,1,6)で、プレイヤー開始位置の正面。
 	constexpr XMFLOAT3 ns_ENEMY_POSITION{0.0f,1.0f,6.0f};
 	// 検証用の敵のColliderへ付ける識別値。命中結果のuserDataと照合する。
 	constexpr std::uint32_t ns_ENEMY_ID = 1;
 
-	//========= 視線のRay表示設定=========
-	// 視線のRayを調べる最大距離。単位はワールド距離単位。ステージの奥行き（約20）より十分長い値を使う。
-	constexpr float ns_DEBUG_RAY_MAX_DISTANCE = 100.0f;
-	// 命中しない場合に、Rayの表示線を伸ばす長さ。単位はワールド距離単位。
-	constexpr float ns_DEBUG_RAY_DISPLAY_LENGTH = 30.0f;
-	// Rayの表示線の始点を、カメラ位置から右方向へずらす量。画面中央の1点に線が重ならないようにする。単位はワールド距離単位。
-	constexpr float ns_DEBUG_RAY_OFFSET_RIGHT = 0.25f;
-	// Rayの表示線の始点を、カメラ位置から下方向（-Y）へずらす量。単位はワールド距離単位。
-	constexpr float ns_DEBUG_RAY_OFFSET_DOWN = 0.3f;
-	// 命中点の十字の、中心から端までの長さ。単位はワールド距離単位。
-	constexpr float ns_DEBUG_HIT_CROSS_HALF_SIZE = 0.2f;
-	// 命中点から伸ばす法線の線の長さ。単位はワールド距離単位。
-	constexpr float ns_DEBUG_NORMAL_LENGTH = 0.5f;
-	// 視線のRayの表示線の色。黄色。
-	constexpr XMFLOAT4 ns_DEBUG_RAY_COLOR{1.0f,1.0f,0.0f,1.0f};
-	// 命中点の十字の色。白。
-	constexpr XMFLOAT4 ns_DEBUG_HIT_CROSS_COLOR{1.0f,1.0f,1.0f,1.0f};
-	// 命中点の法線の線の色。水色。
-	constexpr XMFLOAT4 ns_DEBUG_NORMAL_COLOR{0.0f,1.0f,1.0f,1.0f};
+	//========= HPの設定=========
+	// プレイヤーの最大HP。企画書で未確定のため、検証用の仮値。
+	constexpr float ns_PLAYER_MAX_HP = 100.0f;
+	// F5で与える確認用のダメージ量。HPバーと低HP警告の表示確認に使う。
+	constexpr float ns_DEBUG_DAMAGE = 10.0f;
+
+	//========= 確認用の攻撃とスロー=========
+	// F7で発生させる確認用の攻撃が、予告から当たるまでの時間。単位は秒。回避の入力を間に合わせられる長さの仮値。
+	constexpr float ns_SIMULATED_ATTACK_DELAY_SECONDS = 0.8f;
+	// 確認用の攻撃が命中した場合に、プレイヤーへ与えるダメージ。
+	constexpr float ns_SIMULATED_ATTACK_DAMAGE = 10.0f;
+	// ジャスト回避で、スローを続ける時間。単位は実時間の秒。企画書で未確定の仮値。
+	constexpr float ns_SLOW_MOTION_SECONDS = 1.5f;
+	// スロー中の、プレイヤー以外の時間の進む速さ。1が通常で、小さいほど遅い。仮値。
+	constexpr float ns_SLOW_MOTION_SCALE = 0.3f;
 
 	//========= 射撃の表示設定=========
-	// 直近の弾道を表示し続ける時間。単位は秒。連射中は撃つたびに数え直す。
-	constexpr float ns_SHOT_TRACE_SECONDS = 0.15f;
+	// 命中しない場合に、弾道の線を伸ばす長さ。単位はワールド距離単位。
+	constexpr float ns_SHOT_TRACE_DISPLAY_LENGTH = 30.0f;
 	// 命中を示す表示を続ける時間。単位は秒。
 	constexpr float ns_HIT_MARKER_SECONDS = 0.3f;
-	// 弾道の線の色。橙。
-	constexpr XMFLOAT4 ns_SHOT_TRACE_COLOR{1.0f,0.5f,0.0f,1.0f};
+
+	//========= 補助関数=========
+	// 動作の状態を、デバッグUIに表示する名前へ変換する。
+	// actionState: 変換する動作の状態。
+	// 戻り値: 状態の名前。静的な文字列定数。未定義の値ではUNKNOWN。
+	const char* GetActionStateName(PLAYER_ACTION_STATE actionState)
+	{
+		// 状態ごとに名前を選ぶ。
+		switch(actionState){
+			// 通常。
+		case PLAYER_ACTION_STATE::e_NORMAL:
+		return "NORMAL";
+
+		// ダッシュ。
+		case PLAYER_ACTION_STATE::e_DASH:
+		return "DASH";
+
+		// しゃがみ。
+		case PLAYER_ACTION_STATE::e_CROUCH:
+		return "CROUCH";
+
+		// スライディング。
+		case PLAYER_ACTION_STATE::e_SLIDE:
+		return "SLIDE";
+
+		// 回避。
+		case PLAYER_ACTION_STATE::e_DODGE:
+		return "DODGE";
+		}
+
+		// 未定義の値は、不明として扱う。
+		return "UNKNOWN";
+	}
+
+	// 回避の判定結果を、デバッグUIに表示する名前へ変換する。
+	// judgeResult: 変換する判定結果。
+	// 戻り値: 結果の名前。静的な文字列定数。未定義の値ではUNKNOWN。
+	const char* GetJudgeResultName(DODGE_JUDGE_RESULT judgeResult)
+	{
+		// 結果ごとに名前を選ぶ。
+		switch(judgeResult){
+			// まだ判定がない。
+		case DODGE_JUDGE_RESULT::e_NONE:
+		return "-";
+
+		// 命中した。
+		case DODGE_JUDGE_RESULT::e_HIT:
+		return "HIT (player damaged)";
+
+		// 無敵で避けた。
+		case DODGE_JUDGE_RESULT::e_DODGED:
+		return "DODGED";
+
+		// ジャスト回避。
+		case DODGE_JUDGE_RESULT::e_JUST_DODGED:
+		return "JUST DODGE!";
+		}
+
+		// 未定義の値は、不明として扱う。
+		return "UNKNOWN";
+	}
 }
 
 //========= 生成関数=========
@@ -89,17 +146,18 @@ GameScene::GameScene(SceneManager& sceneManager,InputSystem& inputSystem,Graphic
 // GPU Resource生成の前に、操作と配置の初期状態を準備する。
 void GameScene::Initialize()
 {
-	// プレイヤー・カメラ・武器・視野角・表示状態を既定へ戻し、前回の生成ObjectとColliderを空にする。
+	// プレイヤー・HP・カメラ・武器・視野角・回避の判定・スロー・表示状態を既定へ戻し、前回の生成ObjectとColliderを空にする。
 	// Rendererの生成、表からのObject生成、敵の配置はInitで行う。
 	m_playerController.Initialize(ns_PLAYER_START_POSITION);
+	m_playerHealth.Initialize(ns_PLAYER_MAX_HP);
 	m_FPSCamera = FpsCamera{};
 	m_weaponSystem.Initialize(WEAPON_TABLE::ns_ASSAULT_RIFLE);
 	m_fovDegrees = ns_FOV_DEGREES;
+	m_dodgeJudge.Initialize();
+	m_lastJudgeResult = DODGE_JUDGE_RESULT::e_NONE;
+	m_slowMotionRemainingSeconds = 0.0f;
 	m_stageObjects.clear();
 	m_collisionWorld.Clear();
-	m_isCollisionDebugVisible = false;
-	m_hasDebugRayHit = false;
-	m_shotTraceRemainingSeconds = 0.0f;
 	m_hitMarkerRemainingSeconds = 0.0f;
 
 	// カメラの位置をプレイヤーの開始位置へ合わせる。壁のColliderはInitで登録するため、押し戻しはInit後の更新から始まる。
@@ -116,9 +174,16 @@ bool GameScene::Init()
 		return false;
 	}
 
-	// Collision可視化に使う線描画Rendererの初期化失敗を検出したら、生成済みのRendererを含めて終了して失敗を返す。
-	if(!m_debugLineRenderer.Initialize(m_graphicsSystem)){
+	// Collision可視化の初期化失敗を検出したら、生成済みのRendererを含めて終了して失敗を返す。
+	if(!m_collisionDebugView.Initialize(m_graphicsSystem)){
 		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの線描画Renderer初期化に失敗しました。");
+		Finalize();
+		return false;
+	}
+
+	// 画像のHUDの初期化失敗を検出したら、生成済みのResourceを含めて終了して失敗を返す。個々の画像の読込失敗はここでは失敗にならない。
+	if(!m_gameHud.Initialize(m_graphicsSystem)){
+		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneのHUD初期化に失敗しました。");
 		Finalize();
 		return false;
 	}
@@ -160,7 +225,7 @@ void GameScene::Update(float deltaTime)
 
 	// F3が押された瞬間は、Collision可視化の表示を反転する。Capture解除中も切り替えられるよう、Captureの判定より前に処理する。
 	if(m_inputSystem.IsKeyTriggered(VK_F3)){
-		m_isCollisionDebugVisible = !m_isCollisionDebugVisible;
+		m_collisionDebugView.ToggleVisible();
 	}
 
 	// F4が押された瞬間は、検証用の敵を満タンのHPで同じ位置へ再配置する。Capture解除中も使えるよう、Captureの判定より前に処理する。
@@ -168,9 +233,44 @@ void GameScene::Update(float deltaTime)
 		m_enemy.Respawn(m_collisionWorld);
 	}
 
-	// 敵の怯みと、表示用の残り時間は、Captureに関係なく進める。残り時間は0未満にしない。
-	m_enemy.Update(deltaTime);
-	m_shotTraceRemainingSeconds = std::max(0.0f,m_shotTraceRemainingSeconds - deltaTime);
+	// F5が押された瞬間は、HPバーと低HP警告の確認のため、プレイヤーへ確認用のダメージを与える。被弾の実装までの暫定の操作。
+	if(m_inputSystem.IsKeyTriggered(VK_F5)){
+		m_playerHealth.ApplyDamage(ns_DEBUG_DAMAGE);
+	}
+
+	// F6が押された瞬間は、プレイヤーのHPを満タンへ戻す。
+	if(m_inputSystem.IsKeyTriggered(VK_F6)){
+		m_playerHealth.HealFull();
+	}
+
+	// F7が押された瞬間は、回避とジャスト回避の確認のため、一定時間後に当たる攻撃を予告する。敵の攻撃の実装までの暫定の操作。
+	if(m_inputSystem.IsKeyTriggered(VK_F7)){
+		m_dodgeJudge.StartIncomingAttack(ns_SIMULATED_ATTACK_DELAY_SECONDS);
+	}
+
+	// スローの残り時間を実時間で減らし、スロー中ならプレイヤー以外の時間の進みを遅くする。プレイヤーと武器は、実時間のまま更新する。
+	m_slowMotionRemainingSeconds = std::max(0.0f,m_slowMotionRemainingSeconds - deltaTime);
+	const float world_delta_time = m_slowMotionRemainingSeconds > 0.0f ? deltaTime * ns_SLOW_MOTION_SCALE : deltaTime;
+
+	// 予告した攻撃が当たる瞬間に、無敵かどうかと回避の開始からの経過時間で判定する。Captureに関係なく進める。
+	const DODGE_JUDGE_RESULT judge_result = m_dodgeJudge.Update(world_delta_time,m_playerController.IsInvincible(),
+																															m_playerController.GetSecondsSinceDodgeStart());
+	// 判定結果が出た場合だけ、表示用に記録する。
+	if(judge_result != DODGE_JUDGE_RESULT::e_NONE){
+		m_lastJudgeResult = judge_result;
+	}
+	// 命中した場合は、プレイヤーへ確認用のダメージを与える。
+	if(judge_result == DODGE_JUDGE_RESULT::e_HIT){
+		m_playerHealth.ApplyDamage(ns_SIMULATED_ATTACK_DAMAGE);
+	}
+	// ジャスト回避の場合は、スローを開始する。連続した場合は、時間を数え直す。
+	else if(judge_result == DODGE_JUDGE_RESULT::e_JUST_DODGED){
+		m_slowMotionRemainingSeconds = ns_SLOW_MOTION_SECONDS;
+	}
+
+	// 敵の怯みはスローを反映した時間で、表示用の残り時間は実時間で、Captureに関係なく進める。残り時間は0未満にしない。
+	m_enemy.Update(world_delta_time);
+	m_collisionDebugView.Update(deltaTime);
 	m_hitMarkerRemainingSeconds = std::max(0.0f,m_hitMarkerRemainingSeconds - deltaTime);
 
 	// マウスを解放している間は、カメラ・移動・射撃の操作更新をまとめて停止し、ここで戻る。
@@ -181,30 +281,38 @@ void GameScene::Update(float deltaTime)
 	m_playerController.Update(deltaTime,m_inputSystem,m_FPSCamera,m_collisionWorld);
 	m_FPSCamera.SetPosition(m_playerController.GetPosition());
 
-	// 構えの状態に応じて、視野角の目標値へ滑らかに近づける。1回の更新で差を超えないよう、近づく割合は1以下に制限する。
-	const float target_fov_degrees = m_playerController.IsAiming() ? ns_AIM_FOV_DEGREES : ns_FOV_DEGREES;
+	// 動作の状態に応じた視野角の目標値へ、滑らかに近づける。ダッシュは広く、構えは狭く、それ以外は通常。
+	// 1回の更新で差を超えないよう、近づく割合は1以下に制限する。
+	float target_fov_degrees = ns_FOV_DEGREES;
+	// ダッシュ中は、視野角を広げる。
+	if(m_playerController.GetActionState() == PLAYER_ACTION_STATE::e_DASH){
+		target_fov_degrees = ns_DASH_FOV_DEGREES;
+	}
+	// 構えている間は、視野角を狭める。
+	else if(m_playerController.IsAiming()){
+		target_fov_degrees = ns_AIM_FOV_DEGREES;
+	}
 	const float fov_blend = std::min(1.0f,ns_FOV_SMOOTHING_RATE * deltaTime);
 	m_fovDegrees += (target_fov_degrees - m_fovDegrees) * fov_blend;
 
-	// 射撃を更新する。リロード・連射間隔・弾薬の処理と、命中判定は武器が行い、ダメージの反映だけをここで行う。
-	const WEAPON_UPDATE_RESULT weapon_result = m_weaponSystem.Update(deltaTime,m_inputSystem,m_playerController.IsAiming(),m_FPSCamera,
-																																	 m_collisionWorld);
+	// 射撃を更新する。リロード・連射間隔・弾薬の処理と、命中判定は武器が行い、ダメージの反映だけをここで行う。回避中は射撃できない。
+	const WEAPON_UPDATE_RESULT weapon_result = m_weaponSystem.Update(deltaTime,m_inputSystem,m_playerController.IsAiming(),
+																																	 m_playerController.IsShootingAllowed(),m_FPSCamera,m_collisionWorld);
 
-	// 弾を発射した場合は、命中点または表示用の長さまでを、弾道の終点として記録して表示時間を数え直す。
+	// 弾を発射した場合は、弾道の終点を可視化へ伝える。命中していれば命中点、していなければ弾の方向へ表示用の長さだけ進んだ点。
 	if(weapon_result.didFire){
 		const XMFLOAT3& shot_origin = weapon_result.shotRay.origin;
 		const XMFLOAT3& shot_direction = weapon_result.shotRay.direction;
 		// 命中した場合は、終点を命中点にする。
 		if(weapon_result.didHit){
-			m_shotTraceEnd = weapon_result.rayHit.point;
+			m_collisionDebugView.NotifyShot(weapon_result.rayHit.point);
 		}
 		// 命中しなかった場合は、弾の方向へ表示用の長さだけ進んだ点を終点にする。
 		else{
-			m_shotTraceEnd = XMFLOAT3{shot_origin.x + shot_direction.x * ns_DEBUG_RAY_DISPLAY_LENGTH,
-				shot_origin.y + shot_direction.y * ns_DEBUG_RAY_DISPLAY_LENGTH,
-				shot_origin.z + shot_direction.z * ns_DEBUG_RAY_DISPLAY_LENGTH};
+			m_collisionDebugView.NotifyShot(XMFLOAT3{shot_origin.x + shot_direction.x * ns_SHOT_TRACE_DISPLAY_LENGTH,
+																							 shot_origin.y + shot_direction.y * ns_SHOT_TRACE_DISPLAY_LENGTH,
+																							 shot_origin.z + shot_direction.z * ns_SHOT_TRACE_DISPLAY_LENGTH});
 		}
-		m_shotTraceRemainingSeconds = ns_SHOT_TRACE_SECONDS;
 	}
 
 	// 弾が敵のColliderへ命中した場合だけ、敵へダメージを与え、命中の表示時間を数え直す。地形への命中ではダメージを与えない。
@@ -213,15 +321,11 @@ void GameScene::Update(float deltaTime)
 		m_hitMarkerRemainingSeconds = ns_HIT_MARKER_SECONDS;
 	}
 
-	// Collision可視化の表示中だけ、移動後のカメラ位置から視線方向へRayを飛ばし、最も近い命中を調べる。表示しない間は判定を行わない。
-	if(m_isCollisionDebugVisible){
-		m_debugRay.origin = m_FPSCamera.GetPosition();
-		m_debugRay.direction = m_FPSCamera.GetForward();
-		m_hasDebugRayHit = m_collisionWorld.Raycast(m_debugRay,ns_DEBUG_RAY_MAX_DISTANCE,COLLISION_LAYER::ns_ALL,m_debugRayHit,m_debugRayHitInfo);
-	}
+	// 更新後のカメラから、Collision可視化の視線のRayを更新する。非表示の間は判定を行わない。
+	m_collisionDebugView.UpdateRay(m_FPSCamera,m_collisionWorld);
 }
 
-// 現在の描画先サイズと視点から3D描画を行い、操作状態をデバッグUIへ表示する。
+// 現在の描画先サイズと視点から3D描画とHUDを行い、操作状態をデバッグUIへ表示する。
 void GameScene::Draw()
 {
 	// 描画先の現在サイズをpixel単位で取得する。
@@ -230,7 +334,7 @@ void GameScene::Draw()
 	// 最小化中などで幅または高さが0なら、アスペクト比の除算と描画を行わず戻る。
 	if(render_width == 0 || render_height == 0)return;
 
-	// 現在サイズの比率で左手系の透視投影行列を作り、カメラからView行列を取得する。視野角は構えの状態を反映した現在値を使う。
+	// 現在サイズの比率で左手系の透視投影行列を作り、カメラからView行列を取得する。視野角は動作の状態を反映した現在値を使う。
 	// 投影行列の生成関数と角度変換は、MathTypes.hのusing宣言により修飾なしで呼ぶ。
 	const float aspect_ratio = static_cast<float>(render_width) / static_cast<float>(render_height);
 	const XMMATRIX projection_matrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fovDegrees),aspect_ratio,ns_NEAR_CLIP,ns_FAR_CLIP);
@@ -247,28 +351,42 @@ void GameScene::Draw()
 	// 地形の後に、検証用の敵を描画する。死亡している間は何も描かれない。
 	m_enemy.Draw(m_graphicsSystem,view_matrix,projection_matrix);
 
-	// Collision可視化が有効なら、Objectの描画後に、Colliderの線とRay・弾道の線を重ねて描画する。
-	if(m_isCollisionDebugVisible){
-		DrawCollisionDebug(view_matrix,projection_matrix);
-	}
+	// 表示中なら、3Dの描画の後に、Colliderの線とRay・弾道の線を重ねて描画する。非表示の間は何も描かれない。
+	m_collisionDebugView.Draw(m_graphicsSystem,m_collisionWorld,m_FPSCamera,view_matrix,projection_matrix);
 
-	// UIは操作案内と値の表示だけに限定し、Draw内ではScene予約やゲーム進行を変更しない。
+	// 3Dの上に画像のHUDを重ねるため、深度比較なし・アルファ合成の画面UI用Passへ切り替え、現在の値をHUDへ渡して描画する。
+	m_graphicsSystem.SetRenderPass(e_RenderPass::e_SCREEN_UI);
+	GAME_HUD_STATE hud_state{};
+	hud_state.currentHP = m_playerHealth.GetCurrentHP();
+	hud_state.maxHP = m_playerHealth.GetMaxHP();
+	hud_state.magazineAmmo = m_weaponSystem.GetMagazineAmmo();
+	hud_state.magazineSize = m_weaponSystem.GetMagazineSize();
+	hud_state.reserveAmmo = m_weaponSystem.GetReserveAmmo();
+	hud_state.isReloading = m_weaponSystem.IsReloading();
+	hud_state.reloadProgress = m_weaponSystem.GetReloadProgress();
+	hud_state.isAiming = m_playerController.IsAiming();
+	m_gameHud.Draw(m_graphicsSystem,hud_state);
+
+	// デバッグUIは操作案内と値の表示だけに限定し、Draw内ではScene予約やゲーム進行を変更しない。
 	const XMFLOAT3& player_position = m_playerController.GetPosition();
 	ImGui::Begin("Minimal Game Scene");
 	ImGui::TextUnformatted("WASD: Move / Mouse: Look / Left click: Shoot / Right click (hold): Aim / R: Reload");
-	ImGui::TextUnformatted("F1: Toggle mouse capture / F2: Title / F3: Collision debug / F4: Respawn enemy / Escape: Exit");
+	ImGui::TextUnformatted("Shift (hold): Dash / Ctrl (hold): Crouch / Ctrl while dashing: Slide / Space + WASD: Dodge");
+	ImGui::TextUnformatted("F1: Mouse capture / F2: Title / F3: Collision debug / F4: Respawn enemy / F5: Damage / F6: Heal / F7: Incoming attack");
 	ImGui::Text("Position: %.2f, %.2f, %.2f",player_position.x,player_position.y,player_position.z);
 	ImGui::Text("Mouse capture: %s",m_inputSystem.IsMouseCaptureEnabled() ? "ON" : "OFF");
-	ImGui::Text("Collision debug: %s",m_isCollisionDebugVisible ? "ON" : "OFF");
+	ImGui::Text("Collision debug: %s",m_collisionDebugView.IsVisible() ? "ON" : "OFF");
+	ImGui::Text("Player HP: %.0f / %.0f",m_playerHealth.GetCurrentHP(),m_playerHealth.GetMaxHP());
 
-	// 構えと弾薬の状態を表示する。
+	// 動作の状態・無敵・スローと、確認用の攻撃の状態を表示する。
 	ImGui::Separator();
-	ImGui::Text("Aiming: %s",m_playerController.IsAiming() ? "ON" : "OFF");
-	ImGui::Text("Ammo: %d / %d (reserve %d)",m_weaponSystem.GetMagazineAmmo(),m_weaponSystem.GetMagazineSize(),m_weaponSystem.GetReserveAmmo());
-	// リロード中の場合だけ、進み具合を百分率で表示する。
-	if(m_weaponSystem.IsReloading()){
-		ImGui::Text("Reloading: %.0f%%",m_weaponSystem.GetReloadProgress() * 100.0f);
+	ImGui::Text("Action: %s%s",GetActionStateName(m_playerController.GetActionState()),m_playerController.IsInvincible() ? " (INVINCIBLE)" : "");
+	ImGui::Text("Slow motion: %s",m_slowMotionRemainingSeconds > 0.0f ? "ON" : "OFF");
+	// 攻撃を予告中の場合だけ、当たるまでの残り時間を表示する。
+	if(m_dodgeJudge.HasIncomingAttack()){
+		ImGui::Text("Incoming attack in: %.2f s",m_dodgeJudge.GetSecondsUntilHit());
 	}
+	ImGui::Text("Last attack result: %s",GetJudgeResultName(m_lastJudgeResult));
 
 	// 敵の状態を表示する。死亡中は、再配置の案内を出す。
 	ImGui::Separator();
@@ -287,13 +405,13 @@ void GameScene::Draw()
 	}
 
 	// 可視化の表示中でRayが命中している場合だけ、命中したColliderのレイヤーのbitと距離を表示する。
-	if(m_isCollisionDebugVisible && m_hasDebugRayHit){
-		ImGui::Text("Ray hit: layer bit=%u distance=%.2f",m_debugRayHitInfo.layer,m_debugRayHit.distance);
+	if(m_collisionDebugView.IsVisible() && m_collisionDebugView.HasRayHit()){
+		ImGui::Text("Ray hit: layer bit=%u distance=%.2f",m_collisionDebugView.GetRayHitInfo().layer,m_collisionDebugView.GetRayHit().distance);
 	}
 	ImGui::End();
 }
 
-// Sceneが所有する敵・Object・共有Renderer・線描画Renderer・Collisionを終了する。
+// Sceneが所有する敵・Object・共有Renderer・HUD・Collision可視化・Collisionを終了する。
 void GameScene::Finalize()
 {
 	// 遷移先のInit後に呼ばれても、遷移先が設定したCaptureやBGMを上書きしない。
@@ -302,56 +420,8 @@ void GameScene::Finalize()
 	m_stageObjects.clear();
 	m_modelRegistry.Uninit();
 
-	// 線描画Rendererを解放し、登録したColliderと蓄えた線分を空にする。
-	m_debugLineRenderer.Uninit();
+	// HUDと線描画Rendererを解放し、登録したColliderを空にする。
+	m_gameHud.Uninit();
+	m_collisionDebugView.Uninit();
 	m_collisionWorld.Clear();
-	m_collisionDebugDrawer.Clear();
-}
-
-//========= 補助関数=========
-// 登録中のColliderと視線のRay・直近の弾道を線分へ変換し、深度比較なしで描画する。
-void GameScene::DrawCollisionDebug(const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix)
-{
-	// 前フレームの線を捨て、登録中の全Colliderをレイヤーごとの色で追加する。
-	m_collisionDebugDrawer.Clear();
-	m_collisionDebugDrawer.AddWorld(m_collisionWorld);
-
-	// 線の表示の始点を求める。カメラ位置のままでは画面中央の1点に重なり線が見えないため、右方向と下方向（-Y）へずらす。
-	// 右方向はカメラの右ベクトルに距離を掛け、下方向はワールドのY座標から引く。
-	const XMFLOAT3& camera_position = m_FPSCamera.GetPosition();
-	const XMFLOAT3 camera_right = m_FPSCamera.GetRight();
-	const XMFLOAT3 line_start{camera_position.x + camera_right.x * ns_DEBUG_RAY_OFFSET_RIGHT,
-		camera_position.y + camera_right.y * ns_DEBUG_RAY_OFFSET_RIGHT - ns_DEBUG_RAY_OFFSET_DOWN,
-		camera_position.z + camera_right.z * ns_DEBUG_RAY_OFFSET_RIGHT};
-
-	// 視線のRayの表示線の終点を決める。
-	XMFLOAT3 line_end{};
-	// 命中している場合は、終点を命中点にして、命中点の十字と、命中面の法線の線も追加する。
-	if(m_hasDebugRayHit){
-		line_end = m_debugRayHit.point;
-		m_collisionDebugDrawer.AddCross(m_debugRayHit.point,ns_DEBUG_HIT_CROSS_HALF_SIZE,ns_DEBUG_HIT_CROSS_COLOR);
-		m_collisionDebugDrawer.AddLine(m_debugRayHit.point,
-																	 XMFLOAT3{m_debugRayHit.point.x + m_debugRayHit.normal.x * ns_DEBUG_NORMAL_LENGTH,
-																						m_debugRayHit.point.y + m_debugRayHit.normal.y * ns_DEBUG_NORMAL_LENGTH,
-																						m_debugRayHit.point.z + m_debugRayHit.normal.z * ns_DEBUG_NORMAL_LENGTH},
-																	 ns_DEBUG_NORMAL_COLOR);
-	}
-	// 命中していない場合は、カメラ位置から視線方向へ表示用の長さだけ進んだ点を終点にする。
-	else{
-		const XMFLOAT3 camera_forward = m_FPSCamera.GetForward();
-		line_end = XMFLOAT3{camera_position.x + camera_forward.x * ns_DEBUG_RAY_DISPLAY_LENGTH,
-			camera_position.y + camera_forward.y * ns_DEBUG_RAY_DISPLAY_LENGTH,
-			camera_position.z + camera_forward.z * ns_DEBUG_RAY_DISPLAY_LENGTH};
-	}
-	m_collisionDebugDrawer.AddLine(line_start,line_end,ns_DEBUG_RAY_COLOR);
-
-	// 直近の弾道の表示時間が残っている間だけ、同じ始点から弾の終点までの線を橙色で追加する。ばらつきのある弾道を確認できる。
-	if(m_shotTraceRemainingSeconds > 0.0f){
-		m_collisionDebugDrawer.AddLine(line_start,m_shotTraceEnd,ns_SHOT_TRACE_COLOR);
-	}
-
-	// 壁面と同じ位置のAABBが深度比較でちらつかないよう、深度比較を切って描画し、描画後に既定へ戻す。
-	m_graphicsSystem.SetDepthTestEnabled(false);
-	m_collisionDebugDrawer.Draw(m_graphicsSystem,m_debugLineRenderer,viewMatrix,projectionMatrix);
-	m_graphicsSystem.SetDepthTestEnabled(true);
 }
