@@ -14,6 +14,9 @@
 //========= 外部ライブラリ インクルード=========
 #include <DirectXMath.h>
 
+//========= Debug インクルード=========
+#include "Debug/H/GameDebugUi.h"
+
 //========= Framework インクルード=========
 #include "Framework/Audio/H/AudioSystem.h"
 #include "Framework/Collision/H/CollisionMath.h"
@@ -31,7 +34,6 @@
 #include "Scene/Common/H/StageLayout.h"
 #include "Scene/GameScene/H/CombatResolver.h"
 #include "Scene/GameScene/H/CombatTable.h"
-#include "Scene/GameScene/H/GameDebugUi.h"
 #include "Scene/GameScene/H/WeaponTable.h"
 #include "Scene/TitleScene/H/TitleScene.h"
 

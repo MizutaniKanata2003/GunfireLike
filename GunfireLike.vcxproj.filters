@@ -135,9 +135,6 @@
     <ClCompile Include="Source\Framework\2D\CPP\HudSpriteRenderer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Scene\GameScene\CPP\CollisionDebugView.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Scene\GameScene\CPP\GameHud.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -145,9 +142,6 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Source\Scene\GameScene\CPP\CombatResolver.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Scene\GameScene\CPP\GameDebugUi.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Source\Scene\GameScene\CPP\RoomController.cpp">
@@ -160,6 +154,12 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Source\Scene\GameScene\CPP\AreaTelegraph.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Debug\CPP\GameDebugUi.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Debug\CPP\CollisionDebugView.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
@@ -305,9 +305,6 @@
     <ClInclude Include="Source\Framework\2D\H\HudSpriteRenderer.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\CollisionDebugView.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Scene\GameScene\H\GameHud.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -330,9 +327,6 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Source\Scene\GameScene\H\PlayerActionTable.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Scene\GameScene\H\GameDebugUi.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Source\Scene\GameScene\H\RoomController.h">
@@ -363,6 +357,12 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Source\Scene\GameScene\H\EnemyAreaBehavior.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Debug\H\CollisionDebugView.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Debug\H\GameDebugUi.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

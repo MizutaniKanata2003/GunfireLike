@@ -9,6 +9,9 @@
 #include <cstdint> // std::uint32_tで、スライディングで転倒させた敵のID別の記録を保持する。
 #include <vector> // 設定表から生成したSceneObjectを、表の順に保持する可変長配列として使用する。
 
+//========= Debug インクルード=========
+#include "Debug/H/CollisionDebugView.h"
+
 //========= Framework インクルード=========
 #include "Framework/Collision/H/CollisionWorld.h"
 #include "Framework/Input/H/FpsCamera.h"
@@ -18,7 +21,6 @@
 #include "Scene/Common/H/ModelRegistry.h"
 #include "Scene/Common/H/SceneObject.h"
 #include "Scene/GameScene/H/AreaTelegraph.h"
-#include "Scene/GameScene/H/CollisionDebugView.h"
 #include "Scene/GameScene/H/EnemyManager.h"
 #include "Scene/GameScene/H/EnemyProjectile.h"
 #include "Scene/GameScene/H/ExitDoor.h"
