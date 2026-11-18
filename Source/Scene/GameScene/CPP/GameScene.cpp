@@ -3,7 +3,7 @@
 // テストSceneの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、部屋ごとの敵と出口、設定表から生成した床・壁・画像のHUD・デバッグUIの描画、Resource終了を実装する。
 
 //========= Windows インクルード=========
-#include <windows.h> // VK_F1〜VK_F9の仮想キーコードで、Capture切替・タイトル遷移・可視化切替・最初の部屋からの再開・確認操作のキーを指定する。
+#include <windows.h> // VK_F1〜VK_F8の仮想キーコードで、Capture切替・タイトル遷移・可視化切替・最初の部屋からの再開・確認操作のキーを指定する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで残り時間を0未満にせず、std::minで視野角の補間割合を1以下に制限する。
@@ -180,13 +180,6 @@ void GameScene::Update(float deltaTime)
 		m_slideKnockedDownEnemyMask = 0;
 	}
 
-	// F9が押された瞬間、出口が開いていれば次の部屋へ進める。出口の通過判定の実装までの暫定の操作。
-	if(m_inputSystem.IsKeyTriggered(VK_F9) && m_roomController.TryAdvanceRoom()){
-		// 次の部屋へ進んだら、プレイヤーを開始位置へ戻し、カメラ位置を合わせる。
-		m_playerController.Initialize(ns_PLAYER_START_POSITION);
-		m_FPSCamera.SetPosition(m_playerController.GetPosition());
-	}
-
 	// F5が押された瞬間は、HPバーと低HP警告の確認のため、プレイヤーへ確認用のダメージを与える。ヒットストップや怯みは与えない。
 	if(m_inputSystem.IsKeyTriggered(VK_F5)){
 		m_playerHealth.ApplyDamage(COMBAT_TABLE::ns_DEBUG_DAMAGE);
@@ -230,7 +223,7 @@ void GameScene::Update(float deltaTime)
 	// 生存中の敵がいなければウェーブまたは部屋を進める。生成待ちの間は、空の敵一覧を全滅と扱わない。
 	m_roomController.Update(m_enemyManager.HasLivingEnemies());
 
-	// 部屋の進行状態に合わせて、出口を開閉する。出口開放中と攻略完了後は開き、それ以外は閉じる。F4・F9で戻った場合も、この更新で閉じる。
+	// 部屋の進行状態に合わせて、出口を開閉する。出口開放中と攻略完了後は開き、それ以外は閉じる。F4や部屋の移動で戻った場合も、この更新で閉じる。
 	const ROOM_PHASE room_phase = m_roomController.GetPhase();
 	m_exitDoor.SetOpen(room_phase == ROOM_PHASE::e_EXIT_OPEN || room_phase == ROOM_PHASE::e_COMPLETE,m_collisionWorld);
 
@@ -249,6 +242,9 @@ void GameScene::Update(float deltaTime)
 	const bool can_kick = m_enemyManager.FindMeleeTarget(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),true) != nullptr;
 	m_playerController.Update(gameplay_delta_time,m_inputSystem,m_FPSCamera,m_collisionWorld,can_kick);
 	m_FPSCamera.SetPosition(m_playerController.GetPosition());
+
+	// 移動後の位置で、出口の通過を判定する。通過した場合は、プレイヤーが開始位置へ戻るため、以降の更新は新しい位置から行う。
+	UpdateExitPass();
 
 	// 現在の動作の状態を取得する。
 	const PLAYER_ACTION_STATE action_state = m_playerController.GetActionState();
@@ -509,6 +505,20 @@ bool GameScene::TrySpawnCurrentWave()
 	m_slideKnockedDownEnemyMask = 0;
 	m_roomController.NotifyWaveSpawned();
 	return true;
+}
+
+// 通過範囲に入ったプレイヤーを、次の部屋の開始位置へ移す。
+void GameScene::UpdateExitPass()
+{
+	// 出口が閉じている、またはプレイヤーが通過範囲の外にいる場合は、何もしない。
+	if(!m_exitDoor.IsInPassZone(m_playerController.GetPosition()))return;
+
+	// 進行管理が出口の通過を受理しなかった場合は、何もしない。最終部屋の通過後や、受理済みの重複した通知では受理されない。
+	if(!m_roomController.TryAdvanceRoom())return;
+
+	// 次の部屋へ進んだので、プレイヤーを開始位置へ戻し、カメラ位置を合わせる。出口は、次の更新の進行状態の同期で閉じる。
+	m_playerController.Initialize(ns_PLAYER_START_POSITION);
+	m_FPSCamera.SetPosition(m_playerController.GetPosition());
 }
 
 // 被弾・接触の反応として、ダメージ（あれば）・怯み・ヒットストップを与える。
