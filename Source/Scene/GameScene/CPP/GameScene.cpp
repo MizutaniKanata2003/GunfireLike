@@ -21,6 +21,7 @@
 #include "Framework/Input/H/InputSystem.h"
 
 //========= Scene インクルード=========
+#include "Scene/GameScene/H/EnemyApproach.h"
 #include "Scene/Common/H/SceneManager.h"
 #include "Scene/Common/H/SceneObjectFactory.h"
 #include "Scene/Common/H/StageLayout.h"
@@ -204,6 +205,11 @@ void GameScene::Update(float deltaTime)
 	// 確認用の攻撃の判定、敵の怯み・転倒、回復アイテムの間隔、表示用の残り時間を、Captureに関係なく進める。表示用は実時間で、0未満にしない。
 	UpdateDodgeJudge(world_delta_time);
 	m_enemy.Update(world_delta_time);
+
+	// Capture中だけ検証用の敵を追従させ、マウス解放中は位置を変えない。
+	if(m_inputSystem.IsMouseCaptureEnabled()){
+		ENEMY_APPROACH::Update(m_enemy,m_playerController.GetPosition(),world_delta_time,m_collisionWorld);
+	}
 	m_healItems.Update(gameplay_delta_time);
 	m_collisionDebugView.Update(deltaTime);
 	m_hitMarkerRemainingSeconds = std::max(0.0f,m_hitMarkerRemainingSeconds - deltaTime);
