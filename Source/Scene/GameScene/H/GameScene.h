@@ -4,8 +4,6 @@
 // 各クラスの更新を仲介し、共有Renderer・生成したObject・CollisionWorldを所有する。Scene切替はManagerへ予約する。
 
 //========= C++標準ライブラリ インクルード=========
-#include <array> // 敵の固定枠ごとの攻撃予告と再攻撃待ちを、枠数と同じ長さの配列で保持する。
-#include <cstddef> // std::size_tで、敵の固定枠の番号を受け取る。
 #include <cstdint> // std::uint32_tで、スライディングで転倒させた敵のID別の記録を保持する。
 #include <vector> // 設定表から生成したSceneObjectを、表の順に保持する可変長配列として使用する。
 
@@ -17,9 +15,7 @@
 #include "Framework/Input/H/FpsCamera.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/H/AreaTelegraph.h"
-#include "Scene/Common/H/EnemyManager.h"
-#include "Scene/Common/H/EnemyProjectile.h"
+#include "Scene/Common/H/EnemyController.h"
 #include "Scene/Common/H/ExitDoor.h"
 #include "Scene/Common/H/HealItems.h"
 #include "Scene/Common/H/IScene.h"
@@ -72,27 +68,10 @@ private:
 	// 確認用の攻撃が当たる瞬間を判定し、結果に応じてプレイヤーへのダメージとスローを反映する。
 	// worldDeltaTime: スローを反映した経過時間。単位は秒。ヒットストップ中は0。
 	void UpdateDodgeJudge(float worldDeltaTime);
-	// 全枠の敵を出現順に、種類に応じて更新し、予告中の敵の表示を切り替える。
-	// worldDeltaTime: 敵側の経過時間。単位は秒。スローとヒットストップ反映済み。
-	void UpdateEnemyActions(float worldDeltaTime);
-	// 指定した1枠の接近型について、追従・攻撃予告・命中候補を更新する。
-	// slotIndex: EnemyManagerの固定枠の番号。0始まりで、攻撃状態の配列と同じ範囲であること。
-	// worldDeltaTime: 敵側の経過時間。単位は秒。
-	void UpdateEnemyMeleeSlot(std::size_t slotIndex,float worldDeltaTime);
-	// 指定した1枠の射撃型について、距離維持の移動・攻撃予告・発射を更新する。発射のタイミングに達したら、弾を生成する。
-	// slotIndex: EnemyManagerの固定枠の番号。0始まりで、攻撃状態の配列と同じ範囲であること。
-	// worldDeltaTime: 敵側の経過時間。単位は秒。
-	void UpdateEnemyRangedSlot(std::size_t slotIndex,float worldDeltaTime);
-	// 指定した1枠の範囲攻撃型について、接近・範囲の予告・予告の終わりの範囲の判定を更新する。
-	// slotIndex: EnemyManagerの固定枠の番号。0始まりで、攻撃状態の配列と同じ範囲であること。
-	// worldDeltaTime: 敵側の経過時間。単位は秒。
-	void UpdateEnemyAreaSlot(std::size_t slotIndex,float worldDeltaTime);
-	// 敵の弾を進め、プレイヤーへの命中・回避の結果に応じて、ダメージ・怯み・ヒットストップ・スローを反映する。
-	// worldDeltaTime: 敵側の経過時間。単位は秒。スローとヒットストップ反映済み。
-	void UpdateEnemyProjectiles(float worldDeltaTime);
-	// 全枠の攻撃予告と再攻撃待ちを破棄する。初期化と再配置で、旧ウェーブの状態を持ち越さないために使う。
-	void ResetEnemyMelee();
-	// 現在の部屋とウェーブの敵を生成し、全枠の攻撃状態・敵の弾・範囲の予告を初期化して、進行管理へ生成完了を通知する。
+	// 敵の攻撃イベントを受け取り、命中ならプレイヤーへの被弾の反応を、ジャスト回避ならスローを反映し、求められた場合は直近の判定結果を記録する。
+	// attackEvent: EnemyControllerが通知した攻撃イベント。敵の更新の途中で呼ばれる。
+	void ApplyEnemyAttackEvent(const ENEMY_ATTACK_EVENT& attackEvent);
+	// 現在の部屋とウェーブの敵をEnemyControllerへ生成させ、成功した場合は、スライディングの転倒記録を初期化して、進行管理へ生成完了を通知する。
 	// 戻り値: 登録に成功したらtrue。失敗した場合はEnemyManagerが空にし、進行管理には通知しない。
 	[[nodiscard]] bool TrySpawnCurrentWave();
 	// デバッグ用に、現在のウェーブの生きている敵を全て倒し、敵の予告・弾・範囲の予告を消す。次の更新の全滅判定で、次のウェーブまたは出口の開放へ進む。
@@ -139,12 +118,8 @@ private:
 	FpsCamera m_FPSCamera{};
 	// 弾薬・連射・リロード・射撃判定を管理する武器。
 	WeaponSystem m_weaponSystem{};
-	// 現在のウェーブの敵を所有する。Finalizeで登録先のCollisionWorldより先に解除する。
-	EnemyManager m_enemyManager{};
-	// 射撃型の敵が撃った、飛行中の弾。Cube Rendererを借用するため、Finalizeで共有Rendererより先に解除する。
-	EnemyProjectileManager m_enemyProjectiles{};
-	// 範囲攻撃型の敵が予告中の、床の上の範囲。Cube Rendererを借用するため、Finalizeで共有Rendererより先に解除する。
-	AreaTelegraph m_areaTelegraph{};
+	// 現在のウェーブの敵・敵の弾・範囲の予告・敵ごとの攻撃予告を所有し、更新と描画を行う。Finalizeで、登録先のCollisionWorldと共有Rendererより先に解除する。
+	EnemyController m_enemyController{};
 	// 3部屋×2ウェーブの進行状態。敵の生成と全滅判定は、GameSceneが仲介する。
 	RoomController m_roomController{};
 	// 現在のウェーブの生成に失敗したか。trueの間は生成を再試行せず、F4で最初からやり直す。
@@ -161,10 +136,6 @@ private:
 	//========= 判定・時間の状態=========
 	// 確認用に発生させた攻撃の、命中の瞬間の判定（無敵・ジャスト回避）。
 	JustDodgeJudge m_dodgeJudge{};
-	// 敵の固定枠ごとの攻撃予告。接近型は命中時の回避判定に、射撃型は発射のタイミングの計測に、範囲攻撃型は範囲の判定のタイミングの計測に使う。F7の判定とは状態を共有しない。
-	std::array<JustDodgeJudge,ENEMY_WAVE_TABLE::ns_SLOT_COUNT> m_enemyMeleeJudges{};
-	// 敵の固定枠ごとの、次の攻撃を予告できるまでの残り時間。単位は敵側の秒。初期状態は待ち時間なし。
-	std::array<float,ENEMY_WAVE_TABLE::ns_SLOT_COUNT> m_enemyMeleeRecoverySeconds{};
 	// 直近の判定結果。デバッグUIへの表示に使う。
 	DODGE_JUDGE_RESULT m_lastJudgeResult{DODGE_JUDGE_RESULT::e_NONE};
 	// スローの残り時間。単位は実時間の秒。0より大きい間、プレイヤー以外の時間の進みが遅くなる。
@@ -179,7 +150,7 @@ private:
 	PLAYER_ACTION_STATE m_previousActionState{PLAYER_ACTION_STATE::e_NORMAL};
 
 	//========= 描画ResourceとObject=========
-	// Cube・OBJの共有Rendererを所有する。m_stageObjects・m_enemyManager・m_enemyProjectiles・m_areaTelegraph・m_exitDoorが借用するため、このメンバーを先に宣言し、後に破棄する。
+	// Cube・OBJの共有Rendererを所有する。m_stageObjects・m_enemyController・m_exitDoorが借用するため、このメンバーを先に宣言し、後に破棄する。
 	ModelRegistry m_modelRegistry{};
 	// STAGE_LAYOUTの表から生成した床と壁。Rendererを借用するだけで所有しない。表の順が描画順になる。
 	std::vector<SceneObject> m_stageObjects{};

@@ -7,9 +7,7 @@
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで残り時間を0未満にせず、std::minで視野角の補間割合を1以下に制限する。
-#include <cmath> // std::sqrtで射撃型・範囲攻撃型とプレイヤーの水平距離を求め、std::fabsで範囲の中心からのずれの大きさを求める。
 #include <cstdint> // std::uint32_tで、スライディングで転倒させた敵の記録のビットを扱う。
-#include <vector> // 敵の弾の判定結果を、std::vectorで受け取る。
 
 //========= 外部ライブラリ インクルード=========
 #include <DirectXMath.h>
@@ -28,10 +26,7 @@
 //========= Scene インクルード=========
 #include "Scene/Common/H/CombatResolver.h"
 #include "Scene/Common/H/CombatTable.h"
-#include "Scene/Common/H/EnemyApproach.h"
-#include "Scene/Common/H/EnemyAreaBehavior.h"
 #include "Scene/Common/H/SceneManager.h"
-#include "Scene/Common/H/EnemyRangedBehavior.h"
 #include "Scene/Common/H/SceneObjectFactory.h"
 #include "Scene/Common/H/StageLayout.h"
 #include "Scene/Common/H/WeaponTable.h"
@@ -94,9 +89,7 @@ void GameScene::Initialize()
 
 	// 判定・時間・接触・表示の状態を既定へ戻し、前回の生成ObjectとColliderを空にする。Rendererの生成、表からのObject生成、出口と敵の配置はInitで行う。
 	m_dodgeJudge.Initialize();
-	ResetEnemyMelee();
-	m_enemyProjectiles.Clear();
-	m_areaTelegraph.Clear();
+	m_enemyController.ResetAttackState();
 	m_lastJudgeResult = DODGE_JUDGE_RESULT::e_NONE;
 	m_slowMotionRemainingSeconds = 0.0f;
 	m_hitStopRemainingSeconds = 0.0f;
@@ -150,16 +143,19 @@ bool GameScene::Init()
 		return false;
 	}
 
-	// 敵の弾の描画に使うCube Rendererを借用する。借用できなければ、生成済みのResourceを含めて終了して失敗を返す。
-	if(!m_enemyProjectiles.Initialize(m_modelRegistry)){
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの敵の弾の初期化に失敗しました。");
-		Finalize();
-		return false;
-	}
+	// 敵の更新に使う参照と、攻撃イベントの通知先（被弾・スロー・記録の反映）を、EnemyControllerへ渡す。
+	ENEMY_CONTROLLER_LINKS enemy_links{};
+	enemy_links.modelRegistry = &m_modelRegistry;
+	enemy_links.collisionWorld = &m_collisionWorld;
+	enemy_links.playerController = &m_playerController;
+	enemy_links.playerHealth = &m_playerHealth;
+	enemy_links.onAttackEvent = [this](const ENEMY_ATTACK_EVENT& attackEvent){
+		ApplyEnemyAttackEvent(attackEvent);
+	};
 
-	// 範囲の予告の描画に使うCube Rendererを借用する。借用できなければ、生成済みのResourceを含めて終了して失敗を返す。
-	if(!m_areaTelegraph.Initialize(m_modelRegistry)){
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの範囲の予告の初期化に失敗しました。");
+	// 敵の弾と範囲の予告のCube Rendererを借用する。借用できなければ、生成済みのResourceを含めて終了して失敗を返す。
+	if(!m_enemyController.Initialize(enemy_links)){
+		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの敵の更新の初期化に失敗しました。");
 		Finalize();
 		return false;
 	}
@@ -199,9 +195,7 @@ void GameScene::Update(float deltaTime)
 	if(m_inputSystem.IsKeyTriggered(VK_F4)){
 		m_roomController.Initialize();
 		m_hasWaveSpawnFailed = false;
-		ResetEnemyMelee();
-		m_enemyProjectiles.Clear();
-		m_areaTelegraph.Clear();
+		m_enemyController.ResetAttackState();
 		m_slideKnockedDownEnemyMask = 0;
 	}
 
@@ -249,14 +243,14 @@ void GameScene::Update(float deltaTime)
 
 	// 確認用の攻撃の判定、敵の怯み・転倒、回復アイテムの間隔、表示用の残り時間を、Captureに関係なく進める。表示用は実時間で、0未満にしない。
 	UpdateDodgeJudge(world_delta_time);
-	m_enemyManager.Update(world_delta_time);
+	m_enemyController.GetEnemyManager().Update(world_delta_time);
 
 	// 生成待ちなら現在のウェーブを生成する。失敗した場合は再試行せず、F4で最初からやり直すまで敵なしで待つ。
 	if(m_roomController.GetPhase() == ROOM_PHASE::e_NEEDS_SPAWN && !m_hasWaveSpawnFailed){
 		m_hasWaveSpawnFailed = !TrySpawnCurrentWave();
 	}
 	// 生存中の敵がいなければウェーブまたは部屋を進める。生成待ちの間は、空の敵一覧を全滅と扱わない。
-	m_roomController.Update(m_enemyManager.HasLivingEnemies());
+	m_roomController.Update(m_enemyController.GetEnemyManager().HasLivingEnemies());
 
 	// 部屋の進行状態に合わせて、出口を開閉する。出口開放中と攻略完了後は開き、それ以外は閉じる。F4や部屋の移動で戻った場合も、この更新で閉じる。
 	const ROOM_PHASE room_phase = m_roomController.GetPhase();
@@ -274,7 +268,7 @@ void GameScene::Update(float deltaTime)
 
 	// 視線を先に更新し、その向きで、蹴れる敵がいるかを調べてから、プレイヤーを更新する。ヒットストップ中も視線は動かせる。
 	m_FPSCamera.Update(m_inputSystem);
-	const bool can_kick = m_enemyManager.FindMeleeTarget(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),true) != nullptr;
+	const bool can_kick = m_enemyController.GetEnemyManager().FindMeleeTarget(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),true) != nullptr;
 	m_playerController.Update(gameplay_delta_time,m_inputSystem,m_FPSCamera,m_collisionWorld,can_kick);
 	m_FPSCamera.SetPosition(m_playerController.GetPosition());
 
@@ -317,8 +311,7 @@ void GameScene::Update(float deltaTime)
 	UpdateHeal();
 	UpdateShooting(gameplay_delta_time);
 	// 当フレームの回避・移動・敵への怯みを反映してから、敵の行動と、敵の弾の命中を判定する。
-	UpdateEnemyActions(world_delta_time);
-	UpdateEnemyProjectiles(world_delta_time);
+	m_enemyController.Update(world_delta_time);
 
 	// 更新後のカメラから、Collision可視化の視線のRayを更新する。非表示の間は判定を行わない。
 	m_collisionDebugView.UpdateRay(m_FPSCamera,m_collisionWorld);
@@ -348,15 +341,12 @@ void GameScene::Draw()
 	}
 
 	// 床の上に、範囲の予告を描画する。床の後に描き、敵や出口より先に描くことで、敵の体が予告の上に重なる。
-	m_areaTelegraph.Draw(m_graphicsSystem,view_matrix,projection_matrix);
+	m_enemyController.DrawAreaTelegraph(m_graphicsSystem,view_matrix,projection_matrix);
 	// 続けて出口を描画する。
 	m_exitDoor.Draw(m_graphicsSystem,view_matrix,projection_matrix);
-	// 続けて全枠の敵を出現順に描画する。死亡枠はEnemy::Drawが描画を省略する。
-	for(const Enemy& enemy : m_enemyManager.GetEnemies()){
-		enemy.Draw(m_graphicsSystem,view_matrix,projection_matrix);
-	}
-	// 敵の後に、飛行中の敵の弾を描画し、続けて表示中ならCollisionの線を重ねる。
-	m_enemyProjectiles.Draw(m_graphicsSystem,view_matrix,projection_matrix);
+	// 続けて全枠の敵を出現順に描画し、その後に飛行中の敵の弾を描画する。死亡枠はEnemy::Drawが描画を省略する。
+	m_enemyController.DrawEnemies(m_graphicsSystem,view_matrix,projection_matrix);
+	// 敵と弾の後に、表示中ならCollisionの線を重ねる。
 	m_collisionDebugView.Draw(m_graphicsSystem,m_collisionWorld,m_FPSCamera,view_matrix,projection_matrix);
 
 	// 3Dの上に画像のHUDを重ねるため、深度比較なし・アルファ合成の画面UI用Passへ切り替え、現在の値をHUDへ渡して描画する。
@@ -387,11 +377,11 @@ void GameScene::Draw()
 	debug_info.roomPhase = m_roomController.GetPhase();
 	debug_info.hasWaveSpawnFailed = m_hasWaveSpawnFailed;
 	debug_info.isOneHitKillEnabled = m_isOneHitKillEnabled;
-	debug_info.isEnemyAlive = m_enemyManager.GetFirstEnemy().IsAlive();
-	debug_info.enemyHP = m_enemyManager.GetFirstEnemy().GetCurrentHP();
-	debug_info.enemyMaxHP = m_enemyManager.GetFirstEnemy().GetMaxHP();
-	debug_info.isEnemyFlinching = m_enemyManager.GetFirstEnemy().IsFlinching();
-	debug_info.isEnemyKnockedDown = m_enemyManager.GetFirstEnemy().IsKnockedDown();
+	debug_info.isEnemyAlive = m_enemyController.GetEnemyManager().GetFirstEnemy().IsAlive();
+	debug_info.enemyHP = m_enemyController.GetEnemyManager().GetFirstEnemy().GetCurrentHP();
+	debug_info.enemyMaxHP = m_enemyController.GetEnemyManager().GetFirstEnemy().GetMaxHP();
+	debug_info.isEnemyFlinching = m_enemyController.GetEnemyManager().GetFirstEnemy().IsFlinching();
+	debug_info.isEnemyKnockedDown = m_enemyController.GetEnemyManager().GetFirstEnemy().IsKnockedDown();
 	debug_info.isHitMarkerActive = m_hitMarkerRemainingSeconds > 0.0f;
 	debug_info.isCaptureEnabled = m_inputSystem.IsMouseCaptureEnabled();
 	debug_info.isHitStopActive = m_hitStopRemainingSeconds > 0.0f;
@@ -411,9 +401,7 @@ void GameScene::Finalize()
 {
 	// 遷移先のInit後に呼ばれても、遷移先が設定したCaptureやBGMを上書きしない。
 	// 敵・敵の弾・範囲の予告・出口・Objectは、Collisionと共有Rendererを借用しているため、それらを解放する前に先に終了する。
-	m_enemyManager.Clear(m_collisionWorld);
-	m_enemyProjectiles.Uninit();
-	m_areaTelegraph.Uninit();
+	m_enemyController.Uninit();
 	m_exitDoor.Uninit(m_collisionWorld);
 	m_stageObjects.clear();
 	m_modelRegistry.Uninit();
@@ -446,293 +434,31 @@ void GameScene::UpdateDodgeJudge(float worldDeltaTime)
 	}
 }
 
-// 全枠を出現順に、種類に応じた更新へ振り分け、更新の後に予告中の表示を敵へ反映する。
-void GameScene::UpdateEnemyActions(float worldDeltaTime)
+// 敵の攻撃イベントを、プレイヤーへの被弾・スロー・表示用の記録へ反映する。
+void GameScene::ApplyEnemyAttackEvent(const ENEMY_ATTACK_EVENT& attackEvent)
 {
-	// 全枠を先頭から更新する。死亡枠や行動不能の敵は、枠ごとの更新の中で予告を中断する。
-	for(std::size_t slot_index = 0; slot_index < m_enemyMeleeJudges.size(); ++slot_index){
-		// 敵の種類ごとに、対応する更新を呼ぶ。
-		switch(m_enemyManager.GetEnemies()[slot_index].GetKind()){
-			// 接近型は、追従と近接の攻撃予告・命中を更新する。
-		case ENEMY_KIND::e_MELEE:
-		UpdateEnemyMeleeSlot(slot_index,worldDeltaTime);
-		break;
+	// 表示用の記録が求められた場合だけ、直近の判定結果を更新する。接近型の結果は求めない。
+	if(attackEvent.shouldRecordResult){
+		m_lastJudgeResult = attackEvent.result;
+	}
 
-		// 射撃型は、距離維持の移動と、発射の予告と、弾の生成を更新する。
-		case ENEMY_KIND::e_RANGED:
-		UpdateEnemyRangedSlot(slot_index,worldDeltaTime);
-		break;
-
-		// 範囲攻撃型は、接近と、床の範囲の予告と、予告の終わりの範囲の判定を更新する。
-		case ENEMY_KIND::e_AREA:
-		UpdateEnemyAreaSlot(slot_index,worldDeltaTime);
-		break;
-		}
-
-		// 予告の状態を、その敵の表示へ反映する。死亡・怯みなどで予告が中断された場合は、解除される。
-		m_enemyManager.GetEnemies()[slot_index].SetTelegraphing(m_enemyMeleeJudges[slot_index].HasIncomingAttack());
+	// 無敵でなく命中した場合は、ダメージ・怯み・ヒットストップを与える。
+	if(attackEvent.result == DODGE_JUDGE_RESULT::e_HIT){
+		ApplyPlayerHitReaction(attackEvent.damage,COMBAT_TABLE::ns_DAMAGE_HIT_STOP_SECONDS);
+	}
+	// 実際に回避中のジャスト回避の場合は、スローを開始する。連続した場合は、時間を数え直す。
+	else if(attackEvent.shouldStartSlowMotion){
+		m_slowMotionRemainingSeconds = COMBAT_TABLE::ns_SLOW_MOTION_SECONDS;
 	}
 }
 
-// 接近型の敵だけ、予告中は追従を止め、予告が終わったフレームで一度だけ命中を判定する。
-void GameScene::UpdateEnemyMeleeSlot(std::size_t slotIndex,float worldDeltaTime)
-{
-	// この枠の敵と、その敵専用の予告・再攻撃待ちを参照する。
-	Enemy& enemy = m_enemyManager.GetEnemies()[slotIndex];
-	JustDodgeJudge& judge = m_enemyMeleeJudges[slotIndex];
-	float& recovery_seconds = m_enemyMeleeRecoverySeconds[slotIndex];
-
-	// 戦闘不能になった敵の予告は、時間停止中でも取り消して持ち越さない。
-	if(!enemy.IsAlive() || enemy.IsFlinching() || enemy.IsKnockedDown() || m_playerHealth.IsDead()){
-		// 予告中断時だけ再攻撃待ちを設定し、行動不能が続いても毎回は設定しない。
-		if(judge.HasIncomingAttack()){
-			judge.Initialize();
-			recovery_seconds = COMBAT_TABLE::ns_ENEMY_MELEE_RECOVERY_SECONDS;
-		}
-		return;
-	}
-
-	// ヒットストップで敵側の時間が進まない場合は、新しい予告も始めない。
-	if(worldDeltaTime <= 0.0f)return;
-
-	// 追従の停止距離と同じXZ平面で測る。二乗同士を比較し、平方根を取らずに範囲を求める。
-	const XMFLOAT3 enemy_position = enemy.GetBodySphere().center;
-	const XMFLOAT3& player_position = m_playerController.GetPosition();
-	const float offset_x = player_position.x - enemy_position.x;
-	const float offset_z = player_position.z - enemy_position.z;
-	const float reach = COMBAT_TABLE::ns_ENEMY_MELEE_REACH;
-	const bool is_in_reach = offset_x * offset_x + offset_z * offset_z <= reach * reach;
-
-	// 予告中は追従せず、判定が返るまで敵側の時間で予告を進める。
-	if(judge.HasIncomingAttack()){
-		// 回避以外の無敵も被弾を防ぐが、回避開始時刻としては使わない。
-		const bool is_dodging = m_playerController.GetActionState() == PLAYER_ACTION_STATE::e_DODGE;
-		const float dodge_age_seconds = is_dodging ? m_playerController.GetSecondsSinceDodgeStart() : COMBAT_TABLE::ns_ENEMY_MELEE_RECOVERY_SECONDS;
-		const bool is_invincible = m_playerController.IsInvincible();
-		const DODGE_JUDGE_RESULT result = judge.Update(worldDeltaTime,is_invincible,dodge_age_seconds);
-		// 予告が続いている間は、命中も再攻撃待ちの開始も行わない。
-		if(result == DODGE_JUDGE_RESULT::e_NONE)return;
-
-		// 予告を消費したので、範囲外の空振りでも再攻撃待ちに入る。
-		recovery_seconds = COMBAT_TABLE::ns_ENEMY_MELEE_RECOVERY_SECONDS;
-		// 予告終了時点で範囲外なら、被弾もジャスト回避のスローも発生しない。
-		if(!is_in_reach)return;
-
-		// 範囲内で無敵でなければ、既存の被弾反応にHP・怯み・ヒットストップを任せる。
-		if(result == DODGE_JUDGE_RESULT::e_HIT){
-			ApplyPlayerHitReaction(COMBAT_TABLE::ns_ENEMY_MELEE_DAMAGE,COMBAT_TABLE::ns_DAMAGE_HIT_STOP_SECONDS);
-		}
-		// 実際に回避中のジャスト回避だけがスローを開始する。
-		else if(is_dodging && result == DODGE_JUDGE_RESULT::e_JUST_DODGED){
-			m_slowMotionRemainingSeconds = COMBAT_TABLE::ns_SLOW_MOTION_SECONDS;
-		}
-		return;
-	}
-
-	// 再攻撃待ちは敵側の時間で減らす。残り時間が負にならないようにする。
-	recovery_seconds = std::max(0.0f,recovery_seconds - worldDeltaTime);
-	// 射程外では追従だけを行い、予告の開始は次の更新で判定する。
-	if(!is_in_reach){
-		ENEMY_APPROACH::Update(enemy,player_position,worldDeltaTime,m_collisionWorld);
-		return;
-	}
-
-	// 射程内では待ち時間が終わってから、次の攻撃を予告する。
-	if(recovery_seconds <= 0.0f){
-		judge.StartIncomingAttack(COMBAT_TABLE::ns_ENEMY_MELEE_WINDUP_SECONDS);
-	}
-}
-
-// 予告中は移動せず、予告が終わったフレームで弾を生成する。予告以外では、距離を保つ。
-void GameScene::UpdateEnemyRangedSlot(std::size_t slotIndex,float worldDeltaTime)
-{
-	// この枠の敵と、その敵専用の予告・再攻撃待ちを参照する。
-	Enemy& enemy = m_enemyManager.GetEnemies()[slotIndex];
-	JustDodgeJudge& judge = m_enemyMeleeJudges[slotIndex];
-	float& recovery_seconds = m_enemyMeleeRecoverySeconds[slotIndex];
-
-	// 戦闘不能になった敵の予告は、時間停止中でも取り消して持ち越さない。
-	if(!enemy.IsAlive() || enemy.IsFlinching() || enemy.IsKnockedDown() || m_playerHealth.IsDead()){
-		// 予告中断時だけ再攻撃待ちを設定し、行動不能が続いても毎回は設定しない。
-		if(judge.HasIncomingAttack()){
-			judge.Initialize();
-			recovery_seconds = ENEMY_RANGED::ns_RECOVERY_SECONDS;
-		}
-		return;
-	}
-
-	// ヒットストップで敵側の時間が進まない場合は、移動も新しい予告も始めない。
-	if(worldDeltaTime <= 0.0f)return;
-
-	// 敵とプレイヤーの水平距離を求める。高さは使わない。
-	const XMFLOAT3 enemy_position = enemy.GetBodySphere().center;
-	const XMFLOAT3& player_position = m_playerController.GetPosition();
-	const float offset_x = player_position.x - enemy_position.x;
-	const float offset_z = player_position.z - enemy_position.z;
-	const float distance = std::sqrt(offset_x * offset_x + offset_z * offset_z);
-
-	// 予告中はその場に立ち止まり、予告の終わりだけ、発射のタイミングに達した旨を受け取る。
-	if(judge.HasIncomingAttack()){
-		// 射撃型は回避の判定を使わないため、無敵でない状態と、十分に大きい回避からの経過時間を渡し、予告の終わりだけを検出する。
-		const DODGE_JUDGE_RESULT result = judge.Update(worldDeltaTime,false,ENEMY_RANGED::ns_UNUSED_DODGE_AGE_SECONDS);
-		// 予告が続いている間は、何も起こさない。
-		if(result == DODGE_JUDGE_RESULT::e_NONE)return;
-
-		// 予告の終わりで、再攻撃待ちに入り、予告の終わりのプレイヤーの位置へ向けて、弾を1つ生成する。弾は、以後追尾しない。
-		recovery_seconds = ENEMY_RANGED::ns_RECOVERY_SECONDS;
-		m_enemyProjectiles.Spawn(enemy_position,player_position);
-		return;
-	}
-
-	// 再攻撃待ちは敵側の時間で減らす。残り時間が負にならないようにする。
-	recovery_seconds = std::max(0.0f,recovery_seconds - worldDeltaTime);
-
-	// 遠すぎる間は近づき、近すぎる間は離れる。移動した更新では、予告を始めない。
-	if(distance > ENEMY_RANGED::ns_FAR_DISTANCE){
-		ENEMY_RANGED::Move(enemy,player_position,1.0f,worldDeltaTime,m_collisionWorld);
-		return;
-	}
-	// 近すぎる場合は、プレイヤーから離れる。
-	if(distance < ENEMY_RANGED::ns_NEAR_DISTANCE){
-		ENEMY_RANGED::Move(enemy,player_position,-1.0f,worldDeltaTime,m_collisionWorld);
-		return;
-	}
-
-	// 適切な距離にいて、再攻撃待ちが終わっていれば、立ち止まったまま、次の攻撃を予告する。
-	if(recovery_seconds <= 0.0f){
-		judge.StartIncomingAttack(ENEMY_RANGED::ns_WINDUP_SECONDS);
-	}
-}
-
-// 予告中は移動せず、予告の終わりに、固定した範囲の内にいるプレイヤーへ判定する。予告以外では、攻撃を始める距離まで近づく。
-void GameScene::UpdateEnemyAreaSlot(std::size_t slotIndex,float worldDeltaTime)
-{
-	// この枠の敵と、その敵専用の予告・再攻撃待ちを参照する。
-	Enemy& enemy = m_enemyManager.GetEnemies()[slotIndex];
-	JustDodgeJudge& judge = m_enemyMeleeJudges[slotIndex];
-	float& recovery_seconds = m_enemyMeleeRecoverySeconds[slotIndex];
-
-	// 戦闘不能になった敵の予告と、床の範囲の表示は、時間停止中でも取り消して持ち越さない。
-	if(!enemy.IsAlive() || enemy.IsFlinching() || enemy.IsKnockedDown() || m_playerHealth.IsDead()){
-		// 予告中断時だけ再攻撃待ちを設定し、行動不能が続いても毎回は設定しない。
-		if(judge.HasIncomingAttack()){
-			judge.Initialize();
-			recovery_seconds = ENEMY_AREA::ns_RECOVERY_SECONDS;
-		}
-		m_areaTelegraph.End(slotIndex);
-		return;
-	}
-
-	// ヒットストップで敵側の時間が進まない場合は、移動も新しい予告も始めない。
-	if(worldDeltaTime <= 0.0f)return;
-
-	// 敵とプレイヤーの位置を取得する。範囲の判定にも、接近の判断にも使う。
-	const XMFLOAT3 enemy_position = enemy.GetBodySphere().center;
-	const XMFLOAT3& player_position = m_playerController.GetPosition();
-
-	// 予告中はその場に立ち止まり、予告の終わりだけを受け取る。範囲の中心は、予告を始めた時点で固定した位置のままにする。
-	if(judge.HasIncomingAttack()){
-		// 回避以外の無敵も被弾を防ぐが、回避開始時刻としては使わない。
-		const bool is_dodging = m_playerController.GetActionState() == PLAYER_ACTION_STATE::e_DODGE;
-		const float dodge_age_seconds = is_dodging ? m_playerController.GetSecondsSinceDodgeStart() : ENEMY_AREA::ns_NON_DODGE_AGE_SECONDS;
-		const DODGE_JUDGE_RESULT result = judge.Update(worldDeltaTime,m_playerController.IsInvincible(),dodge_age_seconds);
-		// 予告が続いている間は、範囲を表示したまま、何も起こさない。
-		if(result == DODGE_JUDGE_RESULT::e_NONE)return;
-
-		// 予告の終わりで、再攻撃待ちに入り、固定した範囲の中心を取り出して、範囲の表示を終える。
-		recovery_seconds = ENEMY_AREA::ns_RECOVERY_SECONDS;
-		const XMFLOAT3 area_center = m_areaTelegraph.GetCenter(slotIndex);
-		m_areaTelegraph.End(slotIndex);
-
-		// 範囲は正方形で、高さを使わない。中心からX・Z方向とも半分の大きさ以内なら、範囲の内とする。しゃがんでも範囲の内にいれば、避けられない。
-		const bool is_in_area = std::fabs(player_position.x - area_center.x) <= AREA_TELEGRAPH::ns_HALF_SIZE &&
-			std::fabs(player_position.z - area_center.z) <= AREA_TELEGRAPH::ns_HALF_SIZE;
-		// 範囲の外にいる場合は、被弾もジャスト回避のスローも発生しない。
-		if(!is_in_area)return;
-
-		// 範囲の内にいた場合の結果を、表示用に記録する。
-		m_lastJudgeResult = result;
-		// 無敵でなければ、命中として、ダメージ・怯み・ヒットストップを与える。
-		if(result == DODGE_JUDGE_RESULT::e_HIT){
-			ApplyPlayerHitReaction(ENEMY_AREA::ns_DAMAGE,COMBAT_TABLE::ns_DAMAGE_HIT_STOP_SECONDS);
-		}
-		// 実際に回避中のジャスト回避だけがスローを開始する。
-		else if(is_dodging && result == DODGE_JUDGE_RESULT::e_JUST_DODGED){
-			m_slowMotionRemainingSeconds = COMBAT_TABLE::ns_SLOW_MOTION_SECONDS;
-		}
-		return;
-	}
-
-	// 再攻撃待ちは敵側の時間で減らす。残り時間が負にならないようにする。
-	recovery_seconds = std::max(0.0f,recovery_seconds - worldDeltaTime);
-
-	// 敵とプレイヤーの水平距離を求める。高さは使わない。
-	const float offset_x = player_position.x - enemy_position.x;
-	const float offset_z = player_position.z - enemy_position.z;
-	const float distance = std::sqrt(offset_x * offset_x + offset_z * offset_z);
-
-	// 攻撃を始める距離より遠い間は近づく。近づいた更新では、予告を始めない。
-	if(distance > ENEMY_AREA::ns_ENGAGE_DISTANCE){
-		ENEMY_AREA::Approach(enemy,player_position,worldDeltaTime,m_collisionWorld);
-		return;
-	}
-
-	// 攻撃を始める距離の内で、再攻撃待ちが終わっていれば、プレイヤーのいる位置へ範囲を固定して予告を始める。範囲は、プレイヤーが動いても追わない。
-	if(recovery_seconds <= 0.0f){
-		m_areaTelegraph.Begin(slotIndex,player_position);
-		judge.StartIncomingAttack(ENEMY_AREA::ns_WINDUP_SECONDS);
-	}
-}
-
-// 弾を進め、プレイヤーへ命中・回避した弾の結果を、ダメージ・スロー・表示用の記録へ反映する。
-void GameScene::UpdateEnemyProjectiles(float worldDeltaTime)
-{
-	// 回避の動作中だけ、回避の開始からの経過時間がジャスト回避の判定に使われる。蹴り・殴打の無敵は、通常の回避として扱う。
-	const bool is_dodging = m_playerController.GetActionState() == PLAYER_ACTION_STATE::e_DODGE;
-
-	// 弾を進め、今回の更新で命中・回避した弾ごとの判定結果を受け取る。
-	std::vector<DODGE_JUDGE_RESULT> results;
-	m_enemyProjectiles.Update(worldDeltaTime,m_collisionWorld,m_playerController.GetBodySphere(),m_playerController.IsInvincible(),is_dodging,
-														m_playerController.GetSecondsSinceDodgeStart(),results);
-
-	// 受け取った結果を、出た順に反映する。
-	for(const DODGE_JUDGE_RESULT result : results){
-		m_lastJudgeResult = result;
-
-		// 無敵でなく命中した場合は、ダメージ・怯み・ヒットストップを与える。
-		if(result == DODGE_JUDGE_RESULT::e_HIT){
-			ApplyPlayerHitReaction(ENEMY_PROJECTILE::ns_DAMAGE,COMBAT_TABLE::ns_DAMAGE_HIT_STOP_SECONDS);
-		}
-		// ジャスト回避の場合は、スローを開始する。連続した場合は、時間を数え直す。
-		else if(result == DODGE_JUDGE_RESULT::e_JUST_DODGED){
-			m_slowMotionRemainingSeconds = COMBAT_TABLE::ns_SLOW_MOTION_SECONDS;
-		}
-	}
-}
-
-// 全枠の予告と再攻撃待ちを初期状態へ戻す。
-void GameScene::ResetEnemyMelee()
-{
-	// 全枠の攻撃予告を破棄し、再配置後の敵が旧予告で攻撃しないようにする。
-	for(JustDodgeJudge& judge : m_enemyMeleeJudges){
-		judge.Initialize();
-	}
-	m_enemyMeleeRecoverySeconds.fill(0.0f);
-}
-
-// 現在の部屋とウェーブを生成し、成功した場合だけ敵の攻撃状態と進行状態を新しい編成に合わせる。
+// 現在の部屋とウェーブをEnemyControllerへ生成させ、成功した場合だけ転倒の記録と進行状態を新しい編成に合わせる。
 bool GameScene::TrySpawnCurrentWave()
 {
-	// 登録に失敗した場合は、EnemyManagerが生成済みの枠を解除して空にする。進行管理へ生成完了を通知せず、失敗を返す。
-	if(!m_enemyManager.SpawnWave(m_roomController.GetRoomNumber(),m_roomController.GetWaveNumber(),m_modelRegistry,m_collisionWorld)){
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの部屋ウェーブの生成に失敗しました。");
-		return false;
-	}
+	// 登録に失敗した場合は、EnemyControllerが失敗を記録し、EnemyManagerが生成済みの枠を解除して空にする。進行管理へ生成完了を通知せず、失敗を返す。
+	if(!m_enemyController.TrySpawnWave(m_roomController.GetRoomNumber(),m_roomController.GetWaveNumber()))return false;
 
-	// 新しい敵が旧予告・旧ウェーブの弾と範囲の予告・スライディングの転倒記録を引き継がないよう初期化し、全滅判定を開始する。
-	ResetEnemyMelee();
-	m_enemyProjectiles.Clear();
-	m_areaTelegraph.Clear();
+	// 新しい敵がスライディングの転倒記録を引き継がないよう初期化し、全滅判定を開始する。
 	m_slideKnockedDownEnemyMask = 0;
 	m_roomController.NotifyWaveSpawned();
 	return true;
@@ -742,7 +468,7 @@ bool GameScene::TrySpawnCurrentWave()
 void GameScene::SkipCurrentWave()
 {
 	// 全枠を先頭から調べ、生きている敵だけを倒す。倒された敵のColliderは、ApplyDamageの中で解除される。
-	for(Enemy& enemy : m_enemyManager.GetEnemies()){
+	for(Enemy& enemy : m_enemyController.GetEnemyManager().GetEnemies()){
 		// 死亡中の敵は、倒す対象がないため次の枠へ進む。
 		if(!enemy.IsAlive())continue;
 
@@ -750,9 +476,7 @@ void GameScene::SkipCurrentWave()
 	}
 
 	// 倒された敵の予告・飛行中の弾・範囲の予告を消す。全滅の判定は、次の更新で進行管理が行う。
-	ResetEnemyMelee();
-	m_enemyProjectiles.Clear();
-	m_areaTelegraph.Clear();
+	m_enemyController.ResetAttackState();
 }
 
 // 一撃で倒す設定が有効なら敵の残りHPを、無効なら基本のダメージを返す。
@@ -797,7 +521,7 @@ void GameScene::UpdateMelee()
 	if(!m_playerController.TryConsumeMeleeImpact(melee_type))return;
 
 	// 当たる瞬間に、視点から射程と範囲の内で最も近い生存中の敵を選ぶ。いなければ空振りとして何もしない。
-	Enemy* const target_enemy = m_enemyManager.FindMeleeTarget(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),false);
+	Enemy* const target_enemy = m_enemyController.GetEnemyManager().FindMeleeTarget(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),false);
 	// 対象がいない場合は、空振りとして効果を与えずに戻る。
 	if(target_enemy == nullptr)return;
 
@@ -829,7 +553,7 @@ void GameScene::UpdateContact(float gameplayDeltaTime)
 	}
 
 	// 全枠を出現順に調べ、体が重なった敵ごとに、スライディングの転倒か接触の反応を判定する。
-	for(Enemy& enemy : m_enemyManager.GetEnemies()){
+	for(Enemy& enemy : m_enemyController.GetEnemyManager().GetEnemies()){
 		// 死亡中、または体が重なっていない敵は、接触していないため次の枠へ進む。
 		if(!enemy.IsAlive() || !CollisionMath::IntersectSphereSphere(m_playerController.GetBodySphere(),enemy.GetBodySphere()))continue;
 
@@ -878,7 +602,7 @@ void GameScene::UpdateShooting(float gameplayDeltaTime)
 
 	// 敵レイヤーに命中した場合だけ、Colliderの識別値からダメージを与える相手を探す。
 	if(weapon_result.didHit && weapon_result.hitInfo.layer == COLLISION_LAYER::ns_ENEMY){
-		Enemy* const hit_enemy = m_enemyManager.FindLivingEnemy(weapon_result.hitInfo.userData);
+		Enemy* const hit_enemy = m_enemyController.GetEnemyManager().FindLivingEnemy(weapon_result.hitInfo.userData);
 		// 対応する生存中の敵が見つかった場合だけ、ダメージと命中表示を反映する。
 		if(hit_enemy != nullptr){
 			hit_enemy->ApplyDamage(GetPlayerAttackDamage(WEAPON_TABLE::ns_ASSAULT_RIFLE.damage,*hit_enemy),m_collisionWorld);
