@@ -14,7 +14,7 @@
 #include "Framework/Etc/H/MathTypes.h"
 #include "Framework/Input/H/InputSystem.h"
 
-// 視線の上下回転の制限と、反動の補間・復帰の数値をまとめる。反動の数値は企画書で未確定の仮値。
+// 視線の上下回転の制限と、反動のずれの0揃えの数値をまとめる。反動の追従・復帰・上限は、RECOIL_PROFILEが持つ。
 namespace
 {
 	//========= Pitch制限定数=========
@@ -24,17 +24,7 @@ namespace
 	// 三角関数と保持角度がラジアンを使うため、同じ上限を度から変換する。感度や時間を掛ける値ではない。
 	constexpr float ns_MAX_PITCH_RADIANS = XMConvertToRadians(ns_MAX_PITCH_DEGREES);
 
-	//========= 反動の補間・復帰=========
-	// 実際のずれが目標へ近づく速さ。1秒あたりに差の何倍を縮めるかを表し、大きいほど速く、小さいほど滑らかに見える。仮値。
-	constexpr float ns_RECOIL_FOLLOW_RATE = 16.0f;
-	// 最後の反動から、目標が0へ戻り始めるまでの時間。単位は秒。連射の間は戻り始めないよう、連射の間隔より短い仮値。
-	constexpr float ns_RECOIL_RECOVERY_DELAY_SECONDS = 0.15f;
-	// 目標が0へ戻る速さ。1秒あたりに残りの何倍を縮めるかを表す。仮値。
-	constexpr float ns_RECOIL_RECOVERY_RATE = 6.0f;
-	// 反動のずれの目標のPitchの上限。単位はラジアン。連射で視線が上へ上がり続けないための仮値で、12度。
-	constexpr float ns_MAX_RECOIL_PITCH_RADIANS = XMConvertToRadians(12.0f);
-	// 反動のずれの目標のYawの上限。単位はラジアン。左右へ振れ続けないための仮値で、6度。
-	constexpr float ns_MAX_RECOIL_YAW_RADIANS = XMConvertToRadians(6.0f);
+	//========= 反動の0揃え=========
 	// この大きさ（ラジアン）より小さいずれは、0とみなして0へ揃える。指数的な復帰が、いつまでも0にならないことを防ぐ。
 	constexpr float ns_RECOIL_SNAP_EPSILON = 0.0002f;
 }
@@ -63,8 +53,8 @@ void FpsCamera::UpdateRecoil(float deltaTime)
 	m_secondsSinceRecoil += deltaTime;
 
 	// 最後の反動から一定時間が過ぎたら、目標を0へ向けて指数的に縮める。連射中は経過時間が0へ戻るため、縮まない。
-	if(m_secondsSinceRecoil > ns_RECOIL_RECOVERY_DELAY_SECONDS){
-		const float recovery_blend = std::min(1.0f,ns_RECOIL_RECOVERY_RATE * deltaTime);
+	if(m_secondsSinceRecoil > m_recoilProfile.recoveryDelaySeconds){
+		const float recovery_blend = std::min(1.0f,m_recoilProfile.recoveryRate * deltaTime);
 		m_recoilTargetYaw -= m_recoilTargetYaw * recovery_blend;
 		m_recoilTargetPitch -= m_recoilTargetPitch * recovery_blend;
 
@@ -79,7 +69,7 @@ void FpsCamera::UpdateRecoil(float deltaTime)
 	}
 
 	// 実際のずれを、目標へ滑らかに近づける。1回の更新で差を超えないよう、近づく割合は1以下に制限する。
-	const float follow_blend = std::min(1.0f,ns_RECOIL_FOLLOW_RATE * deltaTime);
+	const float follow_blend = std::min(1.0f,m_recoilProfile.followRate * deltaTime);
 	m_recoilYaw += (m_recoilTargetYaw - m_recoilYaw) * follow_blend;
 	m_recoilPitch += (m_recoilTargetPitch - m_recoilPitch) * follow_blend;
 
@@ -96,9 +86,13 @@ void FpsCamera::UpdateRecoil(float deltaTime)
 // 反動の目標へ、引数の回転量を加え、上限を超えないよう制限して、経過時間を0へ戻す。
 void FpsCamera::ApplyRecoil(float yawRadians,float pitchRadians)
 {
+	// 反動の設定の上限（度）を、保持角度と同じラジアンへ変換する。
+	const float max_recoil_yaw = XMConvertToRadians(m_recoilProfile.maxYawDegrees);
+	const float max_recoil_pitch = XMConvertToRadians(m_recoilProfile.maxPitchDegrees);
+
 	// 目標へ加え、上限の内に収める。実際の視線は、UpdateRecoilで目標へ近づく。
-	m_recoilTargetYaw = std::clamp(m_recoilTargetYaw + yawRadians,-ns_MAX_RECOIL_YAW_RADIANS,ns_MAX_RECOIL_YAW_RADIANS);
-	m_recoilTargetPitch = std::clamp(m_recoilTargetPitch + pitchRadians,-ns_MAX_RECOIL_PITCH_RADIANS,ns_MAX_RECOIL_PITCH_RADIANS);
+	m_recoilTargetYaw = std::clamp(m_recoilTargetYaw + yawRadians,-max_recoil_yaw,max_recoil_yaw);
+	m_recoilTargetPitch = std::clamp(m_recoilTargetPitch + pitchRadians,-max_recoil_pitch,max_recoil_pitch);
 
 	// 反動を加えた直後は、目標が0へ戻り始めないよう、経過時間を0へ戻す。
 	m_secondsSinceRecoil = 0.0f;

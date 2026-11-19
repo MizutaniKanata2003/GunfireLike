@@ -34,7 +34,7 @@ namespace
 }
 
 //========= 初期化・終了関数=========
-// 参照先を登録する。
+// 参照先を登録し、使用する武器の反動の設定をカメラへ渡す。
 bool ShotController::Initialize(const SHOT_CONTROLLER_LINKS& links)
 {
 	// 参照先が1つでも欠けている場合は、以後の更新で空の参照を使ってしまうため、何も登録せず失敗を返す。
@@ -52,6 +52,9 @@ bool ShotController::Initialize(const SHOT_CONTROLLER_LINKS& links)
 	m_enemyManager = links.enemyManager;
 	m_playerCombat = links.playerCombat;
 	m_collisionDebugView = links.collisionDebugView;
+
+	// 使用する武器の反動の設定を、カメラへ渡す。武器を切り替える工程では、切替のたびに、この設定を渡し直す。
+	m_camera->SetRecoilProfile(WEAPON_TABLE::ns_ASSAULT_RIFLE.recoilProfile);
 	return true;
 }
 
