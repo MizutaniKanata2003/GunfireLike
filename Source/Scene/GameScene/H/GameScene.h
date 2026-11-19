@@ -25,7 +25,7 @@
 #include "Scene/Common/H/PlayerHealth.h"
 #include "Scene/Common/H/SceneObject.h"
 #include "Scene/Common/H/RoomController.h"
-#include "Scene/Common/H/WeaponSystem.h"
+#include "Scene/Common/H/ShotController.h"
 #include "Scene/GameScene/H/GameHud.h"
 
 //========= 前方宣言=========
@@ -78,9 +78,6 @@ private:
 	void SkipCurrentWave();
 	// 出口が開いていて、プレイヤーが通過範囲に入った場合だけ、次の部屋へ進め、プレイヤーを開始位置へ戻す。
 	void UpdateExitPass();
-	// 射撃・リロードを更新し、弾が敵へ命中していればダメージを与える。
-	// gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。
-	void UpdateShooting(float gameplayDeltaTime);
 
 	//========= System・Scene参照=========
 	// Scene遷移の予約先となる非所有参照。
@@ -101,8 +98,8 @@ private:
 	HealItems m_healItems{};
 	// マウスによる視線方向と、プレイヤー位置に追従するView行列の生成状態。
 	FpsCamera m_FPSCamera{};
-	// 弾薬・連射・リロード・射撃判定を管理する武器。
-	WeaponSystem m_weaponSystem{};
+	// 射撃・リロードの更新、弾道の終点の通知、命中した敵へのダメージ、命中表示の時間を担当し、武器を所有する。
+	ShotController m_shotController{};
 	// 現在のウェーブの敵・敵の弾・範囲の予告・敵ごとの攻撃予告を所有し、更新と描画を行う。Finalizeで、登録先のCollisionWorldと共有Rendererより先に解除する。
 	EnemyController m_enemyController{};
 	// 蹴り・殴打の当たり・敵との接触・スライディングの転倒・回復アイテムの使用・被弾の反応と、一撃で倒すデバッグ設定を担当する。ヒットストップの残り時間は、このSceneが持つ。
@@ -141,8 +138,4 @@ private:
 	CollisionWorld m_collisionWorld{};
 	// Collisionの可視化（Colliderの線・視線のRay・弾道）。F3で表示を切り替える。
 	CollisionDebugView m_collisionDebugView{};
-
-	//========= 表示状態=========
-	// 直近の命中を表示する残り時間。単位は秒。0より大きい間、命中した旨をデバッグUIへ表示する。
-	float m_hitMarkerRemainingSeconds{};
 };

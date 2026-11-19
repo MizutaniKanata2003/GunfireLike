@@ -27,10 +27,9 @@
 #include "Scene/Common/H/SceneManager.h"
 #include "Scene/Common/H/SceneObjectFactory.h"
 #include "Scene/Common/H/StageLayout.h"
-#include "Scene/Common/H/WeaponTable.h"
 #include "Scene/TitleScene/H/TitleScene.h"
 
-// このSceneの視野角、開始位置、射撃の表示に使用する固定設定をまとめる。戦闘の数値はCombatTableにある。
+// このSceneの視野角、開始位置に使用する固定設定をまとめる。戦闘の数値はCombatTableにある。
 namespace
 {
 	//========= Projection設定=========
@@ -54,12 +53,6 @@ namespace
 	//========= 配置の設定=========
 	// プレイヤーの開始位置。ワールド座標(0,1.6,0)で、床の手前寄りの中央。Yは立っている時のカメラの高さ。壁の内側にある。
 	constexpr XMFLOAT3 ns_PLAYER_START_POSITION{0.0f,1.6f,0.0f};
-
-	//========= 射撃の表示設定=========
-	// 命中しない場合に、弾道の線を伸ばす長さ。単位はワールド距離単位。
-	constexpr float ns_SHOT_TRACE_DISPLAY_LENGTH = 30.0f;
-	// 命中を示す表示を続ける時間。単位は秒。
-	constexpr float ns_HIT_MARKER_SECONDS = 0.3f;
 }
 
 //========= 生成関数=========
@@ -77,7 +70,7 @@ void GameScene::Initialize()
 	m_playerHealth.Initialize(COMBAT_TABLE::ns_PLAYER_MAX_HP);
 	m_healItems.Initialize(COMBAT_TABLE::ns_HEAL_INITIAL_COUNT,COMBAT_TABLE::ns_HEAL_MAX_COUNT);
 	m_FPSCamera = FpsCamera{};
-	m_weaponSystem.Initialize(WEAPON_TABLE::ns_ASSAULT_RIFLE);
+	m_shotController.Reset();
 	m_fovDegrees = ns_FOV_DEGREES;
 
 	// 進行状態を第1部屋の第1ウェーブへ戻し、前回の生成失敗を引き継がない。
@@ -92,7 +85,6 @@ void GameScene::Initialize()
 	m_hitStopRemainingSeconds = 0.0f;
 	m_playerCombat.Reset();
 	m_previousActionState = PLAYER_ACTION_STATE::e_NORMAL;
-	m_hitMarkerRemainingSeconds = 0.0f;
 	m_stageObjects.clear();
 	m_collisionWorld.Clear();
 
@@ -172,6 +164,21 @@ bool GameScene::Init()
 	// 参照先の登録に失敗したら、生成済みのResourceを含めて終了して失敗を返す。
 	if(!m_playerCombat.Initialize(player_combat_links)){
 		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneのプレイヤー戦闘の初期化に失敗しました。");
+		Finalize();
+		return false;
+	}
+
+	// 射撃に使う参照を、ShotControllerへ渡す。参照先の登録に失敗したら、生成済みのResourceを含めて終了して失敗を返す。
+	SHOT_CONTROLLER_LINKS shot_links{};
+	shot_links.playerController = &m_playerController;
+	shot_links.camera = &m_FPSCamera;
+	shot_links.inputSystem = &m_inputSystem;
+	shot_links.collisionWorld = &m_collisionWorld;
+	shot_links.enemyManager = &m_enemyController.GetEnemyManager();
+	shot_links.playerCombat = &m_playerCombat;
+	shot_links.collisionDebugView = &m_collisionDebugView;
+	if(!m_shotController.Initialize(shot_links)){
+		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの射撃の初期化に失敗しました。");
 		Finalize();
 		return false;
 	}
@@ -274,7 +281,7 @@ void GameScene::Update(float deltaTime)
 
 	m_healItems.Update(gameplay_delta_time);
 	m_collisionDebugView.Update(deltaTime);
-	m_hitMarkerRemainingSeconds = std::max(0.0f,m_hitMarkerRemainingSeconds - deltaTime);
+	m_shotController.UpdateHitMarker(deltaTime);
 
 	// 反動によるカメラのずれを、実時間で目標へ滑らかに近づけ、射撃をやめて少し経つと、元の視線へ戻す。Captureに関係なく進める。
 	m_FPSCamera.UpdateRecoil(deltaTime);
@@ -295,7 +302,7 @@ void GameScene::Update(float deltaTime)
 	const PLAYER_ACTION_STATE action_state = m_playerController.GetActionState();
 	// 殴打を始めた更新では、リロードをキャンセルする。弾は補充しない。殴打の開始は、1回前の状態が殴打ではなかったことで検出する。
 	if(action_state == PLAYER_ACTION_STATE::e_PUNCH && m_previousActionState != PLAYER_ACTION_STATE::e_PUNCH){
-		m_weaponSystem.CancelReload();
+		m_shotController.CancelReload();
 	}
 	m_previousActionState = action_state;
 
@@ -323,7 +330,7 @@ void GameScene::Update(float deltaTime)
 
 	// 近接攻撃・接触・回復・射撃を、この順に更新する。
 	m_playerCombat.Update(gameplay_delta_time);
-	UpdateShooting(gameplay_delta_time);
+	m_shotController.Update(gameplay_delta_time);
 	// 当フレームの回避・移動・敵への怯みを反映してから、敵の行動と、敵の弾の命中を判定する。
 	m_enemyController.Update(world_delta_time);
 
@@ -369,11 +376,11 @@ void GameScene::Draw()
 	hud_state.currentHP = m_playerHealth.GetCurrentHP();
 	hud_state.maxHP = m_playerHealth.GetMaxHP();
 	hud_state.healItemCount = m_healItems.GetCount();
-	hud_state.magazineAmmo = m_weaponSystem.GetMagazineAmmo();
-	hud_state.magazineSize = m_weaponSystem.GetMagazineSize();
-	hud_state.reserveAmmo = m_weaponSystem.GetReserveAmmo();
-	hud_state.isReloading = m_weaponSystem.IsReloading();
-	hud_state.reloadProgress = m_weaponSystem.GetReloadProgress();
+	hud_state.magazineAmmo = m_shotController.GetWeaponSystem().GetMagazineAmmo();
+	hud_state.magazineSize = m_shotController.GetWeaponSystem().GetMagazineSize();
+	hud_state.reserveAmmo = m_shotController.GetWeaponSystem().GetReserveAmmo();
+	hud_state.isReloading = m_shotController.GetWeaponSystem().IsReloading();
+	hud_state.reloadProgress = m_shotController.GetWeaponSystem().GetReloadProgress();
 	hud_state.isAiming = m_playerController.IsAiming();
 	m_gameHud.Draw(m_graphicsSystem,hud_state);
 
@@ -396,7 +403,7 @@ void GameScene::Draw()
 	debug_info.enemyMaxHP = m_enemyController.GetEnemyManager().GetFirstEnemy().GetMaxHP();
 	debug_info.isEnemyFlinching = m_enemyController.GetEnemyManager().GetFirstEnemy().IsFlinching();
 	debug_info.isEnemyKnockedDown = m_enemyController.GetEnemyManager().GetFirstEnemy().IsKnockedDown();
-	debug_info.isHitMarkerActive = m_hitMarkerRemainingSeconds > 0.0f;
+	debug_info.isHitMarkerActive = m_shotController.IsHitMarkerActive();
 	debug_info.isCaptureEnabled = m_inputSystem.IsMouseCaptureEnabled();
 	debug_info.isHitStopActive = m_hitStopRemainingSeconds > 0.0f;
 	debug_info.isSlowMotionActive = m_slowMotionRemainingSeconds > 0.0f;
@@ -415,6 +422,7 @@ void GameScene::Finalize()
 {
 	// 遷移先のInit後に呼ばれても、遷移先が設定したCaptureやBGMを上書きしない。
 	// 敵・敵の弾・範囲の予告・出口・Objectは、Collisionと共有Rendererを借用しているため、それらを解放する前に先に終了する。
+	m_shotController.Uninit();
 	m_playerCombat.Uninit();
 	m_enemyController.Uninit();
 	m_exitDoor.Uninit(m_collisionWorld);
@@ -506,38 +514,4 @@ void GameScene::UpdateExitPass()
 	// 次の部屋へ進んだので、プレイヤーを開始位置へ戻し、カメラ位置を合わせる。出口は、次の更新の進行状態の同期で閉じる。
 	m_playerController.Initialize(ns_PLAYER_START_POSITION);
 	m_FPSCamera.SetPosition(m_playerController.GetPosition());
-}
-
-// 射撃・リロードを更新し、敵へ命中していればダメージを与える。
-void GameScene::UpdateShooting(float gameplayDeltaTime)
-{
-	// 射撃を更新する。リロード・連射間隔・弾薬の処理と、命中判定は武器が行い、ダメージの反映だけをここで行う。回避・蹴り・殴打の間は射撃できない。
-	const WEAPON_UPDATE_RESULT weapon_result = m_weaponSystem.Update(gameplayDeltaTime,m_inputSystem,m_playerController.IsAiming(),
-																																	 m_playerController.IsShootingAllowed(),m_FPSCamera,m_collisionWorld);
-
-	// 弾を発射した場合は、弾道の終点を可視化へ伝える。命中していれば命中点、していなければ弾の方向へ表示用の長さだけ進んだ点。
-	if(weapon_result.didFire){
-		const XMFLOAT3& shot_origin = weapon_result.shotRay.origin;
-		const XMFLOAT3& shot_direction = weapon_result.shotRay.direction;
-		// 命中した場合は、終点を命中点にする。
-		if(weapon_result.didHit){
-			m_collisionDebugView.NotifyShot(weapon_result.rayHit.point);
-		}
-		// 命中しなかった場合は、弾の方向へ表示用の長さだけ進んだ点を終点にする。
-		else{
-			m_collisionDebugView.NotifyShot(XMFLOAT3{shot_origin.x + shot_direction.x * ns_SHOT_TRACE_DISPLAY_LENGTH,
-																							 shot_origin.y + shot_direction.y * ns_SHOT_TRACE_DISPLAY_LENGTH,
-																							 shot_origin.z + shot_direction.z * ns_SHOT_TRACE_DISPLAY_LENGTH});
-		}
-	}
-
-	// 敵レイヤーに命中した場合だけ、Colliderの識別値からダメージを与える相手を探す。
-	if(weapon_result.didHit && weapon_result.hitInfo.layer == COLLISION_LAYER::ns_ENEMY){
-		Enemy* const hit_enemy = m_enemyController.GetEnemyManager().FindLivingEnemy(weapon_result.hitInfo.userData);
-		// 対応する生存中の敵が見つかった場合だけ、ダメージと命中表示を反映する。
-		if(hit_enemy != nullptr){
-			hit_enemy->ApplyDamage(m_playerCombat.GetAttackDamage(WEAPON_TABLE::ns_ASSAULT_RIFLE.damage,*hit_enemy),m_collisionWorld);
-			m_hitMarkerRemainingSeconds = ns_HIT_MARKER_SECONDS;
-		}
-	}
 }
