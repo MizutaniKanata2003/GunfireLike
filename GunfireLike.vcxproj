@@ -190,6 +190,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="External\imgui\imgui_tables.cpp" />
     <ClCompile Include="External\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Source\Debug\CPP\CollisionDebugView.cpp" />
+    <ClCompile Include="Source\Debug\CPP\GameDebugController.cpp" />
     <ClCompile Include="Source\Debug\CPP\GameDebugUi.cpp" />
     <ClCompile Include="Source\Framework\2D\CPP\HudCanvas.cpp" />
     <ClCompile Include="Source\Framework\2D\CPP\HudSpriteRenderer.cpp" />
@@ -243,6 +244,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="External\imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="External\imgui\imgui.h" />
     <ClInclude Include="Source\Debug\H\CollisionDebugView.h" />
+    <ClInclude Include="Source\Debug\H\GameDebugController.h" />
     <ClInclude Include="Source\Debug\H\GameDebugUi.h" />
     <ClInclude Include="Source\Framework\2D\H\HudCanvas.h" />
     <ClInclude Include="Source\Framework\2D\H\HudSpriteRenderer.h" />

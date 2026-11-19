@@ -1,23 +1,24 @@
 ﻿#pragma once
 
 // 移動・ダッシュ・しゃがみ・スライディング・回避・蹴り・殴打・視点・構え・射撃・リロード・回復と、設定表から生成した床・壁、部屋ごとの敵と敵の弾と範囲の予告、出口、画像のHUD、Collisionの可視化を行う最小構成のGameSceneを宣言する。
-// 各クラスの更新を仲介し、共有Renderer・生成したObject・CollisionWorldを所有する。Scene切替はManagerへ予約する。
+// 各クラスの更新を仲介し、共有Renderer・生成したObject・CollisionWorldを所有する。Scene切替はManagerへ予約する。個別のゲーム規則は、各Controllerが持つ。
 
 //========= C++標準ライブラリ インクルード=========
 #include <vector> // 設定表から生成したSceneObjectを、表の順に保持する可変長配列として使用する。
 
 //========= Debug インクルード=========
 #include "Debug/H/CollisionDebugView.h"
+#include "Debug/H/GameDebugController.h"
 
 //========= Framework インクルード=========
 #include "Framework/Collision/H/CollisionWorld.h"
+#include "Framework/Etc/H/MathTypes.h"
 #include "Framework/Input/H/FpsCamera.h"
 
 //========= Scene インクルード=========
 #include "Scene/Common/Camera/H/CameraFovController.h"
-#include "Scene/Common/Combat/H/JustDodgeJudge.h"
-#include "Scene/Common/Combat/H/TimeScaleController.h"
 #include "Scene/Common/Combat/H/PlayerCombatController.h"
+#include "Scene/Common/Combat/H/TimeScaleController.h"
 #include "Scene/Common/Core/H/IScene.h"
 #include "Scene/Common/Enemy/H/EnemyController.h"
 #include "Scene/Common/Object/H/ModelRegistry.h"
@@ -55,18 +56,47 @@ public:
 	// 戻り値: 各初期化・Object生成・敵の配置が成功したらtrue。falseを検出した場合はFinalize後にfalseを返す。
 	// 下位処理の例外は捕捉しない。
 	bool Init() override;
-	// F2の遷移予約、F3〜F9・F11の確認操作、F1のCapture切替、ヒットストップ・スローの管理、部屋の進行、出口の通過、視点・移動・動作・射撃・近接攻撃・回復・接触・敵の行動と弾の更新と反映を行う。
-	// deltaTime: 各更新へ渡す経過時間。単位は秒。ヒットストップ中は0、スロー中はプレイヤー以外へ縮めた値を、それぞれの更新へ渡す。
-	// Capture解除中は視点・移動・射撃・出口の通過・敵の行動の更新を行わない。F2で予約した場合は後続処理を行わない。
+	// F2の遷移予約、F1のCapture切替、F4の再開、デバッグ操作を処理し、時間・部屋・プレイヤー・戦闘・敵の順に更新する。
+	// deltaTime: 実時間の経過時間。単位は秒。各更新へは、ヒットストップ中は0、スロー中はプレイヤー以外へ縮めた値を、それぞれ渡す。
+	// Capture解除中は視点・移動・戦闘・敵の行動の更新を行わない。F2で予約した場合は後続処理を行わない。
 	void Update(float deltaTime) override;
-	// 描画先サイズに合わせて行列を作り、生成済みのObject・範囲の予告・出口・敵・敵の弾・Collisionの可視化を描画し、続けて画像のHUDと読み取り専用のデバッグUIを描画する。
+	// 描画先サイズに合わせて行列を作り、3D・画像のHUD・読み取り専用のデバッグUIを、この順に描画する。
 	// 幅または高さが0なら何もしない。ImGuiフレーム開始後、描画データ確定前に呼ぶ。
 	void Draw() override;
 	// 敵・敵の弾・範囲の予告・出口・生成したObjectを先に破棄し、その後に共有Renderer・HUD・Collision可視化・Collisionを解放する。繰り返し呼出可能。CaptureやBGMは変更しない。
 	void Finalize() override;
 
 private:
+	//========= 初期化の補助関数=========
+	// 共有Renderer・Collision可視化・HUD・ステージObject・出口を初期化する。失敗の後始末は、呼出側のInitがFinalizeで行う。
+	// 戻り値: 全て成功したらtrue。失敗した場合は、失敗した対象をログへ記録してfalse。
+	[[nodiscard]] bool InitRenderResources();
+	// 敵の更新とプレイヤーの戦闘へ、使用する参照と通知先を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
+	// 戻り値: 両方の登録に成功したらtrue。
+	[[nodiscard]] bool InitEnemyAndPlayerCombat();
+	// 射撃とデバッグ操作へ、使用する参照を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
+	// 戻り値: 両方の登録に成功したらtrue。
+	[[nodiscard]] bool InitShotAndDebug();
+
 	//========= 更新の補助関数=========
+	// F2の遷移予約、F1のCapture切替、F4の最初の部屋からの再開を処理する。
+	// 戻り値: F2でタイトルへの遷移を予約した場合はtrue。呼出側は、後続の更新を行わず戻る。
+	[[nodiscard]] bool UpdateSceneInput();
+	// 確認用の攻撃の判定と、敵の怯み・転倒・部屋の進行・出口の開閉を、Captureに関係なく更新する。
+	// worldDeltaTime: スローを反映した経過時間。単位は秒。ヒットストップ中は0。
+	void UpdateWorldAndRoom(float worldDeltaTime);
+	// 回復アイテムの間隔・Collision可視化の表示時間・命中表示・反動のずれを、Captureに関係なく更新する。
+	// deltaTime: 実時間の経過時間。単位は秒。表示用と反動の時間に使う。
+	// gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。回復アイテムの間隔に使う。
+	void UpdateTimers(float deltaTime,float gameplayDeltaTime);
+	// 視点・プレイヤーの動作・出口の通過・殴打でのリロードのキャンセル・視野角を更新する。Capture中だけ呼ぶ。
+	// deltaTime: 実時間の経過時間。単位は秒。視野角の補間に使う。
+	// gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。プレイヤーの動作に使う。
+	void UpdatePlayer(float deltaTime,float gameplayDeltaTime);
+	// プレイヤーの戦闘・射撃・敵の行動と弾を更新し、Collision可視化の視線のRayを更新する。Capture中だけ呼ぶ。
+	// gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。プレイヤーの戦闘と射撃に使う。
+	// worldDeltaTime: スローを反映した経過時間。単位は秒。敵の行動と弾に使う。
+	void UpdateCombat(float gameplayDeltaTime,float worldDeltaTime);
 	// 確認用の攻撃が当たる瞬間を判定し、結果に応じてプレイヤーへのダメージとスローを反映する。
 	// worldDeltaTime: スローを反映した経過時間。単位は秒。ヒットストップ中は0。
 	void UpdateDodgeJudge(float worldDeltaTime);
@@ -80,6 +110,14 @@ private:
 	void SkipCurrentWave();
 	// 出口が開いていて、プレイヤーが通過範囲に入った場合だけ、次の部屋へ進め、プレイヤーを開始位置へ戻す。
 	void UpdateExitPass();
+
+	//========= 描画の補助関数=========
+	// 床・壁・範囲の予告・出口・敵・敵の弾・Collisionの線を、この順に3Dで描画する。
+	// viewMatrix: World空間からView空間への変換行列。
+	// projectionMatrix: View空間からClip空間への変換行列。
+	void DrawWorld(const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix);
+	// 3Dの上に、画像のHUD（照準・HPバー・弾薬・リロード表示・回復アイテム数・低HP警告）を描画する。
+	void DrawHud();
 
 	//========= System・Scene参照=========
 	// Scene遷移の予約先となる非所有参照。
@@ -108,6 +146,8 @@ private:
 	PlayerCombatController m_playerCombat{};
 	// ヒットストップとスローの残り時間を持ち、更新ごとに、プレイヤー側と、敵・判定側の経過時間を求める。
 	TimeScaleController m_timeScale{};
+	// デバッグ操作・確認用の攻撃の判定・デバッグUIの情報の組立を担当する。ゲームの状態は、参照を通じてだけ変更する。
+	GameDebugController m_debugController{};
 	// 3部屋×2ウェーブの進行状態。敵の生成と全滅判定は、GameSceneが仲介する。
 	RoomController m_roomController{};
 	// 現在のウェーブの生成に失敗したか。trueの間は生成を再試行せず、F4で最初からやり直す。
@@ -116,12 +156,6 @@ private:
 	ExitDoor m_exitDoor{};
 	// 動作の状態に応じた視野角の目標値と、現在の視野角の補間を担当する。
 	CameraFovController m_cameraFov{};
-
-	//========= 判定・時間の状態=========
-	// 確認用に発生させた攻撃の、命中の瞬間の判定（無敵・ジャスト回避）。
-	JustDodgeJudge m_dodgeJudge{};
-	// 直近の判定結果。デバッグUIへの表示に使う。
-	DODGE_JUDGE_RESULT m_lastJudgeResult{DODGE_JUDGE_RESULT::e_NONE};
 	// 1回前の更新での、プレイヤーの動作の状態。殴打の開始を検出するために使う。
 	PLAYER_ACTION_STATE m_previousActionState{PLAYER_ACTION_STATE::e_NORMAL};
 
@@ -130,7 +164,7 @@ private:
 	ModelRegistry m_modelRegistry{};
 	// STAGE_LAYOUTの表から生成した床と壁。Rendererを借用するだけで所有しない。表の順が描画順になる。
 	std::vector<SceneObject> m_stageObjects{};
-	// 画像で描くHUD（照準・HPバー・弾薬・リロード表示・回復アイテム数・低HP警告）。
+	// 画像で描くHUD。
 	GameHud m_gameHud{};
 
 	//========= Collision=========
