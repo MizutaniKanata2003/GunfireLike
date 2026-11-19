@@ -2,13 +2,18 @@
 
 // Device・SwapChainと描画先・Stateを生成し、Bind/Clear/Present、Resize、解放を実装する。
 // 既存設定・API順・失敗経路を維持し、Flip Model化やResizeのBind解除などの修正は混ぜない。
+// 描画領域は、BackBufferの内側に収めた16:9のViewportとして生成する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <iomanip> // setfill・setwでHRESULTを0埋め8桁に整える。
 #include <sstream> // wostringstreamへ数値と書式指定を渡し、失敗値の表示文字列を生成する。
 #include <string> // wstringでAPI名・HRESULTを連結してLoggerへ渡す。
 
+//========= 外部ライブラリ インクルード=========
+#include <d3d11_1.h> // ID3D11DeviceContext1::ClearViewで、RTVの一部の矩形だけを塗る。
+
 //========= Framework インクルード=========
+#include "Framework/DirectX/H/ViewportArea.h"
 #include "Framework/Etc/H/Logger.h"
 
 // HRESULT表示、Device生成のDebug有無、Blend設定用の静的配列を内部処理としてまとめる。
@@ -192,7 +197,8 @@ bool GraphicsSystem::Init(HWND windowHandle,unsigned int width,unsigned int heig
 	cull_back_rasterizer_description.FillMode = D3D11_FILL_SOLID;
 	cull_back_rasterizer_description.CullMode = D3D11_CULL_BACK;
 	cull_back_rasterizer_description.DepthClipEnable = TRUE;
-	const HRESULT cull_back_rasterizer_state_result = m_device->CreateRasterizerState(&cull_back_rasterizer_description,m_cullBackRasterizerState.GetAddressOf());
+	const HRESULT cull_back_rasterizer_state_result = m_device->CreateRasterizerState(&cull_back_rasterizer_description,
+																																										m_cullBackRasterizerState.GetAddressOf());
 	// 背面Cull State生成失敗では先行Stateを含めて解放し、falseへ戻る。
 	if(FAILED(cull_back_rasterizer_state_result)){
 		WriteGraphicsError(L"ID3D11Device::CreateRasterizerState",cull_back_rasterizer_state_result);
@@ -205,7 +211,8 @@ bool GraphicsSystem::Init(HWND windowHandle,unsigned int width,unsigned int heig
 	cull_none_rasterizer_description.FillMode = D3D11_FILL_SOLID;
 	cull_none_rasterizer_description.CullMode = D3D11_CULL_NONE;
 	cull_none_rasterizer_description.DepthClipEnable = TRUE;
-	const HRESULT cull_none_rasterizer_state_result = m_device->CreateRasterizerState(&cull_none_rasterizer_description,m_cullNoneRasterizerState.GetAddressOf());
+	const HRESULT cull_none_rasterizer_state_result = m_device->CreateRasterizerState(&cull_none_rasterizer_description,
+																																										m_cullNoneRasterizerState.GetAddressOf());
 	// CullなしState生成失敗では全所有Resourceを部分終了する。
 	if(FAILED(cull_none_rasterizer_state_result)){
 		WriteGraphicsError(L"ID3D11Device::CreateRasterizerState",cull_none_rasterizer_state_result);
@@ -233,8 +240,22 @@ void GraphicsSystem::BeginFrame(const float clearColor[4])
 	// RTVを先頭から1個とDSVを設定する。配列の個数でありバイト数ではない。Bind状態は以後も残る。
 	m_context->OMSetRenderTargets(1,m_renderTargetView.GetAddressOf(),m_depthStencilView.Get());
 
-	// RGBAは呼出側の4成分を使用する。Depthだけを1へClearし、Stencil値0の引数を渡すがStencil Clear Flagは付けない。
-	m_context->ClearRenderTargetView(m_renderTargetView.Get(),clearColor);
+	// BackBuffer全体を黒で塗る。16:9の描画領域の外側は、この色のまま黒帯として残る。
+	const float bar_color[4]{0.0f,0.0f,0.0f,1.0f};
+	m_context->ClearRenderTargetView(m_renderTargetView.Get(),bar_color);
+
+	// D3D11.1のContextを取得できた場合は、16:9の描画領域だけを呼出側の色で塗る。取得できない場合は、全体を呼出側の色で塗り、黒帯を作らない。
+	ComPtr<ID3D11DeviceContext1> context_1{};
+	if(SUCCEEDED(m_context.As(&context_1))){
+		const D3D11_RECT area_rect{static_cast<LONG>(m_viewportLeft),static_cast<LONG>(m_viewportTop),
+			static_cast<LONG>(m_viewportLeft + m_renderWidth),static_cast<LONG>(m_viewportTop + m_renderHeight)};
+		context_1->ClearView(m_renderTargetView.Get(),clearColor,&area_rect,1);
+	}
+	else{
+		m_context->ClearRenderTargetView(m_renderTargetView.Get(),clearColor);
+	}
+
+	// Depthだけを1へClearし、Stencil値0の引数を渡すがStencil Clear Flagは付けない。Depthは描画領域より広いBackBuffer全体を塗る。
 	m_context->ClearDepthStencilView(m_depthStencilView.Get(),D3D11_CLEAR_DEPTH,1.0f,0);
 
 	// 前フレームのBlend・Depth・Cullを引き継がずOPAQUEへ明示設定する。ViewportとShaderの再設定はここではしない。
@@ -306,28 +327,28 @@ void GraphicsSystem::SetRenderPass(e_RenderPass renderPass)
 	// SampleMaskの全bit 1は全Sampleを許可する指定。Stencil参照値0も既存値を維持する。
 	// nullptrのBlend/Depthはそれぞれ既定State。GetBlendFactorは静的配列で、以前の値の保存先ではない。
 	switch(renderPass){
-		// 奥行き比較・書込とCullを止め、BlendなしでSkyを描く。 以前のStateは復元しない。
+		// 奥行き比較・書込とCullを止め、BlendなしでSkyを描く。以前のStateは復元しない。
 	case e_RenderPass::e_SKY:
 	m_context->OMSetBlendState(nullptr,GetBlendFactor(),0xffffffff);
 	m_context->OMSetDepthStencilState(m_depthDisabledState.Get(),0);
 	m_context->RSSetState(m_cullNoneRasterizerState.Get());
 	return;
 
-	// 既定Depth、背面Cull、Blendなしへ揃える。 以前のStateは復元しない。
+	// 既定Depth、背面Cull、Blendなしへ揃える。以前のStateは復元しない。
 	case e_RenderPass::e_OPAQUE:
 	m_context->OMSetBlendState(nullptr,GetBlendFactor(),0xffffffff);
 	m_context->OMSetDepthStencilState(nullptr,0);
 	m_context->RSSetState(m_cullBackRasterizerState.Get());
 	return;
 
-	// Depth比較を維持して書込だけを止め、Alpha Blendと背面Cullを使う。 以前のStateは復元しない。
+	// Depth比較を維持して書込だけを止め、Alpha Blendと背面Cullを使う。以前のStateは復元しない。
 	case e_RenderPass::e_TRANSPARENT:
 	m_context->OMSetBlendState(m_alphaBlendState.Get(),GetBlendFactor(),0xffffffff);
 	m_context->OMSetDepthStencilState(m_depthReadOnlyState.Get(),0);
 	m_context->RSSetState(m_cullBackRasterizerState.Get());
 	return;
 
-	// DepthとCullを止め、Alpha Blendで画面UIを描く。 以前のStateは復元しない。
+	// DepthとCullを止め、Alpha Blendで画面UIを描く。以前のStateは復元しない。
 	case e_RenderPass::e_SCREEN_UI:
 	m_context->OMSetBlendState(m_alphaBlendState.Get(),GetBlendFactor(),0xffffffff);
 	m_context->OMSetDepthStencilState(m_depthDisabledState.Get(),0);
@@ -361,7 +382,7 @@ void GraphicsSystem::SetDepthTestEnabled(bool isEnabled)
 }
 
 //========= 補助関数=========
-// BackBufferのRTV、Depth用Texture/DSV、Viewportと保持サイズを準備する。
+// BackBufferのRTV、Depth用Texture/DSV、16:9のViewportと保持サイズを準備する。
 bool GraphicsSystem::CreateRenderTargets(unsigned int width,unsigned int height)
 {
 	// Device・Context・SwapChainが揃わなければ生成を始めない。この分岐自体では既存Viewを解除しない。
@@ -388,6 +409,7 @@ bool GraphicsSystem::CreateRenderTargets(unsigned int width,unsigned int height)
 
 	// Depthは指定pixel寸法、1Mip・1画像・非MSAA。D24_UNORM_S8_UINTは24bit Depthと8bit Stencilの形式。
 	// BindはDepth Stencil用途。ゼロ初期値のUsage=DEFAULT、Quality/CPUAccessFlags/MiscFlags=0を維持する。
+	// 寸法はBackBuffer全体で、描画領域（Viewport）より小さくならない。
 	D3D11_TEXTURE2D_DESC depth_texture_desc{};
 	depth_texture_desc.Width = width;
 	depth_texture_desc.Height = height;
@@ -414,17 +436,23 @@ bool GraphicsSystem::CreateRenderTargets(unsigned int width,unsigned int height)
 		return false;
 	}
 
-	// 左上(0,0)・描画先全体・Depth範囲0〜1のViewportを1個Bindする。整数pixel寸法をfloatへ変換する。
+	// BackBufferへ収まる最大の16:9の領域を求め、その位置・大きさのViewportを1個Bindする。Depth範囲は0〜1。
+	// 領域の外側はViewportの外のため描かれず、BeginFrameで塗った黒のまま残る。
+	const VIEWPORT_AREA area = ViewportFit::Calculate(width,height);
 	D3D11_VIEWPORT viewport{};
-	viewport.Width = static_cast<float>(width);
-	viewport.Height = static_cast<float>(height);
+	viewport.TopLeftX = static_cast<float>(area.left);
+	viewport.TopLeftY = static_cast<float>(area.top);
+	viewport.Width = static_cast<float>(area.width);
+	viewport.Height = static_cast<float>(area.height);
 	viewport.MinDepth = 0.0f;
 	viewport.MaxDepth = 1.0f;
 	m_context->RSSetViewports(1,&viewport);
 
-	// 全生成後にだけ寸法を確定する。この関数はRTV/DSVのOM BindやClearまでは行わない。
-	m_renderWidth = width;
-	m_renderHeight = height;
+	// 全生成後にだけ領域の位置と寸法を確定する。この関数はRTV/DSVのOM BindやClearまでは行わない。
+	m_viewportLeft = area.left;
+	m_viewportTop = area.top;
+	m_renderWidth = area.width;
+	m_renderHeight = area.height;
 	return true;
 }
 
@@ -435,7 +463,9 @@ void GraphicsSystem::ReleaseRenderTargets()
 	m_depthStencilView.Reset();
 	m_renderTargetView.Reset();
 
-	// 保持寸法を0に揃える。Context側に別参照が残る場合でも、Getterはこの保持値を返す。
+	// 保持する描画領域を0に揃える。Context側に別参照が残る場合でも、Getterはこの保持値を返す。
+	m_viewportLeft = {};
+	m_viewportTop = {};
 	m_renderWidth = {};
 	m_renderHeight = {};
 }

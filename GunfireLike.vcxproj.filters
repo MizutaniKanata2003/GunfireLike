@@ -422,6 +422,9 @@
     <ClInclude Include="Source\Scene\GameScene\H\GameSession.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Framework\DirectX\H\ViewportArea.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Source\Framework\Shaders\BasicColorVS.hlsl" />

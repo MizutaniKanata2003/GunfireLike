@@ -2,6 +2,7 @@
 
 // Direct3D 11のDevice・即時Context・SwapChain、描画先View、Blend・Depth・Rasterizer Stateを所有する。
 // SceneやMeshの生成、ShaderのBind、描画内容の選択は利用側の責務。Windowは所有しない。
+// 3D・HUD・文字は、BackBufferの内側に収めた16:9の描画領域（Viewport）へ描く。比率が違うWindowでは、領域の外を黒帯にし、視野・HUDの配置を変えない。
 // 明示的UninitでContextの状態も解除する。メンバーの自動破棄だけで同じ終了処理を行うデストラクターは定義しない。
 
 //========= Windows インクルード=========
@@ -29,22 +30,23 @@ class GraphicsSystem final
 {
 public:
 	//========= ライフサイクル・フレーム制御関数=========
-	// 旧ResourceをUninitしてから生成し、描画先とViewportを準備してOPAQUE設定へ移す。
+	// 旧ResourceをUninitしてから生成し、描画先と16:9のViewportを準備してOPAQUE設定へ移す。
 	// windowHandle: 表示先の有効なWindow。借用し、メンバーへハンドルを保存しない。
-	// width: 初期描画先の幅。pixel単位。引数0に対する独自の早期検証は行わない。
-	// height: 初期描画先の高さ。pixel単位。引数0に対する独自の早期検証は行わない。
+	// width: 初期のBackBufferの幅。pixel単位。引数0に対する独自の早期検証は行わない。
+	// height: 初期のBackBufferの高さ。pixel単位。引数0に対する独自の早期検証は行わない。
 	// 戻り値: 全生成成功でtrue。検出した最終生成失敗はログ後にUninitしてfalse。旧状態へ復帰しない。
 	// Debug構成はDebug Layer付き生成失敗で通常生成へ再試行する。例外捕捉やDevice消失時の自動復旧はない。
 	bool Init(HWND windowHandle,unsigned int width,unsigned int height);
 	// BackBufferとDepthをBind・Clearし、OPAQUEへ設定する。Contextか必要Viewがなければ何もしない。
+	// BackBuffer全体を黒で塗り、16:9の描画領域だけをclearColorで塗る。D3D11.1のContextを取得できない場合は、全体をclearColorで塗る。
 	// clearColor: 呼出中に有効なRGBA4成分配列。nullptr不可。値のclampはせず、参照も保持しない。
-	// Viewport・Shader・各Mesh Resourceをフレームごとに再設定する処理ではない。
+	// Shaderや各Mesh Resourceをフレームごとに再設定する処理ではない。
 	void BeginFrame(const float clearColor[4]);
 	// SwapChainへPresent(1,0)を要求する。未生成なら何もせず、失敗はログだけで呼出元へ成否を返さない。
 	void EndFrame();
-	// 旧Viewと保持サイズを解除してBackBufferをResizeし、新しいViewとViewportを生成する。
-	// width: 新しい幅。pixel単位。0なら全処理を省略する。
-	// height: 新しい高さ。pixel単位。0なら全処理を省略する。
+	// 旧Viewと保持サイズを解除してBackBufferをResizeし、新しいViewと16:9のViewportを生成する。
+	// width: 新しいBackBufferの幅。pixel単位。0なら全処理を省略する。
+	// height: 新しいBackBufferの高さ。pixel単位。0なら全処理を省略する。
 	// SwapChainなしでも何もしない。失敗後の旧描画先の復元は行わない。Contextの旧Bind解除も追加しない。
 	void Resize(unsigned int width,unsigned int height);
 	// View→ContextのClearState→各State→SwapChain・Context・Deviceの順で終了する。
@@ -56,9 +58,10 @@ public:
 	[[nodiscard]] ID3D11Device* GetDevice() const { return m_device.Get(); }
 	// 即時Contextの借用ポインター。Uninit・再初期化をまたいだ利用は、利用側で寿命を管理する。
 	[[nodiscard]] ID3D11DeviceContext* GetContext() const { return m_context.Get(); }
-	// 最後に描画先生成が成功した幅。pixel単位。View解除後は0で、最小化通知だけでは必ずしも0にならない。
+	// 16:9の描画領域（Viewport）の幅。pixel単位。BackBuffer全体の幅ではない。View解除後は0。
+	// 最後に描画先生成が成功した時の値で、投影の比率とHUDの基準の計算に使う。
 	[[nodiscard]] unsigned int GetRenderWidth() const { return m_renderWidth; }
-	// 最後に描画先生成が成功した高さ。pixel単位。Resizeのサイズ0経路では現在値を維持する。
+	// 16:9の描画領域（Viewport）の高さ。pixel単位。BackBuffer全体の高さではない。View解除後は0。
 	[[nodiscard]] unsigned int GetRenderHeight() const { return m_renderHeight; }
 
 	//========= 描画State設定関数=========
@@ -74,9 +77,9 @@ public:
 
 private:
 	//========= 補助関数=========
-	// BackBufferのRTVとDepth用Texture/DSVを生成し、成功後にViewportと保持サイズを設定する。
-	// width: DepthとViewportの幅。pixel単位。SwapChainのBackBufferサイズとの対応は呼出側が維持する。
-	// height: DepthとViewportの高さ。pixel単位。
+	// BackBufferのRTVとDepth用Texture/DSVを生成し、成功後に16:9のViewportと保持サイズを設定する。
+	// width: BackBufferとDepthの幅。pixel単位。SwapChainのBackBufferサイズとの対応は呼出側が維持する。
+	// height: BackBufferとDepthの高さ。pixel単位。Viewportは、この寸法の内側に収めた16:9の領域になる。
 	// 戻り値: 成功でtrue。基盤不足でfalse。検出した生成失敗はViewを部分解放してfalse。
 	bool CreateRenderTargets(unsigned int width,unsigned int height);
 	// Viewの所有参照を解放して保持サイズを0へ戻す。Contextが別途持つBind参照は解除しない。
@@ -96,11 +99,15 @@ private:
 	// 奥行き判定先DSVを所有する。Depth TextureはこのViewの参照で寿命を保持する。
 	ComPtr<ID3D11DepthStencilView> m_depthStencilView{};
 
-	//========= Render Targetサイズ=========
-	// 生成成功後に確定する幅。初期値0は未生成、ReleaseRenderTargetsで0へ戻す。単位はpixel。
+	//========= 描画領域（Viewport）=========
+	// 16:9の描画領域の幅。生成成功後に確定する。初期値0は未生成、ReleaseRenderTargetsで0へ戻す。単位はpixel。
 	unsigned int m_renderWidth{};
-	// 生成成功後に確定する高さ。初期値0は未生成、ReleaseRenderTargetsで0へ戻す。単位はpixel。
+	// 16:9の描画領域の高さ。生成成功後に確定する。初期値0は未生成、ReleaseRenderTargetsで0へ戻す。単位はpixel。
 	unsigned int m_renderHeight{};
+	// 描画領域の左端のBackBuffer上のX。単位はpixel。黒帯を左右へ均等に配るため、(BackBufferの幅 - 描画領域の幅)の半分になる。
+	unsigned int m_viewportLeft{};
+	// 描画領域の上端のBackBuffer上のY。単位はpixel。黒帯を上下へ均等に配るため、(BackBufferの高さ - 描画領域の高さ)の半分になる。
+	unsigned int m_viewportTop{};
 
 	//========= 描画State関連=========
 	// Depth比較・書込を無効にしたStateの所有参照。Sky・UIで使用する。
