@@ -219,6 +219,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Scene\Common\Camera\CPP\CameraFovController.cpp" />
     <ClCompile Include="Source\Scene\Common\Combat\CPP\CombatResolver.cpp" />
     <ClCompile Include="Source\Scene\Common\Combat\CPP\JustDodgeJudge.cpp" />
+    <ClCompile Include="Source\Scene\Common\Stage\CPP\StageController.cpp" />
     <ClCompile Include="Source\Scene\Common\Weapon\CPP\ShotController.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\GraphicsSystem.cpp" />
     <ClCompile Include="Source\main.cpp" />
@@ -278,11 +279,12 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\Common\Enemy\H\AreaTelegraph.h" />
     <ClInclude Include="Source\Scene\Common\Stage\H\ExitDoor.h" />
     <ClInclude Include="Source\Scene\Common\Object\H\ObjectConfig.h" />
-    <ClInclude Include="Source\Scene\Common\Stage\H\RoomController.h" />
     <ClInclude Include="Source\Scene\Common\Camera\H\CameraFovController.h" />
     <ClInclude Include="Source\Scene\Common\Combat\H\CombatResolver.h" />
     <ClInclude Include="Source\Scene\Common\Combat\H\CombatTable.h" />
     <ClInclude Include="Source\Scene\Common\Combat\H\JustDodgeJudge.h" />
+    <ClInclude Include="Source\Scene\Common\Stage\H\RoomController.h" />
+    <ClInclude Include="Source\Scene\Common\Stage\H\StageController.h" />
     <ClInclude Include="Source\Scene\Common\Weapon\H\ShotController.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\Enemy.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\EnemyApproach.h" />

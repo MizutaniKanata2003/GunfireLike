@@ -1,6 +1,6 @@
 ﻿#include "../H/GameScene.h"
 
-// テストSceneの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、部屋ごとの敵と敵の弾と範囲の予告と出口、設定表から生成した床・壁・画像のHUD・デバッグUIの描画、Resource終了を実装する。
+// テストSceneの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
 
 //========= Windows インクルード=========
 #include <windows.h> // VK_F1・VK_F2・VK_F4の仮想キーコードで、Capture切替・タイトル遷移・最初の部屋からの再開のキーを指定する。
@@ -20,8 +20,6 @@
 #include "Scene/Common/Combat/H/CombatResolver.h"
 #include "Scene/Common/Combat/H/CombatTable.h"
 #include "Scene/Common/Core/H/SceneManager.h"
-#include "Scene/Common/Object/H/SceneObjectFactory.h"
-#include "Scene/Common/Stage/H/StageLayout.h"
 #include "Scene/TitleScene/H/TitleScene.h"
 
 // このSceneの投影面（Clip面）の距離、開始位置に使用する固定設定をまとめる。戦闘の数値はCombatTableにある。
@@ -56,18 +54,15 @@ void GameScene::Initialize()
 	m_shotController.Reset();
 	m_cameraFov.Reset();
 
-	// 進行状態を第1部屋の第1ウェーブへ戻し、前回の生成失敗を引き継がない。
-	m_roomController.Initialize();
-	m_hasWaveSpawnFailed = false;
+	// 進行状態を第1部屋の第1ウェーブへ戻し、前回の生成失敗と、前回の生成ObjectとColliderを空にする。Rendererの生成、表からのObject生成、出口と敵の配置はInitで行う。
+	m_stage.Initialize();
 
-	// 判定・時間・接触・表示の状態を既定へ戻し、前回の生成ObjectとColliderを空にする。Rendererの生成、表からのObject生成、出口と敵の配置はInitで行う。
+	// 判定・時間・接触・表示の状態を既定へ戻す。
 	m_debugController.Reset();
 	m_enemyController.ResetAttackState();
 	m_timeScale.Reset();
 	m_playerCombat.Reset();
 	m_previousActionState = PLAYER_ACTION_STATE::e_NORMAL;
-	m_stageObjects.clear();
-	m_collisionWorld.Clear();
 
 	// カメラの位置をプレイヤーの開始位置へ合わせる。壁のColliderはInitで登録するため、押し戻しはInit後の更新から始まる。
 	m_FPSCamera.SetPosition(m_playerController.GetPosition());
@@ -135,44 +130,36 @@ void GameScene::Draw()
 	// 3D・画像のHUD・デバッグUIの順に描画する。デバッグUIはゲームの状態を変更しない。
 	DrawWorld(view_matrix,projection_matrix);
 	DrawHud();
-	m_debugController.DrawUi(m_hasWaveSpawnFailed);
+	m_debugController.DrawUi(m_stage.HasWaveSpawnFailed());
 }
 
-// Sceneが所有する敵・敵の弾・範囲の予告・出口・Object・共有Renderer・HUD・Collision可視化・Collisionを終了する。
+// Sceneが所有する敵・敵の弾・範囲の予告・ステージ・HUD・Collision可視化を終了する。
 void GameScene::Finalize()
 {
 	// 遷移先のInit後に呼ばれても、遷移先が設定したCaptureやBGMを上書きしない。
-	// 各Controllerの参照を先に手放し、敵・敵の弾・範囲の予告・出口・Objectは、Collisionと共有Rendererを借用しているため、それらを解放する前に先に終了する。
+	// 各Controllerの参照を先に手放し、敵・敵の弾・範囲の予告は、Collisionと共有Rendererを借用しているため、ステージを解放する前に先に終了する。
 	m_debugController.Uninit();
 	m_shotController.Uninit();
 	m_playerCombat.Uninit();
 	m_enemyController.Uninit();
-	m_exitDoor.Uninit(m_collisionWorld);
-	m_stageObjects.clear();
-	m_modelRegistry.Uninit();
+	m_stage.Uninit();
 
-	// HUDと線描画Rendererを解放し、登録したColliderを空にする。
+	// HUDと線描画Rendererを解放する。
 	m_gameHud.Uninit();
 	m_collisionDebugView.Uninit();
-	m_collisionWorld.Clear();
 }
 
 //========= 初期化の補助関数=========
-// 共有Renderer・Collision可視化・HUD・ステージObject・出口を初期化する。
+// ステージ・Collision可視化・HUDを初期化する。
 bool GameScene::InitRenderResources()
 {
-	// 5つの初期化を、この順に実行する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。後始末は、呼出側のInitがFinalizeで行う。
-	// 共有Rendererの初期化失敗を検出する。
-	return InitCheck::Succeeded(m_modelRegistry.Initialize(m_graphicsSystem),e_LogCategory::e_SCENE,L"GameSceneの基本Mesh初期化に失敗しました。")
+	// 3つの初期化を、この順に実行する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。後始末は、呼出側のInitがFinalizeで行う。
+	// 共有Renderer・床と壁・出口の初期化失敗を検出する。失敗した対象のログは、StageControllerが記録する。
+	return m_stage.Init(m_graphicsSystem)
 		// Collision可視化の初期化失敗を検出する。
 		&& InitCheck::Succeeded(m_collisionDebugView.Initialize(m_graphicsSystem),e_LogCategory::e_SCENE,L"GameSceneの線描画Renderer初期化に失敗しました。")
 		// 画像のHUDの初期化失敗を検出する。個々の画像の読込失敗はここでは失敗にならない。
-		&& InitCheck::Succeeded(m_gameHud.Initialize(m_graphicsSystem),e_LogCategory::e_SCENE,L"GameSceneのHUD初期化に失敗しました。")
-		// 設定表から床と4面の壁を、表の順に生成し、壁のAABB ColliderをCollisionWorldへ登録する。全件成功しなければ失敗する。
-		&& InitCheck::Succeeded(SceneObjectFactory::Build(STAGE_LAYOUT::ns_OBJECTS,STAGE_LAYOUT::ns_OBJECT_COUNT,m_modelRegistry,&m_collisionWorld,m_stageObjects),
-														e_LogCategory::e_SCENE,L"GameSceneのステージObject生成に失敗しました。")
-		// 閉じた状態の出口を登録する。Cube Rendererを借用できなければ失敗する。
-		&& InitCheck::Succeeded(m_exitDoor.Initialize(m_modelRegistry,m_collisionWorld),e_LogCategory::e_SCENE,L"GameSceneの出口の初期化に失敗しました。");
+		&& InitCheck::Succeeded(m_gameHud.Initialize(m_graphicsSystem),e_LogCategory::e_SCENE,L"GameSceneのHUD初期化に失敗しました。");
 }
 
 // 敵の更新とプレイヤーの戦闘へ、使用する参照と通知先を渡す。
@@ -180,8 +167,8 @@ bool GameScene::InitEnemyAndPlayerCombat()
 {
 	// 敵の更新に使う参照と、攻撃イベントの通知先（被弾・スロー・記録の反映）を用意する。
 	ENEMY_CONTROLLER_LINKS enemy_links{};
-	enemy_links.modelRegistry = &m_modelRegistry;
-	enemy_links.collisionWorld = &m_collisionWorld;
+	enemy_links.modelRegistry = &m_stage.GetModelRegistry();
+	enemy_links.collisionWorld = &m_stage.GetCollisionWorld();
 	enemy_links.playerController = &m_playerController;
 	enemy_links.playerHealth = &m_playerHealth;
 	enemy_links.onAttackEvent = [this](const ENEMY_ATTACK_EVENT& attackEvent){
@@ -195,7 +182,7 @@ bool GameScene::InitEnemyAndPlayerCombat()
 	player_combat_links.playerHealth = &m_playerHealth;
 	player_combat_links.healItems = &m_healItems;
 	player_combat_links.enemyManager = &m_enemyController.GetEnemyManager();
-	player_combat_links.collisionWorld = &m_collisionWorld;
+	player_combat_links.collisionWorld = &m_stage.GetCollisionWorld();
 	player_combat_links.camera = &m_FPSCamera;
 	player_combat_links.inputSystem = &m_inputSystem;
 	player_combat_links.onHitStopRequested = [this](float hitStopSeconds){
@@ -217,7 +204,7 @@ bool GameScene::InitShotAndDebug()
 	shot_links.playerController = &m_playerController;
 	shot_links.camera = &m_FPSCamera;
 	shot_links.inputSystem = &m_inputSystem;
-	shot_links.collisionWorld = &m_collisionWorld;
+	shot_links.collisionWorld = &m_stage.GetCollisionWorld();
 	shot_links.enemyManager = &m_enemyController.GetEnemyManager();
 	shot_links.playerCombat = &m_playerCombat;
 	shot_links.collisionDebugView = &m_collisionDebugView;
@@ -230,7 +217,7 @@ bool GameScene::InitShotAndDebug()
 	debug_links.playerHealth = &m_playerHealth;
 	debug_links.healItems = &m_healItems;
 	debug_links.playerCombat = &m_playerCombat;
-	debug_links.roomController = &m_roomController;
+	debug_links.roomController = &m_stage.GetRoomController();
 	debug_links.enemyController = &m_enemyController;
 	debug_links.shotController = &m_shotController;
 	debug_links.timeScale = &m_timeScale;
@@ -259,8 +246,7 @@ bool GameScene::UpdateSceneInput()
 
 	// F4では最初の部屋から作り直す。旧ウェーブと、旧ウェーブの弾・範囲の予告は、同じ更新の生成処理で置き換わる。
 	if(m_inputSystem.IsKeyTriggered(VK_F4)){
-		m_roomController.Initialize();
-		m_hasWaveSpawnFailed = false;
+		m_stage.Restart();
 		m_enemyController.ResetAttackState();
 		m_playerCombat.ClearSlideKnockdownRecord();
 	}
@@ -274,16 +260,13 @@ void GameScene::UpdateWorldAndRoom(float worldDeltaTime)
 	UpdateDodgeJudge(worldDeltaTime);
 	m_enemyController.GetEnemyManager().Update(worldDeltaTime);
 
-	// 生成待ちなら現在のウェーブを生成する。失敗した場合は再試行せず、F4で最初からやり直すまで敵なしで待つ。
-	if(m_roomController.GetPhase() == ROOM_PHASE::e_NEEDS_SPAWN && !m_hasWaveSpawnFailed){
-		m_hasWaveSpawnFailed = !TrySpawnCurrentWave();
+	// 生成待ちなら現在のウェーブを生成し、結果を記録する。失敗した場合は再試行せず、F4で最初からやり直すまで敵なしで待つ。
+	if(m_stage.ShouldSpawnWave()){
+		m_stage.RecordSpawnResult(TrySpawnCurrentWave());
 	}
-	// 生存中の敵がいなければウェーブまたは部屋を進める。生成待ちの間は、空の敵一覧を全滅と扱わない。
-	m_roomController.Update(m_enemyController.GetEnemyManager().HasLivingEnemies());
 
-	// 部屋の進行状態に合わせて、出口を開閉する。出口開放中と攻略完了後は開き、それ以外は閉じる。F4や部屋の移動で戻った場合も、この更新で閉じる。
-	const ROOM_PHASE room_phase = m_roomController.GetPhase();
-	m_exitDoor.SetOpen(room_phase == ROOM_PHASE::e_EXIT_OPEN || room_phase == ROOM_PHASE::e_COMPLETE,m_collisionWorld);
+	// 敵の全滅の結果から、ウェーブまたは部屋を進め、出口を開閉する。
+	m_stage.UpdateProgress(m_enemyController.GetEnemyManager().HasLivingEnemies());
 }
 
 // 回復アイテムの間隔・Collision可視化の表示時間・命中表示・反動のずれを、Captureに関係なく更新する。
@@ -304,7 +287,7 @@ void GameScene::UpdatePlayer(float deltaTime,float gameplayDeltaTime)
 	// 視線を先に更新し、その向きで、蹴れる敵がいるかを調べてから、プレイヤーを更新する。ヒットストップ中も視線は動かせる。
 	m_FPSCamera.Update(m_inputSystem);
 	const bool can_kick = m_enemyController.GetEnemyManager().FindMeleeTarget(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),true) != nullptr;
-	m_playerController.Update(gameplayDeltaTime,m_inputSystem,m_FPSCamera,m_collisionWorld,can_kick);
+	m_playerController.Update(gameplayDeltaTime,m_inputSystem,m_FPSCamera,m_stage.GetCollisionWorld(),can_kick);
 	m_FPSCamera.SetPosition(m_playerController.GetPosition());
 
 	// 移動後の位置で、出口の通過を判定する。通過した場合は、プレイヤーが開始位置へ戻るため、以降の更新は新しい位置から行う。
@@ -331,7 +314,7 @@ void GameScene::UpdateCombat(float gameplayDeltaTime,float worldDeltaTime)
 	m_enemyController.Update(worldDeltaTime);
 
 	// 更新後のカメラから、Collision可視化の視線のRayを更新する。非表示の間は判定を行わない。
-	m_collisionDebugView.UpdateRay(m_FPSCamera,m_collisionWorld);
+	m_collisionDebugView.UpdateRay(m_FPSCamera,m_stage.GetCollisionWorld());
 }
 
 // 確認用の攻撃が当たる瞬間の判定結果を、プレイヤーへのダメージとスローへ反映する。
@@ -372,11 +355,11 @@ void GameScene::ApplyEnemyAttackEvent(const ENEMY_ATTACK_EVENT& attackEvent)
 bool GameScene::TrySpawnCurrentWave()
 {
 	// 登録に失敗した場合は、EnemyControllerが失敗を記録し、EnemyManagerが生成済みの枠を解除して空にする。進行管理へ生成完了を通知せず、失敗を返す。
-	if(!m_enemyController.TrySpawnWave(m_roomController.GetRoomNumber(),m_roomController.GetWaveNumber()))return false;
+	if(!m_enemyController.TrySpawnWave(m_stage.GetRoomNumber(),m_stage.GetWaveNumber()))return false;
 
 	// 新しい敵がスライディングの転倒記録を引き継がないよう初期化し、全滅判定を開始する。
 	m_playerCombat.ClearSlideKnockdownRecord();
-	m_roomController.NotifyWaveSpawned();
+	m_stage.NotifyWaveSpawned();
 	return true;
 }
 
@@ -388,21 +371,18 @@ void GameScene::SkipCurrentWave()
 		// 死亡中の敵は、倒す対象がないため次の枠へ進む。
 		if(!enemy.IsAlive())continue;
 
-		enemy.ApplyDamage(enemy.GetCurrentHP(),m_collisionWorld);
+		enemy.ApplyDamage(enemy.GetCurrentHP(),m_stage.GetCollisionWorld());
 	}
 
 	// 倒された敵の予告・飛行中の弾・範囲の予告を消す。全滅の判定は、次の更新で進行管理が行う。
 	m_enemyController.ResetAttackState();
 }
 
-// 通過範囲に入ったプレイヤーを、次の部屋の開始位置へ移す。
+// 出口を通過したプレイヤーを、次の部屋の開始位置へ移す。
 void GameScene::UpdateExitPass()
 {
-	// 出口が閉じている、またはプレイヤーが通過範囲の外にいる場合は、何もしない。
-	if(!m_exitDoor.IsInPassZone(m_playerController.GetPosition()))return;
-
-	// 進行管理が出口の通過を受理しなかった場合は、何もしない。最終部屋の通過後や、受理済みの重複した通知では受理されない。
-	if(!m_roomController.TryAdvanceRoom())return;
+	// 出口が閉じている、位置が通過範囲の外にある、または進行管理が通過を受理しなかった場合は、何もしない。最終部屋の通過後や、受理済みの重複した通知では受理されない。
+	if(!m_stage.TryPassExit(m_playerController.GetPosition()))return;
 
 	// 次の部屋へ進んだので、プレイヤーを開始位置へ戻し、カメラ位置を合わせる。出口は、次の更新の進行状態の同期で閉じる。
 	m_playerController.Initialize(ns_PLAYER_START_POSITION);
@@ -417,17 +397,15 @@ void GameScene::DrawWorld(const XMMATRIX& viewMatrix,const XMMATRIX& projectionM
 	m_graphicsSystem.SetRenderPass(e_RenderPass::e_OPAQUE);
 
 	// 生成済みの全Objectを、表の順（床→左壁→右壁→手前壁→奥壁）に描画する。
-	for(const SceneObject& object : m_stageObjects){
-		object.Draw(m_graphicsSystem,viewMatrix,projectionMatrix);
-	}
+	m_stage.DrawObjects(m_graphicsSystem,viewMatrix,projectionMatrix);
 
 	// 床の上に、範囲の予告を描画する。床の後に描き、敵や出口より先に描くことで、敵の体が予告の上に重なる。続けて出口を描画する。
 	m_enemyController.DrawAreaTelegraph(m_graphicsSystem,viewMatrix,projectionMatrix);
-	m_exitDoor.Draw(m_graphicsSystem,viewMatrix,projectionMatrix);
+	m_stage.DrawExit(m_graphicsSystem,viewMatrix,projectionMatrix);
 	// 続けて全枠の敵を出現順に描画し、その後に飛行中の敵の弾を描画する。死亡枠はEnemy::Drawが描画を省略する。
 	m_enemyController.DrawEnemies(m_graphicsSystem,viewMatrix,projectionMatrix);
 	// 敵と弾の後に、表示中ならCollisionの線を重ねる。
-	m_collisionDebugView.Draw(m_graphicsSystem,m_collisionWorld,m_FPSCamera,viewMatrix,projectionMatrix);
+	m_collisionDebugView.Draw(m_graphicsSystem,m_stage.GetCollisionWorld(),m_FPSCamera,viewMatrix,projectionMatrix);
 }
 
 // 3Dの上に、画像のHUDを描画する。

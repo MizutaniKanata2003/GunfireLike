@@ -1,17 +1,13 @@
 ﻿#pragma once
 
 // 移動・ダッシュ・しゃがみ・スライディング・回避・蹴り・殴打・視点・構え・射撃・リロード・回復と、設定表から生成した床・壁、部屋ごとの敵と敵の弾と範囲の予告、出口、画像のHUD、Collisionの可視化を行う最小構成のGameSceneを宣言する。
-// 各クラスの更新を仲介し、共有Renderer・生成したObject・CollisionWorldを所有する。Scene切替はManagerへ予約する。個別のゲーム規則は、各Controllerが持つ。
-
-//========= C++標準ライブラリ インクルード=========
-#include <vector> // 設定表から生成したSceneObjectを、表の順に保持する可変長配列として使用する。
+// 各クラスの更新を仲介する。ステージの世界（共有Renderer・生成したObject・出口・CollisionWorld・部屋の進行）はStageControllerが所有する。Scene切替はManagerへ予約する。個別のゲーム規則は、各Controllerが持つ。
 
 //========= Debug インクルード=========
 #include "Debug/H/CollisionDebugView.h"
 #include "Debug/H/GameDebugController.h"
 
 //========= Framework インクルード=========
-#include "Framework/Collision/H/CollisionWorld.h"
 #include "Framework/Etc/H/MathTypes.h"
 #include "Framework/Input/H/FpsCamera.h"
 
@@ -21,13 +17,10 @@
 #include "Scene/Common/Combat/H/TimeScaleController.h"
 #include "Scene/Common/Core/H/IScene.h"
 #include "Scene/Common/Enemy/H/EnemyController.h"
-#include "Scene/Common/Object/H/ModelRegistry.h"
-#include "Scene/Common/Object/H/SceneObject.h"
 #include "Scene/Common/Player/H/HealItems.h"
 #include "Scene/Common/Player/H/PlayerController.h"
 #include "Scene/Common/Player/H/PlayerHealth.h"
-#include "Scene/Common/Stage/H/ExitDoor.h"
-#include "Scene/Common/Stage/H/RoomController.h"
+#include "Scene/Common/Stage/H/StageController.h"
 #include "Scene/Common/Weapon/H/ShotController.h"
 #include "Scene/GameScene/H/GameHud.h"
 
@@ -50,9 +43,9 @@ public:
 	GameScene(SceneManager& sceneManager,InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem);
 
 	//========= Sceneライフサイクル関数=========
-	// プレイヤー・カメラ・武器・HP・回復アイテム・Collision・判定の状態・部屋の進行・敵の弾と範囲の予告・デバッグ設定・表示状態を初期状態へ戻し、生成済みObjectを空にして、カメラをプレイヤー位置へ合わせる。
+	// プレイヤー・カメラ・武器・HP・回復アイテム・ステージ・判定の状態・敵の弾と範囲の予告・デバッグ設定・表示状態を初期状態へ戻し、カメラをプレイヤー位置へ合わせる。
 	void Initialize() override;
-	// 共有Renderer・HUD・Collision可視化を初期化し、設定表から床と壁（とそのCollider）、出口、敵の弾、範囲の予告、第1部屋の敵を生成して、成功後にFPS操作とGame用BGMを有効にする。
+	// ステージ・HUD・Collision可視化を初期化し、敵の弾、範囲の予告、第1部屋の敵を生成して、成功後にFPS操作とGame用BGMを有効にする。
 	// 戻り値: 各初期化・Object生成・敵の配置が成功したらtrue。falseを検出した場合はFinalize後にfalseを返す。
 	// 下位処理の例外は捕捉しない。
 	bool Init() override;
@@ -63,12 +56,12 @@ public:
 	// 描画先サイズに合わせて行列を作り、3D・画像のHUD・読み取り専用のデバッグUIを、この順に描画する。
 	// 幅または高さが0なら何もしない。ImGuiフレーム開始後、描画データ確定前に呼ぶ。
 	void Draw() override;
-	// 敵・敵の弾・範囲の予告・出口・生成したObjectを先に破棄し、その後に共有Renderer・HUD・Collision可視化・Collisionを解放する。繰り返し呼出可能。CaptureやBGMは変更しない。
+	// 敵・敵の弾・範囲の予告を先に破棄し、その後にステージ・HUD・Collision可視化を解放する。繰り返し呼出可能。CaptureやBGMは変更しない。
 	void Finalize() override;
 
 private:
 	//========= 初期化の補助関数=========
-	// 共有Renderer・Collision可視化・HUD・ステージObject・出口を初期化する。失敗の後始末は、呼出側のInitがFinalizeで行う。
+	// ステージ・Collision可視化・HUDを初期化する。失敗の後始末は、呼出側のInitがFinalizeで行う。
 	// 戻り値: 全て成功したらtrue。失敗した場合は、失敗した対象をログへ記録してfalse。
 	[[nodiscard]] bool InitRenderResources();
 	// 敵の更新とプレイヤーの戦闘へ、使用する参照と通知先を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
@@ -108,7 +101,7 @@ private:
 	[[nodiscard]] bool TrySpawnCurrentWave();
 	// デバッグ用に、現在のウェーブの生きている敵を全て倒し、敵の予告・弾・範囲の予告を消す。次の更新の全滅判定で、次のウェーブまたは出口の開放へ進む。
 	void SkipCurrentWave();
-	// 出口が開いていて、プレイヤーが通過範囲に入った場合だけ、次の部屋へ進め、プレイヤーを開始位置へ戻す。
+	// 出口の通過を判定し、次の部屋へ進んだ場合だけ、プレイヤーを開始位置へ戻す。
 	void UpdateExitPass();
 
 	//========= 描画の補助関数=========
@@ -148,28 +141,16 @@ private:
 	TimeScaleController m_timeScale{};
 	// デバッグ操作・確認用の攻撃の判定・デバッグUIの情報の組立を担当する。ゲームの状態は、参照を通じてだけ変更する。
 	GameDebugController m_debugController{};
-	// 3部屋×2ウェーブの進行状態。敵の生成と全滅判定は、GameSceneが仲介する。
-	RoomController m_roomController{};
-	// 現在のウェーブの生成に失敗したか。trueの間は生成を再試行せず、F4で最初からやり直す。
-	bool m_hasWaveSpawnFailed{};
-	// 部屋の出口。進行状態に合わせて開閉し、閉じている間は通行を止め、開いている間は通過を判定する。Finalizeで登録先のCollisionWorldより先に解除する。
-	ExitDoor m_exitDoor{};
+	// 共有Renderer・床と壁・出口・CollisionWorld・部屋の進行を所有する。敵の生成と全滅判定は、GameSceneが仲介する。
+	StageController m_stage{};
 	// 動作の状態に応じた視野角の目標値と、現在の視野角の補間を担当する。
 	CameraFovController m_cameraFov{};
 	// 1回前の更新での、プレイヤーの動作の状態。殴打の開始を検出するために使う。
 	PLAYER_ACTION_STATE m_previousActionState{PLAYER_ACTION_STATE::e_NORMAL};
 
-	//========= 描画ResourceとObject=========
-	// Cube・OBJの共有Rendererを所有する。m_stageObjects・m_enemyController・m_exitDoorが借用するため、このメンバーを先に宣言し、後に破棄する。
-	ModelRegistry m_modelRegistry{};
-	// STAGE_LAYOUTの表から生成した床と壁。Rendererを借用するだけで所有しない。表の順が描画順になる。
-	std::vector<SceneObject> m_stageObjects{};
+	//========= HUDとデバッグ=========
 	// 画像で描くHUD。
 	GameHud m_gameHud{};
-
-	//========= Collision=========
-	// 床・壁・出口のAABBと、敵の球を登録するCollision。
-	CollisionWorld m_collisionWorld{};
 	// Collisionの可視化（Colliderの線・視線のRay・弾道）。F3で表示を切り替える。
 	CollisionDebugView m_collisionDebugView{};
 };
