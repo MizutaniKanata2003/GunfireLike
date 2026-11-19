@@ -189,8 +189,16 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="External\imgui\imgui_draw.cpp" />
     <ClCompile Include="External\imgui\imgui_tables.cpp" />
     <ClCompile Include="External\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="Source\Debug\CPP\CollisionDebugView.cpp" />
+    <ClCompile Include="Source\Debug\CPP\GameDebugUi.cpp" />
     <ClCompile Include="Source\Framework\2D\CPP\HudCanvas.cpp" />
+    <ClCompile Include="Source\Framework\2D\CPP\HudSpriteRenderer.cpp" />
+    <ClCompile Include="Source\Framework\3D\CPP\DebugLineRenderer.cpp" />
     <ClCompile Include="Source\Framework\Audio\CPP\AudioSystem.cpp" />
+    <ClCompile Include="Source\Framework\Collision\CPP\CollisionDebugDrawer.cpp" />
+    <ClCompile Include="Source\Framework\Collision\CPP\CollisionMath.cpp" />
+    <ClCompile Include="Source\Framework\Collision\CPP\CollisionResolver.cpp" />
+    <ClCompile Include="Source\Framework\Collision\CPP\CollisionWorld.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\ShaderBinaryLoader.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\TextureLoader.cpp" />
     <ClCompile Include="Source\Framework\Etc\CPP\GameTimer.cpp" />
@@ -204,40 +212,48 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Framework\2D\CPP\HudRenderer.cpp" />
     <ClCompile Include="Source\Framework\2D\CPP\HudTextRenderer.cpp" />
     <ClCompile Include="Source\Framework\3D\CPP\ObjModelRenderer.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\CombatSystem.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\EnemyController.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\EnemyHealthBar.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\EnemyVisual.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\GameHud.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\GunViewModel.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\ModelRegistry.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\PlayerCombatController.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\PlayerHealthStateController.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\ProjectileSystem.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\SkyDome.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\SceneObject.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\SceneObjectFactory.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\StageField.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\StageGate.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\StageGateController.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\StageProgressController.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\Transform.cpp" />
-    <ClCompile Include="Source\Scene\ResultScene\CPP\ResultScene.cpp" />
-    <ClCompile Include="Source\Scene\ShopScene\CPP\ShopGate.cpp" />
-    <ClCompile Include="Source\Scene\ShopScene\CPP\ShopScene.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\GraphicsSystem.cpp" />
     <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\AreaTelegraph.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\CombatResolver.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\Enemy.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\EnemyProjectile.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\ExitDoor.cpp" />
+    <ClCompile Include="Source\Scene\GameScene\CPP\GameHud.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameScene.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\SceneManager.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="Source\Scene\Common\CPP\JustDodgeJudge.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\PlayerController.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\RoomController.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\WeaponSystem.cpp" />
     <ClCompile Include="Source\Scene\TitleScene\CPP\TitleScene.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="External\imgui\backends\imgui_impl_dx11.h" />
     <ClInclude Include="External\imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="External\imgui\imgui.h" />
+    <ClInclude Include="Source\Debug\H\CollisionDebugView.h" />
+    <ClInclude Include="Source\Debug\H\GameDebugUi.h" />
     <ClInclude Include="Source\Framework\2D\H\HudCanvas.h" />
+    <ClInclude Include="Source\Framework\2D\H\HudSpriteRenderer.h" />
+    <ClInclude Include="Source\Framework\3D\H\DebugLineRenderer.h" />
     <ClInclude Include="Source\Framework\Audio\H\AudioSystem.h" />
     <ClInclude Include="Source\Framework\2D\H\FadeOverlay.h" />
+    <ClInclude Include="Source\Framework\Collision\H\CollisionDebugDrawer.h" />
+    <ClInclude Include="Source\Framework\Collision\H\CollisionMath.h" />
+    <ClInclude Include="Source\Framework\Collision\H\CollisionResolver.h" />
+    <ClInclude Include="Source\Framework\Collision\H\CollisionShapes.h" />
+    <ClInclude Include="Source\Framework\Collision\H\CollisionWorld.h" />
     <ClInclude Include="Source\Framework\DirectX\H\ConstantBuffer.h" />
     <ClInclude Include="Source\Framework\DirectX\H\GraphicsConstants.h" />
     <ClInclude Include="Source\Framework\DirectX\H\ShaderBinaryLoader.h" />
@@ -245,18 +261,6 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\DirectX\H\VertexFormat.h" />
     <ClInclude Include="Source\Framework\Etc\H\Logger.h" />
     <ClInclude Include="Source\Framework\Etc\H\MathTypes.h" />
-    <ClInclude Include="Source\Scene\Common\H\CombatSystem.h" />
-    <ClInclude Include="Source\Scene\Common\H\EnemyController.h" />
-    <ClInclude Include="Source\Scene\Common\H\EnemyHealthBar.h" />
-    <ClInclude Include="Source\Scene\Common\H\EnemyVisual.h" />
-    <ClInclude Include="Source\Scene\Common\H\GameHud.h" />
-    <ClInclude Include="Source\Scene\Common\H\GameProgress.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-    </ClInclude>
-    <ClInclude Include="Source\Scene\Common\H\GunViewModel.h" />
-    <ClInclude Include="Source\Scene\Common\H\PlayerCombatController.h" />
-    <ClInclude Include="Source\Scene\Common\H\PlayerHealth.h" />
     <ClInclude Include="Source\Framework\Etc\H\AppConfig.h" />
     <ClInclude Include="Source\Framework\Etc\H\GameTimer.h" />
     <ClInclude Include="Source\Framework\Input\H\InputSystem.h" />
@@ -268,22 +272,41 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\2D\H\HudRenderer.h" />
     <ClInclude Include="Source\Framework\2D\H\HudTextRenderer.h" />
     <ClInclude Include="Source\Framework\3D\H\ObjModelRenderer.h" />
-    <ClInclude Include="Source\Scene\Common\H\PlayerHealthStateController.h" />
-    <ClInclude Include="Source\Scene\Common\H\ProjectileSystem.h" />
-    <ClInclude Include="Source\Scene\Common\H\SkyDome.h" />
+    <ClInclude Include="Source\Scene\Common\H\EnemyController.h" />
+    <ClInclude Include="Source\Scene\Common\H\ModelRegistry.h" />
+    <ClInclude Include="Source\Scene\Common\H\ObjectConfig.h" />
+    <ClInclude Include="Source\Scene\Common\H\PlayerCombatController.h" />
+    <ClInclude Include="Source\Scene\Common\H\SceneObject.h" />
+    <ClInclude Include="Source\Scene\Common\H\SceneObjectFactory.h" />
     <ClInclude Include="Source\Scene\Common\H\StageField.h" />
-    <ClInclude Include="Source\Scene\Common\H\StageGate.h" />
-    <ClInclude Include="Source\Scene\Common\H\StageGateController.h" />
-    <ClInclude Include="Source\Scene\Common\H\StageProgressController.h" />
+    <ClInclude Include="Source\Scene\Common\H\StageLayout.h" />
     <ClInclude Include="Source\Scene\Common\H\Transform.h" />
-    <ClInclude Include="Source\Scene\ResultScene\H\ResultScene.h" />
-    <ClInclude Include="Source\Scene\ShopScene\H\ShopGate.h" />
-    <ClInclude Include="Source\Scene\ShopScene\H\ShopScene.h" />
-    <ClInclude Include="Source\Scene\Common\H\StageData.h" />
     <ClInclude Include="Source\Framework\DirectX\H\GraphicsSystem.h" />
+    <ClInclude Include="Source\Scene\Common\H\UiLayout.h" />
+    <ClInclude Include="Source\Scene\Common\H\AreaTelegraph.h" />
+    <ClInclude Include="Source\Scene\Common\H\CombatResolver.h" />
+    <ClInclude Include="Source\Scene\Common\H\CombatTable.h" />
+    <ClInclude Include="Source\Scene\Common\H\Enemy.h" />
+    <ClInclude Include="Source\Scene\Common\H\EnemyApproach.h" />
+    <ClInclude Include="Source\Scene\Common\H\EnemyAreaBehavior.h" />
+    <ClInclude Include="Source\Scene\Common\H\EnemyManager.h" />
+    <ClInclude Include="Source\Scene\Common\H\EnemyProjectile.h" />
+    <ClInclude Include="Source\Scene\Common\H\EnemyRangedBehavior.h" />
+    <ClInclude Include="Source\Scene\Common\H\EnemyTable.h" />
+    <ClInclude Include="Source\Scene\Common\H\EnemyWaveTable.h" />
+    <ClInclude Include="Source\Scene\Common\H\ExitDoor.h" />
+    <ClInclude Include="Source\Scene\GameScene\H\GameHud.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameScene.h" />
     <ClInclude Include="Source\Scene\Common\H\IScene.h" />
     <ClInclude Include="Source\Scene\Common\H\SceneManager.h" />
+    <ClInclude Include="Source\Scene\Common\H\HealItems.h" />
+    <ClInclude Include="Source\Scene\Common\H\JustDodgeJudge.h" />
+    <ClInclude Include="Source\Scene\Common\H\PlayerActionTable.h" />
+    <ClInclude Include="Source\Scene\Common\H\PlayerController.h" />
+    <ClInclude Include="Source\Scene\Common\H\PlayerHealth.h" />
+    <ClInclude Include="Source\Scene\Common\H\RoomController.h" />
+    <ClInclude Include="Source\Scene\Common\H\WeaponSystem.h" />
+    <ClInclude Include="Source\Scene\Common\H\WeaponTable.h" />
     <ClInclude Include="Source\Scene\TitleScene\H\TitleScene.h" />
   </ItemGroup>
   <ItemGroup>
@@ -296,6 +319,10 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">main</EntryPointName>
       <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)Shaders\BasicColorVS.cso</ObjectFileOutput>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">5.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">5.0</ShaderModel>
     </FxCompile>
     <FxCompile Include="Source\Framework\Shaders\BasicColorPS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
@@ -329,6 +356,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\..\..\..\Downloads\D7以降_細分化タスク一覧_2026-11-18.md" />
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
