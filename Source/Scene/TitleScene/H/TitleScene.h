@@ -7,7 +7,7 @@
 #include "Framework/2D/H/HudTextRenderer.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/H/IScene.h"
+#include "Scene/Common/Scene/H/IScene.h"
 
 //========= 前方宣言=========
 class AudioSystem;

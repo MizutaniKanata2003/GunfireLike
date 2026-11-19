@@ -21,11 +21,11 @@
 #include "Framework/Input/H/InputSystem.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/H/CombatResolver.h"
-#include "Scene/Common/H/CombatTable.h"
-#include "Scene/Common/H/SceneManager.h"
-#include "Scene/Common/H/SceneObjectFactory.h"
-#include "Scene/Common/H/StageLayout.h"
+#include "Scene/Common/Combat/H/CombatResolver.h"
+#include "Scene/Common/Combat/H/CombatTable.h"
+#include "Scene/Common/Scene/H/SceneManager.h"
+#include "Scene/Common/Scene/H/SceneObjectFactory.h"
+#include "Scene/Common/Stage/H/StageLayout.h"
 #include "Scene/TitleScene/H/TitleScene.h"
 
 // このSceneの投影面（Clip面）の距離、開始位置に使用する固定設定をまとめる。戦闘の数値はCombatTableにある。

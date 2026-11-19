@@ -11,7 +11,7 @@
 #include "Framework/DirectX/H/GraphicsSystem.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/H/UiLayout.h"
+#include "Scene/Common/UI/H/UiLayout.h"
 
 // HUDの表示ルールに使う固定設定をまとめる。企画書で未確定の見た目の数値は、仮値。
 namespace
