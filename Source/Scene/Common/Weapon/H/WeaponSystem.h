@@ -65,6 +65,8 @@ public:
 	void ToggleInfiniteAmmo() { m_isInfiniteAmmo = !m_isInfiniteAmmo; }
 
 	//========= Getter関数=========
+	// 使用中の武器の性能値への参照を返す。戻り値の参照は、次のInitializeまで有効。
+	[[nodiscard]] const WEAPON_DATA& GetWeaponData() const { return m_weaponData; }
 	// 現在の装填弾数を返す。
 	[[nodiscard]] int GetMagazineAmmo() const { return m_magazineAmmo; }
 	// 現在の予備弾薬の数を返す。

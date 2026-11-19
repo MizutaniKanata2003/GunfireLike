@@ -2,6 +2,7 @@
 
 // 射撃の更新（弾薬・連射・リロードの進行と、命中判定の結果の反映）と、命中表示を担当する。
 // 武器1丁の状態はWeaponSystemが持ち、このクラスが所有する。弾道の終点をCollisionの可視化へ伝え、敵レイヤーへ命中した場合に、敵へダメージを与える。
+// 武器の装備（種類の切替）を受け付ける。購入・強化・所持数の管理は担当しない。暫定の切替の入力（数字キー）だけを持つ。
 // プレイヤーの動作の更新・視線の更新・近接攻撃・敵の行動・ヒットストップの管理は担当しない。
 
 //========= Scene インクルード=========
@@ -23,7 +24,7 @@ struct SHOT_CONTROLLER_LINKS
 	const PlayerController* playerController{};
 	// 発射の始点と方向の取得元で、発射時に反動を加える先となるカメラ。視線と位置を、先に更新しておくこと。
 	FpsCamera* camera{};
-	// 左クリック（射撃）とRキー（リロード）の取得元。読み取りだけを行う。
+	// 左クリック（射撃）、Rキー（リロード）、数字キー（暫定の武器切替）の取得元。読み取りだけを行う。
 	const InputSystem* inputSystem{};
 	// 命中判定を行うCollisionWorld。敵が死亡する際にColliderを解除するため、読み取り専用ではない。
 	CollisionWorld* collisionWorld{};
@@ -40,17 +41,17 @@ class ShotController final
 {
 public:
 	//========= 初期化・終了関数=========
-	// 参照先を登録し、使用する武器の反動の設定をカメラへ渡す。
+	// 参照先を登録し、使用中の武器の反動の設定をカメラへ渡す。
 	// links: 借用する参照先。1つでも欠けている場合は何も登録しない。
 	// 戻り値: 全ての参照先が揃っていて登録できたらtrue。
 	[[nodiscard]] bool Initialize(const SHOT_CONTROLLER_LINKS& links);
 	// 参照先を手放す。未初期化でも、繰り返しても呼出可能。
 	void Uninit();
-	// 武器を初期の性能値・満タンの弾薬へ戻し、命中表示を消す。参照先は変えない。
+	// 初期武器（連射銃）を、満タンの弾薬で装備し直し、命中表示を消す。参照先は変えない。
 	void Reset();
 
 	//========= 更新関数=========
-	// 射撃・リロードを更新し、弾が敵へ命中していればダメージを与える。Initialize成功後に呼ぶ。
+	// 暫定の武器切替の入力を処理し、射撃・リロードを更新して、弾が敵へ命中していればダメージを与える。Initialize成功後に呼ぶ。
 	// gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。
 	void Update(float gameplayDeltaTime);
 	// 命中表示の残り時間を進める。Captureやヒットストップに関係なく毎フレーム呼ぶ。
@@ -58,6 +59,9 @@ public:
 	void UpdateHitMarker(float deltaTime);
 	// リロードを途中でやめる。弾は補充しない。殴打など、リロードをキャンセルする動作から呼ぶ。
 	void CancelReload() { m_weaponSystem.CancelReload(); }
+	// 武器を装備する。武器の性能値と、カメラの反動の設定を切り替える。弾薬は、装備した武器の初期値になる。弾薬を消費しないデバッグ設定は、引き継ぐ。
+	// weaponType: 装備する武器の種類。表の範囲内であること。
+	void EquipWeapon(WEAPON_TYPE weaponType);
 	// デバッグ用に、弾薬を消費しない設定を切り替える。
 	void ToggleInfiniteAmmo() { m_weaponSystem.ToggleInfiniteAmmo(); }
 
@@ -70,12 +74,16 @@ public:
 	[[nodiscard]] bool IsInfiniteAmmoEnabled() const { return m_weaponSystem.IsInfiniteAmmoEnabled(); }
 
 private:
+	//========= 補助関数=========
+	// 数字キー（1から順に、表の武器の並び）が押された瞬間に、対応する武器を装備する。暫定の操作で、武器の所持・購入の実装までの代わり。
+	void UpdateWeaponSelection();
+
 	//========= 参照先=========
 	// 構え・射撃の可否の読み取り元。非所有。未登録はnullptr。
 	const PlayerController* m_playerController{};
 	// 発射の始点・方向と、反動の加算先。非所有。未登録はnullptr。
 	FpsCamera* m_camera{};
-	// 射撃・リロードの入力の取得元。非所有。未登録はnullptr。
+	// 射撃・リロード・武器切替の入力の取得元。非所有。未登録はnullptr。
 	const InputSystem* m_inputSystem{};
 	// 命中判定とColliderの解除に使うCollisionWorld。非所有。未登録はnullptr。
 	CollisionWorld* m_collisionWorld{};
