@@ -219,23 +219,8 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Scene\Common\Combat\CPP\CombatResolver.cpp" />
     <ClCompile Include="Source\Scene\Common\Combat\CPP\JustDodgeJudge.cpp" />
     <ClCompile Include="Source\Scene\Common\Combat\CPP\ShotController.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\CameraFovController.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\EnemyController.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\ModelRegistry.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\PlayerCombatController.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\SceneObject.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\SceneObjectFactory.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\ShotController.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\StageField.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\TimeScaleController.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\Transform.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\GraphicsSystem.cpp" />
     <ClCompile Include="Source\main.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\AreaTelegraph.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\CombatResolver.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\Enemy.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\EnemyProjectile.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\ExitDoor.cpp" />
     <ClCompile Include="Source\Scene\Common\Enemy\CPP\Enemy.cpp" />
     <ClCompile Include="Source\Scene\Common\Enemy\CPP\EnemyController.cpp" />
     <ClCompile Include="Source\Scene\Common\Enemy\CPP\EnemyProjectile.cpp" />
@@ -251,14 +236,6 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Scene\Common\Weapon\CPP\WeaponSystem.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameHud.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameScene.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\SceneManager.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="Source\Scene\Common\CPP\JustDodgeJudge.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\PlayerController.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\RoomController.cpp" />
-    <ClCompile Include="Source\Scene\Common\CPP\WeaponSystem.cpp" />
     <ClCompile Include="Source\Scene\TitleScene\CPP\TitleScene.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -316,32 +293,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\Common\Etc\H\ModelRegistry.h" />
     <ClInclude Include="Source\Scene\Common\Etc\H\TimeScaleController.h" />
     <ClInclude Include="Source\Scene\Common\Etc\H\Transform.h" />
-    <ClInclude Include="Source\Scene\Common\H\CameraFovController.h" />
-    <ClInclude Include="Source\Scene\Common\H\EnemyController.h" />
-    <ClInclude Include="Source\Scene\Common\H\ModelRegistry.h" />
-    <ClInclude Include="Source\Scene\Common\H\ObjectConfig.h" />
-    <ClInclude Include="Source\Scene\Common\H\PlayerCombatController.h" />
-    <ClInclude Include="Source\Scene\Common\H\SceneObject.h" />
-    <ClInclude Include="Source\Scene\Common\H\SceneObjectFactory.h" />
-    <ClInclude Include="Source\Scene\Common\H\ShotController.h" />
-    <ClInclude Include="Source\Scene\Common\H\StageField.h" />
-    <ClInclude Include="Source\Scene\Common\H\StageLayout.h" />
-    <ClInclude Include="Source\Scene\Common\H\TimeScaleController.h" />
-    <ClInclude Include="Source\Scene\Common\H\Transform.h" />
     <ClInclude Include="Source\Framework\DirectX\H\GraphicsSystem.h" />
-    <ClInclude Include="Source\Scene\Common\H\UiLayout.h" />
-    <ClInclude Include="Source\Scene\Common\H\AreaTelegraph.h" />
-    <ClInclude Include="Source\Scene\Common\H\CombatResolver.h" />
-    <ClInclude Include="Source\Scene\Common\H\CombatTable.h" />
-    <ClInclude Include="Source\Scene\Common\H\Enemy.h" />
-    <ClInclude Include="Source\Scene\Common\H\EnemyApproach.h" />
-    <ClInclude Include="Source\Scene\Common\H\EnemyAreaBehavior.h" />
-    <ClInclude Include="Source\Scene\Common\H\EnemyManager.h" />
-    <ClInclude Include="Source\Scene\Common\H\EnemyProjectile.h" />
-    <ClInclude Include="Source\Scene\Common\H\EnemyRangedBehavior.h" />
-    <ClInclude Include="Source\Scene\Common\H\EnemyTable.h" />
-    <ClInclude Include="Source\Scene\Common\H\EnemyWaveTable.h" />
-    <ClInclude Include="Source\Scene\Common\H\ExitDoor.h" />
     <ClInclude Include="Source\Scene\Common\Player\H\HealItems.h" />
     <ClInclude Include="Source\Scene\Common\Player\H\PlayerActionTable.h" />
     <ClInclude Include="Source\Scene\Common\Player\H\PlayerCombatController.h" />
@@ -358,16 +310,6 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\Common\Weapon\H\WeaponTable.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameHud.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameScene.h" />
-    <ClInclude Include="Source\Scene\Common\H\IScene.h" />
-    <ClInclude Include="Source\Scene\Common\H\SceneManager.h" />
-    <ClInclude Include="Source\Scene\Common\H\HealItems.h" />
-    <ClInclude Include="Source\Scene\Common\H\JustDodgeJudge.h" />
-    <ClInclude Include="Source\Scene\Common\H\PlayerActionTable.h" />
-    <ClInclude Include="Source\Scene\Common\H\PlayerController.h" />
-    <ClInclude Include="Source\Scene\Common\H\PlayerHealth.h" />
-    <ClInclude Include="Source\Scene\Common\H\RoomController.h" />
-    <ClInclude Include="Source\Scene\Common\H\WeaponSystem.h" />
-    <ClInclude Include="Source\Scene\Common\H\WeaponTable.h" />
     <ClInclude Include="Source\Scene\TitleScene\H\TitleScene.h" />
   </ItemGroup>
   <ItemGroup>
