@@ -7,7 +7,6 @@
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで残り時間を0未満にせず、std::minで視野角の補間割合を1以下に制限する。
-#include <cstdint> // std::uint32_tで、スライディングで転倒させた敵の記録のビットを扱う。
 
 //========= 外部ライブラリ インクルード=========
 #include <DirectXMath.h>
@@ -17,7 +16,6 @@
 
 //========= Framework インクルード=========
 #include "Framework/Audio/H/AudioSystem.h"
-#include "Framework/Collision/H/CollisionMath.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
 #include "Framework/Etc/H/Logger.h"
 #include "Framework/Etc/H/MathTypes.h"
@@ -82,10 +80,9 @@ void GameScene::Initialize()
 	m_weaponSystem.Initialize(WEAPON_TABLE::ns_ASSAULT_RIFLE);
 	m_fovDegrees = ns_FOV_DEGREES;
 
-	// 進行状態を第1部屋の第1ウェーブへ戻し、前回の生成失敗とデバッグ設定を引き継がない。
+	// 進行状態を第1部屋の第1ウェーブへ戻し、前回の生成失敗を引き継がない。
 	m_roomController.Initialize();
 	m_hasWaveSpawnFailed = false;
-	m_isOneHitKillEnabled = false;
 
 	// 判定・時間・接触・表示の状態を既定へ戻し、前回の生成ObjectとColliderを空にする。Rendererの生成、表からのObject生成、出口と敵の配置はInitで行う。
 	m_dodgeJudge.Initialize();
@@ -93,8 +90,7 @@ void GameScene::Initialize()
 	m_lastJudgeResult = DODGE_JUDGE_RESULT::e_NONE;
 	m_slowMotionRemainingSeconds = 0.0f;
 	m_hitStopRemainingSeconds = 0.0f;
-	m_contactCooldownRemainingSeconds = 0.0f;
-	m_slideKnockedDownEnemyMask = 0;
+	m_playerCombat.Reset();
 	m_previousActionState = PLAYER_ACTION_STATE::e_NORMAL;
 	m_hitMarkerRemainingSeconds = 0.0f;
 	m_stageObjects.clear();
@@ -160,6 +156,26 @@ bool GameScene::Init()
 		return false;
 	}
 
+	// プレイヤーの戦闘に使う参照と、ヒットストップの通知先を、PlayerCombatControllerへ渡す。ヒットストップは、すでに残っている場合は長い方を使う。
+	PLAYER_COMBAT_LINKS player_combat_links{};
+	player_combat_links.playerController = &m_playerController;
+	player_combat_links.playerHealth = &m_playerHealth;
+	player_combat_links.healItems = &m_healItems;
+	player_combat_links.enemyManager = &m_enemyController.GetEnemyManager();
+	player_combat_links.collisionWorld = &m_collisionWorld;
+	player_combat_links.camera = &m_FPSCamera;
+	player_combat_links.inputSystem = &m_inputSystem;
+	player_combat_links.onHitStopRequested = [this](float hitStopSeconds){
+		m_hitStopRemainingSeconds = std::max(m_hitStopRemainingSeconds,hitStopSeconds);
+	};
+
+	// 参照先の登録に失敗したら、生成済みのResourceを含めて終了して失敗を返す。
+	if(!m_playerCombat.Initialize(player_combat_links)){
+		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneのプレイヤー戦闘の初期化に失敗しました。");
+		Finalize();
+		return false;
+	}
+
 	// 現在の部屋とウェーブの生成に失敗したら、残っているSceneのResourceも解放して初期化失敗を返す。
 	if(!TrySpawnCurrentWave()){
 		Finalize();
@@ -196,7 +212,7 @@ void GameScene::Update(float deltaTime)
 		m_roomController.Initialize();
 		m_hasWaveSpawnFailed = false;
 		m_enemyController.ResetAttackState();
-		m_slideKnockedDownEnemyMask = 0;
+		m_playerCombat.ClearSlideKnockdownRecord();
 	}
 
 	// F5が押された瞬間は、HPバーと低HP警告の確認のため、プレイヤーへ確認用のダメージを与える。ヒットストップや怯みは与えない。
@@ -221,7 +237,7 @@ void GameScene::Update(float deltaTime)
 
 	// F9が押された瞬間は、デバッグ用に、一撃で敵を倒す設定を切り替える。Capture解除中も切り替えられるよう、Captureの判定より前に処理する。
 	if(m_inputSystem.IsKeyTriggered(VK_F9)){
-		m_isOneHitKillEnabled = !m_isOneHitKillEnabled;
+		m_playerCombat.ToggleOneHitKill();
 	}
 
 	// F11が押された瞬間は、デバッグ用に、現在のウェーブの敵を全て倒して、次のウェーブまたは出口の開放へ進める。
@@ -306,9 +322,7 @@ void GameScene::Update(float deltaTime)
 	m_fovDegrees += (target_fov_degrees - m_fovDegrees) * fov_blend;
 
 	// 近接攻撃・接触・回復・射撃を、この順に更新する。
-	UpdateMelee();
-	UpdateContact(gameplay_delta_time);
-	UpdateHeal();
+	m_playerCombat.Update(gameplay_delta_time);
 	UpdateShooting(gameplay_delta_time);
 	// 当フレームの回避・移動・敵への怯みを反映してから、敵の行動と、敵の弾の命中を判定する。
 	m_enemyController.Update(world_delta_time);
@@ -376,7 +390,7 @@ void GameScene::Draw()
 	debug_info.waveNumber = m_roomController.GetWaveNumber();
 	debug_info.roomPhase = m_roomController.GetPhase();
 	debug_info.hasWaveSpawnFailed = m_hasWaveSpawnFailed;
-	debug_info.isOneHitKillEnabled = m_isOneHitKillEnabled;
+	debug_info.isOneHitKillEnabled = m_playerCombat.IsOneHitKillEnabled();
 	debug_info.isEnemyAlive = m_enemyController.GetEnemyManager().GetFirstEnemy().IsAlive();
 	debug_info.enemyHP = m_enemyController.GetEnemyManager().GetFirstEnemy().GetCurrentHP();
 	debug_info.enemyMaxHP = m_enemyController.GetEnemyManager().GetFirstEnemy().GetMaxHP();
@@ -401,6 +415,7 @@ void GameScene::Finalize()
 {
 	// 遷移先のInit後に呼ばれても、遷移先が設定したCaptureやBGMを上書きしない。
 	// 敵・敵の弾・範囲の予告・出口・Objectは、Collisionと共有Rendererを借用しているため、それらを解放する前に先に終了する。
+	m_playerCombat.Uninit();
 	m_enemyController.Uninit();
 	m_exitDoor.Uninit(m_collisionWorld);
 	m_stageObjects.clear();
@@ -426,7 +441,7 @@ void GameScene::UpdateDodgeJudge(float worldDeltaTime)
 
 	// 命中した場合は、ダメージ・怯み・ヒットストップを与える。
 	if(judge_result == DODGE_JUDGE_RESULT::e_HIT){
-		ApplyPlayerHitReaction(COMBAT_TABLE::ns_SIMULATED_ATTACK_DAMAGE,COMBAT_TABLE::ns_DAMAGE_HIT_STOP_SECONDS);
+		m_playerCombat.ApplyHitReaction(COMBAT_TABLE::ns_SIMULATED_ATTACK_DAMAGE,COMBAT_TABLE::ns_DAMAGE_HIT_STOP_SECONDS);
 	}
 	// ジャスト回避の場合は、スローを開始する。連続した場合は、時間を数え直す。
 	else if(judge_result == DODGE_JUDGE_RESULT::e_JUST_DODGED){
@@ -444,7 +459,7 @@ void GameScene::ApplyEnemyAttackEvent(const ENEMY_ATTACK_EVENT& attackEvent)
 
 	// 無敵でなく命中した場合は、ダメージ・怯み・ヒットストップを与える。
 	if(attackEvent.result == DODGE_JUDGE_RESULT::e_HIT){
-		ApplyPlayerHitReaction(attackEvent.damage,COMBAT_TABLE::ns_DAMAGE_HIT_STOP_SECONDS);
+		m_playerCombat.ApplyHitReaction(attackEvent.damage,COMBAT_TABLE::ns_DAMAGE_HIT_STOP_SECONDS);
 	}
 	// 実際に回避中のジャスト回避の場合は、スローを開始する。連続した場合は、時間を数え直す。
 	else if(attackEvent.shouldStartSlowMotion){
@@ -459,7 +474,7 @@ bool GameScene::TrySpawnCurrentWave()
 	if(!m_enemyController.TrySpawnWave(m_roomController.GetRoomNumber(),m_roomController.GetWaveNumber()))return false;
 
 	// 新しい敵がスライディングの転倒記録を引き継がないよう初期化し、全滅判定を開始する。
-	m_slideKnockedDownEnemyMask = 0;
+	m_playerCombat.ClearSlideKnockdownRecord();
 	m_roomController.NotifyWaveSpawned();
 	return true;
 }
@@ -479,12 +494,6 @@ void GameScene::SkipCurrentWave()
 	m_enemyController.ResetAttackState();
 }
 
-// 一撃で倒す設定が有効なら敵の残りHPを、無効なら基本のダメージを返す。
-float GameScene::GetPlayerAttackDamage(float baseDamage,const Enemy& target) const
-{
-	return m_isOneHitKillEnabled ? target.GetCurrentHP() : baseDamage;
-}
-
 // 通過範囲に入ったプレイヤーを、次の部屋の開始位置へ移す。
 void GameScene::UpdateExitPass()
 {
@@ -497,84 +506,6 @@ void GameScene::UpdateExitPass()
 	// 次の部屋へ進んだので、プレイヤーを開始位置へ戻し、カメラ位置を合わせる。出口は、次の更新の進行状態の同期で閉じる。
 	m_playerController.Initialize(ns_PLAYER_START_POSITION);
 	m_FPSCamera.SetPosition(m_playerController.GetPosition());
-}
-
-// 被弾・接触の反応として、ダメージ（あれば）・怯み・ヒットストップを与える。
-void GameScene::ApplyPlayerHitReaction(float damage,float hitStopSeconds)
-{
-	// ダメージが正の場合だけHPを減らす。接触は0のため、HPは変わらない。
-	if(damage > 0.0f){
-		m_playerHealth.ApplyDamage(damage);
-	}
-
-	// プレイヤーを怯ませ、ヒットストップを設定する。すでに残っている場合は、長い方を使う。
-	m_playerController.ApplyFlinch(COMBAT_TABLE::ns_PLAYER_FLINCH_SECONDS);
-	m_hitStopRemainingSeconds = std::max(m_hitStopRemainingSeconds,hitStopSeconds);
-}
-
-// 近接攻撃の当たりを取り出し、範囲内の敵へ効果を与える。
-void GameScene::UpdateMelee()
-{
-	// 当たりの種類の出力先を用意する。
-	PLAYER_MELEE_TYPE melee_type{};
-	// 当たりが発生していなければ、何もしない。
-	if(!m_playerController.TryConsumeMeleeImpact(melee_type))return;
-
-	// 当たる瞬間に、視点から射程と範囲の内で最も近い生存中の敵を選ぶ。いなければ空振りとして何もしない。
-	Enemy* const target_enemy = m_enemyController.GetEnemyManager().FindMeleeTarget(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),false);
-	// 対象がいない場合は、空振りとして効果を与えずに戻る。
-	if(target_enemy == nullptr)return;
-
-	// 蹴りはダメージだけを与える。殴打はダメージを与えた後に、転倒させる。ダメージで死亡した場合、転倒は何も起こらない。
-	if(melee_type == PLAYER_MELEE_TYPE::e_KICK){
-		target_enemy->ApplyDamage(GetPlayerAttackDamage(COMBAT_TABLE::ns_KICK_DAMAGE,*target_enemy),m_collisionWorld);
-	}
-	// 殴打の場合は、ダメージを与えた後に転倒させる。範囲攻撃型は、転倒しない。
-	else{
-		target_enemy->ApplyDamage(GetPlayerAttackDamage(COMBAT_TABLE::ns_PUNCH_DAMAGE,*target_enemy),m_collisionWorld);
-		target_enemy->ApplyKnockdown();
-	}
-
-	// 当たった手応えとして、短いヒットストップを与える。
-	m_hitStopRemainingSeconds = std::max(m_hitStopRemainingSeconds,COMBAT_TABLE::ns_MELEE_HIT_STOP_SECONDS);
-}
-
-// 敵との接触を調べ、スライディングなら転倒、それ以外は条件を満たす場合に接触の反応を与える。
-void GameScene::UpdateContact(float gameplayDeltaTime)
-{
-	// 接触の反応の間隔を進める。0未満にはしない。
-	m_contactCooldownRemainingSeconds = std::max(0.0f,m_contactCooldownRemainingSeconds - gameplayDeltaTime);
-
-	// 現在の動作の状態を取得する。
-	const PLAYER_ACTION_STATE action_state = m_playerController.GetActionState();
-	// スライディングでなくなったら、次のスライディングで再び転倒させられるよう、記録を戻す。
-	if(action_state != PLAYER_ACTION_STATE::e_SLIDE){
-		m_slideKnockedDownEnemyMask = 0;
-	}
-
-	// 全枠を出現順に調べ、体が重なった敵ごとに、スライディングの転倒か接触の反応を判定する。
-	for(Enemy& enemy : m_enemyController.GetEnemyManager().GetEnemies()){
-		// 死亡中、または体が重なっていない敵は、接触していないため次の枠へ進む。
-		if(!enemy.IsAlive() || !CollisionMath::IntersectSphereSphere(m_playerController.GetBodySphere(),enemy.GetBodySphere()))continue;
-
-		// スライディング中は、この敵をまだ転倒させていない場合だけ転倒させる。接触の反応は与えず、他の敵の判定を続ける。範囲攻撃型は、転倒しない。
-		if(action_state == PLAYER_ACTION_STATE::e_SLIDE){
-			const std::uint32_t enemy_bit = 1u << enemy.GetEnemyId();
-			// 未記録で、実際に転倒させられた場合だけ、この敵への記録を付ける。すでに転倒中や、転倒しない種類なら何もしない。
-			if((m_slideKnockedDownEnemyMask & enemy_bit) == 0 && enemy.ApplyKnockdown()){
-				m_slideKnockedDownEnemyMask |= enemy_bit;
-			}
-			continue;
-		}
-
-		// 殴打中・蹴り中・無敵中・敵が転倒中・反応の間隔が残っている間は、接触の反応を与えない。
-		if(action_state == PLAYER_ACTION_STATE::e_PUNCH || action_state == PLAYER_ACTION_STATE::e_KICK || m_playerController.IsInvincible() ||
-			 enemy.IsKnockedDown() || m_contactCooldownRemainingSeconds > 0.0f)continue;
-
-		// 条件を満たした接触は、ダメージなしの怯みとヒットストップを与え、間隔を設定する。以後の枠は、間隔が残るため反応しない。
-		ApplyPlayerHitReaction(0.0f,COMBAT_TABLE::ns_CONTACT_HIT_STOP_SECONDS);
-		m_contactCooldownRemainingSeconds = COMBAT_TABLE::ns_CONTACT_COOLDOWN_SECONDS;
-	}
 }
 
 // 射撃・リロードを更新し、敵へ命中していればダメージを与える。
@@ -605,23 +536,8 @@ void GameScene::UpdateShooting(float gameplayDeltaTime)
 		Enemy* const hit_enemy = m_enemyController.GetEnemyManager().FindLivingEnemy(weapon_result.hitInfo.userData);
 		// 対応する生存中の敵が見つかった場合だけ、ダメージと命中表示を反映する。
 		if(hit_enemy != nullptr){
-			hit_enemy->ApplyDamage(GetPlayerAttackDamage(WEAPON_TABLE::ns_ASSAULT_RIFLE.damage,*hit_enemy),m_collisionWorld);
+			hit_enemy->ApplyDamage(m_playerCombat.GetAttackDamage(WEAPON_TABLE::ns_ASSAULT_RIFLE.damage,*hit_enemy),m_collisionWorld);
 			m_hitMarkerRemainingSeconds = ns_HIT_MARKER_SECONDS;
 		}
-	}
-}
-
-// Qを押した瞬間に、HPが満タンでなく、回復アイテムを使えれば、HPを回復する。動作の状態に関係なく使え、他の動作は中断しない。
-void GameScene::UpdateHeal()
-{
-	// Qを押した瞬間でなければ、何もしない。
-	if(!m_inputSystem.IsKeyTriggered('Q'))return;
-
-	// HPが満タンなら、使っても効果がないため、アイテムを消費しない。
-	if(m_playerHealth.IsFull())return;
-
-	// アイテムを使えた（所持数があり、連続使用の間隔が空いている）場合だけ、HPを回復する。
-	if(m_healItems.TryUse(COMBAT_TABLE::ns_HEAL_COOLDOWN_SECONDS)){
-		m_playerHealth.Heal(COMBAT_TABLE::ns_HEAL_AMOUNT);
 	}
 }

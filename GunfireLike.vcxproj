@@ -214,6 +214,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Framework\3D\CPP\ObjModelRenderer.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\EnemyController.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\ModelRegistry.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\PlayerCombatController.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\SceneObject.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\SceneObjectFactory.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\StageField.cpp" />
@@ -274,6 +275,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\Common\H\EnemyController.h" />
     <ClInclude Include="Source\Scene\Common\H\ModelRegistry.h" />
     <ClInclude Include="Source\Scene\Common\H\ObjectConfig.h" />
+    <ClInclude Include="Source\Scene\Common\H\PlayerCombatController.h" />
     <ClInclude Include="Source\Scene\Common\H\SceneObject.h" />
     <ClInclude Include="Source\Scene\Common\H\SceneObjectFactory.h" />
     <ClInclude Include="Source\Scene\Common\H\StageField.h" />

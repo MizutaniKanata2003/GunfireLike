@@ -4,7 +4,6 @@
 // 各クラスの更新を仲介し、共有Renderer・生成したObject・CollisionWorldを所有する。Scene切替はManagerへ予約する。
 
 //========= C++標準ライブラリ インクルード=========
-#include <cstdint> // std::uint32_tで、スライディングで転倒させた敵のID別の記録を保持する。
 #include <vector> // 設定表から生成したSceneObjectを、表の順に保持する可変長配列として使用する。
 
 //========= Debug インクルード=========
@@ -21,6 +20,7 @@
 #include "Scene/Common/H/IScene.h"
 #include "Scene/Common/H/JustDodgeJudge.h"
 #include "Scene/Common/H/ModelRegistry.h"
+#include "Scene/Common/H/PlayerCombatController.h"
 #include "Scene/Common/H/PlayerController.h"
 #include "Scene/Common/H/PlayerHealth.h"
 #include "Scene/Common/H/SceneObject.h"
@@ -76,26 +76,11 @@ private:
 	[[nodiscard]] bool TrySpawnCurrentWave();
 	// デバッグ用に、現在のウェーブの生きている敵を全て倒し、敵の予告・弾・範囲の予告を消す。次の更新の全滅判定で、次のウェーブまたは出口の開放へ進む。
 	void SkipCurrentWave();
-	// プレイヤーの攻撃が敵へ与えるダメージを返す。一撃で倒す設定が有効なら、その敵の残りHPを返し、無効なら基本のダメージを返す。
-	// baseDamage: 設定が無効の場合に使う、攻撃の基本のダメージ。
-	// target: ダメージを受ける敵。
-	[[nodiscard]] float GetPlayerAttackDamage(float baseDamage,const Enemy& target) const;
 	// 出口が開いていて、プレイヤーが通過範囲に入った場合だけ、次の部屋へ進め、プレイヤーを開始位置へ戻す。
 	void UpdateExitPass();
-	// プレイヤーへ被弾の反応（ダメージ・怯み・ヒットストップ）を与える。
-	// damage: 与えるダメージ。接触の場合は0。
-	// hitStopSeconds: 設定するヒットストップの長さ。単位は秒。
-	void ApplyPlayerHitReaction(float damage,float hitStopSeconds);
-	// 近接攻撃の当たりが発生していれば、射程と範囲の内の敵へ、蹴り・殴打の効果を与える。
-	void UpdateMelee();
-	// 敵との体の接触を調べ、スライディング中は敵を転倒させ、それ以外では条件を満たす場合に接触の反応を与える。
-	// gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。接触の反応の間隔を進める。
-	void UpdateContact(float gameplayDeltaTime);
 	// 射撃・リロードを更新し、弾が敵へ命中していればダメージを与える。
 	// gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。
 	void UpdateShooting(float gameplayDeltaTime);
-	// Qの入力で、回復アイテムを使ってHPを回復する。HPが満タンの場合は消費しない。他の動作は中断しない。
-	void UpdateHeal();
 
 	//========= System・Scene参照=========
 	// Scene遷移の予約先となる非所有参照。
@@ -120,6 +105,8 @@ private:
 	WeaponSystem m_weaponSystem{};
 	// 現在のウェーブの敵・敵の弾・範囲の予告・敵ごとの攻撃予告を所有し、更新と描画を行う。Finalizeで、登録先のCollisionWorldと共有Rendererより先に解除する。
 	EnemyController m_enemyController{};
+	// 蹴り・殴打の当たり・敵との接触・スライディングの転倒・回復アイテムの使用・被弾の反応と、一撃で倒すデバッグ設定を担当する。ヒットストップの残り時間は、このSceneが持つ。
+	PlayerCombatController m_playerCombat{};
 	// 3部屋×2ウェーブの進行状態。敵の生成と全滅判定は、GameSceneが仲介する。
 	RoomController m_roomController{};
 	// 現在のウェーブの生成に失敗したか。trueの間は生成を再試行せず、F4で最初からやり直す。
@@ -128,10 +115,6 @@ private:
 	ExitDoor m_exitDoor{};
 	// 現在の視野角。単位は度。構え・ダッシュの状態に応じた目標値へ滑らかに近づく。
 	float m_fovDegrees{};
-
-	//========= デバッグ設定=========
-	// 一撃で敵を倒す設定が有効か。F9で切り替える。有効の間、プレイヤーの射撃・蹴り・殴打が、敵の残りHPと同じダメージを与える。
-	bool m_isOneHitKillEnabled{};
 
 	//========= 判定・時間の状態=========
 	// 確認用に発生させた攻撃の、命中の瞬間の判定（無敵・ジャスト回避）。
@@ -142,10 +125,6 @@ private:
 	float m_slowMotionRemainingSeconds{};
 	// ヒットストップの残り時間。単位は実時間の秒。0より大きい間、プレイヤーと敵の時間が止まる。
 	float m_hitStopRemainingSeconds{};
-	// 敵への接触の反応が、次に起きるまでの残り時間。単位は秒。0なら起きる。
-	float m_contactCooldownRemainingSeconds{};
-	// 現在のスライディングで転倒させた敵の記録。ビット番号が敵IDに対応し、同じスライディングで同じ敵を繰り返し転倒させない。
-	std::uint32_t m_slideKnockedDownEnemyMask{};
 	// 1回前の更新での、プレイヤーの動作の状態。殴打の開始を検出するために使う。
 	PLAYER_ACTION_STATE m_previousActionState{PLAYER_ACTION_STATE::e_NORMAL};
 
