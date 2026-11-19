@@ -6,7 +6,6 @@
 #include <windows.h> // VK_F1〜VK_F9とVK_F11の仮想キーコードで、Capture切替・タイトル遷移・可視化切替・最初の部屋からの再開・確認操作・デバッグ操作のキーを指定する。
 
 //========= C++標準ライブラリ インクルード=========
-#include <algorithm> // std::maxで残り時間を0未満にせず、std::minで視野角の補間割合を1以下に制限する。
 
 //========= 外部ライブラリ インクルード=========
 #include <DirectXMath.h>
@@ -29,22 +28,10 @@
 #include "Scene/Common/H/StageLayout.h"
 #include "Scene/TitleScene/H/TitleScene.h"
 
-// このSceneの視野角、開始位置に使用する固定設定をまとめる。戦闘の数値はCombatTableにある。
+// このSceneの投影面（Clip面）の距離、開始位置に使用する固定設定をまとめる。戦闘の数値はCombatTableにある。
 namespace
 {
 	//========= Projection設定=========
-	// 通常時の垂直方向の視野角。単位は度。行列生成時にラジアンへ変換する。
-	constexpr float ns_FOV_DEGREES = 60.0f;
-	// 構えている時の垂直方向の視野角。単位は度。通常より狭くして、拡大して見える。企画書で未確定の仮値。
-	constexpr float ns_AIM_FOV_DEGREES = 45.0f;
-	// ダッシュ中の垂直方向の視野角。単位は度。通常より広くして、速さを出す。仮値。
-	constexpr float ns_DASH_FOV_DEGREES = 66.0f;
-	// スライディング中の垂直方向の視野角。単位は度。ダッシュよりさらに広くして、滑る速さと低さを出し、しゃがみとの違いを分かりやすくする。仮値。
-	constexpr float ns_SLIDE_FOV_DEGREES = 78.0f;
-	// しゃがみ中の垂直方向の視野角。単位は度。通常より少し狭くして、慎重な状態を示し、スライディングとの違いを分かりやすくする。仮値。
-	constexpr float ns_CROUCH_FOV_DEGREES = 56.0f;
-	// 視野角が目標値へ近づく速さ。1秒あたりに差の何倍を縮めるかを表し、大きいほど速い。仮値。
-	constexpr float ns_FOV_SMOOTHING_RATE = 12.0f;
 	// View空間での近距離Clip面の距離。単位はワールド距離単位。これより近い物は描画されない。
 	constexpr float ns_NEAR_CLIP = 0.1f;
 	// View空間での遠距離Clip面の距離。単位はワールド距離単位。これより遠い物は描画されない。
@@ -71,7 +58,7 @@ void GameScene::Initialize()
 	m_healItems.Initialize(COMBAT_TABLE::ns_HEAL_INITIAL_COUNT,COMBAT_TABLE::ns_HEAL_MAX_COUNT);
 	m_FPSCamera = FpsCamera{};
 	m_shotController.Reset();
-	m_fovDegrees = ns_FOV_DEGREES;
+	m_cameraFov.Reset();
 
 	// 進行状態を第1部屋の第1ウェーブへ戻し、前回の生成失敗を引き継がない。
 	m_roomController.Initialize();
@@ -299,27 +286,8 @@ void GameScene::Update(float deltaTime)
 	}
 	m_previousActionState = action_state;
 
-	// 動作の状態に応じた視野角の目標値へ、滑らかに近づける。スライディングが最も広く、次にダッシュ。構えは狭く、しゃがみは少し狭い。それ以外は通常。
-	// 1回の更新で差を超えないよう、近づく割合は1以下に制限する。
-	float target_fov_degrees = ns_FOV_DEGREES;
-	// スライディング中は、視野角を最も広げる。
-	if(action_state == PLAYER_ACTION_STATE::e_SLIDE){
-		target_fov_degrees = ns_SLIDE_FOV_DEGREES;
-	}
-	// ダッシュ中は、視野角を広げる。
-	else if(action_state == PLAYER_ACTION_STATE::e_DASH){
-		target_fov_degrees = ns_DASH_FOV_DEGREES;
-	}
-	// 構えている間は、視野角を狭める。しゃがみ中でも、構えを優先する。
-	else if(m_playerController.IsAiming()){
-		target_fov_degrees = ns_AIM_FOV_DEGREES;
-	}
-	// しゃがみ中は、視野角を少し狭める。
-	else if(action_state == PLAYER_ACTION_STATE::e_CROUCH){
-		target_fov_degrees = ns_CROUCH_FOV_DEGREES;
-	}
-	const float fov_blend = std::min(1.0f,ns_FOV_SMOOTHING_RATE * deltaTime);
-	m_fovDegrees += (target_fov_degrees - m_fovDegrees) * fov_blend;
+	// 動作の状態と構えに応じた視野角の目標値へ、滑らかに近づける。
+	m_cameraFov.Update(deltaTime,action_state,m_playerController.IsAiming());
 
 	// 近接攻撃・接触・回復・射撃を、この順に更新する。
 	m_playerCombat.Update(gameplay_delta_time);
@@ -343,7 +311,7 @@ void GameScene::Draw()
 	// 現在サイズの比率で左手系の透視投影行列を作り、カメラからView行列を取得する。視野角は動作の状態を反映した現在値を使う。
 	// 投影行列の生成関数と角度変換は、MathTypes.hのusing宣言により修飾なしで呼ぶ。
 	const float aspect_ratio = static_cast<float>(render_width) / static_cast<float>(render_height);
-	const XMMATRIX projection_matrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fovDegrees),aspect_ratio,ns_NEAR_CLIP,ns_FAR_CLIP);
+	const XMMATRIX projection_matrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(m_cameraFov.GetFovDegrees()),aspect_ratio,ns_NEAR_CLIP,ns_FAR_CLIP);
 	const XMMATRIX view_matrix = m_FPSCamera.GetViewMatrix();
 
 	// 床・壁・範囲の予告・出口・敵・敵の弾はOPAQUE Passで描画するため、描画前にPassを設定する。

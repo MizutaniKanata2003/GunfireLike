@@ -14,6 +14,7 @@
 #include "Framework/Input/H/FpsCamera.h"
 
 //========= Scene インクルード=========
+#include "Scene/Common/H/CameraFovController.h"
 #include "Scene/Common/H/EnemyController.h"
 #include "Scene/Common/H/ExitDoor.h"
 #include "Scene/Common/H/HealItems.h"
@@ -113,8 +114,8 @@ private:
 	bool m_hasWaveSpawnFailed{};
 	// 部屋の出口。進行状態に合わせて開閉し、閉じている間は通行を止め、開いている間は通過を判定する。Finalizeで登録先のCollisionWorldより先に解除する。
 	ExitDoor m_exitDoor{};
-	// 現在の視野角。単位は度。構え・ダッシュの状態に応じた目標値へ滑らかに近づく。
-	float m_fovDegrees{};
+	// 動作の状態に応じた視野角の目標値と、現在の視野角の補間を担当する。
+	CameraFovController m_cameraFov{};
 
 	//========= 判定・時間の状態=========
 	// 確認用に発生させた攻撃の、命中の瞬間の判定（無敵・ジャスト回避）。
