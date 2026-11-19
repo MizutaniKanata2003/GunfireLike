@@ -11,6 +11,7 @@
 //========= Framework インクルード=========
 #include "Framework/Audio/H/AudioSystem.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
+#include "Framework/Etc/H/InitCheck.h"
 #include "Framework/Etc/H/Logger.h"
 #include "Framework/Etc/H/MathTypes.h"
 #include "Framework/Input/H/InputSystem.h"
@@ -160,42 +161,24 @@ void GameScene::Finalize()
 // 共有Renderer・Collision可視化・HUD・ステージObject・出口を初期化する。
 bool GameScene::InitRenderResources()
 {
-	// 共有Rendererの初期化失敗を検出したら、失敗を返す。Captureと再生は変更しない。
-	if(!m_modelRegistry.Initialize(m_graphicsSystem)){
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの基本Mesh初期化に失敗しました。");
-		return false;
-	}
-
-	// Collision可視化の初期化失敗を検出したら、失敗を返す。
-	if(!m_collisionDebugView.Initialize(m_graphicsSystem)){
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの線描画Renderer初期化に失敗しました。");
-		return false;
-	}
-
-	// 画像のHUDの初期化失敗を検出したら、失敗を返す。個々の画像の読込失敗はここでは失敗にならない。
-	if(!m_gameHud.Initialize(m_graphicsSystem)){
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneのHUD初期化に失敗しました。");
-		return false;
-	}
-
-	// 設定表から床と4面の壁を、表の順に生成し、壁のAABB ColliderをCollisionWorldへ登録する。全件成功しなければ、失敗を返す。
-	if(!SceneObjectFactory::Build(STAGE_LAYOUT::ns_OBJECTS,STAGE_LAYOUT::ns_OBJECT_COUNT,m_modelRegistry,&m_collisionWorld,m_stageObjects)){
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneのステージObject生成に失敗しました。");
-		return false;
-	}
-
-	// 閉じた状態の出口を登録する。Cube Rendererを借用できなければ、失敗を返す。
-	if(!m_exitDoor.Initialize(m_modelRegistry,m_collisionWorld)){
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの出口の初期化に失敗しました。");
-		return false;
-	}
-	return true;
+	// 5つの初期化を、この順に実行する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。後始末は、呼出側のInitがFinalizeで行う。
+	// 共有Rendererの初期化失敗を検出する。
+	return InitCheck::Succeeded(m_modelRegistry.Initialize(m_graphicsSystem),e_LogCategory::e_SCENE,L"GameSceneの基本Mesh初期化に失敗しました。")
+		// Collision可視化の初期化失敗を検出する。
+		&& InitCheck::Succeeded(m_collisionDebugView.Initialize(m_graphicsSystem),e_LogCategory::e_SCENE,L"GameSceneの線描画Renderer初期化に失敗しました。")
+		// 画像のHUDの初期化失敗を検出する。個々の画像の読込失敗はここでは失敗にならない。
+		&& InitCheck::Succeeded(m_gameHud.Initialize(m_graphicsSystem),e_LogCategory::e_SCENE,L"GameSceneのHUD初期化に失敗しました。")
+		// 設定表から床と4面の壁を、表の順に生成し、壁のAABB ColliderをCollisionWorldへ登録する。全件成功しなければ失敗する。
+		&& InitCheck::Succeeded(SceneObjectFactory::Build(STAGE_LAYOUT::ns_OBJECTS,STAGE_LAYOUT::ns_OBJECT_COUNT,m_modelRegistry,&m_collisionWorld,m_stageObjects),
+														e_LogCategory::e_SCENE,L"GameSceneのステージObject生成に失敗しました。")
+		// 閉じた状態の出口を登録する。Cube Rendererを借用できなければ失敗する。
+		&& InitCheck::Succeeded(m_exitDoor.Initialize(m_modelRegistry,m_collisionWorld),e_LogCategory::e_SCENE,L"GameSceneの出口の初期化に失敗しました。");
 }
 
 // 敵の更新とプレイヤーの戦闘へ、使用する参照と通知先を渡す。
 bool GameScene::InitEnemyAndPlayerCombat()
 {
-	// 敵の更新に使う参照と、攻撃イベントの通知先（被弾・スロー・記録の反映）を、EnemyControllerへ渡す。
+	// 敵の更新に使う参照と、攻撃イベントの通知先（被弾・スロー・記録の反映）を用意する。
 	ENEMY_CONTROLLER_LINKS enemy_links{};
 	enemy_links.modelRegistry = &m_modelRegistry;
 	enemy_links.collisionWorld = &m_collisionWorld;
@@ -205,13 +188,8 @@ bool GameScene::InitEnemyAndPlayerCombat()
 		ApplyEnemyAttackEvent(attackEvent);
 	};
 
-	// 敵の弾と範囲の予告のCube Rendererを借用する。借用できなければ、失敗を返す。
-	if(!m_enemyController.Initialize(enemy_links)){
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの敵の更新の初期化に失敗しました。");
-		return false;
-	}
-
-	// プレイヤーの戦闘に使う参照と、ヒットストップの通知先を、PlayerCombatControllerへ渡す。ヒットストップは、すでに残っている場合は長い方を使う。
+	// プレイヤーの戦闘に使う参照と、ヒットストップの通知先を用意する。ヒットストップは、すでに残っている場合は長い方を使う。
+	// 参照の取得は、どちらも対象の状態を変えない。以後の登録の順序に影響しないよう、両方を先に用意する。
 	PLAYER_COMBAT_LINKS player_combat_links{};
 	player_combat_links.playerController = &m_playerController;
 	player_combat_links.playerHealth = &m_playerHealth;
@@ -224,18 +202,17 @@ bool GameScene::InitEnemyAndPlayerCombat()
 		m_timeScale.RequestHitStop(hitStopSeconds);
 	};
 
-	// 参照先の登録に失敗したら、失敗を返す。
-	if(!m_playerCombat.Initialize(player_combat_links)){
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneのプレイヤー戦闘の初期化に失敗しました。");
-		return false;
-	}
-	return true;
+	// 敵の更新、プレイヤーの戦闘の順に登録する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。
+	// 敵の弾と範囲の予告のCube Rendererを借用できなければ、敵の更新の登録は失敗する。
+	return InitCheck::Succeeded(m_enemyController.Initialize(enemy_links),e_LogCategory::e_SCENE,L"GameSceneの敵の更新の初期化に失敗しました。")
+		// 参照先の登録に失敗した場合は、プレイヤーの戦闘の登録が失敗する。
+		&& InitCheck::Succeeded(m_playerCombat.Initialize(player_combat_links),e_LogCategory::e_SCENE,L"GameSceneのプレイヤー戦闘の初期化に失敗しました。");
 }
 
 // 射撃とデバッグ操作へ、使用する参照を渡す。
 bool GameScene::InitShotAndDebug()
 {
-	// 射撃に使う参照を、ShotControllerへ渡す。
+	// 射撃に使う参照を用意する。
 	SHOT_CONTROLLER_LINKS shot_links{};
 	shot_links.playerController = &m_playerController;
 	shot_links.camera = &m_FPSCamera;
@@ -245,13 +222,7 @@ bool GameScene::InitShotAndDebug()
 	shot_links.playerCombat = &m_playerCombat;
 	shot_links.collisionDebugView = &m_collisionDebugView;
 
-	// 参照先の登録に失敗したら、失敗を返す。
-	if(!m_shotController.Initialize(shot_links)){
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneの射撃の初期化に失敗しました。");
-		return false;
-	}
-
-	// デバッグ操作とデバッグUIに使う参照を、GameDebugControllerへ渡す。ゲームの状態は、各クラスの公開関数を通じてだけ変更される。
+	// デバッグ操作とデバッグUIに使う参照を用意する。ゲームの状態は、各クラスの公開関数を通じてだけ変更される。
 	GAME_DEBUG_CONTROLLER_LINKS debug_links{};
 	debug_links.inputSystem = &m_inputSystem;
 	debug_links.collisionDebugView = &m_collisionDebugView;
@@ -264,12 +235,11 @@ bool GameScene::InitShotAndDebug()
 	debug_links.shotController = &m_shotController;
 	debug_links.timeScale = &m_timeScale;
 
-	// 参照先の登録に失敗したら、失敗を返す。
-	if(!m_debugController.Initialize(debug_links)){
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameSceneのデバッグ操作の初期化に失敗しました。");
-		return false;
-	}
-	return true;
+	// 射撃、デバッグ操作の順に登録する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。
+	// 参照先の登録に失敗した場合は、射撃の登録が失敗する。
+	return InitCheck::Succeeded(m_shotController.Initialize(shot_links),e_LogCategory::e_SCENE,L"GameSceneの射撃の初期化に失敗しました。")
+		// 参照先の登録に失敗した場合は、デバッグ操作の登録が失敗する。
+		&& InitCheck::Succeeded(m_debugController.Initialize(debug_links),e_LogCategory::e_SCENE,L"GameSceneのデバッグ操作の初期化に失敗しました。");
 }
 
 //========= 更新の補助関数=========
