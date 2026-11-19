@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 // 移動・ダッシュ・しゃがみ・スライディング・回避・蹴り・殴打・視点・構え・射撃・リロード・回復と、設定表から生成した床・壁、部屋ごとの敵と敵の弾と範囲の予告、出口、画像のHUD、Collisionの可視化を行う最小構成のGameSceneを宣言する。
-// 各クラスの更新を仲介する。ステージの世界（共有Renderer・生成したObject・出口・CollisionWorld・部屋の進行）はStageControllerが所有する。Scene切替はManagerへ予約する。個別のゲーム規則は、各Controllerが持つ。
+// 各クラスの更新を仲介する。ステージの世界はStageController、プレイヤー側一式はPlayerSuiteが所有する。Scene切替はManagerへ予約する。個別のゲーム規則は、各Controllerが持つ。
 
 //========= Debug インクルード=========
 #include "Debug/H/CollisionDebugView.h"
@@ -9,19 +9,13 @@
 
 //========= Framework インクルード=========
 #include "Framework/Etc/H/MathTypes.h"
-#include "Framework/Input/H/FpsCamera.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/Camera/H/CameraFovController.h"
-#include "Scene/Common/Combat/H/PlayerCombatController.h"
 #include "Scene/Common/Combat/H/TimeScaleController.h"
 #include "Scene/Common/Core/H/IScene.h"
 #include "Scene/Common/Enemy/H/EnemyController.h"
-#include "Scene/Common/Player/H/HealItems.h"
-#include "Scene/Common/Player/H/PlayerController.h"
-#include "Scene/Common/Player/H/PlayerHealth.h"
+#include "Scene/Common/Player/H/PlayerSuite.h"
 #include "Scene/Common/Stage/H/StageController.h"
-#include "Scene/Common/Weapon/H/ShotController.h"
 #include "Scene/GameScene/H/GameHud.h"
 
 //========= 前方宣言=========
@@ -43,7 +37,7 @@ public:
 	GameScene(SceneManager& sceneManager,InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem);
 
 	//========= Sceneライフサイクル関数=========
-	// プレイヤー・カメラ・武器・HP・回復アイテム・ステージ・判定の状態・敵の弾と範囲の予告・デバッグ設定・表示状態を初期状態へ戻し、カメラをプレイヤー位置へ合わせる。
+	// プレイヤー側一式・ステージ・判定の状態・敵の弾と範囲の予告・デバッグ設定を初期状態へ戻し、カメラをプレイヤー位置へ合わせる。
 	void Initialize() override;
 	// ステージ・HUD・Collision可視化を初期化し、敵の弾、範囲の予告、第1部屋の敵を生成して、成功後にFPS操作とGame用BGMを有効にする。
 	// 戻り値: 各初期化・Object生成・敵の配置が成功したらtrue。falseを検出した場合はFinalize後にfalseを返す。
@@ -56,7 +50,7 @@ public:
 	// 描画先サイズに合わせて行列を作り、3D・画像のHUD・読み取り専用のデバッグUIを、この順に描画する。
 	// 幅または高さが0なら何もしない。ImGuiフレーム開始後、描画データ確定前に呼ぶ。
 	void Draw() override;
-	// 敵・敵の弾・範囲の予告を先に破棄し、その後にステージ・HUD・Collision可視化を解放する。繰り返し呼出可能。CaptureやBGMは変更しない。
+	// デバッグ・プレイヤー側・敵を先に終了し、その後にステージ・HUD・Collision可視化を解放する。繰り返し呼出可能。CaptureやBGMは変更しない。
 	void Finalize() override;
 
 private:
@@ -64,12 +58,12 @@ private:
 	// ステージ・Collision可視化・HUDを初期化する。失敗の後始末は、呼出側のInitがFinalizeで行う。
 	// 戻り値: 全て成功したらtrue。失敗した場合は、失敗した対象をログへ記録してfalse。
 	[[nodiscard]] bool InitRenderResources();
-	// 敵の更新とプレイヤーの戦闘へ、使用する参照と通知先を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
+	// 敵の更新へ、使用する参照と通知先を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
+	// 戻り値: 登録に成功したらtrue。
+	[[nodiscard]] bool InitEnemyController();
+	// プレイヤー側一式とデバッグ操作へ、使用する参照と通知先を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
 	// 戻り値: 両方の登録に成功したらtrue。
-	[[nodiscard]] bool InitEnemyAndPlayerCombat();
-	// 射撃とデバッグ操作へ、使用する参照を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
-	// 戻り値: 両方の登録に成功したらtrue。
-	[[nodiscard]] bool InitShotAndDebug();
+	[[nodiscard]] bool InitPlayerAndDebug();
 
 	//========= 更新の補助関数=========
 	// F2の遷移予約、F1のCapture切替、F4の最初の部屋からの再開を処理する。
@@ -123,30 +117,16 @@ private:
 	AudioSystem& m_audioSystem;
 
 	//========= Scene所有状態=========
-	// 位置・動作の状態・構え・近接攻撃・怯み・壁からの押し戻しを管理するプレイヤー。
-	PlayerController m_playerController{};
-	// プレイヤーのHP。
-	PlayerHealth m_playerHealth{};
-	// 回復アイテムの所持数と、連続使用の間隔。
-	HealItems m_healItems{};
-	// マウスによる視線方向と、プレイヤー位置に追従するView行列の生成状態。
-	FpsCamera m_FPSCamera{};
-	// 射撃・リロードの更新、弾道の終点の通知、命中した敵へのダメージ、命中表示の時間を担当し、武器を所有する。
-	ShotController m_shotController{};
+	// プレイヤー・HP・回復アイテム・カメラ・近接攻撃と接触と回復・射撃・視野角を所有する。ヒットストップは、TimeScaleControllerへ求める。
+	PlayerSuite m_player{};
 	// 現在のウェーブの敵・敵の弾・範囲の予告・敵ごとの攻撃予告を所有し、更新と描画を行う。Finalizeで、登録先のCollisionWorldと共有Rendererより先に解除する。
 	EnemyController m_enemyController{};
-	// 蹴り・殴打の当たり・敵との接触・スライディングの転倒・回復アイテムの使用・被弾の反応と、一撃で倒すデバッグ設定を担当する。ヒットストップは、TimeScaleControllerへ求める。
-	PlayerCombatController m_playerCombat{};
 	// ヒットストップとスローの残り時間を持ち、更新ごとに、プレイヤー側と、敵・判定側の経過時間を求める。
 	TimeScaleController m_timeScale{};
 	// デバッグ操作・確認用の攻撃の判定・デバッグUIの情報の組立を担当する。ゲームの状態は、参照を通じてだけ変更する。
 	GameDebugController m_debugController{};
 	// 共有Renderer・床と壁・出口・CollisionWorld・部屋の進行を所有する。敵の生成と全滅判定は、GameSceneが仲介する。
 	StageController m_stage{};
-	// 動作の状態に応じた視野角の目標値と、現在の視野角の補間を担当する。
-	CameraFovController m_cameraFov{};
-	// 1回前の更新での、プレイヤーの動作の状態。殴打の開始を検出するために使う。
-	PLAYER_ACTION_STATE m_previousActionState{PLAYER_ACTION_STATE::e_NORMAL};
 
 	//========= HUDとデバッグ=========
 	// 画像で描くHUD。
