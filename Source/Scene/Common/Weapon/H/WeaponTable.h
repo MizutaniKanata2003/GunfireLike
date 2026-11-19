@@ -4,7 +4,7 @@
 // 武器の動作や状態は担当しない。性能値を1か所に集約するための定義だけを持つ。
 
 //========= Framework インクルード=========
-#include "Framework/Input/H/FpsCamera.h" // 武器ごとの反動の追従・復帰・上限を表すRECOIL_PROFILEを、性能値へ含めるために使用する。
+#include "Framework/Input/H/FpsCamera.h" // 武器ごとの反動の制御方式・追従・復帰・上限を表すRECOIL_PROFILEを、性能値へ含めるために使用する。
 
 // 武器1種類の性能値。
 struct WEAPON_DATA
@@ -38,7 +38,7 @@ struct WEAPON_DATA
 	float reloadSeconds;
 
 	//========= 反動の制御=========
-	// 反動によるカメラのずれの、追従・復帰・上限の設定。武器を装備した時に、カメラへ渡す。
+	// 反動によるカメラのずれの、制御方式・追従・復帰・上限の設定。武器を装備した時に、カメラへ渡す。
 	RECOIL_PROFILE recoilProfile;
 };
 
@@ -46,9 +46,9 @@ struct WEAPON_DATA
 namespace WEAPON_TABLE
 {
 	//========= 反動の制御=========
-	// 連射武器の反動の制御。目標へ滑らかに近づき、射撃をやめて少し経つと元へ戻る。D1より前の固定値と同じ。
-	// 並び: 追従の速さ(1/秒)、復帰を始めるまでの時間(秒)、復帰の速さ(1/秒)、Pitchの上限(度)、Yawの上限(度)。
-	inline constexpr RECOIL_PROFILE ns_RECOIL_PROFILE_ASSAULT_RIFLE{16.0f,0.15f,6.0f,12.0f,6.0f};
+	// 連射武器の反動の制御。射撃を続けている間は、視線のずれを戻さず（上限まで上がり続け）、射撃をやめた時に、元へ戻り始める。
+	// 並び: 制御方式、追従の速さ(1/秒)、やめてから戻り始めるまでの時間(秒)、復帰の速さ(1/秒)、Pitchの上限(度)、Yawの上限(度)。
+	inline constexpr RECOIL_PROFILE ns_RECOIL_PROFILE_ASSAULT_RIFLE{RECOIL_CONTROL::e_HOLD_UNTIL_RELEASE,16.0f,0.15f,6.0f,12.0f,6.0f};
 
 	//========= 連射武器=========
 	// 初期武器の無強化の連射武器。企画書の方針（無強化では連射が遅く、反動が大きく、リロードが遅い）に沿った仮値。

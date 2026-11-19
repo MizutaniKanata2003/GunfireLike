@@ -40,7 +40,7 @@ class ShotController final
 {
 public:
 	//========= 初期化・終了関数=========
-	// 参照先を登録する。
+	// 参照先を登録し、使用する武器の反動の設定をカメラへ渡す。
 	// links: 借用する参照先。1つでも欠けている場合は何も登録しない。
 	// 戻り値: 全ての参照先が揃っていて登録できたらtrue。
 	[[nodiscard]] bool Initialize(const SHOT_CONTROLLER_LINKS& links);
@@ -58,12 +58,16 @@ public:
 	void UpdateHitMarker(float deltaTime);
 	// リロードを途中でやめる。弾は補充しない。殴打など、リロードをキャンセルする動作から呼ぶ。
 	void CancelReload() { m_weaponSystem.CancelReload(); }
+	// デバッグ用に、弾薬を消費しない設定を切り替える。
+	void ToggleInfiniteAmmo() { m_weaponSystem.ToggleInfiniteAmmo(); }
 
 	//========= Getter関数=========
 	// 武器の読み取り専用参照を返す。HUDの弾薬・リロード表示に使う。戻り値の参照は、このControllerの寿命を超えて保持しない。
 	[[nodiscard]] const WeaponSystem& GetWeaponSystem() const { return m_weaponSystem; }
 	// 直近の命中を表示中かを返す。
 	[[nodiscard]] bool IsHitMarkerActive() const { return m_hitMarkerRemainingSeconds > 0.0f; }
+	// 弾薬を消費しないデバッグ設定が有効かを返す。
+	[[nodiscard]] bool IsInfiniteAmmoEnabled() const { return m_weaponSystem.IsInfiniteAmmoEnabled(); }
 
 private:
 	//========= 参照先=========

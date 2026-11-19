@@ -41,10 +41,10 @@ class WeaponSystem final
 {
 public:
 	//========= 初期化・更新関数=========
-	// 性能値を登録し、弾薬を満タン・予備弾薬を初期値へ戻し、連射間隔とリロードの状態を解除する。
+	// 性能値を登録し、弾薬を満タン・予備弾薬を初期値へ戻し、連射間隔とリロードの状態を解除する。弾薬を消費しないデバッグ設定も、無効へ戻す。
 	// weaponData: 使用する武器の性能値。値をコピーする。
 	void Initialize(const WEAPON_DATA& weaponData);
-	// 連射間隔とリロードの時間を進め、リロード開始と射撃の入力を処理する。
+	// 連射間隔とリロードの時間を進め、リロード開始と射撃の入力を処理する。射撃を続けている最中かを、カメラの反動の制御へ伝える。
 	// deltaTime: この更新で進める経過時間。単位は秒。
 	// input: 左クリック（射撃）とRキー（リロード）の取得先。参照は保持しない。
 	// isAiming: 構えているか。trueなら構え射撃の散布、falseなら通常射撃の散布を使う。
@@ -61,6 +61,8 @@ public:
 		m_isReloading = false;
 		m_reloadElapsedSeconds = 0.0f;
 	}
+	// デバッグ用に、弾薬を消費しない設定を切り替える。有効の間は、装填弾数が0でも発射でき、発射しても弾薬が減らない。
+	void ToggleInfiniteAmmo() { m_isInfiniteAmmo = !m_isInfiniteAmmo; }
 
 	//========= Getter関数=========
 	// 現在の装填弾数を返す。
@@ -71,6 +73,8 @@ public:
 	[[nodiscard]] int GetMagazineSize() const { return m_weaponData.magazineSize; }
 	// リロード中かを返す。
 	[[nodiscard]] bool IsReloading() const { return m_isReloading; }
+	// 弾薬を消費しないデバッグ設定が有効かを返す。
+	[[nodiscard]] bool IsInfiniteAmmoEnabled() const { return m_isInfiniteAmmo; }
 	// リロードの進み具合を0〜1で返す。リロード中でなければ0。
 	[[nodiscard]] float GetReloadProgress() const;
 
@@ -97,6 +101,10 @@ private:
 	bool m_isReloading{};
 	// リロード開始からの経過時間。単位は秒。リロード中だけ進む。
 	float m_reloadElapsedSeconds{};
+
+	//========= デバッグ設定=========
+	// 弾薬を消費しないか。デバッグ用。Initializeで無効へ戻る。
+	bool m_isInfiniteAmmo{};
 
 	//========= 乱数=========
 	// 弾のばらつきと反動の左右に使う乱数生成器。再現性は不要なため、固定の初期値を使う。

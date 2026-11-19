@@ -37,10 +37,11 @@ void WeaponSystem::Initialize(const WEAPON_DATA& weaponData)
 	m_magazineAmmo = weaponData.magazineSize;
 	m_reserveAmmo = weaponData.initialReserveAmmo;
 
-	// 連射間隔とリロードの状態を解除する。
+	// 連射間隔とリロードの状態を解除し、弾薬を消費しないデバッグ設定も無効へ戻す。
 	m_fireCooldownSeconds = 0.0f;
 	m_isReloading = false;
 	m_reloadElapsedSeconds = 0.0f;
+	m_isInfiniteAmmo = false;
 }
 
 // リロード中なら時間を進め、そうでなければリロード開始と射撃を判定する。
@@ -49,6 +50,11 @@ WEAPON_UPDATE_RESULT WeaponSystem::Update(float deltaTime,const InputSystem& inp
 {
 	// 戻す結果。発射しなければ全て初期値のまま。
 	WEAPON_UPDATE_RESULT result{};
+
+	// 射撃を続けている最中かを、カメラの反動の制御へ伝える。射撃が許可され、左クリックを押し続け、リロード中でなく、撃てる弾がある間だけtrue。
+	// 連射方式の反動は、trueの間は戻らず、falseになった更新から戻り始める。弾が尽きた時や、リロード、射撃の禁止でも、falseになる。
+	const bool is_firing = isShootingAllowed && input.IsKeyPressed(VK_LBUTTON) && !m_isReloading && (m_magazineAmmo > 0 || m_isInfiniteAmmo);
+	camera.SetRecoilHold(is_firing);
 
 	// 連射間隔の残り時間を進める。0未満にはせず、発射可能の状態を0で表す。
 	m_fireCooldownSeconds = std::max(0.0f,m_fireCooldownSeconds - deltaTime);
@@ -77,11 +83,15 @@ WEAPON_UPDATE_RESULT WeaponSystem::Update(float deltaTime,const InputSystem& inp
 		return result;
 	}
 
-	// 射撃が許可されていない、左クリックを押し続けていない、連射間隔が残っている、または装填弾がない場合は発射しない。
-	if(!isShootingAllowed || !input.IsKeyPressed(VK_LBUTTON) || m_fireCooldownSeconds > 0.0f || m_magazineAmmo <= 0)return result;
+	// 射撃が許可されていない、左クリックを押し続けていない、連射間隔が残っている場合は発射しない。
+	// 装填弾がない場合も発射しないが、弾薬を消費しないデバッグ設定が有効なら、装填弾数に関係なく発射できる。
+	if(!isShootingAllowed || !input.IsKeyPressed(VK_LBUTTON) || m_fireCooldownSeconds > 0.0f)return result;
+	if(m_magazineAmmo <= 0 && !m_isInfiniteAmmo)return result;
 
-	// 弾を1発消費し、次の弾までの連射間隔を設定する。
-	--m_magazineAmmo;
+	// 弾を1発消費し、次の弾までの連射間隔を設定する。弾薬を消費しないデバッグ設定が有効なら、弾は減らさない。
+	if(!m_isInfiniteAmmo){
+		--m_magazineAmmo;
+	}
 	m_fireCooldownSeconds = m_weaponData.fireIntervalSeconds;
 
 	// 構えているかに応じた散布で、視線方向を中心にした弾の方向を決める。反動は方向を決めた後に加える。

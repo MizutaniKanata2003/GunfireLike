@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 // 一人称視点の位置・Yaw・Pitchと、射撃の反動による一時的な視線のずれを保持し、方向ベクトルと左手系View行列を生成する。
-// 反動の追従・復帰・上限の数値は、RECOIL_PROFILEとして外から受け取る。1発ごとの反動量は、ApplyRecoilの引数で受け取る。
+// 反動の制御方式・追従・復帰・上限の数値は、RECOIL_PROFILEとして外から受け取る。1発ごとの反動量は、ApplyRecoilの引数で受け取る。
 // 移動位置の決定や描画は担当しない。位置の追従は呼出側がSetPositionで反映する。
 
 //========= Framework インクルード=========
@@ -10,16 +10,27 @@
 //========= 前方宣言=========
 class InputSystem;
 
-// 反動による視線のずれの、追従・復帰・上限の設定。武器ごとの表（WeaponTable）から、カメラへ渡す。
+// 反動によるずれを、いつ元の視線へ戻すかの方式。
+enum class RECOIL_CONTROL
+{
+	e_TIMED_RETURN,      // 最後の反動から、一定時間が経つと、戻り始める。単発の武器向き。
+	e_HOLD_UNTIL_RELEASE // 射撃を続けている間は戻さず、射撃をやめた時に、戻り始める。連射の武器向き。
+};
+
+// 反動による視線のずれの、制御方式・追従・復帰・上限の設定。武器ごとの表（WeaponTable）から、カメラへ渡す。
 // 既定値は、D1より前の固定値（企画書で未確定の仮値）と同じ。
 struct RECOIL_PROFILE
 {
+	//========= 制御方式=========
+	// 反動のずれを戻し始める条件。
+	RECOIL_CONTROL control{RECOIL_CONTROL::e_TIMED_RETURN};
+
 	//========= 追従=========
 	// 実際のずれが目標へ近づく速さ。1秒あたりに差の何倍を縮めるかを表し、大きいほど速く、小さいほど滑らかに見える。
 	float followRate{16.0f};
 
 	//========= 復帰=========
-	// 最後の反動から、目標が0へ戻り始めるまでの時間。単位は秒。連射の間は戻り始めないよう、連射の間隔より短くする。
+	// 最後の反動から、目標が0へ戻り始めるまでの時間。単位は秒。e_TIMED_RETURNでは連射の間隔より短くする。e_HOLD_UNTIL_RELEASEでは、射撃をやめた後の待ち時間にもなる。
 	float recoveryDelaySeconds{0.15f};
 	// 目標が0へ戻る速さ。1秒あたりに残りの何倍を縮めるかを表す。
 	float recoveryRate{6.0f};
@@ -40,7 +51,7 @@ public:
 	// input: FPS操作状態と累積差分の取得先。ConsumeMouseDeltaで取得先の差分をクリアする。
 	// 解除中は何もしない。回転量にdeltaTimeは掛けず、Pitchだけを±89度へ制限する。
 	void Update(InputSystem& input);
-	// 反動によるずれを、目標へ滑らかに近づけ、射撃をやめてしばらく経つと、元の視線へ戻す。毎フレーム呼ぶ。追従と復帰の速さは、反動の設定による。
+	// 反動によるずれを、目標へ滑らかに近づけ、元の視線へ戻す。毎フレーム呼ぶ。戻し始める条件・追従と復帰の速さは、反動の設定による。
 	// deltaTime: この更新で進める経過時間。単位は秒。0なら何も進めない。
 	void UpdateRecoil(float deltaTime);
 	// 射撃の反動として、視線を動かす目標を加える。実際の視線は、UpdateRecoilで目標へ滑らかに近づく。位置とマウスで決めた向きは変更しない。
@@ -67,8 +78,11 @@ public:
 	// position: 設定するワールド座標。呼出後に引数への参照は保持しない。
 	void SetPosition(const XMFLOAT3& position) { m_position = position; }
 	// 反動の設定をコピーする。現在の反動のずれと目標は変更せず、次の更新から新しい設定を使う。
-	// recoilProfile: 設定する反動の追従・復帰・上限。呼出後に引数への参照は保持しない。
+	// recoilProfile: 設定する反動の制御方式・追従・復帰・上限。呼出後に引数への参照は保持しない。
 	void SetRecoilProfile(const RECOIL_PROFILE& recoilProfile) { m_recoilProfile = recoilProfile; }
+	// 射撃を続けている最中かを伝える。e_HOLD_UNTIL_RELEASEの設定では、trueの間は反動のずれを戻さず、falseになった更新から戻し始める。他の方式では使わない。
+	// isHeld: 射撃を続けている最中ならtrue。毎フレーム、UpdateRecoilより前に伝える。
+	void SetRecoilHold(bool isHeld) { m_isRecoilHeld = isHeld; }
 
 private:
 	//========= カメラ操作設定=========
@@ -84,11 +98,11 @@ private:
 	float m_pitch{};
 
 	//========= 反動の状態=========
-	// 反動の追従・復帰・上限の設定。既定は、RECOIL_PROFILEの既定値。
+	// 反動の制御方式・追従・復帰・上限の設定。既定は、RECOIL_PROFILEの既定値。
 	RECOIL_PROFILE m_recoilProfile{};
-	// 反動によるYawのずれの目標。単位はラジアン。射撃で増え、射撃をやめて少し経つと0へ戻る。
+	// 反動によるYawのずれの目標。単位はラジアン。射撃で増え、戻し始める条件を満たすと0へ戻る。
 	float m_recoilTargetYaw{};
-	// 反動によるPitchのずれの目標。単位はラジアン。射撃で増え、射撃をやめて少し経つと0へ戻る。
+	// 反動によるPitchのずれの目標。単位はラジアン。射撃で増え、戻し始める条件を満たすと0へ戻る。
 	float m_recoilTargetPitch{};
 	// 実際に視線へ加えているYawのずれ。単位はラジアン。目標へ滑らかに近づく。
 	float m_recoilYaw{};
@@ -96,4 +110,6 @@ private:
 	float m_recoilPitch{};
 	// 最後に反動を加えてからの経過時間。単位は秒。一定時間を過ぎると、目標が0へ戻り始める。
 	float m_secondsSinceRecoil{1000.0f};
+	// 射撃を続けている最中か。SetRecoilHoldで毎フレーム更新される。e_HOLD_UNTIL_RELEASEの設定でだけ、戻し始める条件に使う。
+	bool m_isRecoilHeld{};
 };
