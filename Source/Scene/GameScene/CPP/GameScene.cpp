@@ -23,8 +23,8 @@
 //========= Scene インクルード=========
 #include "Scene/Common/Combat/H/CombatResolver.h"
 #include "Scene/Common/Combat/H/CombatTable.h"
-#include "Scene/Common/Scene/H/SceneManager.h"
-#include "Scene/Common/Scene/H/SceneObjectFactory.h"
+#include "Scene/Common/Core/H/SceneManager.h"
+#include "Scene/Common/Object/H/SceneObjectFactory.h"
 #include "Scene/Common/Stage/H/StageLayout.h"
 #include "Scene/TitleScene/H/TitleScene.h"
 

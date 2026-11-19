@@ -11,7 +11,7 @@
 #include "Framework/Etc/H/Logger.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/Etc/H/ModelRegistry.h"
+#include "Scene/Common/Object/H/ModelRegistry.h"
 
 // 生成の失敗時に使う補助関数をまとめる。
 namespace

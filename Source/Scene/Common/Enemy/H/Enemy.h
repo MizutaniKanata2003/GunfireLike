@@ -12,7 +12,7 @@
 
 //========= Scene インクルード=========
 #include "Scene/Common/Enemy/H/EnemyWaveTable.h"
-#include "Scene/Common/Etc/H/Transform.h"
+#include "Scene/Common/Object/H/Transform.h"
 
 //========= 前方宣言=========
 class BasicMeshRenderer;

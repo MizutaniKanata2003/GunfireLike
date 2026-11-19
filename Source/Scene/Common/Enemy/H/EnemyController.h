@@ -13,8 +13,8 @@
 #include "Framework/Etc/H/MathTypes.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/AnyObject/H/AreaTelegraph.h"
 #include "Scene/Common/Combat/H/JustDodgeJudge.h"
+#include "Scene/Common/Enemy/H/AreaTelegraph.h"
 #include "Scene/Common/Enemy/H/EnemyManager.h"
 #include "Scene/Common/Enemy/H/EnemyProjectile.h"
 #include "Scene/Common/Enemy/H/EnemyWaveTable.h"

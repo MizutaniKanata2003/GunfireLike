@@ -10,7 +10,7 @@
 #include "Framework/Collision/H/CollisionShapes.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/AnyObject/H/ObjectConfig.h"
+#include "Scene/Common/Object/H/ObjectConfig.h"
 
 // Game画面の固定ステージの配置表をまとめる。
 namespace STAGE_LAYOUT

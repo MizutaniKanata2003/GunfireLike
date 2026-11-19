@@ -11,7 +11,7 @@
 #include "Framework/Collision/H/CollisionWorld.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/Etc/H/ModelRegistry.h"
+#include "Scene/Common/Object/H/ModelRegistry.h"
 
 // 扉のAABBを、中心と寸法から求める補助関数をまとめる。
 namespace

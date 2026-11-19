@@ -7,9 +7,9 @@
 #include "Framework/Etc/H/MathTypes.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/AnyObject/H/RoomController.h"
 #include "Scene/Common/Combat/H/JustDodgeJudge.h"
 #include "Scene/Common/Player/H/PlayerController.h"
+#include "Scene/Common/Stage/H/RoomController.h"
 
 // デバッグ表示に必要な、ゲームの状態の値。
 struct GAME_DEBUG_INFO

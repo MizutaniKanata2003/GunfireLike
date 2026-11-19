@@ -6,8 +6,8 @@
 #include "Framework/3D/H/BasicMeshRenderer.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/Etc/H/ModelRegistry.h"
-#include "Scene/Common/Etc/H/Transform.h"
+#include "Scene/Common/Object/H/ModelRegistry.h"
+#include "Scene/Common/Object/H/Transform.h"
 
 //========= 初期化・終了関数=========
 // Cube Rendererを借用し、全枠の予告を解除する。

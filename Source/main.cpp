@@ -18,7 +18,7 @@
 #include "Framework/Input/H/InputSystem.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/Scene/H/SceneManager.h"
+#include "Scene/Common/Core/H/SceneManager.h"
 
 //========= 外部関数宣言=========
 // Win32バックエンドへウィンドウメッセージを転送する。外部APIの名前と型は変更しない。

@@ -17,7 +17,7 @@
 #include "Scene/Common/Enemy/H/EnemyApproach.h"
 #include "Scene/Common/Enemy/H/EnemyAreaBehavior.h"
 #include "Scene/Common/Enemy/H/EnemyRangedBehavior.h"
-#include "Scene/Common/Etc/H/ModelRegistry.h"
+#include "Scene/Common/Object/H/ModelRegistry.h"
 #include "Scene/Common/Player/H/PlayerController.h"
 #include "Scene/Common/Player/H/PlayerHealth.h"
 

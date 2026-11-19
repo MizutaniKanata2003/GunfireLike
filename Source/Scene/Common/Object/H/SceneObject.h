@@ -8,8 +8,8 @@
 #include "Framework/Etc/H/MathTypes.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/AnyObject/H/ObjectConfig.h"
-#include "Scene/Common/Etc/H/Transform.h"
+#include "Scene/Common/Object/H/Transform.h"
+#include "Scene/Common/Object/H/ObjectConfig.h"
 
 //========= 前方宣言=========
 class GraphicsSystem;

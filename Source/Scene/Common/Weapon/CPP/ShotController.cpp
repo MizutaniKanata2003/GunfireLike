@@ -17,9 +17,9 @@
 #include "Framework/Input/H/InputSystem.h"
 
 //========= Scene インクルード=========
+#include "Scene/Common/Combat/H/PlayerCombatController.h"
 #include "Scene/Common/Enemy/H/Enemy.h"
 #include "Scene/Common/Enemy/H/EnemyManager.h"
-#include "Scene/Common/Player/H/PlayerCombatController.h"
 #include "Scene/Common/Player/H/PlayerController.h"
 #include "Scene/Common/Weapon/H/WeaponTable.h"
 

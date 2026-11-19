@@ -11,8 +11,8 @@
 #include "Framework/Collision/H/CollisionWorld.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/AnyObject/H/ObjectConfig.h"
-#include "Scene/Common/Scene/H/SceneObject.h"
+#include "Scene/Common/Object/H/ObjectConfig.h"
+#include "Scene/Common/Object/H/SceneObject.h"
 
 //========= 前方宣言=========
 class ModelRegistry;

@@ -10,7 +10,7 @@
 
 //========= Scene インクルード=========
 #include "Scene/Common/Enemy/H/EnemyTable.h"
-#include "Scene/Common/Etc/H/ModelRegistry.h"
+#include "Scene/Common/Object/H/ModelRegistry.h"
 
 // 検証用の敵の状態の数値と色をまとめる。企画書で未確定の数値は仮値。
 namespace

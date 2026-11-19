@@ -7,7 +7,7 @@
 #include "Framework/3D/H/ObjModelRenderer.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/Etc/H/ModelRegistry.h"
+#include "Scene/Common/Object/H/ModelRegistry.h"
 
 //========= 初期化関数=========
 // 設定をコピーし、種別に応じた共有Rendererを借用する。

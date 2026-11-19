@@ -16,7 +16,7 @@
 #include "Framework/Input/H/InputSystem.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/Scene/H/SceneManager.h"
+#include "Scene/Common/Core/H/SceneManager.h"
 #include "Scene/GameScene/H/GameScene.h"
 
 //========= 生成関数=========

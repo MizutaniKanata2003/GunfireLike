@@ -14,20 +14,20 @@
 #include "Framework/Input/H/FpsCamera.h"
 
 //========= Scene インクルード=========
-#include "Scene/Common/AnyObject/H/ExitDoor.h"
-#include "Scene/Common/AnyObject/H/RoomController.h"
 #include "Scene/Common/Camera/H/CameraFovController.h"
 #include "Scene/Common/Combat/H/JustDodgeJudge.h"
-#include "Scene/Common/Combat/H/ShotController.h"
+#include "Scene/Common/Combat/H/TimeScaleController.h"
+#include "Scene/Common/Combat/H/PlayerCombatController.h"
+#include "Scene/Common/Core/H/IScene.h"
 #include "Scene/Common/Enemy/H/EnemyController.h"
-#include "Scene/Common/Etc/H/ModelRegistry.h"
-#include "Scene/Common/Etc/H/TimeScaleController.h"
+#include "Scene/Common/Object/H/ModelRegistry.h"
+#include "Scene/Common/Object/H/SceneObject.h"
 #include "Scene/Common/Player/H/HealItems.h"
-#include "Scene/Common/Player/H/PlayerCombatController.h"
 #include "Scene/Common/Player/H/PlayerController.h"
 #include "Scene/Common/Player/H/PlayerHealth.h"
-#include "Scene/Common/Scene/H/IScene.h"
-#include "Scene/Common/Scene/H/SceneObject.h"
+#include "Scene/Common/Stage/H/ExitDoor.h"
+#include "Scene/Common/Stage/H/RoomController.h"
+#include "Scene/Common/Weapon/H/ShotController.h"
 #include "Scene/GameScene/H/GameHud.h"
 
 //========= 前方宣言=========
