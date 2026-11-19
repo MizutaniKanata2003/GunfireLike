@@ -219,6 +219,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Scene\Common\CPP\SceneObjectFactory.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\ShotController.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\StageField.cpp" />
+    <ClCompile Include="Source\Scene\Common\CPP\TimeScaleController.cpp" />
     <ClCompile Include="Source\Scene\Common\CPP\Transform.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\GraphicsSystem.cpp" />
     <ClCompile Include="Source\main.cpp" />
@@ -282,6 +283,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\Common\H\ShotController.h" />
     <ClInclude Include="Source\Scene\Common\H\StageField.h" />
     <ClInclude Include="Source\Scene\Common\H\StageLayout.h" />
+    <ClInclude Include="Source\Scene\Common\H\TimeScaleController.h" />
     <ClInclude Include="Source\Scene\Common\H\Transform.h" />
     <ClInclude Include="Source\Framework\DirectX\H\GraphicsSystem.h" />
     <ClInclude Include="Source\Scene\Common\H\UiLayout.h" />

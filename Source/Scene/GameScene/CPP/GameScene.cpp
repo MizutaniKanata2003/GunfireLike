@@ -81,8 +81,7 @@ void GameScene::Initialize()
 	m_dodgeJudge.Initialize();
 	m_enemyController.ResetAttackState();
 	m_lastJudgeResult = DODGE_JUDGE_RESULT::e_NONE;
-	m_slowMotionRemainingSeconds = 0.0f;
-	m_hitStopRemainingSeconds = 0.0f;
+	m_timeScale.Reset();
 	m_playerCombat.Reset();
 	m_previousActionState = PLAYER_ACTION_STATE::e_NORMAL;
 	m_stageObjects.clear();
@@ -158,7 +157,7 @@ bool GameScene::Init()
 	player_combat_links.camera = &m_FPSCamera;
 	player_combat_links.inputSystem = &m_inputSystem;
 	player_combat_links.onHitStopRequested = [this](float hitStopSeconds){
-		m_hitStopRemainingSeconds = std::max(m_hitStopRemainingSeconds,hitStopSeconds);
+		m_timeScale.RequestHitStop(hitStopSeconds);
 	};
 
 	// 参照先の登録に失敗したら、生成済みのResourceを含めて終了して失敗を返す。
@@ -252,17 +251,11 @@ void GameScene::Update(float deltaTime)
 		SkipCurrentWave();
 	}
 
-	// ヒットストップ中かを、この更新の開始時点の残り時間で決め、残り時間を実時間で減らす。ヒットストップ中は、プレイヤーと敵の時間を止める。
-	const bool is_hit_stopped = m_hitStopRemainingSeconds > 0.0f;
-	m_hitStopRemainingSeconds = std::max(0.0f,m_hitStopRemainingSeconds - deltaTime);
-
-	// スローの残り時間を実時間で減らし、スロー中ならプレイヤー以外の時間の進みを遅くする。プレイヤーと武器は、スローの影響を受けない。
-	m_slowMotionRemainingSeconds = std::max(0.0f,m_slowMotionRemainingSeconds - deltaTime);
-	const float slowed_delta_time = m_slowMotionRemainingSeconds > 0.0f ? deltaTime * COMBAT_TABLE::ns_SLOW_MOTION_SCALE : deltaTime;
-
-	// プレイヤー側の時間と、敵・判定側の時間を決める。ヒットストップ中は、どちらも0にする。
-	const float gameplay_delta_time = is_hit_stopped ? 0.0f : deltaTime;
-	const float world_delta_time = is_hit_stopped ? 0.0f : slowed_delta_time;
+	// ヒットストップとスローの残り時間を実時間で進め、プレイヤー側の時間と、敵・判定側の時間を求める。ヒットストップ中は、どちらも0になる。
+	// スロー中は、敵・判定側の時間だけが遅くなる。プレイヤーと武器は、スローの影響を受けない。
+	const TIME_SCALE_DELTAS time_deltas = m_timeScale.Advance(deltaTime);
+	const float gameplay_delta_time = time_deltas.gameplayDeltaTime;
+	const float world_delta_time = time_deltas.worldDeltaTime;
 
 	// 確認用の攻撃の判定、敵の怯み・転倒、回復アイテムの間隔、表示用の残り時間を、Captureに関係なく進める。表示用は実時間で、0未満にしない。
 	UpdateDodgeJudge(world_delta_time);
@@ -405,8 +398,8 @@ void GameScene::Draw()
 	debug_info.isEnemyKnockedDown = m_enemyController.GetEnemyManager().GetFirstEnemy().IsKnockedDown();
 	debug_info.isHitMarkerActive = m_shotController.IsHitMarkerActive();
 	debug_info.isCaptureEnabled = m_inputSystem.IsMouseCaptureEnabled();
-	debug_info.isHitStopActive = m_hitStopRemainingSeconds > 0.0f;
-	debug_info.isSlowMotionActive = m_slowMotionRemainingSeconds > 0.0f;
+	debug_info.isHitStopActive = m_timeScale.IsHitStopActive();
+	debug_info.isSlowMotionActive = m_timeScale.IsSlowMotionActive();
 	debug_info.hasIncomingAttack = m_dodgeJudge.HasIncomingAttack();
 	debug_info.secondsUntilHit = m_dodgeJudge.GetSecondsUntilHit();
 	debug_info.lastJudgeResult = m_lastJudgeResult;
@@ -453,7 +446,7 @@ void GameScene::UpdateDodgeJudge(float worldDeltaTime)
 	}
 	// ジャスト回避の場合は、スローを開始する。連続した場合は、時間を数え直す。
 	else if(judge_result == DODGE_JUDGE_RESULT::e_JUST_DODGED){
-		m_slowMotionRemainingSeconds = COMBAT_TABLE::ns_SLOW_MOTION_SECONDS;
+		m_timeScale.StartSlowMotion();
 	}
 }
 
@@ -471,7 +464,7 @@ void GameScene::ApplyEnemyAttackEvent(const ENEMY_ATTACK_EVENT& attackEvent)
 	}
 	// 実際に回避中のジャスト回避の場合は、スローを開始する。連続した場合は、時間を数え直す。
 	else if(attackEvent.shouldStartSlowMotion){
-		m_slowMotionRemainingSeconds = COMBAT_TABLE::ns_SLOW_MOTION_SECONDS;
+		m_timeScale.StartSlowMotion();
 	}
 }
 

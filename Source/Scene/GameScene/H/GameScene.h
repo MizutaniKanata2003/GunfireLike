@@ -26,6 +26,7 @@
 #include "Scene/Common/H/SceneObject.h"
 #include "Scene/Common/H/RoomController.h"
 #include "Scene/Common/H/ShotController.h"
+#include "Scene/Common/H/TimeScaleController.h"
 #include "Scene/GameScene/H/GameHud.h"
 
 //========= 前方宣言=========
@@ -102,8 +103,10 @@ private:
 	ShotController m_shotController{};
 	// 現在のウェーブの敵・敵の弾・範囲の予告・敵ごとの攻撃予告を所有し、更新と描画を行う。Finalizeで、登録先のCollisionWorldと共有Rendererより先に解除する。
 	EnemyController m_enemyController{};
-	// 蹴り・殴打の当たり・敵との接触・スライディングの転倒・回復アイテムの使用・被弾の反応と、一撃で倒すデバッグ設定を担当する。ヒットストップの残り時間は、このSceneが持つ。
+	// 蹴り・殴打の当たり・敵との接触・スライディングの転倒・回復アイテムの使用・被弾の反応と、一撃で倒すデバッグ設定を担当する。ヒットストップは、TimeScaleControllerへ求める。
 	PlayerCombatController m_playerCombat{};
+	// ヒットストップとスローの残り時間を持ち、更新ごとに、プレイヤー側と、敵・判定側の経過時間を求める。
+	TimeScaleController m_timeScale{};
 	// 3部屋×2ウェーブの進行状態。敵の生成と全滅判定は、GameSceneが仲介する。
 	RoomController m_roomController{};
 	// 現在のウェーブの生成に失敗したか。trueの間は生成を再試行せず、F4で最初からやり直す。
@@ -118,10 +121,6 @@ private:
 	JustDodgeJudge m_dodgeJudge{};
 	// 直近の判定結果。デバッグUIへの表示に使う。
 	DODGE_JUDGE_RESULT m_lastJudgeResult{DODGE_JUDGE_RESULT::e_NONE};
-	// スローの残り時間。単位は実時間の秒。0より大きい間、プレイヤー以外の時間の進みが遅くなる。
-	float m_slowMotionRemainingSeconds{};
-	// ヒットストップの残り時間。単位は実時間の秒。0より大きい間、プレイヤーと敵の時間が止まる。
-	float m_hitStopRemainingSeconds{};
 	// 1回前の更新での、プレイヤーの動作の状態。殴打の開始を検出するために使う。
 	PLAYER_ACTION_STATE m_previousActionState{PLAYER_ACTION_STATE::e_NORMAL};
 
