@@ -50,6 +50,10 @@ namespace WEAPON_TABLE
 	// 1発だけ撃ってやめた場合（タップ撃ち）も、やめた時から戻り始めるため、次の発砲までに、ずれの大半が戻る。
 	// 並び: 制御方式、追従の速さ(1/秒)、やめてから戻り始めるまでの時間(秒)、復帰の速さ(1/秒)、Pitchの上限(度)、Yawの上限(度)。
 	inline constexpr RECOIL_PROFILE ns_RECOIL_PROFILE_ASSAULT_RIFLE{RECOIL_CONTROL::e_HOLD_UNTIL_RELEASE,16.0f,0.0f,6.0f,12.0f,6.0f};
+	// 単発武器（ハンドガン型）の反動の制御。1発ごとに、視線のずれの目標へ加え、実際の視線は目標へ滑らかに近づく。
+	// 最後の発砲から待ち時間が過ぎると、元へ戻る。D1より前の固定値（企画書で未確定の仮値）と同じで、現行の動作を維持する。
+	// 並び: 制御方式、追従の速さ(1/秒)、最後の反動から戻り始めるまでの時間(秒)、復帰の速さ(1/秒)、Pitchの上限(度)、Yawの上限(度)。
+	inline constexpr RECOIL_PROFILE ns_RECOIL_PROFILE_SINGLE_SHOT{RECOIL_CONTROL::e_TIMED_RETURN,16.0f,0.15f,6.0f,12.0f,6.0f};
 
 	//========= 連射武器=========
 	// 初期武器の無強化の連射武器。企画書の方針（無強化では連射が遅く、反動が大きく、リロードが遅い）に沿った仮値。
