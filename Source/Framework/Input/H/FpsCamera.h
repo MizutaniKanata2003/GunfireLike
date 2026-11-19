@@ -14,7 +14,7 @@ class InputSystem;
 enum class RECOIL_CONTROL
 {
 	e_TIMED_RETURN,      // 最後の反動から、一定時間が経つと、戻り始める。単発の武器向き。
-	e_HOLD_UNTIL_RELEASE // 射撃を続けている間は戻さず、射撃をやめた時に、戻り始める。連射の武器向き。
+	e_HOLD_UNTIL_RELEASE // 射撃を続けている間は戻さず、射撃をやめてから、一定時間が経つと、戻り始める。連射の武器向き。1発だけ撃ってやめた場合も、やめた時から戻る。
 };
 
 // 反動による視線のずれの、制御方式・追従・復帰・上限の設定。武器ごとの表（WeaponTable）から、カメラへ渡す。
@@ -30,9 +30,10 @@ struct RECOIL_PROFILE
 	float followRate{16.0f};
 
 	//========= 復帰=========
-	// 最後の反動から、目標が0へ戻り始めるまでの時間。単位は秒。e_TIMED_RETURNでは連射の間隔より短くする。e_HOLD_UNTIL_RELEASEでは、射撃をやめた後の待ち時間にもなる。
+	// 戻り始めるまでの待ち時間。単位は秒。e_TIMED_RETURNでは、最後の反動からの時間で、連射の間隔より短くする。
+	// e_HOLD_UNTIL_RELEASEでは、射撃をやめてからの時間。0なら、やめた時から、すぐに戻り始める。
 	float recoveryDelaySeconds{0.15f};
-	// 目標が0へ戻る速さ。1秒あたりに残りの何倍を縮めるかを表す。
+	// 目標が0へ戻る速さ。1秒あたりに残りの何倍を縮めるかを表す。タップ撃ちの間隔で、反動が積み上がらない程度に大きくする。
 	float recoveryRate{6.0f};
 
 	//========= 上限=========
@@ -52,6 +53,7 @@ public:
 	// 解除中は何もしない。回転量にdeltaTimeは掛けず、Pitchだけを±89度へ制限する。
 	void Update(InputSystem& input);
 	// 反動によるずれを、目標へ滑らかに近づけ、元の視線へ戻す。毎フレーム呼ぶ。戻し始める条件・追従と復帰の速さは、反動の設定による。
+	// SetRecoilHoldで伝えられた値は、この更新で使い切り、毎フレーム伝え直す必要がある。伝えられなかった場合は、射撃を続けていないものとして扱う。
 	// deltaTime: この更新で進める経過時間。単位は秒。0なら何も進めない。
 	void UpdateRecoil(float deltaTime);
 	// 射撃の反動として、視線を動かす目標を加える。実際の視線は、UpdateRecoilで目標へ滑らかに近づく。位置とマウスで決めた向きは変更しない。
@@ -80,8 +82,8 @@ public:
 	// 反動の設定をコピーする。現在の反動のずれと目標は変更せず、次の更新から新しい設定を使う。
 	// recoilProfile: 設定する反動の制御方式・追従・復帰・上限。呼出後に引数への参照は保持しない。
 	void SetRecoilProfile(const RECOIL_PROFILE& recoilProfile) { m_recoilProfile = recoilProfile; }
-	// 射撃を続けている最中かを伝える。e_HOLD_UNTIL_RELEASEの設定では、trueの間は反動のずれを戻さず、falseになった更新から戻し始める。他の方式では使わない。
-	// isHeld: 射撃を続けている最中ならtrue。毎フレーム、UpdateRecoilより前に伝える。
+	// 射撃を続けている最中かを伝える。e_HOLD_UNTIL_RELEASEの設定では、trueの間は反動のずれを戻さず、伝えなくなった（またはfalseを伝えた）更新から、戻り始める。他の方式では使わない。
+	// isHeld: 射撃を続けている最中ならtrue。毎フレーム伝える。次のUpdateRecoilで使い切る。
 	void SetRecoilHold(bool isHeld) { m_isRecoilHeld = isHeld; }
 
 private:
@@ -108,8 +110,8 @@ private:
 	float m_recoilYaw{};
 	// 実際に視線へ加えているPitchのずれ。単位はラジアン。目標へ滑らかに近づく。
 	float m_recoilPitch{};
-	// 最後に反動を加えてからの経過時間。単位は秒。一定時間を過ぎると、目標が0へ戻り始める。
-	float m_secondsSinceRecoil{1000.0f};
-	// 射撃を続けている最中か。SetRecoilHoldで毎フレーム更新される。e_HOLD_UNTIL_RELEASEの設定でだけ、戻し始める条件に使う。
+	// 戻し始めるまでの待ち時間の経過。単位は秒。反動を加えた時に0へ戻り、e_HOLD_UNTIL_RELEASEでは、射撃を続けている間も0へ戻る。設定の待ち時間を超えると、目標が0へ戻り始める。
+	float m_recoveryWaitSeconds{1000.0f};
+	// 射撃を続けている最中か。SetRecoilHoldで伝えられ、UpdateRecoilで使い切ってfalseへ戻る。e_HOLD_UNTIL_RELEASEの設定でだけ、戻し始める条件に使う。
 	bool m_isRecoilHeld{};
 };

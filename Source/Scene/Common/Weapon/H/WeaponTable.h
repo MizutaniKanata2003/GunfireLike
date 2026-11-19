@@ -46,9 +46,10 @@ struct WEAPON_DATA
 namespace WEAPON_TABLE
 {
 	//========= 反動の制御=========
-	// 連射武器の反動の制御。射撃を続けている間は、視線のずれを戻さず（上限まで上がり続け）、射撃をやめた時に、元へ戻り始める。
+	// 連射武器の反動の制御。射撃を続けている間は、視線のずれを戻さず（上限まで上がり続け）、射撃をやめた時に、すぐ元へ戻り始める。
+	// 1発だけ撃ってやめた場合（タップ撃ち）も、やめた時から戻り始めるため、次の発砲までに、ずれの大半が戻る。
 	// 並び: 制御方式、追従の速さ(1/秒)、やめてから戻り始めるまでの時間(秒)、復帰の速さ(1/秒)、Pitchの上限(度)、Yawの上限(度)。
-	inline constexpr RECOIL_PROFILE ns_RECOIL_PROFILE_ASSAULT_RIFLE{RECOIL_CONTROL::e_HOLD_UNTIL_RELEASE,16.0f,0.15f,6.0f,12.0f,6.0f};
+	inline constexpr RECOIL_PROFILE ns_RECOIL_PROFILE_ASSAULT_RIFLE{RECOIL_CONTROL::e_HOLD_UNTIL_RELEASE,16.0f,0.0f,6.0f,12.0f,6.0f};
 
 	//========= 連射武器=========
 	// 初期武器の無強化の連射武器。企画書の方針（無強化では連射が遅く、反動が大きく、リロードが遅い）に沿った仮値。

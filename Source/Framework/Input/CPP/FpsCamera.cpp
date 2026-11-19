@@ -14,7 +14,7 @@
 #include "Framework/Etc/H/MathTypes.h"
 #include "Framework/Input/H/InputSystem.h"
 
-// 視線の上下回転の制限と、反動のずれの0揃えの数値をまとめる。反動の追従・復帰・上限は、RECOIL_PROFILEが持つ。
+// 視線の上下回転の制限と、反動のずれの0揃えの数値をまとめる。反動の制御方式・追従・復帰・上限は、RECOIL_PROFILEが持つ。
 namespace
 {
 	//========= Pitch制限定数=========
@@ -46,14 +46,20 @@ void FpsCamera::Update(InputSystem& input)
 	m_pitch = std::clamp(m_pitch,-ns_MAX_PITCH_RADIANS,ns_MAX_PITCH_RADIANS);
 }
 
-// 反動の目標を、時間が経つと0へ戻し、実際のずれを目標へ滑らかに近づける。
+// 反動の目標を、戻し始める条件を満たすと0へ戻し、実際のずれを目標へ滑らかに近づける。
 void FpsCamera::UpdateRecoil(float deltaTime)
 {
-	// 最後の反動からの経過時間を進める。
-	m_secondsSinceRecoil += deltaTime;
+	// 射撃を続けている間は戻さない方式で、今まさに射撃を続けているかを求める。他の方式では、常にfalseとして扱う。
+	// 伝えられた値は、ここで使い切る。射撃の更新が止まっている間（Captureの解除中など）は、伝わらないため、続けていないものとして戻し始める。
+	const bool is_holding = m_recoilProfile.control == RECOIL_CONTROL::e_HOLD_UNTIL_RELEASE && m_isRecoilHeld;
+	m_isRecoilHeld = false;
 
-	// 最後の反動から一定時間が過ぎたら、目標を0へ向けて指数的に縮める。連射中は経過時間が0へ戻るため、縮まない。
-	if(m_secondsSinceRecoil > m_recoilProfile.recoveryDelaySeconds){
+	// 待ち時間の経過を進める。射撃を続けている間は0へ戻し、やめた時から数え始める。
+	// e_TIMED_RETURNでは、反動を加えた時だけ0へ戻る。つまり、最後の反動からの時間になる。
+	m_recoveryWaitSeconds = is_holding ? 0.0f : m_recoveryWaitSeconds + deltaTime;
+
+	// 待ち時間が過ぎたら、目標を0へ向けて指数的に縮める。連射中は、方式に応じて経過が0へ戻るため、縮まない。
+	if(m_recoveryWaitSeconds > m_recoilProfile.recoveryDelaySeconds){
 		const float recovery_blend = std::min(1.0f,m_recoilProfile.recoveryRate * deltaTime);
 		m_recoilTargetYaw -= m_recoilTargetYaw * recovery_blend;
 		m_recoilTargetPitch -= m_recoilTargetPitch * recovery_blend;
@@ -83,7 +89,7 @@ void FpsCamera::UpdateRecoil(float deltaTime)
 	}
 }
 
-// 反動の目標へ、引数の回転量を加え、上限を超えないよう制限して、経過時間を0へ戻す。
+// 反動の目標へ、引数の回転量を加え、上限を超えないよう制限して、待ち時間の経過を0へ戻す。
 void FpsCamera::ApplyRecoil(float yawRadians,float pitchRadians)
 {
 	// 反動の設定の上限（度）を、保持角度と同じラジアンへ変換する。
@@ -94,8 +100,8 @@ void FpsCamera::ApplyRecoil(float yawRadians,float pitchRadians)
 	m_recoilTargetYaw = std::clamp(m_recoilTargetYaw + yawRadians,-max_recoil_yaw,max_recoil_yaw);
 	m_recoilTargetPitch = std::clamp(m_recoilTargetPitch + pitchRadians,-max_recoil_pitch,max_recoil_pitch);
 
-	// 反動を加えた直後は、目標が0へ戻り始めないよう、経過時間を0へ戻す。
-	m_secondsSinceRecoil = 0.0f;
+	// 反動を加えた直後は、目標が0へ戻り始めないよう、待ち時間の経過を0へ戻す。
+	m_recoveryWaitSeconds = 0.0f;
 }
 
 //========= Getter関数=========
