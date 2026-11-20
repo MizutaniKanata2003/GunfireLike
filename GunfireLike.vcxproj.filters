@@ -431,6 +431,9 @@
     <ClInclude Include="Source\Scene\Common\Player\H\Wallet.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Scene\Common\Reward\H\RewardController.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Source\Framework\Shaders\BasicColorVS.hlsl" />

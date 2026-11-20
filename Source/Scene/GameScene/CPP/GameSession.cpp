@@ -1,9 +1,9 @@
 ﻿#include "../H/GameSession.h"
 
-// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
+// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
 
 //========= Windows インクルード=========
-#include <windows.h> // VK_F1・VK_F2・VK_F4の仮想キーコードで、Capture切替・タイトルへ戻る要求・最初の部屋からの再開のキーを指定する。
+#include <windows.h> // VK_F1・VK_F2・VK_F4・VK_RETURNの仮想キーコードで、Capture切替・タイトルへ戻る要求・最初の部屋からの再開・報酬の選び終えるキーを指定する。
 
 //========= 外部ライブラリ インクルード=========
 #include <DirectXMath.h>
@@ -51,9 +51,10 @@ void GameSession::Initialize()
 	m_enemyController.ResetAttackState();
 	m_timeScale.Reset();
 
-	// 通貨を開始時の所持額へ戻し、敵の生死の記録を空にする。前回のプレイの敵を、倒された敵として扱わない。
+	// 通貨を開始時の所持額へ戻し、敵の生死の記録を空にする。前回のプレイの敵を、倒された敵として扱わない。報酬選択も、解除する。
 	m_wallet.Initialize(ECONOMY_TABLE::ns_INITIAL_BALANCE);
 	m_wasEnemyAlive.fill(false);
+	m_reward.Reset();
 }
 
 // 描画Resourceと生成Objectの準備に成功した後にだけ、ゲーム操作とBGMへ切り替える。
@@ -84,18 +85,24 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 		SkipCurrentWave();
 	}
 
-	// ヒットストップとスローの残り時間を実時間で進め、プレイヤー側の時間と、敵・判定側の時間を求める。ヒットストップ中は、どちらも0になる。
+	// 報酬選択中は、時間を進めない。ヒットストップ・スロー・回復アイテムの間隔・表示の時間も、この更新では0を渡して、選択が終わるまで止める。
+	const float frame_delta_time = m_reward.IsSelecting() ? 0.0f : deltaTime;
+
+	// ヒットストップとスローの残り時間を進め、プレイヤー側の時間と、敵・判定側の時間を求める。ヒットストップ中は、どちらも0になる。
 	// スロー中は、敵・判定側の時間だけが遅くなる。プレイヤーと武器は、スローの影響を受けない。
-	const TIME_SCALE_DELTAS time_deltas = m_timeScale.Advance(deltaTime);
+	const TIME_SCALE_DELTAS time_deltas = m_timeScale.Advance(frame_delta_time);
 
 	// 確認用の攻撃・敵の怯みと転倒・部屋の進行・出口の開閉と、各種の残り時間を、Captureに関係なく進める。
 	// その後、ここまでに倒された敵（デバッグ操作で倒した敵を含む）の撃破報酬を、通貨へ加える。
 	UpdateWorldAndRoom(time_deltas.worldDeltaTime);
-	UpdateTimers(deltaTime,time_deltas.gameplayDeltaTime);
+	UpdateTimers(frame_delta_time,time_deltas.gameplayDeltaTime);
 	UpdateKillRewards();
 
-	// マウスを解放している間は、カメラ・移動・戦闘の操作更新をまとめて停止し、ここで戻る。
-	if(!m_inputSystem.IsMouseCaptureEnabled())return GAME_SESSION_RESULT::e_CONTINUE;
+	// 部屋のクリアの結果を受けて、報酬選択へ入る・抜ける。入った更新では、以降のプレイヤーの更新を行わない。
+	UpdateReward();
+
+	// マウスを解放している間と、報酬選択中は、カメラ・移動・戦闘の操作更新をまとめて停止し、ここで戻る。
+	if(!m_inputSystem.IsMouseCaptureEnabled() || m_reward.IsSelecting())return GAME_SESSION_RESULT::e_CONTINUE;
 
 	// 視点とプレイヤーを先に更新し、その結果の位置と動作の状態を使って、戦闘・射撃・敵の行動を更新する。
 	// 射撃・近接攻撃で倒された敵の撃破報酬は、次の更新を待たず、ここで通貨へ加える。
@@ -223,6 +230,12 @@ bool GameSession::UpdateSessionInput()
 		m_stage.Restart();
 		m_enemyController.ResetAttackState();
 		m_player.GetPlayerCombat().ClearSlideKnockdownRecord();
+
+		// 報酬選択の最中に再開した場合は、解除したCaptureを戻して、選択を終える。
+		if(m_reward.IsSelecting()){
+			m_inputSystem.SetMouseCaptureEnabled(true);
+		}
+		m_reward.Reset();
 	}
 	return false;
 }
@@ -249,6 +262,24 @@ void GameSession::UpdateTimers(float deltaTime,float gameplayDeltaTime)
 	// プレイヤー側の回復アイテムの間隔・命中表示・反動のずれを進める。Collision可視化の表示用の残り時間は、実時間で進め、0未満にしない。
 	m_player.UpdateTimers(deltaTime,gameplayDeltaTime);
 	m_collisionDebugView.Update(deltaTime);
+}
+
+// 部屋のクリアで報酬選択へ入る判定と、選び終えた時に抜ける判定を行う。
+void GameSession::UpdateReward()
+{
+	// 部屋の進行状態と、選び終える操作（Enter。E3でカードの選択へ置き換える暫定の操作）を渡して、状態の変化を受け取る。
+	const REWARD_UPDATE_RESULT reward_result = m_reward.Update(m_stage.GetRoomController().GetPhase(),m_inputSystem.IsKeyTriggered(VK_RETURN));
+
+	// 入った更新では、Captureを解除して、マウスをUIの操作へ渡す。ゲームの操作と時間は、Updateが止める。
+	if(reward_result == REWARD_UPDATE_RESULT::e_STARTED){
+		m_inputSystem.SetMouseCaptureEnabled(false);
+		Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,L"部屋のクリアで、報酬選択へ入りました。Enterで選び終えます。");
+	}
+	// 抜けた更新では、Captureを戻して、ゲームの操作へ戻る。出口は、すでに開いている。
+	else if(reward_result == REWARD_UPDATE_RESULT::e_FINISHED){
+		m_inputSystem.SetMouseCaptureEnabled(true);
+		Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,L"報酬選択を終えました。");
+	}
 }
 
 // 視点・プレイヤーの動作・出口の通過・殴打でのリロードのキャンセル・視野角を更新する。
@@ -419,5 +450,6 @@ void GameSession::DrawHud()
 	hud_state.reloadProgress = weapon.GetReloadProgress();
 	hud_state.isAiming = m_player.GetPlayerController().IsAiming();
 	hud_state.currency = m_wallet.GetBalance();
+	hud_state.isRewardSelecting = m_reward.IsSelecting();
 	m_gameHud.Draw(m_graphicsSystem,hud_state);
 }

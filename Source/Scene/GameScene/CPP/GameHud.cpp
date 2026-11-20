@@ -1,6 +1,6 @@
 ﻿#include "../H/GameHud.h"
 
-// HUDの画像の読込・描画と、弾薬・リロード・回復アイテム数・通貨の文字の描画を実装する。
+// HUDの画像の読込・描画と、弾薬・リロード・回復アイテム数・通貨・報酬選択の文字の描画を実装する。
 // 画像の配置は表から読み、状態に応じた拡縮・色・表示割合・文字の大きさだけをこのファイルで決める。
 
 //========= C++標準ライブラリ インクルード=========
@@ -39,6 +39,10 @@ namespace
 	const XMVECTORF32 ns_HEAL_TEXT_COLOR{{{0.8f,1.0f,0.8f,1.0f}}};
 	// 通貨の数字の色。金色。通貨のアイコンの色に合わせる。
 	const XMVECTORF32 ns_CURRENCY_TEXT_COLOR{{{1.0f,0.85f,0.3f,1.0f}}};
+	// 報酬選択の表示の文字の色。金色。
+	const XMVECTORF32 ns_REWARD_TEXT_COLOR{{{1.0f,0.85f,0.3f,1.0f}}};
+	// 報酬選択の操作案内の文字の色。白。
+	const XMVECTORF32 ns_REWARD_GUIDE_TEXT_COLOR{{{1.0f,1.0f,1.0f,1.0f}}};
 
 	//========= 弾薬の文字の配置=========
 	// 弾薬の枠の左端から、数字を置く領域の左端までの距離。基準Canvas上の大きさ。左側の弾のアイコンを避けるための値。
@@ -69,6 +73,20 @@ namespace
 	constexpr float ns_CURRENCY_TEXT_AREA_WIDTH = 132.0f;
 	// 通貨の数字を置く領域の右端と、アイコンの左端との間の余白。基準Canvas上の大きさ。
 	constexpr float ns_CURRENCY_TEXT_GAP = 8.0f;
+
+	//========= 報酬選択の表示の配置=========
+	// 報酬選択の見出しを置く領域の左上の位置。基準Canvas上の座標。画面中央（640,360）の少し上へ、横幅いっぱいの領域を置く。
+	const XMFLOAT2 ns_REWARD_TITLE_AREA_POSITION{240.0f,230.0f};
+	// 報酬選択の見出しを置く領域の大きさ。基準Canvas上の大きさ。
+	const XMFLOAT2 ns_REWARD_TITLE_AREA_SIZE{800.0f,90.0f};
+	// 報酬選択の見出しの高さの目標。基準Canvas上の大きさ。
+	constexpr float ns_REWARD_TITLE_TARGET_HEIGHT = 72.0f;
+	// 報酬選択の操作案内を置く領域の左上の位置。基準Canvas上の座標。見出しの真下に置く。
+	const XMFLOAT2 ns_REWARD_GUIDE_AREA_POSITION{240.0f,330.0f};
+	// 報酬選択の操作案内を置く領域の大きさ。基準Canvas上の大きさ。
+	const XMFLOAT2 ns_REWARD_GUIDE_AREA_SIZE{800.0f,50.0f};
+	// 報酬選択の操作案内の高さの目標。基準Canvas上の大きさ。
+	constexpr float ns_REWARD_GUIDE_TARGET_HEIGHT = 32.0f;
 }
 
 //========= 初期化・描画関数=========
@@ -134,10 +152,8 @@ void GameHud::Draw(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 	// 文字を描く。装填弾数と予備弾薬を「装填 / 予備」の形で枠の右側へ、リロード中なら進み具合を枠の真上へ描く。
 	m_textRenderer.Begin();
 	const XMFLOAT2 ammo_area_position{HUD_LAYOUT::ns_AMMO_FRAME.position.x + ns_AMMO_TEXT_AREA_LEFT,HUD_LAYOUT::ns_AMMO_FRAME.position.y};
-	const XMFLOAT2 ammo_area_size{HUD_LAYOUT::ns_AMMO_FRAME.size.x - ns_AMMO_TEXT_AREA_LEFT - ns_AMMO_TEXT_AREA_RIGHT_MARGIN,
-		HUD_LAYOUT::ns_AMMO_FRAME.size.y};
-	DrawFittedText(std::to_wstring(state.magazineAmmo) + L" / " + std::to_wstring(state.reserveAmmo),ammo_area_position,ammo_area_size,
-								 ns_AMMO_TEXT_TARGET_HEIGHT,ns_AMMO_TEXT_COLOR);
+	const XMFLOAT2 ammo_area_size{HUD_LAYOUT::ns_AMMO_FRAME.size.x - ns_AMMO_TEXT_AREA_LEFT - ns_AMMO_TEXT_AREA_RIGHT_MARGIN,HUD_LAYOUT::ns_AMMO_FRAME.size.y};
+	DrawFittedText(std::to_wstring(state.magazineAmmo) + L" / " + std::to_wstring(state.reserveAmmo),ammo_area_position,ammo_area_size,ns_AMMO_TEXT_TARGET_HEIGHT,ns_AMMO_TEXT_COLOR);
 
 	// 回復アイテムの所持数を、HPバーの真上へ「Q x数」の形で描く。HPバーの左端に合わせ、HPバーの上端から領域の高さだけ上に置く。
 	const XMFLOAT2 heal_area_position{HUD_LAYOUT::ns_HP_FRAME.position.x,HUD_LAYOUT::ns_HP_FRAME.position.y - ns_HEAL_TEXT_AREA_HEIGHT};
@@ -145,8 +161,7 @@ void GameHud::Draw(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 	DrawFittedText(L"Q x" + std::to_wstring(state.healItemCount),heal_area_position,heal_area_size,ns_HEAL_TEXT_TARGET_HEIGHT,ns_HEAL_TEXT_COLOR);
 
 	// 通貨の所持額を、アイコンの左隣へ描く。領域の右端がアイコンの左端から余白だけ離れる位置に置き、高さはアイコンと同じにして、上下の中央へ揃える。
-	const XMFLOAT2 currency_area_position{HUD_LAYOUT::ns_CURRENCY_ICON.position.x - ns_CURRENCY_TEXT_GAP - ns_CURRENCY_TEXT_AREA_WIDTH,
-		HUD_LAYOUT::ns_CURRENCY_ICON.position.y};
+	const XMFLOAT2 currency_area_position{HUD_LAYOUT::ns_CURRENCY_ICON.position.x - ns_CURRENCY_TEXT_GAP - ns_CURRENCY_TEXT_AREA_WIDTH,HUD_LAYOUT::ns_CURRENCY_ICON.position.y};
 	const XMFLOAT2 currency_area_size{ns_CURRENCY_TEXT_AREA_WIDTH,HUD_LAYOUT::ns_CURRENCY_ICON.size.y};
 	DrawFittedText(std::to_wstring(state.currency),currency_area_position,currency_area_size,ns_CURRENCY_TEXT_TARGET_HEIGHT,ns_CURRENCY_TEXT_COLOR);
 
@@ -155,8 +170,13 @@ void GameHud::Draw(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 		const XMFLOAT2 reload_area_position{HUD_LAYOUT::ns_AMMO_FRAME.position.x,HUD_LAYOUT::ns_AMMO_FRAME.position.y - ns_RELOAD_TEXT_AREA_HEIGHT};
 		const XMFLOAT2 reload_area_size{HUD_LAYOUT::ns_AMMO_FRAME.size.x,ns_RELOAD_TEXT_AREA_HEIGHT};
 		const int reload_percent = static_cast<int>(std::clamp(state.reloadProgress,0.0f,1.0f) * 100.0f);
-		DrawFittedText(L"RELOADING " + std::to_wstring(reload_percent) + L"%",reload_area_position,reload_area_size,ns_RELOAD_TEXT_TARGET_HEIGHT,
-									 ns_RELOAD_TEXT_COLOR);
+		DrawFittedText(L"RELOADING " + std::to_wstring(reload_percent) + L"%",reload_area_position,reload_area_size,ns_RELOAD_TEXT_TARGET_HEIGHT,ns_RELOAD_TEXT_COLOR);
+	}
+
+	// 報酬選択の最中だけ、画面中央に、見出しと、選び終える操作の案内を描く。報酬のカードは、E3で追加する。
+	if(state.isRewardSelecting){
+		DrawFittedText(L"REWARD",ns_REWARD_TITLE_AREA_POSITION,ns_REWARD_TITLE_AREA_SIZE,ns_REWARD_TITLE_TARGET_HEIGHT,ns_REWARD_TEXT_COLOR);
+		DrawFittedText(L"PRESS ENTER",ns_REWARD_GUIDE_AREA_POSITION,ns_REWARD_GUIDE_AREA_SIZE,ns_REWARD_GUIDE_TARGET_HEIGHT,ns_REWARD_GUIDE_TEXT_COLOR);
 	}
 	m_textRenderer.End();
 }
