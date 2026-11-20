@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// 敵1体の状態（種類・HP・怯み・転倒・攻撃予告の表示・生死）と、球のColliderの登録、Cubeでの仮表示を担当する。
+// 敵1体の状態（種類・HP・怯み・転倒・射撃のダメージの印・攻撃予告の表示・生死）と、球のColliderの登録、Cubeでの仮表示を担当する。
 // 種類ごとの数値はEnemyTableから読む。敵の行動（移動・攻撃）は持たない。複数体の管理は、EnemyManagerが担当する。
 
 //========= C++標準ライブラリ インクルード=========
@@ -38,7 +38,7 @@ public:
 	void Uninit(CollisionWorld& collisionWorld);
 
 	//========= 更新・描画関数=========
-	// 怯みと転倒の残り時間を進める。
+	// 怯み・転倒・射撃のダメージの印の残り時間を進める。
 	// deltaTime: この更新で進める経過時間。単位は秒。
 	void Update(float deltaTime);
 	// 地形との重なりを補正し、登録済みの球Colliderと描画位置を更新する。
@@ -46,7 +46,7 @@ public:
 	// collisionWorld: この敵のColliderを登録したCollisionWorld。
 	// 戻り値: Colliderと描画位置を更新できればtrue。死亡中または更新失敗時はfalse。
 	[[nodiscard]] bool TryMoveTo(const XMFLOAT3& targetPosition,CollisionWorld& collisionWorld);
-	// 生きている場合だけ、Cubeで描画する。通常は種類の色、攻撃の予告中は黄、怯み中・転倒中は色を変え、転倒中は低く潰して描く。
+	// 生きている場合だけ、Cubeで描画する。通常は種類の色、射撃のダメージの印が付いている間は紫、攻撃の予告中は黄、怯み中・転倒中は色を変え、転倒中は低く潰して描く。
 	// graphicsSystem: Rendererが使う描画基盤。
 	// viewMatrix: World空間からView空間への変換行列。
 	// projectionMatrix: View空間からClip空間への変換行列。
@@ -62,7 +62,11 @@ public:
 	// 転倒させる。転倒中は怯みも解除され、蹴りの対象にならない。すでに転倒中、死亡している、または範囲攻撃型（転倒しない種類）の場合は何もしない。
 	// 戻り値: 新しく転倒させたらtrue。何もしなかった場合はfalse。
 	bool ApplyKnockdown();
-	// HPを満タンへ戻して怯みと転倒を解除する。死亡していた場合はColliderを登録し直して生き返らせる。攻撃の予告の表示も解除する。
+	// 一定時間、この敵が射撃で受けるダメージを増やす印を付ける。特殊強化（殴打追撃）の効果。すでに印が付いている場合は、倍率と時間を新しい値へ置き換える。死亡している場合は何もしない。
+	// damageScale: 射撃で受けるダメージの倍率。1.0より大きい値。
+	// durationSeconds: 印が続く時間。単位は秒。この敵の側の時間（スローの影響を受ける時間）で数える。
+	void ApplyShotDamageMark(float damageScale,float durationSeconds);
+	// HPを満タンへ戻して怯みと転倒と射撃のダメージの印を解除する。死亡していた場合はColliderを登録し直して生き返らせる。攻撃の予告の表示も解除する。
 	// collisionWorld: Initializeで渡したのと同じCollisionWorld。
 	void Respawn(CollisionWorld& collisionWorld);
 	// 攻撃の予告中の表示を切り替える。予告の状態そのものは、呼出側が管理し、毎回の更新で現在の状態を渡す。
@@ -78,6 +82,10 @@ public:
 	[[nodiscard]] bool IsKnockedDown() const { return m_knockdownRemainingSeconds > 0.0f; }
 	// 攻撃の予告中の表示になっているかを返す。
 	[[nodiscard]] bool IsTelegraphing() const { return m_isTelegraphing; }
+	// 射撃のダメージの印が付いているかを返す。
+	[[nodiscard]] bool IsShotDamageMarked() const { return m_shotDamageMarkRemainingSeconds > 0.0f; }
+	// この敵が射撃で受けるダメージの倍率を返す。印が付いている間は、その倍率で、付いていなければ1.0。
+	[[nodiscard]] float GetShotDamageScale() const { return IsShotDamageMarked() ? m_shotDamageScale : 1.0f; }
 	// 現在のHPを返す。
 	[[nodiscard]] float GetCurrentHP() const { return m_currentHP; }
 	// 最大HPを返す。種類の表の値。
@@ -117,6 +125,10 @@ private:
 	float m_flinchRemainingSeconds{};
 	// 転倒の残り時間。単位は秒。0より大きい間は転倒中。
 	float m_knockdownRemainingSeconds{};
+	// 射撃のダメージの印の残り時間。単位は秒。0より大きい間は、印が付いている。
+	float m_shotDamageMarkRemainingSeconds{};
+	// 印が付いている間に、射撃で受けるダメージの倍率。印が付いていない間は使わない。
+	float m_shotDamageScale{1.0f};
 	// 生きているか。
 	bool m_isAlive{};
 };

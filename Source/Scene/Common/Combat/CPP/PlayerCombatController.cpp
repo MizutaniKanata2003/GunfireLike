@@ -1,6 +1,6 @@
 ﻿#include "../H/PlayerCombatController.h"
 
-// 近接攻撃の当たりによる敵へのダメージと転倒、敵との接触の反応、スライディングによる転倒、回復アイテムの使用、被弾の反応を実装する。
+// 近接攻撃の当たりによる敵へのダメージと転倒と殴打追撃の印、敵との接触の反応、スライディングによる転倒、回復アイテムの使用、被弾の反応を実装する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで、接触の反応の間隔の残り時間を0未満にしない。
@@ -58,12 +58,14 @@ void PlayerCombatController::Uninit()
 	m_onHitStopRequested = nullptr;
 }
 
-// 接触の反応の間隔・スライディングの転倒記録・一撃で倒す設定を、初期状態へ戻す。
+// 接触の反応の間隔・スライディングの転倒記録・一撃で倒す設定・殴打追撃の効果を、初期状態へ戻す。
 void PlayerCombatController::Reset()
 {
 	m_contactCooldownRemainingSeconds = 0.0f;
 	ClearSlideKnockdownRecord();
 	m_isOneHitKillEnabled = false;
+	m_followUpDamageScale = 1.0f;
+	m_followUpSeconds = 0.0f;
 }
 
 //========= 更新関数=========
@@ -110,14 +112,19 @@ void PlayerCombatController::UpdateMelee()
 	// 対象がいない場合は、空振りとして効果を与えずに戻る。
 	if(target_enemy == nullptr)return;
 
-	// 蹴りはダメージだけを与える。殴打はダメージを与えた後に、転倒させる。ダメージで死亡した場合、転倒は何も起こらない。
+	// 蹴りはダメージだけを与える。殴打はダメージを与えた後に、転倒させ、殴打追撃を取得していれば、射撃のダメージの印を付ける。ダメージで死亡した場合、転倒と印は何も起こらない。
 	if(melee_type == PLAYER_MELEE_TYPE::e_KICK){
 		target_enemy->ApplyDamage(GetAttackDamage(COMBAT_TABLE::ns_KICK_DAMAGE,*target_enemy),*m_collisionWorld);
 	}
-	// 殴打の場合は、ダメージを与えた後に転倒させる。範囲攻撃型は、転倒しない。
+	// 殴打の場合は、ダメージを与えた後に転倒させ、印を付ける。範囲攻撃型は、転倒しない。
 	else{
 		target_enemy->ApplyDamage(GetAttackDamage(COMBAT_TABLE::ns_PUNCH_DAMAGE,*target_enemy),*m_collisionWorld);
 		target_enemy->ApplyKnockdown();
+
+		// 殴打追撃を取得している（倍率が1.0より大きい）場合だけ、印を付ける。死亡した敵には、Enemy側が付けない。
+		if(m_followUpDamageScale > 1.0f){
+			target_enemy->ApplyShotDamageMark(m_followUpDamageScale,m_followUpSeconds);
+		}
 	}
 
 	// 当たった手応えとして、短いヒットストップを求める。

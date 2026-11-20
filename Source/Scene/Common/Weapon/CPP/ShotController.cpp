@@ -115,13 +115,14 @@ void ShotController::Update(float gameplayDeltaTime)
 		}
 	}
 
-	// 敵レイヤーに命中した場合だけ、Colliderの識別値からダメージを与える相手を探す。ダメージは、使用中の武器の値に、増加中なら倍率を掛け、怯み時間は、特殊強化の倍率を掛ける。
+	// 敵レイヤーに命中した場合だけ、Colliderの識別値からダメージを与える相手を探す。
+	// ダメージは、使用中の武器の値に、ジャスト回避の後の増加（回避反撃）と、敵に付いた印（殴打追撃）の倍率を掛け、怯み時間は、制圧射撃の倍率を掛ける。
 	if(weapon_result.didHit && weapon_result.hitInfo.layer == COLLISION_LAYER::ns_ENEMY){
 		Enemy* const hit_enemy = m_enemyManager->FindLivingEnemy(weapon_result.hitInfo.userData);
 		// 対応する生存中の敵が見つかった場合だけ、ダメージと命中表示を反映する。
 		if(hit_enemy != nullptr){
-			const float damage_scale = IsDamageBoostActive() ? m_damageBoostScale : 1.0f;
-			const float weapon_damage = m_weaponSystem.GetWeaponData().damage * damage_scale;
+			const float boost_scale = IsDamageBoostActive() ? m_damageBoostScale : 1.0f;
+			const float weapon_damage = m_weaponSystem.GetWeaponData().damage * boost_scale * hit_enemy->GetShotDamageScale();
 			hit_enemy->ApplyDamage(m_playerCombat->GetAttackDamage(weapon_damage,*hit_enemy),*m_collisionWorld,m_flinchScale);
 			m_hitMarkerRemainingSeconds = ns_HIT_MARKER_SECONDS;
 		}

@@ -341,9 +341,11 @@ void GameSession::UpdateReward()
 		}
 	}
 
-	// 常に効く特殊強化の効果を、使う側へ渡す。制圧射撃は、射撃で敵へ与える怯み時間の倍率として、射撃の担当へ渡す。毎回渡して、再開や初期化の後も、取得数と一致させる。
+	// 常に効く特殊強化の効果を、使う側へ渡す。毎回渡して、再開や初期化の後も、取得数と一致させる。
+	// 制圧射撃は、射撃で敵へ与える怯み時間の倍率として、射撃の担当へ渡す。殴打追撃は、殴打が当たった敵へ付ける印の倍率と時間として、戦闘の担当へ渡す。
 	// 回避反撃は、ジャスト回避の時だけ効くため、ここでは渡さない（StartJustDodgeEffectsが渡す）。
 	m_player.GetShotController().SetFlinchScale(m_reward.GetSuppressiveFlinchScale());
+	m_player.GetPlayerCombat().SetFollowUpStrike(m_reward.GetFollowUpDamageScale(),REWARD_TABLE::ns_FOLLOW_UP_SECONDS);
 }
 
 // ジャスト回避が成立した時の効果を反映する。

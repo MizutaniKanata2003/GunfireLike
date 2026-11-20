@@ -2,7 +2,7 @@
 
 // 部屋のクリア後に、報酬のカードを選ぶ状態（報酬選択）へ入り、カードを選ぶと抜ける流れと、報酬（特殊強化）の取得数を管理する。
 // カードの当たりとホバーはUiButtonで判定する。時間の停止・入力の切替・画面の表示は、呼出側が行う。
-// 取得数から、強化の効果の大きさ（制圧射撃の怯み時間の倍率、回避反撃の射撃ダメージの倍率）を返す。効果を使う側へ値を渡すのは、呼出側が行う。
+// 取得数から、強化の効果の大きさ（制圧射撃の怯み時間の倍率、回避反撃と殴打追撃のダメージの倍率）を返す。効果を使う側へ値を渡すのは、呼出側が行う。
 
 //========= C++標準ライブラリ インクルード=========
 #include <array> // std::arrayで、カードごとのボタンと取得数を固定長で保持する。
@@ -26,7 +26,7 @@ namespace REWARD_TABLE
 	{
 		e_SUPPRESSIVE_FIRE, // 制圧射撃。射撃で敵に与える怯みの時間を伸ばす。
 		e_COUNTER_DODGE,    // 回避反撃。ジャスト回避の後、一定時間、射撃のダメージを増やす。
-		e_FOLLOW_UP_STRIKE  // 殴打追撃。E6で効果を実装する。
+		e_FOLLOW_UP_STRIKE  // 殴打追撃。殴打を当てた敵が、一定時間、射撃で受けるダメージを増やす。
 	};
 
 	//========= レベル=========
@@ -44,6 +44,12 @@ namespace REWARD_TABLE
 	inline constexpr float ns_COUNTER_DODGE_DAMAGE_SCALES[ns_MAX_LEVEL + 1]{1.0f,1.3f,1.6f,2.0f};
 	// ジャスト回避の後に、射撃ダメージが増える時間。単位は秒。ジャスト回避のスローの影響を受けない、プレイヤー側の時間で数える。企画書で未確定の仮値。
 	inline constexpr float ns_COUNTER_DODGE_SECONDS = 4.0f;
+
+	//========= 殴打追撃の効果=========
+	// 殴打追撃のレベルごとの、印が付いた敵が射撃で受けるダメージの倍率。添字はレベル（0が未取得）。企画書の「殴打命中敵が一定時間、射撃で受けるダメージ増加」に当たる仮値。
+	inline constexpr float ns_FOLLOW_UP_DAMAGE_SCALES[ns_MAX_LEVEL + 1]{1.0f,1.25f,1.5f,2.0f};
+	// 殴打を当てた敵に、印が続く時間。単位は秒。敵の側の時間（スローの影響を受ける時間）で数える。企画書で未確定の仮値。
+	inline constexpr float ns_FOLLOW_UP_SECONDS = 5.0f;
 
 	//========= 報酬の定義=========
 	// 報酬1種類分の表示内容。
@@ -164,6 +170,11 @@ public:
 	[[nodiscard]] float GetCounterDodgeDamageScale() const
 	{
 		return REWARD_TABLE::ns_COUNTER_DODGE_DAMAGE_SCALES[GetLevel(REWARD_TABLE::REWARD_TYPE::e_COUNTER_DODGE)];
+	}
+	// 殴打追撃の現在のレベルに応じた、印が付いた敵が射撃で受けるダメージの倍率を返す。未取得なら1.0（印を付けない）。
+	[[nodiscard]] float GetFollowUpDamageScale() const
+	{
+		return REWARD_TABLE::ns_FOLLOW_UP_DAMAGE_SCALES[GetLevel(REWARD_TABLE::REWARD_TYPE::e_FOLLOW_UP_STRIKE)];
 	}
 
 private:

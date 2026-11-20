@@ -1,6 +1,6 @@
 ﻿#include "../H/Enemy.h"
 
-// 敵1体のHP・怯み・転倒・Collider登録・Cube表示を実装する。
+// 敵1体のHP・怯み・転倒・射撃のダメージの印・Collider登録・Cube表示を実装する。
 // 種類ごとのHP・当たり・大きさ・色はEnemyTableから読み、怯みと転倒の時間と状態の色は、このファイルの定数にまとめた仮値。
 
 //========= Framework インクルード=========
@@ -26,7 +26,9 @@ namespace
 	constexpr float ns_KNOCKDOWN_HEIGHT_SCALE = 0.4f;
 
 	//========= 状態の色=========
-	// 攻撃の予告中の色。黄で、Object画像の色へ乗算して色味を変える。種類の色より優先し、怯みの色より後にする。
+	// 射撃のダメージの印が付いている間の色。紫で、Object画像の色へ乗算して色味を変える。種類の色の代わりに使い、予告・怯み・転倒の色より後にする。
+	constexpr XMFLOAT4 ns_MARK_COLOR{0.9f,0.4f,1.0f,1.0f};
+	// 攻撃の予告中の色。黄で、Object画像の色へ乗算して色味を変える。種類の色と印の色より優先し、怯みの色より後にする。
 	constexpr XMFLOAT4 ns_TELEGRAPH_COLOR{1.0f,1.0f,0.3f,1.0f};
 	// 怯み中の色。橙で、Object画像の色へ乗算して色味を変える。予告の色より優先する。
 	constexpr XMFLOAT4 ns_FLINCH_COLOR{1.0f,0.5f,0.2f,1.0f};
@@ -56,6 +58,8 @@ bool Enemy::Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,EN
 	m_currentHP = params.maxHP;
 	m_flinchRemainingSeconds = 0.0f;
 	m_knockdownRemainingSeconds = 0.0f;
+	m_shotDamageMarkRemainingSeconds = 0.0f;
+	m_shotDamageScale = 1.0f;
 	m_isTelegraphing = false;
 	m_isAlive = true;
 	m_colliderHandle = collisionWorld.AddSphere(COLLISION_SPHERE{position,params.colliderRadius},COLLISION_LAYER::ns_ENEMY,enemyId);
@@ -77,11 +81,13 @@ void Enemy::Uninit(CollisionWorld& collisionWorld)
 	m_currentHP = 0.0f;
 	m_flinchRemainingSeconds = 0.0f;
 	m_knockdownRemainingSeconds = 0.0f;
+	m_shotDamageMarkRemainingSeconds = 0.0f;
+	m_shotDamageScale = 1.0f;
 	m_isTelegraphing = false;
 }
 
 //========= 更新・描画関数=========
-// 怯みと転倒の残り時間を減らす。
+// 怯み・転倒・射撃のダメージの印の残り時間を減らす。
 void Enemy::Update(float deltaTime)
 {
 	// 怯み中の場合だけ時間を進め、0未満にならないようにする。怯みでなければ何もしない。
@@ -99,6 +105,15 @@ void Enemy::Update(float deltaTime)
 		// 残り時間が0以下になったら、転倒を終えて0にそろえる。
 		if(m_knockdownRemainingSeconds < 0.0f){
 			m_knockdownRemainingSeconds = 0.0f;
+		}
+	}
+
+	// 射撃のダメージの印が付いている場合だけ時間を進め、0未満にならないようにする。印がなければ何もしない。
+	if(m_shotDamageMarkRemainingSeconds > 0.0f){
+		m_shotDamageMarkRemainingSeconds -= deltaTime;
+		// 残り時間が0以下になったら、印を外して0にそろえる。
+		if(m_shotDamageMarkRemainingSeconds < 0.0f){
+			m_shotDamageMarkRemainingSeconds = 0.0f;
 		}
 	}
 }
@@ -129,10 +144,10 @@ void Enemy::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const
 	// 死亡している、またはRendererを借用していない場合は、描画しない。
 	if(!m_isAlive || m_cubeRenderer == nullptr)return;
 
-	// 描画用のTransformと色を決める。通常は保持しているTransformと、種類の色。
+	// 描画用のTransformと色を決める。通常は保持しているTransformと、種類の色。射撃のダメージの印が付いている間は、印の色にする。
 	const ENEMY_PARAMS& params = ENEMY_TABLE::GetParams(m_kind);
 	Transform draw_transform = m_transform;
-	XMFLOAT4 color = params.normalColor;
+	XMFLOAT4 color = IsShotDamageMarked() ? ns_MARK_COLOR : params.normalColor;
 
 	// 転倒中は、高さを低く潰し、足元の位置が変わらないよう中心を下げて、色を変える。中心を下げる量は、潰した高さの分の半分。
 	if(IsKnockedDown()){
@@ -188,17 +203,30 @@ bool Enemy::ApplyKnockdown()
 	return true;
 }
 
-// HPと怯み・転倒を戻し、死亡中ならColliderを登録し直す。
+// 射撃のダメージの印を付ける。
+void Enemy::ApplyShotDamageMark(float damageScale,float durationSeconds)
+{
+	// 死亡している敵には、印を付けない。
+	if(!m_isAlive)return;
+
+	// 倍率と時間を、新しい値へ置き換える。すでに印がある場合も、時間を数え直す。
+	m_shotDamageScale = damageScale;
+	m_shotDamageMarkRemainingSeconds = durationSeconds;
+}
+
+// HPと怯み・転倒・印を戻し、死亡中ならColliderを登録し直す。
 void Enemy::Respawn(CollisionWorld& collisionWorld)
 {
 	// 未初期化（Rendererを借用していない）の場合は、生き返らせる対象がないため戻る。
 	if(m_cubeRenderer == nullptr)return;
 
-	// HPを満タンにして、怯みと転倒と、攻撃の予告の表示を解除する。
+	// HPを満タンにして、怯みと転倒と射撃のダメージの印と、攻撃の予告の表示を解除する。
 	const ENEMY_PARAMS& params = ENEMY_TABLE::GetParams(m_kind);
 	m_currentHP = params.maxHP;
 	m_flinchRemainingSeconds = 0.0f;
 	m_knockdownRemainingSeconds = 0.0f;
+	m_shotDamageMarkRemainingSeconds = 0.0f;
+	m_shotDamageScale = 1.0f;
 	m_isTelegraphing = false;
 
 	// 死亡中だった場合だけ、Colliderを同じ位置へ登録し直して生きている状態にする。生きている場合は二重登録しない。
