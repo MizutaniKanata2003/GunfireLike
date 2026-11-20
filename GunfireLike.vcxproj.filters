@@ -440,6 +440,9 @@
     <ClInclude Include="Source\Scene\Common\Weapon\H\WeaponInventory.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Scene\Common\Weapon\H\WeaponUpgrade.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Source\Framework\Shaders\BasicColorVS.hlsl" />

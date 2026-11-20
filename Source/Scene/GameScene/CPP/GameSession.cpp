@@ -1,9 +1,9 @@
 ﻿#include "../H/GameSession.h"
 
-// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択とその効果の反映、ショップでの武器と弾薬の購入と武器の売却、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
+// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択とその効果の反映、ショップでの武器と弾薬の購入・武器の売却・武器の強化、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
 
 //========= C++標準ライブラリ インクルード=========
-#include <string> // 報酬の選択と購入・売却をログへ記録する際に、見出しや名前を連結する。
+#include <string> // 報酬の選択と購入・売却・強化をログへ記録する際に、見出しや名前を連結する。
 
 //========= Windows インクルード=========
 #include <windows.h> // VK_F1・VK_F2・VK_F4・VK_LBUTTON・VK_RETURNの仮想キーコードで、Capture切替・タイトルへ戻る要求・最初の部屋からの再開・カードやボタンのクリック・ショップを閉じるキーを指定する。
@@ -36,6 +36,8 @@ namespace
 	//========= 報酬選択・ショップの入力設定=========
 	// カードや購入ボタンを、キーで選ぶ時の、最初のものに対応するキー。1から順に、並びと同じ。クリックが使えない場合の代わりの操作。
 	constexpr unsigned char ns_UI_FIRST_KEY = '1';
+	// ショップのページ切替に使うキー。
+	constexpr unsigned char ns_SHOP_SWITCH_KEY = 'U';
 	// 描画先の大きさが無効な場合に、カーソルを置く、基準Canvasの外の位置。どのカードやボタンにも乗らない。
 	constexpr float ns_CURSOR_OUTSIDE_CANVAS = -1000.0f;
 
@@ -73,21 +75,30 @@ namespace
 		return triggered_index;
 	}
 
-	// ショップの、この更新で押されたキーに対応するボタンの添字を返す。数字キーは、武器の購入と売却（1〜3）と弾薬の購入（4〜6）、Enterは閉じるボタンに対応する。
+	// ショップの、この更新で押されたキーに対応するボタンの添字を返す。Enterは閉じるボタン、Uはページ切替に対応する。
+	// 数字キーは、売買のページでは、武器の購入と売却（1〜3）と弾薬の購入（4〜6）、強化のページでは、強化の項目（1〜5）に対応する。
 	// inputSystem: キー入力の取得元。
+	// page: 現在のページ。
 	// 戻り値: 押されたキーに対応するボタンの添字。どれも押されていなければ-1。
-	int FindTriggeredShopKey(const InputSystem& inputSystem)
+	int FindTriggeredShopKey(const InputSystem& inputSystem,SHOP_PAGE page)
 	{
-		// Enterは、閉じるボタンの代わりにする。数字キーより優先する。
+		// Enterは、閉じるボタンの代わりにする。Uは、ページ切替ボタンの代わりにする。どちらも、数字キーより優先する。
 		if(inputSystem.IsKeyTriggered(VK_RETURN))return SHOP_TABLE::ns_CLOSE_INDEX;
+		if(inputSystem.IsKeyTriggered(ns_SHOP_SWITCH_KEY))return SHOP_TABLE::ns_SWITCH_INDEX;
 
-		// 閉じるボタンの手前までの、購入と売却のボタンの数だけ、数字キーを調べる。
-		return FindTriggeredNumberKey(inputSystem,SHOP_TABLE::ns_CLOSE_INDEX);
+		// 強化のページは、強化の項目の数だけ、数字キーを調べ、強化のボタンの添字へ変換する。
+		if(page == SHOP_PAGE::e_UPGRADE){
+			const int item_index = FindTriggeredNumberKey(inputSystem,SHOP_TABLE::ns_UPGRADE_COUNT);
+			return item_index >= 0 ? SHOP_TABLE::ns_UPGRADE_BUTTON_OFFSET + item_index : -1;
+		}
+
+		// 売買のページは、武器と弾薬のボタンの数（強化のボタンの手前まで）だけ、数字キーを調べる。
+		return FindTriggeredNumberKey(inputSystem,SHOP_TABLE::ns_UPGRADE_BUTTON_OFFSET);
 	}
 
 	//========= 装備中の武器の判別=========
 	// 装備中の武器の性能値から、武器の種類の値（表の添字）を求める。表示名の文字列の指す先が、表の同じ武器の表示名と一致するかで判別する。
-	// 武器の性能値は、表の値をコピーするため、表示名のポインターも、表のものと同じになる。
+	// 武器の性能値は、表の値をコピーし、強化でも表示名は変わらないため、表示名のポインターも、表のものと同じになる。
 	// weaponData: 装備中の武器の性能値。
 	// 戻り値: 武器の種類の値。表にない場合は-1。
 	int FindWeaponIndex(const WEAPON_DATA& weaponData)
@@ -129,7 +140,7 @@ void GameSession::Initialize()
 	// 報酬の取得数を0へ戻し、報酬選択を解除する。カードのボタンの矩形も、設定し直す。
 	m_reward.Initialize();
 
-	// 武器の所持を初期武器だけに戻し、ショップを閉じる。ボタンの矩形も、設定し直す。
+	// 武器の所持と強化を初期状態へ戻し、ショップを閉じる。ボタンの矩形も、設定し直す。
 	m_inventory.Initialize();
 	m_shop.Initialize();
 }
@@ -175,7 +186,7 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 	UpdateTimers(frame_delta_time,time_deltas.gameplayDeltaTime);
 	UpdateKillRewards();
 
-	// 部屋のクリアの結果を受けて、報酬選択へ入る・抜ける。抜けた更新で、続けてショップを開く。ショップが開いている間は、購入・売却・閉じる操作を処理する。
+	// 部屋のクリアの結果を受けて、報酬選択へ入る・抜ける。抜けた更新で、続けてショップを開く。ショップが開いている間は、購入・売却・強化・閉じる操作を処理する。
 	UpdateReward();
 	UpdateShop();
 
@@ -306,7 +317,7 @@ bool GameSession::UpdateSessionInput()
 		m_inputSystem.SetMouseCaptureEnabled(!m_inputSystem.IsMouseCaptureEnabled());
 	}
 
-	// F4では最初の部屋から作り直す。旧ウェーブと、旧ウェーブの弾・範囲の予告は、同じ更新の生成処理で置き換わる。通貨・報酬の取得数・武器の所持は、そのまま引き継ぐ。
+	// F4では最初の部屋から作り直す。旧ウェーブと、旧ウェーブの弾・範囲の予告は、同じ更新の生成処理で置き換わる。通貨・報酬の取得数・武器の所持と強化は、そのまま引き継ぐ。
 	if(m_inputSystem.IsKeyTriggered(VK_F4)){
 		m_stage.Restart();
 		m_enemyController.ResetAttackState();
@@ -381,7 +392,7 @@ void GameSession::UpdateReward()
 	m_player.GetPlayerCombat().SetFollowUpStrike(m_reward.GetFollowUpDamageScale(),REWARD_TABLE::ns_FOLLOW_UP_SECONDS);
 }
 
-// ショップが開いている間、購入・売却と閉じる操作を処理する。
+// ショップが開いている間、購入・売却・強化と閉じる操作を処理する。
 void GameSession::UpdateShop()
 {
 	// 閉じている間は、何もしない。
@@ -392,14 +403,14 @@ void GameSession::UpdateShop()
 	SHOP_INPUT shop_input{};
 	shop_input.cursorCanvasPosition = ConvertCursorToCanvas(m_inputSystem,m_graphicsSystem);
 	shop_input.isClickTriggered = m_inputSystem.IsKeyTriggered(VK_LBUTTON);
-	shop_input.keyChoiceIndex = FindTriggeredShopKey(m_inputSystem);
+	shop_input.keyChoiceIndex = FindTriggeredShopKey(m_inputSystem,m_shop.GetPage());
 	SHOP_CONTEXT shop_context{};
 	shop_context.balance = m_wallet.GetBalance();
 	shop_context.equippedWeaponIndex = FindWeaponIndex(weapon.GetWeaponData());
 	shop_context.equippedReserveAmmo = weapon.GetReserveAmmo();
 	const SHOP_UPDATE_RESULT shop_result = m_shop.Update(shop_input,shop_context,m_inventory);
 
-	// 武器の購入・売却、弾薬の購入が求められた場合は、反映する。
+	// 武器の購入・売却、弾薬の購入、強化が求められた場合は、反映する。
 	if(shop_result == SHOP_UPDATE_RESULT::e_PURCHASE_REQUESTED){
 		ApplyShopPurchase();
 	}
@@ -408,6 +419,9 @@ void GameSession::UpdateShop()
 	}
 	else if(shop_result == SHOP_UPDATE_RESULT::e_AMMO_PURCHASE_REQUESTED){
 		ApplyShopAmmoPurchase();
+	}
+	else if(shop_result == SHOP_UPDATE_RESULT::e_UPGRADE_REQUESTED){
+		ApplyShopUpgrade();
 	}
 	// 閉じた場合は、Captureを戻して、ゲームの操作へ戻る。選んだクリックが射撃にならないよう、入力の保護が、続けて働く。
 	else if(shop_result == SHOP_UPDATE_RESULT::e_CLOSED){
@@ -434,29 +448,30 @@ void GameSession::ApplyShopPurchase()
 	}
 
 	// 購入した武器を、装備する。弾薬は、その武器の初期値になる。
-	m_player.GetShotController().EquipWeapon(weapon_type);
+	EquipOwnedWeapon(row_index);
 	Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,std::wstring{L"武器を購入しました: "} + SHOP_TABLE::ns_WEAPON_NAMES[row_index]);
 }
 
 // ショップでの武器の売却を反映する。
 void GameSession::ApplyShopSale()
 {
-	// 売却する武器と価格を、ショップの表から取り出す。行の添字は、武器の種類の値と同じ。
+	// 売却する武器を、ショップの表から取り出す。行の添字は、武器の種類の値と同じ。
 	const int row_index = m_shop.GetLastPurchaseIndex();
 	const WEAPON_TYPE weapon_type = static_cast<WEAPON_TYPE>(row_index);
 
-	// 売却する武器を装備中かを、手放す前に調べる。外せなかった場合（最後の1丁など）は、何も変えずに戻る。
+	// 売却する武器を装備中かと、売却で得る通貨（強化に使った費用の回収を含む）を、手放す前に調べる。外せなかった場合（最後の1丁など）は、何も変えずに戻る。
 	const bool was_equipped = FindWeaponIndex(m_player.GetShotController().GetWeaponSystem().GetWeaponData()) == row_index;
+	const int sell_price = SHOP_TABLE::GetSellPrice(row_index,m_inventory.GetUpgradeSpent(row_index));
 	if(!m_inventory.TryRemove(weapon_type))return;
 
-	// 売却の価格を、通貨へ加える。
-	m_wallet.Add(SHOP_TABLE::ns_WEAPON_SELL_PRICES[row_index]);
+	// 売却で得る通貨を、加える。
+	m_wallet.Add(sell_price);
 
 	// 装備中の武器を手放した場合は、所持している別の武器（表の並びで最も先）を、代わりに装備する。所持の下限があるため、必ず1丁は残る。
 	if(was_equipped){
 		const int next_weapon_index = m_inventory.FindFirstOwnedIndex();
 		if(next_weapon_index >= 0){
-			m_player.GetShotController().EquipWeapon(static_cast<WEAPON_TYPE>(next_weapon_index));
+			EquipOwnedWeapon(next_weapon_index);
 		}
 	}
 	Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,std::wstring{L"武器を売却しました: "} + SHOP_TABLE::ns_WEAPON_NAMES[row_index]);
@@ -483,6 +498,38 @@ void GameSession::ApplyShopAmmoPurchase()
 	}
 	Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,
 								std::wstring{L"弾薬を購入しました: "} + SHOP_TABLE::ns_WEAPON_NAMES[row_index] + L" +" + std::to_wstring(added_ammo));
+}
+
+// ショップでの強化の購入を反映する。
+void GameSession::ApplyShopUpgrade()
+{
+	// 強化する項目と、強化の対象（装備中の武器）を求める。装備中の武器が判別できない場合は、何も変えずに戻る。
+	const int item_index = m_shop.GetLastPurchaseIndex();
+	const int weapon_index = FindWeaponIndex(m_player.GetShotController().GetWeaponSystem().GetWeaponData());
+	if(weapon_index < 0)return;
+
+	// 次の段階へ上げる価格を求め、通貨を支払う。足りない場合は、何も変えずに戻る。
+	const int price = WEAPON_UPGRADE_TABLE::GetPrice(item_index,m_inventory.GetUpgradeLevel(weapon_index,item_index));
+	if(!m_wallet.TrySpend(price))return;
+
+	// 段階を1つ上げる。上げられなかった場合（上限など）は、支払った通貨を戻して、何も変えない。
+	if(!m_inventory.TryUpgrade(static_cast<WEAPON_TYPE>(weapon_index),item_index,price)){
+		m_wallet.Add(price);
+		return;
+	}
+
+	// 使用中の武器の性能値を、強化後の値へ差し替える。弾薬とリロードの進行は、引き継ぐ。
+	m_player.GetShotController().ApplyUpgradedData(BuildUpgradedWeaponData(WEAPON_TABLE::ns_WEAPONS[weapon_index],m_inventory.GetUpgradeLevels(weapon_index)));
+	Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,
+								std::wstring{L"武器を強化しました: "} + SHOP_TABLE::ns_WEAPON_NAMES[weapon_index] + L" " + WEAPON_UPGRADE_TABLE::ns_ITEM_NAMES[item_index]);
+}
+
+// 所持している武器を、強化を反映した性能値で装備する。
+void GameSession::EquipOwnedWeapon(int weaponIndex)
+{
+	// 表の基本の性能値へ、その武器の強化の段階を反映した値で、装備する。
+	m_player.GetShotController().EquipWeapon(static_cast<WEAPON_TYPE>(weaponIndex),
+																					 BuildUpgradedWeaponData(WEAPON_TABLE::ns_WEAPONS[weaponIndex],m_inventory.GetUpgradeLevels(weaponIndex)));
 }
 
 // ジャスト回避が成立した時の効果を反映する。
@@ -655,6 +702,7 @@ void GameSession::DrawHud()
 
 	// 現在の値をHUDへ渡して描画する。弾薬とリロードの値は、射撃を担当するShotControllerの武器から読み取る。
 	const WeaponSystem& weapon = m_player.GetShotController().GetWeaponSystem();
+	const int equipped_weapon_index = FindWeaponIndex(weapon.GetWeaponData());
 	GAME_HUD_STATE hud_state{};
 	hud_state.currentHP = m_player.GetPlayerHealth().GetCurrentHP();
 	hud_state.maxHP = m_player.GetPlayerHealth().GetMaxHP();
@@ -670,10 +718,14 @@ void GameSession::DrawHud()
 	hud_state.hoveredRewardIndex = m_reward.GetHoveredIndex();
 	hud_state.rewardOwnedCounts = m_reward.GetAcquiredCounts();
 	hud_state.isShopOpen = m_shop.IsOpen();
+	hud_state.shopPage = m_shop.GetPage();
 	hud_state.hoveredShopIndex = m_shop.GetHoveredIndex();
 	hud_state.shopRowStates = m_shop.GetRowStates();
+	hud_state.shopSellPrices = m_shop.GetSellPrices();
 	hud_state.shopAmmoStates = m_shop.GetAmmoStates();
+	hud_state.shopUpgradeStates = m_shop.GetUpgradeStates();
+	hud_state.shopUpgradeLevels = m_inventory.GetUpgradeLevels(equipped_weapon_index);
 	hud_state.ownedWeaponCount = m_inventory.GetCount();
-	hud_state.equippedWeaponIndex = FindWeaponIndex(weapon.GetWeaponData());
+	hud_state.equippedWeaponIndex = equipped_weapon_index;
 	m_gameHud.Draw(m_graphicsSystem,hud_state);
 }

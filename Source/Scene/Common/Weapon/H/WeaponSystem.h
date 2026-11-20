@@ -1,10 +1,10 @@
 ﻿#pragma once
 
 // 武器1丁の弾薬・連射間隔・リロードの状態を保持し、射撃入力に応じてRayによる命中判定（HitScan）と視線の反動を行う。
-// ダメージの適用や敵の状態更新は担当せず、命中した相手の情報を結果として返す。武器の切替・購入・強化は担当しないが、購入した予備弾薬の加算だけは受け付ける。
+// ダメージの適用や敵の状態更新は担当せず、命中した相手の情報を結果として返す。武器の切替・購入・強化は担当しないが、購入した予備弾薬の加算と、強化後の性能値への差し替えは受け付ける。
 
 //========= C++標準ライブラリ インクルード=========
-#include <algorithm> // std::minとstd::maxで、予備弾薬の加算を上限内に収める。
+#include <algorithm> // std::minとstd::maxで、予備弾薬の加算を上限内に収め、装填弾数を装弾数の上限内に収める。
 #include <random> // std::mt19937で弾のばらつきと反動の左右の乱数を生成する。
 
 //========= Framework インクルード=========
@@ -76,6 +76,13 @@ public:
 		const int added_ammo = std::min(amount,addable_ammo);
 		m_reserveAmmo += added_ammo;
 		return added_ammo;
+	}
+	// 性能値を、強化後の値へ差し替える。装填弾数・予備弾薬・連射間隔・リロードの進行は、そのまま引き継ぐ。装填弾数が、新しい装弾数の上限を超える場合だけ、上限へ収める。強化の購入から呼ぶ。
+	// weaponData: 差し替える性能値。同じ武器の強化後の値であること。値をコピーする。
+	void ReplaceWeaponData(const WEAPON_DATA& weaponData)
+	{
+		m_weaponData = weaponData;
+		m_magazineAmmo = std::min(m_magazineAmmo,m_weaponData.magazineSize);
 	}
 	// デバッグ用に、弾薬を消費しない設定を切り替える。有効の間は、装填弾数が0でも発射でき、発射しても弾薬が減らない。
 	void ToggleInfiniteAmmo() { m_isInfiniteAmmo = !m_isInfiniteAmmo; }

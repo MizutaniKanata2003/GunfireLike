@@ -115,19 +115,29 @@ namespace
 	// 取得数の高さの目標。基準Canvas上の大きさ。
 	constexpr float ns_CARD_OWNED_TARGET_HEIGHT = 26.0f;
 
-	//========= ショップの文字の配置=========
+	//========= ショップの文字の配置（共通）=========
 	// 見出しを置く領域の左上の位置。基準Canvas上の座標。パネル（上端90）の上部の左側へ置く。
 	const XMFLOAT2 ns_SHOP_TITLE_AREA_POSITION{200.0f,105.0f};
 	// 見出しを置く領域の大きさ。基準Canvas上の大きさ。
 	const XMFLOAT2 ns_SHOP_TITLE_AREA_SIZE{480.0f,70.0f};
 	// 見出しの高さの目標。基準Canvas上の大きさ。
 	constexpr float ns_SHOP_TITLE_TARGET_HEIGHT = 56.0f;
-	// 所持数を置く領域の左上の位置。基準Canvas上の座標。パネルの上部の右側へ置く。
-	const XMFLOAT2 ns_SHOP_SLOTS_AREA_POSITION{720.0f,115.0f};
-	// 所持数を置く領域の大きさ。基準Canvas上の大きさ。
-	const XMFLOAT2 ns_SHOP_SLOTS_AREA_SIZE{360.0f,50.0f};
-	// 所持数の高さの目標。基準Canvas上の大きさ。
-	constexpr float ns_SHOP_SLOTS_TARGET_HEIGHT = 30.0f;
+	// 右上の情報（売買のページの所持数、強化のページの武器名）を置く領域の左上の位置。基準Canvas上の座標。パネルの上部の右側へ置く。
+	const XMFLOAT2 ns_SHOP_INFO_AREA_POSITION{720.0f,115.0f};
+	// 右上の情報を置く領域の大きさ。基準Canvas上の大きさ。
+	const XMFLOAT2 ns_SHOP_INFO_AREA_SIZE{360.0f,50.0f};
+	// 右上の情報の高さの目標。基準Canvas上の大きさ。
+	constexpr float ns_SHOP_INFO_TARGET_HEIGHT = 30.0f;
+	// ボタンの文字の高さの目標。基準Canvas上の大きさ。ボタンの高さ（64）に収まる大きさ。
+	constexpr float ns_SHOP_BUTTON_TEXT_TARGET_HEIGHT = 30.0f;
+	// 操作の案内を置く領域の左上の位置。基準Canvas上の座標。最後の行（下端478）と、閉じるボタン（上端546）の間へ置く。
+	const XMFLOAT2 ns_SHOP_GUIDE_AREA_POSITION{200.0f,490.0f};
+	// 操作の案内を置く領域の大きさ。基準Canvas上の大きさ。
+	const XMFLOAT2 ns_SHOP_GUIDE_AREA_SIZE{880.0f,40.0f};
+	// 操作の案内の高さの目標。基準Canvas上の大きさ。
+	constexpr float ns_SHOP_GUIDE_TARGET_HEIGHT = 24.0f;
+
+	//========= ショップの文字の配置（売買のページ）=========
 	// 各行の左側（武器名と予備弾薬）を置く領域の、左端のX座標と幅。基準Canvas上の座標と大きさ。武器のボタン（左端580）の手前に収める。
 	constexpr float ns_SHOP_NAME_AREA_X = 200.0f;
 	constexpr float ns_SHOP_NAME_AREA_WIDTH = 360.0f;
@@ -141,14 +151,13 @@ namespace
 	constexpr float ns_SHOP_RESERVE_AREA_HEIGHT = 36.0f;
 	// 予備弾薬の高さの目標。基準Canvas上の大きさ。
 	constexpr float ns_SHOP_RESERVE_TARGET_HEIGHT = 22.0f;
-	// ボタンの文字の高さの目標。基準Canvas上の大きさ。ボタンの高さ（64）に収まる大きさ。
-	constexpr float ns_SHOP_BUTTON_TEXT_TARGET_HEIGHT = 30.0f;
-	// 操作の案内を置く領域の左上の位置。基準Canvas上の座標。最後の行（下端478）と、閉じるボタン（上端546）の間へ置く。
-	const XMFLOAT2 ns_SHOP_GUIDE_AREA_POSITION{200.0f,490.0f};
-	// 操作の案内を置く領域の大きさ。基準Canvas上の大きさ。
-	const XMFLOAT2 ns_SHOP_GUIDE_AREA_SIZE{880.0f,40.0f};
-	// 操作の案内の高さの目標。基準Canvas上の大きさ。
-	constexpr float ns_SHOP_GUIDE_TARGET_HEIGHT = 24.0f;
+
+	//========= ショップの文字の配置（強化のページ）=========
+	// 強化の各行の、項目名と段階を置く領域の、左端のX座標と幅。基準Canvas上の座標と大きさ。強化のボタン（左端840）の手前に収める。
+	constexpr float ns_SHOP_UPGRADE_NAME_AREA_X = 200.0f;
+	constexpr float ns_SHOP_UPGRADE_NAME_AREA_WIDTH = 620.0f;
+	// 強化の項目名と段階の高さの目標。基準Canvas上の大きさ。
+	constexpr float ns_SHOP_UPGRADE_NAME_TARGET_HEIGHT = 32.0f;
 
 	//========= ショップのボタンの補助関数=========
 	// 武器のボタンが、押せる状態かを返す。購入できる、売却できる、売却の確認中の場合だけ、押せる。
@@ -158,10 +167,10 @@ namespace
 		return rowState == SHOP_ROW_STATE::e_AVAILABLE || rowState == SHOP_ROW_STATE::e_SELLABLE || rowState == SHOP_ROW_STATE::e_SELL_CONFIRM;
 	}
 
-	// 武器の行の状態に応じた、ボタンの文字を返す。購入できる時は購入の価格、売却できる時は売却の価格を添える。
+	// 武器の行の状態に応じた、ボタンの文字を返す。購入できる時は購入の価格、売却できる時は売却で得る通貨を添える。
 	// rowState: 武器の行の状態。
 	// price: 武器の購入の価格。
-	// sellPrice: 武器の売却の価格。
+	// sellPrice: 武器の売却で得る通貨。
 	std::wstring GetWeaponButtonLabel(SHOP_ROW_STATE rowState,int price,int sellPrice)
 	{
 		switch(rowState){
@@ -189,6 +198,37 @@ namespace
 		case SHOP_AMMO_STATE::e_TOO_EXPENSIVE: return L"NEED MORE";
 		}
 		return L"";
+	}
+
+	// 強化の購入の状態に応じた、ボタンの文字を返す。強化できる時は、価格を添える。
+	// upgradeState: 強化の項目の購入の状態。
+	// price: 次の段階へ上げる価格。
+	std::wstring GetUpgradeButtonLabel(SHOP_UPGRADE_STATE upgradeState,int price)
+	{
+		switch(upgradeState){
+		case SHOP_UPGRADE_STATE::e_AVAILABLE:     return L"UP " + std::to_wstring(price);
+		case SHOP_UPGRADE_STATE::e_MAX_LEVEL:     return L"MAX LEVEL";
+		case SHOP_UPGRADE_STATE::e_TOO_EXPENSIVE: return L"NEED MORE";
+		case SHOP_UPGRADE_STATE::e_NO_WEAPON:     return L"NO WEAPON";
+		}
+		return L"";
+	}
+
+	// ボタンが、押せる状態かを返す。ページ切替と閉じるボタンは、常に押せる。
+	// buttonIndex: ボタンの添字。
+	// state: 描画する値。
+	bool IsShopButtonPressable(int buttonIndex,const GAME_HUD_STATE& state)
+	{
+		if(buttonIndex < SHOP_TABLE::ns_AMMO_BUTTON_OFFSET){
+			return IsWeaponButtonPressable(state.shopRowStates[buttonIndex]);
+		}
+		if(buttonIndex < SHOP_TABLE::ns_UPGRADE_BUTTON_OFFSET){
+			return state.shopAmmoStates[buttonIndex - SHOP_TABLE::ns_AMMO_BUTTON_OFFSET] == SHOP_AMMO_STATE::e_AVAILABLE;
+		}
+		if(buttonIndex < SHOP_TABLE::ns_SWITCH_INDEX){
+			return state.shopUpgradeStates[buttonIndex - SHOP_TABLE::ns_UPGRADE_BUTTON_OFFSET] == SHOP_UPGRADE_STATE::e_AVAILABLE;
+		}
+		return true;
 	}
 }
 
@@ -386,40 +426,51 @@ void GameHud::DrawRewardTexts(const std::array<int,REWARD_TABLE::ns_CARD_COUNT>&
 	}
 }
 
-// ショップのパネルと、ボタンの画像を描く。
+// ショップのパネルと、現在のページのボタンの画像を描く。
 void GameHud::DrawShopSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 {
 	// パネルを先に描く。
 	m_spriteRenderer.DrawSprite(graphicsSystem,m_shopPanelTexture,SHOP_LAYOUT::ns_PANEL.position,SHOP_LAYOUT::ns_PANEL.size,ns_WHITE,1.0f);
 
-	// 全てのボタンを、武器、弾薬の購入、閉じるボタンの順に描く。押せないボタンは、押せない時の画像にする。押せるボタンは、カーソルが乗っていればホバー用の画像にする。
+	// 現在のページのボタンだけを、添字の順に描く。押せないボタンは、押せない時の画像にする。押せるボタンは、カーソルが乗っていればホバー用の画像にする。
 	for(int button_index = 0; button_index < SHOP_LAYOUT::ns_BUTTON_COUNT; ++button_index){
-		// ボタンの種類ごとに、押せる状態かを調べる。閉じるボタンは、常に押せる。
-		bool is_pressable = true;
-		if(button_index < SHOP_TABLE::ns_AMMO_BUTTON_OFFSET){
-			is_pressable = IsWeaponButtonPressable(state.shopRowStates[button_index]);
-		}
-		else if(button_index < SHOP_TABLE::ns_CLOSE_INDEX){
-			is_pressable = state.shopAmmoStates[button_index - SHOP_TABLE::ns_AMMO_BUTTON_OFFSET] == SHOP_AMMO_STATE::e_AVAILABLE;
-		}
+		if(!SHOP_TABLE::IsButtonOnPage(button_index,state.shopPage))continue;
 
 		HudTextureHandle button_texture = m_shopButtonDisabledTexture;
-		if(is_pressable){
+		if(IsShopButtonPressable(button_index,state)){
 			button_texture = (button_index == state.hoveredShopIndex) ? m_shopButtonHoverTexture : m_shopButtonTexture;
 		}
 		m_spriteRenderer.DrawSprite(graphicsSystem,button_texture,SHOP_LAYOUT::ns_BUTTON_POSITIONS[button_index],SHOP_LAYOUT::ns_BUTTON_SIZE,ns_WHITE,1.0f);
 	}
 }
 
-// ショップの文字を描く。
+// ショップの文字を、現在のページに応じて描く。
 void GameHud::DrawShopTexts(const GAME_HUD_STATE& state)
+{
+	// 現在のページの文字を描く。
+	if(state.shopPage == SHOP_PAGE::e_TRADE){
+		DrawShopTradeTexts(state);
+	}
+	else{
+		DrawShopUpgradeTexts(state);
+	}
+
+	// ページ切替と閉じるボタンの文字は、どちらのページでも描く。切替ボタンは、行き先のページの名前にする。
+	DrawFittedText(state.shopPage == SHOP_PAGE::e_TRADE ? L"UPGRADES" : L"BACK",SHOP_LAYOUT::ns_BUTTON_POSITIONS[SHOP_TABLE::ns_SWITCH_INDEX],
+								 SHOP_LAYOUT::ns_BUTTON_SIZE,ns_SHOP_BUTTON_TEXT_TARGET_HEIGHT,ns_SHOP_BUTTON_TEXT_COLOR);
+	DrawFittedText(L"CLOSE",SHOP_LAYOUT::ns_BUTTON_POSITIONS[SHOP_TABLE::ns_CLOSE_INDEX],SHOP_LAYOUT::ns_BUTTON_SIZE,ns_SHOP_BUTTON_TEXT_TARGET_HEIGHT,
+								 ns_SHOP_BUTTON_TEXT_COLOR);
+}
+
+// 売買のページの文字を描く。
+void GameHud::DrawShopTradeTexts(const GAME_HUD_STATE& state)
 {
 	// 見出しと、所持数（上限との比）と、操作の案内を描く。
 	DrawFittedText(L"SHOP",ns_SHOP_TITLE_AREA_POSITION,ns_SHOP_TITLE_AREA_SIZE,ns_SHOP_TITLE_TARGET_HEIGHT,ns_REWARD_TITLE_COLOR);
 	DrawFittedText(L"SLOTS " + std::to_wstring(state.ownedWeaponCount) + L" / " + std::to_wstring(WEAPON_INVENTORY_TABLE::ns_MAX_WEAPONS),
-								 ns_SHOP_SLOTS_AREA_POSITION,ns_SHOP_SLOTS_AREA_SIZE,ns_SHOP_SLOTS_TARGET_HEIGHT,ns_REWARD_BODY_COLOR);
-	DrawFittedText(L"CLICK  (OR 1-3: WEAPON  4-6: AMMO)    SELL: PRESS TWICE    ENTER: CLOSE",ns_SHOP_GUIDE_AREA_POSITION,ns_SHOP_GUIDE_AREA_SIZE,
-								 ns_SHOP_GUIDE_TARGET_HEIGHT,ns_REWARD_BODY_COLOR);
+								 ns_SHOP_INFO_AREA_POSITION,ns_SHOP_INFO_AREA_SIZE,ns_SHOP_INFO_TARGET_HEIGHT,ns_REWARD_BODY_COLOR);
+	DrawFittedText(L"CLICK  (1-3: WEAPON  4-6: AMMO)   SELL: PRESS TWICE   U: UPGRADES   ENTER: CLOSE",ns_SHOP_GUIDE_AREA_POSITION,
+								 ns_SHOP_GUIDE_AREA_SIZE,ns_SHOP_GUIDE_TARGET_HEIGHT,ns_REWARD_BODY_COLOR);
 
 	// 各行の武器名・予備弾薬・2つのボタンの文字を描く。予備弾薬は、装備している武器の行にだけ、「RESERVE 現在 / 上限」の形で表示する。
 	for(int row_index = 0; row_index < SHOP_TABLE::ns_ROW_COUNT; ++row_index){
@@ -436,7 +487,7 @@ void GameHud::DrawShopTexts(const GAME_HUD_STATE& state)
 		const SHOP_ROW_STATE row_state = state.shopRowStates[row_index];
 		const XMVECTORF32& weapon_text_color = row_state == SHOP_ROW_STATE::e_SELL_CONFIRM ? ns_SHOP_BUTTON_CONFIRM_TEXT_COLOR
 			: (IsWeaponButtonPressable(row_state) ? ns_SHOP_BUTTON_TEXT_COLOR : ns_SHOP_BUTTON_DISABLED_TEXT_COLOR);
-		DrawFittedText(GetWeaponButtonLabel(row_state,SHOP_TABLE::ns_WEAPON_PRICES[row_index],SHOP_TABLE::ns_WEAPON_SELL_PRICES[row_index]),
+		DrawFittedText(GetWeaponButtonLabel(row_state,SHOP_TABLE::ns_WEAPON_PRICES[row_index],state.shopSellPrices[row_index]),
 									 SHOP_LAYOUT::ns_BUTTON_POSITIONS[row_index],SHOP_LAYOUT::ns_BUTTON_SIZE,ns_SHOP_BUTTON_TEXT_TARGET_HEIGHT,weapon_text_color);
 
 		// 弾薬の購入ボタンの文字。購入できる時だけ白、他は灰色。
@@ -445,8 +496,29 @@ void GameHud::DrawShopTexts(const GAME_HUD_STATE& state)
 									 SHOP_LAYOUT::ns_BUTTON_POSITIONS[SHOP_TABLE::ns_AMMO_BUTTON_OFFSET + row_index],SHOP_LAYOUT::ns_BUTTON_SIZE,
 									 ns_SHOP_BUTTON_TEXT_TARGET_HEIGHT,ammo_state == SHOP_AMMO_STATE::e_AVAILABLE ? ns_SHOP_BUTTON_TEXT_COLOR : ns_SHOP_BUTTON_DISABLED_TEXT_COLOR);
 	}
+}
 
-	// 閉じるボタンの文字を描く。
-	DrawFittedText(L"CLOSE",SHOP_LAYOUT::ns_BUTTON_POSITIONS[SHOP_TABLE::ns_CLOSE_INDEX],SHOP_LAYOUT::ns_BUTTON_SIZE,ns_SHOP_BUTTON_TEXT_TARGET_HEIGHT,
-								 ns_SHOP_BUTTON_TEXT_COLOR);
+// 強化のページの文字を描く。
+void GameHud::DrawShopUpgradeTexts(const GAME_HUD_STATE& state)
+{
+	// 見出しと、強化の対象（装備中の武器）の名前を描く。装備中の武器が判別できない場合は、名前を描かない。
+	DrawFittedText(L"UPGRADE",ns_SHOP_TITLE_AREA_POSITION,ns_SHOP_TITLE_AREA_SIZE,ns_SHOP_TITLE_TARGET_HEIGHT,ns_REWARD_TITLE_COLOR);
+	if(state.equippedWeaponIndex >= 0 && state.equippedWeaponIndex < SHOP_TABLE::ns_ROW_COUNT){
+		DrawFittedText(SHOP_TABLE::ns_WEAPON_NAMES[state.equippedWeaponIndex],ns_SHOP_INFO_AREA_POSITION,ns_SHOP_INFO_AREA_SIZE,ns_SHOP_INFO_TARGET_HEIGHT,
+									 ns_CURRENCY_TEXT_COLOR);
+	}
+
+	// 各項目の名前と段階、強化のボタンの文字を描く。強化できる時は、次の段階の価格を添える。
+	for(int item_index = 0; item_index < SHOP_TABLE::ns_UPGRADE_COUNT; ++item_index){
+		const float row_top = SHOP_LAYOUT::ns_UPGRADE_ROW_TOP + SHOP_LAYOUT::ns_UPGRADE_ROW_STEP * static_cast<float>(item_index);
+		const int level = state.shopUpgradeLevels[item_index];
+		DrawFittedText(std::wstring{WEAPON_UPGRADE_TABLE::ns_ITEM_NAMES[item_index]} + L"   LV " + std::to_wstring(level) + L" / " +
+									 std::to_wstring(WEAPON_UPGRADE_TABLE::ns_MAX_LEVEL),XMFLOAT2{ns_SHOP_UPGRADE_NAME_AREA_X,row_top},
+									 XMFLOAT2{ns_SHOP_UPGRADE_NAME_AREA_WIDTH,SHOP_LAYOUT::ns_UPGRADE_ROW_HEIGHT},ns_SHOP_UPGRADE_NAME_TARGET_HEIGHT,ns_REWARD_BODY_COLOR);
+
+		const SHOP_UPGRADE_STATE upgrade_state = state.shopUpgradeStates[item_index];
+		DrawFittedText(GetUpgradeButtonLabel(upgrade_state,WEAPON_UPGRADE_TABLE::GetPrice(item_index,level)),
+									 SHOP_LAYOUT::ns_BUTTON_POSITIONS[SHOP_TABLE::ns_UPGRADE_BUTTON_OFFSET + item_index],SHOP_LAYOUT::ns_BUTTON_SIZE,
+									 ns_SHOP_BUTTON_TEXT_TARGET_HEIGHT,upgrade_state == SHOP_UPGRADE_STATE::e_AVAILABLE ? ns_SHOP_BUTTON_TEXT_COLOR : ns_SHOP_BUTTON_DISABLED_TEXT_COLOR);
+	}
 }

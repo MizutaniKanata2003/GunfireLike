@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// ゲーム中のHUD（照準・HPバー・弾薬・リロード表示・回復アイテム数・通貨・低HP警告）と、報酬選択のカード、ショップ（武器と弾薬の購入画面）を、画像と文字で描画する。
+// ゲーム中のHUD（照準・HPバー・弾薬・リロード表示・回復アイテム数・通貨・低HP警告）と、報酬選択のカード、ショップ（武器と弾薬の購入・売却・強化の画面）を、画像と文字で描画する。
 // 画像の配置はUiLayoutの表から読み、描画する値はGAME_HUD_STATEとして受け取る。値の決定・ゲームの進行・クリックの判定は担当しない。
 
 //========= C++標準ライブラリ インクルード=========
@@ -13,7 +13,7 @@
 
 //========= Scene インクルード=========
 #include "Scene/Common/Reward/H/RewardController.h" // 報酬の表（見出し・説明）と、カードの数を使用する。
-#include "Scene/Common/Shop/H/ShopController.h"    // ショップの表（価格・名前・弾薬の上限）と、行の状態を使用する。
+#include "Scene/Common/Shop/H/ShopController.h"    // ショップの表（価格・名前・弾薬の上限）と、ページ・行の状態を使用する。
 
 //========= 前方宣言=========
 class GraphicsSystem;
@@ -60,15 +60,23 @@ struct GAME_HUD_STATE
 	//========= ショップ=========
 	// ショップが開いているか。trueなら、画面を暗くして、購入パネルを描く。
 	bool isShopOpen{};
-	// カーソルが乗っているボタンの添字。乗っていなければ-1。武器の購入、弾薬の購入、閉じるボタンの順。
+	// ショップの現在のページ。売買か、強化か。
+	SHOP_PAGE shopPage{SHOP_PAGE::e_TRADE};
+	// カーソルが乗っているボタンの添字。乗っていなければ-1。武器、弾薬の購入、強化、ページ切替、閉じるボタンの順。
 	int hoveredShopIndex{-1};
-	// 武器の行ごとの購入の状態。添字は、武器の種類（WEAPON_TYPE）の値と同じ。ボタンの文字と画像を決める。
+	// 武器の行ごとの購入と売却の状態。添字は、武器の種類（WEAPON_TYPE）の値と同じ。ボタンの文字と画像を決める。
 	std::array<SHOP_ROW_STATE,SHOP_TABLE::ns_ROW_COUNT> shopRowStates{};
+	// 武器の行ごとの、売却した時に得る通貨。添字は、武器の種類の値と同じ。
+	std::array<int,SHOP_TABLE::ns_ROW_COUNT> shopSellPrices{};
 	// 弾薬の行ごとの購入の状態。添字は、武器の種類の値と同じ。ボタンの文字と画像を決める。
 	std::array<SHOP_AMMO_STATE,SHOP_TABLE::ns_ROW_COUNT> shopAmmoStates{};
-	// 所持している武器の数。パネルの右上に「SLOTS 数 / 上限」の形で表示する。
+	// 強化の項目ごとの購入の状態。添字は、強化の項目の添字と同じ。
+	std::array<SHOP_UPGRADE_STATE,SHOP_TABLE::ns_UPGRADE_COUNT> shopUpgradeStates{};
+	// 装備中の武器の、強化の項目ごとの段階。添字は、強化の項目の添字と同じ。
+	std::array<int,SHOP_TABLE::ns_UPGRADE_COUNT> shopUpgradeLevels{};
+	// 所持している武器の数。売買のページの右上に「SLOTS 数 / 上限」の形で表示する。
 	int ownedWeaponCount{};
-	// 装備している武器の種類の値（表の添字）。その行に、予備弾薬の数を表示する。判別できない場合は-1。
+	// 装備している武器の種類の値（表の添字）。その行に予備弾薬の数を、強化のページの右上に武器名を表示する。判別できない場合は-1。
 	int equippedWeaponIndex{-1};
 };
 
@@ -106,13 +114,19 @@ private:
 	// 報酬選択の文字（見出し・各カードの見出しと説明と取得数・操作の案内）を描く。Begin・Endの間に呼ぶ。
 	// ownedCounts: 報酬ごとの取得数。
 	void DrawRewardTexts(const std::array<int,REWARD_TABLE::ns_CARD_COUNT>& ownedCounts);
-	// ショップのパネルと、ボタンの画像を描く。押せるボタンは、カーソルが乗っていればホバー用の画像で、押せないボタンは、押せない時の画像で描く。
+	// ショップのパネルと、現在のページのボタンの画像を描く。押せるボタンは、カーソルが乗っていればホバー用の画像で、押せないボタンは、押せない時の画像で描く。
 	// graphicsSystem: 描画基盤。
 	// state: 描画する値。ショップの項目を使う。
 	void DrawShopSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state);
-	// ショップの文字（見出し・所持数・各行の武器名と予備弾薬・ボタンの文字・操作の案内）を描く。Begin・Endの間に呼ぶ。
+	// ショップの文字を、現在のページに応じて描く。Begin・Endの間に呼ぶ。ページ切替と閉じるボタンの文字は、どちらのページでも描く。
 	// state: 描画する値。ショップの項目を使う。
 	void DrawShopTexts(const GAME_HUD_STATE& state);
+	// 売買のページの文字（見出し・所持数・各行の武器名と予備弾薬・武器と弾薬のボタンの文字・操作の案内）を描く。Begin・Endの間に呼ぶ。
+	// state: 描画する値。ショップの項目を使う。
+	void DrawShopTradeTexts(const GAME_HUD_STATE& state);
+	// 強化のページの文字（見出し・装備中の武器名・各項目の名前と段階・強化のボタンの文字）を描く。Begin・Endの間に呼ぶ。
+	// state: 描画する値。ショップの項目を使う。
+	void DrawShopUpgradeTexts(const GAME_HUD_STATE& state);
 
 	//========= 描画Renderer=========
 	// 画像を矩形で描画するRenderer。

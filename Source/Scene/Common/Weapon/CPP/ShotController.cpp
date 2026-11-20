@@ -116,7 +116,7 @@ void ShotController::Update(float gameplayDeltaTime)
 	}
 
 	// 敵レイヤーに命中した場合だけ、Colliderの識別値からダメージを与える相手を探す。
-	// ダメージは、使用中の武器の値に、ジャスト回避の後の増加（回避反撃）と、敵に付いた印（殴打追撃）の倍率を掛け、怯み時間は、制圧射撃の倍率を掛ける。
+	// ダメージは、使用中の武器の値（強化を含む）に、ジャスト回避の後の増加（回避反撃）と、敵に付いた印（殴打追撃）の倍率を掛け、怯み時間は、制圧射撃の倍率を掛ける。
 	if(weapon_result.didHit && weapon_result.hitInfo.layer == COLLISION_LAYER::ns_ENEMY){
 		Enemy* const hit_enemy = m_enemyManager->FindLivingEnemy(weapon_result.hitInfo.userData);
 		// 対応する生存中の敵が見つかった場合だけ、ダメージと命中表示を反映する。
@@ -136,24 +136,33 @@ void ShotController::UpdateHitMarker(float deltaTime)
 }
 
 //========= 武器の装備関数=========
-// 武器の性能値とカメラの反動の設定を切り替える。
+// 表の基本の性能値で、武器を装備する。
 void ShotController::EquipWeapon(WEAPON_TYPE weaponType)
 {
 	// 表の範囲外の種類は装備しない。通常は、呼出側が範囲内の値を渡す。
 	const int weapon_index = static_cast<int>(weaponType);
 	if(weapon_index < 0 || weapon_index >= WEAPON_TABLE::ns_WEAPON_COUNT)return;
 
+	EquipWeapon(weaponType,WEAPON_TABLE::ns_WEAPONS[weapon_index]);
+}
+
+// 指定した性能値で、武器を装備する。
+void ShotController::EquipWeapon(WEAPON_TYPE weaponType,const WEAPON_DATA& weaponData)
+{
+	// 表の範囲外の種類は装備しない。通常は、呼出側が範囲内の値を渡す。
+	const int weapon_index = static_cast<int>(weaponType);
+	if(weapon_index < 0 || weapon_index >= WEAPON_TABLE::ns_WEAPON_COUNT)return;
+
 	// 弾薬を消費しないデバッグ設定は、武器を切り替えても引き継ぐ。Initializeは、この設定を無効へ戻すため、切替の前の状態を覚えて、戻す。
-	const WEAPON_DATA& weapon_data = WEAPON_TABLE::ns_WEAPONS[weapon_index];
 	const bool was_infinite_ammo = m_weaponSystem.IsInfiniteAmmoEnabled();
-	m_weaponSystem.Initialize(weapon_data);
+	m_weaponSystem.Initialize(weaponData);
 	if(was_infinite_ammo){
 		m_weaponSystem.ToggleInfiniteAmmo();
 	}
 
-	// 参照先の登録後なら、新しい武器の反動の設定を、カメラへ渡す。登録の前（Reset）では、Initializeが渡す。
+	// 参照先の登録後なら、この武器の反動の設定を、カメラへ渡す。登録の前（Reset）では、Initializeが渡す。
 	if(m_camera != nullptr){
-		m_camera->SetRecoilProfile(weapon_data.recoilProfile);
+		m_camera->SetRecoilProfile(weaponData.recoilProfile);
 	}
 }
 
