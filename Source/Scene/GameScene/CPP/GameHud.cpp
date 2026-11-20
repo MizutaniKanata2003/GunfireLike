@@ -1,11 +1,11 @@
 ﻿#include "../H/GameHud.h"
 
-// HUDの画像の読込・描画と、弾薬・リロード・回復アイテム数・通貨・報酬選択の文字の描画を実装する。
+// HUDの画像の読込・描画と、弾薬・リロード・回復アイテム数・通貨の文字、報酬選択のカードの描画を実装する。
 // 画像の配置は表から読み、状態に応じた拡縮・色・表示割合・文字の大きさだけをこのファイルで決める。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::clampでHPの割合を0〜1へ制限し、std::minで文字の拡大率を領域に収まる値に制限する。
-#include <string> // std::to_wstringで弾薬数・進み具合・通貨の数字を文字列へ変換し、結合する。
+#include <string> // std::to_wstringで弾薬数・進み具合・通貨・取得数の数字を文字列へ変換し、結合する。
 
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/GraphicsSystem.h"
@@ -39,10 +39,10 @@ namespace
 	const XMVECTORF32 ns_HEAL_TEXT_COLOR{{{0.8f,1.0f,0.8f,1.0f}}};
 	// 通貨の数字の色。金色。通貨のアイコンの色に合わせる。
 	const XMVECTORF32 ns_CURRENCY_TEXT_COLOR{{{1.0f,0.85f,0.3f,1.0f}}};
-	// 報酬選択の表示の文字の色。金色。
-	const XMVECTORF32 ns_REWARD_TEXT_COLOR{{{1.0f,0.85f,0.3f,1.0f}}};
-	// 報酬選択の操作案内の文字の色。白。
-	const XMVECTORF32 ns_REWARD_GUIDE_TEXT_COLOR{{{1.0f,1.0f,1.0f,1.0f}}};
+	// 報酬選択の見出しと、カードの見出しの文字の色。金色。
+	const XMVECTORF32 ns_REWARD_TITLE_COLOR{{{1.0f,0.85f,0.3f,1.0f}}};
+	// 報酬選択のカードの説明・取得数・操作の案内の文字の色。白に近い色。
+	const XMVECTORF32 ns_REWARD_BODY_COLOR{{{0.92f,0.92f,0.92f,1.0f}}};
 
 	//========= 弾薬の文字の配置=========
 	// 弾薬の枠の左端から、数字を置く領域の左端までの距離。基準Canvas上の大きさ。左側の弾のアイコンを避けるための値。
@@ -74,19 +74,39 @@ namespace
 	// 通貨の数字を置く領域の右端と、アイコンの左端との間の余白。基準Canvas上の大きさ。
 	constexpr float ns_CURRENCY_TEXT_GAP = 8.0f;
 
-	//========= 報酬選択の表示の配置=========
-	// 報酬選択の見出しを置く領域の左上の位置。基準Canvas上の座標。画面中央（640,360）の少し上へ、横幅いっぱいの領域を置く。
-	const XMFLOAT2 ns_REWARD_TITLE_AREA_POSITION{240.0f,230.0f};
-	// 報酬選択の見出しを置く領域の大きさ。基準Canvas上の大きさ。
+	//========= 報酬選択の文字の配置（画面全体）=========
+	// 見出しを置く領域の左上の位置。基準Canvas上の座標。カードの上の余白（0〜150）へ置く。
+	const XMFLOAT2 ns_REWARD_TITLE_AREA_POSITION{240.0f,30.0f};
+	// 見出しを置く領域の大きさ。基準Canvas上の大きさ。
 	const XMFLOAT2 ns_REWARD_TITLE_AREA_SIZE{800.0f,90.0f};
-	// 報酬選択の見出しの高さの目標。基準Canvas上の大きさ。
-	constexpr float ns_REWARD_TITLE_TARGET_HEIGHT = 72.0f;
-	// 報酬選択の操作案内を置く領域の左上の位置。基準Canvas上の座標。見出しの真下に置く。
-	const XMFLOAT2 ns_REWARD_GUIDE_AREA_POSITION{240.0f,330.0f};
-	// 報酬選択の操作案内を置く領域の大きさ。基準Canvas上の大きさ。
+	// 見出しの高さの目標。基準Canvas上の大きさ。
+	constexpr float ns_REWARD_TITLE_TARGET_HEIGHT = 64.0f;
+	// 操作の案内を置く領域の左上の位置。基準Canvas上の座標。カードの下（630〜）へ置く。
+	const XMFLOAT2 ns_REWARD_GUIDE_AREA_POSITION{240.0f,645.0f};
+	// 操作の案内を置く領域の大きさ。基準Canvas上の大きさ。
 	const XMFLOAT2 ns_REWARD_GUIDE_AREA_SIZE{800.0f,50.0f};
-	// 報酬選択の操作案内の高さの目標。基準Canvas上の大きさ。
-	constexpr float ns_REWARD_GUIDE_TARGET_HEIGHT = 32.0f;
+	// 操作の案内の高さの目標。基準Canvas上の大きさ。
+	constexpr float ns_REWARD_GUIDE_TARGET_HEIGHT = 28.0f;
+
+	//========= 報酬選択の文字の配置（カードの中）=========
+	// カードの左上から、見出しの領域の左上までの距離。基準Canvas上の大きさ。カードの幅（360）の内側へ、左右20ずつの余白を取る。
+	const XMFLOAT2 ns_CARD_TITLE_OFFSET{20.0f,28.0f};
+	// 見出しの領域の大きさ。基準Canvas上の大きさ。
+	const XMFLOAT2 ns_CARD_TITLE_SIZE{320.0f,56.0f};
+	// 見出しの高さの目標。基準Canvas上の大きさ。
+	constexpr float ns_CARD_TITLE_TARGET_HEIGHT = 30.0f;
+	// カードの左上から、説明の領域の左上までの距離。基準Canvas上の大きさ。
+	const XMFLOAT2 ns_CARD_DESCRIPTION_OFFSET{20.0f,130.0f};
+	// 説明の領域の大きさ。基準Canvas上の大きさ。複数行を、この領域の中央へ置く。
+	const XMFLOAT2 ns_CARD_DESCRIPTION_SIZE{320.0f,190.0f};
+	// 説明（複数行全体）の高さの目標。基準Canvas上の大きさ。
+	constexpr float ns_CARD_DESCRIPTION_TARGET_HEIGHT = 110.0f;
+	// カードの左上から、取得数の領域の左上までの距離。基準Canvas上の大きさ。
+	const XMFLOAT2 ns_CARD_OWNED_OFFSET{20.0f,400.0f};
+	// 取得数の領域の大きさ。基準Canvas上の大きさ。
+	const XMFLOAT2 ns_CARD_OWNED_SIZE{320.0f,50.0f};
+	// 取得数の高さの目標。基準Canvas上の大きさ。
+	constexpr float ns_CARD_OWNED_TARGET_HEIGHT = 26.0f;
 }
 
 //========= 初期化・描画関数=========
@@ -115,6 +135,9 @@ bool GameHud::Initialize(GraphicsSystem& graphicsSystem)
 	m_ammoFrameTexture = m_spriteRenderer.LoadTexture(graphicsSystem,HUD_LAYOUT::ns_AMMO_FRAME.texturePath);
 	m_currencyIconTexture = m_spriteRenderer.LoadTexture(graphicsSystem,HUD_LAYOUT::ns_CURRENCY_ICON.texturePath);
 	m_lowHpWarningTexture = m_spriteRenderer.LoadTexture(graphicsSystem,HUD_LAYOUT::ns_LOW_HP_WARNING.texturePath);
+	m_rewardBackdropTexture = m_spriteRenderer.LoadTexture(graphicsSystem,REWARD_LAYOUT::ns_BACKDROP.texturePath);
+	m_rewardCardTexture = m_spriteRenderer.LoadTexture(graphicsSystem,REWARD_LAYOUT::ns_CARD_FRAME_PATH);
+	m_rewardCardHoverTexture = m_spriteRenderer.LoadTexture(graphicsSystem,REWARD_LAYOUT::ns_CARD_FRAME_HOVER_PATH);
 	return true;
 }
 
@@ -125,7 +148,13 @@ void GameHud::Draw(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 	const bool has_health = state.maxHP > 0.0f;
 	const float health_ratio = has_health ? std::clamp(state.currentHP / state.maxHP,0.0f,1.0f) : 0.0f;
 
-	// HPの割合が低HPの閾値以下なら、画面全体の警告を最初に描き、他のHUDがその上に重なるようにする。
+	// 報酬選択中は、画面全体を暗くする背景を最初に描き、他のHUDとカードがその上に重なるようにする。
+	if(state.isRewardSelecting){
+		m_spriteRenderer.DrawSprite(graphicsSystem,m_rewardBackdropTexture,REWARD_LAYOUT::ns_BACKDROP.position,REWARD_LAYOUT::ns_BACKDROP.size,
+																ns_WHITE,1.0f);
+	}
+
+	// HPの割合が低HPの閾値以下なら、画面全体の警告を描き、他のHUDがその上に重なるようにする。
 	if(has_health && health_ratio <= ns_LOW_HP_RATIO){
 		m_spriteRenderer.DrawSprite(graphicsSystem,m_lowHpWarningTexture,HUD_LAYOUT::ns_LOW_HP_WARNING.position,
 																HUD_LAYOUT::ns_LOW_HP_WARNING.size,ns_WHITE,1.0f);
@@ -148,6 +177,11 @@ void GameHud::Draw(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 	// 弾薬の枠と、通貨のアイコンを描く。数字は、画像の後に文字として描く。
 	m_spriteRenderer.DrawSprite(graphicsSystem,m_ammoFrameTexture,HUD_LAYOUT::ns_AMMO_FRAME.position,HUD_LAYOUT::ns_AMMO_FRAME.size,ns_WHITE,1.0f);
 	m_spriteRenderer.DrawSprite(graphicsSystem,m_currencyIconTexture,HUD_LAYOUT::ns_CURRENCY_ICON.position,HUD_LAYOUT::ns_CURRENCY_ICON.size,ns_WHITE,1.0f);
+
+	// 報酬選択中は、他の画像の後に、カードの枠を描く。文字は、次の文字の描画で、カードの上に重ねる。
+	if(state.isRewardSelecting){
+		DrawRewardCards(graphicsSystem,state.hoveredRewardIndex);
+	}
 
 	// 文字を描く。装填弾数と予備弾薬を「装填 / 予備」の形で枠の右側へ、リロード中なら進み具合を枠の真上へ描く。
 	m_textRenderer.Begin();
@@ -177,10 +211,9 @@ void GameHud::Draw(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 									 ns_RELOAD_TEXT_COLOR);
 	}
 
-	// 報酬選択の最中だけ、画面中央に、見出しと、選び終える操作の案内を描く。報酬のカードは、E3で追加する。
+	// 報酬選択中は、カードの文字を、最後に重ねて描く。
 	if(state.isRewardSelecting){
-		DrawFittedText(L"REWARD",ns_REWARD_TITLE_AREA_POSITION,ns_REWARD_TITLE_AREA_SIZE,ns_REWARD_TITLE_TARGET_HEIGHT,ns_REWARD_TEXT_COLOR);
-		DrawFittedText(L"PRESS ENTER",ns_REWARD_GUIDE_AREA_POSITION,ns_REWARD_GUIDE_AREA_SIZE,ns_REWARD_GUIDE_TARGET_HEIGHT,ns_REWARD_GUIDE_TEXT_COLOR);
+		DrawRewardTexts(state.rewardOwnedCounts);
 	}
 	m_textRenderer.End();
 }
@@ -197,6 +230,9 @@ void GameHud::Uninit()
 	m_ammoFrameTexture = 0;
 	m_currencyIconTexture = 0;
 	m_lowHpWarningTexture = 0;
+	m_rewardBackdropTexture = 0;
+	m_rewardCardTexture = 0;
+	m_rewardCardHoverTexture = 0;
 }
 
 //========= 補助関数=========
@@ -204,7 +240,7 @@ void GameHud::Uninit()
 void GameHud::DrawFittedText(const std::wstring& text,const XMFLOAT2& areaPosition,const XMFLOAT2& areaSize,float targetHeight,
 														 const XMVECTORF32& color)
 {
-	// 文字を拡大率1で測った幅と高さ。Font未生成や空文字列では0になる。
+	// 文字を拡大率1で測った幅と高さ。Font未生成や空文字列では0になる。改行を含む文字列は、全行を合わせた大きさになる。
 	const XMFLOAT2 base_size = m_textRenderer.MeasureText(text,1.0f);
 	// 測った幅か高さが0以下なら、拡大率を求められない（0除算になる）ため、何も描かずに戻る。
 	if(base_size.x <= 0.0f || base_size.y <= 0.0f)return;
@@ -218,4 +254,37 @@ void GameHud::DrawFittedText(const std::wstring& text,const XMFLOAT2& areaPositi
 	const XMFLOAT2 text_size{base_size.x * text_scale,base_size.y * text_scale};
 	const XMFLOAT2 text_position{areaPosition.x + (areaSize.x - text_size.x) * 0.5f,areaPosition.y + (areaSize.y - text_size.y) * 0.5f};
 	m_textRenderer.DrawText(text,text_position,color,text_scale);
+}
+
+// 報酬のカードの枠を、カードの数だけ描く。
+void GameHud::DrawRewardCards(GraphicsSystem& graphicsSystem,int hoveredIndex)
+{
+	// 全てのカードを左から順に描く。カーソルが乗っているカードだけ、ホバー用の画像にする。
+	for(int card_index = 0; card_index < REWARD_LAYOUT::ns_CARD_COUNT; ++card_index){
+		const HudTextureHandle card_texture = (card_index == hoveredIndex) ? m_rewardCardHoverTexture : m_rewardCardTexture;
+		m_spriteRenderer.DrawSprite(graphicsSystem,card_texture,REWARD_LAYOUT::ns_CARD_POSITIONS[card_index],REWARD_LAYOUT::ns_CARD_SIZE,ns_WHITE,1.0f);
+	}
+}
+
+// 報酬選択の文字を描く。
+void GameHud::DrawRewardTexts(const std::array<int,REWARD_TABLE::ns_CARD_COUNT>& ownedCounts)
+{
+	// 画面の見出しと、操作の案内を描く。
+	DrawFittedText(L"REWARD",ns_REWARD_TITLE_AREA_POSITION,ns_REWARD_TITLE_AREA_SIZE,ns_REWARD_TITLE_TARGET_HEIGHT,ns_REWARD_TITLE_COLOR);
+	DrawFittedText(L"CLICK A CARD  (OR PRESS 1 / 2 / 3)",ns_REWARD_GUIDE_AREA_POSITION,ns_REWARD_GUIDE_AREA_SIZE,ns_REWARD_GUIDE_TARGET_HEIGHT,
+								 ns_REWARD_BODY_COLOR);
+
+	// 各カードの見出し・説明・取得数を、カードの左上からの距離で配置して描く。
+	for(int card_index = 0; card_index < REWARD_LAYOUT::ns_CARD_COUNT; ++card_index){
+		const XMFLOAT2& card_position = REWARD_LAYOUT::ns_CARD_POSITIONS[card_index];
+		const REWARD_TABLE::REWARD_DEFINITION& reward = REWARD_TABLE::ns_REWARDS[card_index];
+
+		DrawFittedText(reward.title,XMFLOAT2{card_position.x + ns_CARD_TITLE_OFFSET.x,card_position.y + ns_CARD_TITLE_OFFSET.y},ns_CARD_TITLE_SIZE,
+									 ns_CARD_TITLE_TARGET_HEIGHT,ns_REWARD_TITLE_COLOR);
+		DrawFittedText(reward.description,XMFLOAT2{card_position.x + ns_CARD_DESCRIPTION_OFFSET.x,card_position.y + ns_CARD_DESCRIPTION_OFFSET.y},
+									 ns_CARD_DESCRIPTION_SIZE,ns_CARD_DESCRIPTION_TARGET_HEIGHT,ns_REWARD_BODY_COLOR);
+		DrawFittedText(L"OWNED x" + std::to_wstring(ownedCounts[card_index]),
+									 XMFLOAT2{card_position.x + ns_CARD_OWNED_OFFSET.x,card_position.y + ns_CARD_OWNED_OFFSET.y},ns_CARD_OWNED_SIZE,
+									 ns_CARD_OWNED_TARGET_HEIGHT,ns_REWARD_BODY_COLOR);
+	}
 }

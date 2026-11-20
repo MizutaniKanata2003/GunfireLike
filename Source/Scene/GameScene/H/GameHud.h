@@ -1,14 +1,18 @@
 ﻿#pragma once
 
-// ゲーム中のHUD（照準・HPバー・弾薬・リロード表示・回復アイテム数・通貨・報酬選択の表示・低HP警告）を、画像と文字で描画する。
-// 画像の配置はUiLayoutの表から読み、描画する値はGAME_HUD_STATEとして受け取る。値の決定・ゲームの進行は担当しない。
+// ゲーム中のHUD（照準・HPバー・弾薬・リロード表示・回復アイテム数・通貨・低HP警告）と、報酬選択のカードを、画像と文字で描画する。
+// 画像の配置はUiLayoutの表から読み、描画する値はGAME_HUD_STATEとして受け取る。値の決定・ゲームの進行・カードのクリックの判定は担当しない。
 
 //========= C++標準ライブラリ インクルード=========
+#include <array> // std::arrayで、報酬ごとの取得数を固定長で受け取る。
 #include <string> // 描画する文字列を、std::wstringの参照として受け取る。
 
 //========= Framework インクルード=========
 #include "Framework/2D/H/HudSpriteRenderer.h"
 #include "Framework/2D/H/HudTextRenderer.h"
+
+//========= Scene インクルード=========
+#include "Scene/Common/Reward/H/RewardController.h" // 報酬の表（見出し・説明）と、カードの数を使用する。
 
 //========= 前方宣言=========
 class GraphicsSystem;
@@ -45,8 +49,12 @@ struct GAME_HUD_STATE
 	int currency{};
 
 	//========= 報酬選択=========
-	// 報酬選択の最中か。trueなら、画面中央に、選択中であることと、選び終える操作を表示する。報酬のカードは、E3で追加する。
+	// 報酬選択の最中か。trueなら、画面を暗くして、見出しと、報酬のカードと、操作の案内を描く。
 	bool isRewardSelecting{};
+	// カーソルが乗っているカードの添字。乗っていなければ-1。そのカードは、枠をホバー用の画像で描く。
+	int hoveredRewardIndex{-1};
+	// 報酬ごとの取得数。添字は報酬の表の並びと同じ。各カードの下に「OWNED x数」の形で表示する。
+	std::array<int,REWARD_TABLE::ns_CARD_COUNT> rewardOwnedCounts{};
 };
 
 // 画像と文字でHUDを描画するクラス。
@@ -59,7 +67,7 @@ public:
 	// 戻り値: 全ての初期化と読込に成功すればtrue。失敗した場合は、部分Resourceを解放してfalse。
 	// COMの初期化は呼出側が済ませておくこと。
 	[[nodiscard]] bool Initialize(GraphicsSystem& graphicsSystem);
-	// 低HP警告・照準・HPバー・弾薬の枠・通貨のアイコンの画像を描き、続けて弾薬・リロード・回復アイテム数・通貨・報酬選択の文字を描く。
+	// 画像を描き、続けて文字を描く。報酬選択中は、背景の暗幕を最初に、カードの枠を他の画像の後に描き、文字は最後に重ねる。
 	// graphicsSystem: 描画基盤。呼出前に、画面UI用のRender Pass（e_SCREEN_UI）を設定しておくこと。
 	// state: 描画する値。参照は保持しない。
 	// 画像の読込に失敗している場合、その画像は描かれない。
@@ -76,6 +84,13 @@ private:
 	// targetHeight: 文字の高さの目標。基準Canvas上の大きさ。領域の幅に収まらない場合は、幅に合わせて小さくする。
 	// color: 文字のRGBA色。
 	void DrawFittedText(const std::wstring& text,const XMFLOAT2& areaPosition,const XMFLOAT2& areaSize,float targetHeight,const XMVECTORF32& color);
+	// 報酬のカードの枠を、カードの数だけ描く。カーソルが乗っているカードは、ホバー用の画像で描く。
+	// graphicsSystem: 描画基盤。
+	// hoveredIndex: カーソルが乗っているカードの添字。乗っていなければ-1。
+	void DrawRewardCards(GraphicsSystem& graphicsSystem,int hoveredIndex);
+	// 報酬選択の文字（見出し・各カードの見出しと説明と取得数・操作の案内）を描く。Begin・Endの間に呼ぶ。
+	// ownedCounts: 報酬ごとの取得数。
+	void DrawRewardTexts(const std::array<int,REWARD_TABLE::ns_CARD_COUNT>& ownedCounts);
 
 	//========= 描画Renderer=========
 	// 画像を矩形で描画するRenderer。
@@ -96,4 +111,10 @@ private:
 	HudTextureHandle m_lowHpWarningTexture{};
 	// 通貨のアイコンの画像。
 	HudTextureHandle m_currencyIconTexture{};
+	// 報酬選択の背景（暗幕）の画像。
+	HudTextureHandle m_rewardBackdropTexture{};
+	// 報酬のカードの枠の画像（通常）。
+	HudTextureHandle m_rewardCardTexture{};
+	// 報酬のカードの枠の画像（カーソルが乗っている時）。
+	HudTextureHandle m_rewardCardHoverTexture{};
 };

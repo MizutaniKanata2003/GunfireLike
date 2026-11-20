@@ -42,3 +42,25 @@ namespace HUD_LAYOUT
 	// 画面全体を覆う、周辺が赤くなる警告。1280×720。
 	inline constexpr UI_IMAGE_LAYOUT ns_LOW_HP_WARNING{L"Assets/Textures/UI/LowHpWarning.png",{0.0f,0.0f},{1280.0f,720.0f}};
 }
+
+// 報酬選択の画像の配置をまとめる。画像は、Assets/Textures/UI/へ置く。
+namespace REWARD_LAYOUT
+{
+	//========= カードの数=========
+	// 画面に並べる報酬のカードの数。RewardControllerの報酬の表（REWARD_TABLE）の数と同じにする。
+	inline constexpr int ns_CARD_COUNT = 3;
+
+	//========= 背景=========
+	// 報酬選択の間、画面全体を暗くする半透明の背景。1280×720。
+	inline constexpr UI_IMAGE_LAYOUT ns_BACKDROP{L"Assets/Textures/UI/RewardBackdrop.png",{0.0f,0.0f},{1280.0f,720.0f}};
+
+	//========= カード=========
+	// カードの枠の画像（通常）。360×480。3枚とも同じ画像を使う。
+	inline constexpr const wchar_t* ns_CARD_FRAME_PATH = L"Assets/Textures/UI/RewardCard.png";
+	// カードの枠の画像（カーソルが乗っている時）。360×480。
+	inline constexpr const wchar_t* ns_CARD_FRAME_HOVER_PATH = L"Assets/Textures/UI/RewardCardHover.png";
+	// カード1枚の幅と高さ。基準Canvas上の大きさ。
+	inline constexpr XMFLOAT2 ns_CARD_SIZE{360.0f,480.0f};
+	// カードの左上の位置。左から順に並べ、カードの間は40。左右の余白は60ずつで、3枚が画面の中央に収まる。上下は、見出しと案内の間へ置く。
+	inline constexpr XMFLOAT2 ns_CARD_POSITIONS[ns_CARD_COUNT]{{60.0f,150.0f},{460.0f,150.0f},{860.0f,150.0f}};
+}

@@ -156,14 +156,14 @@ void Enemy::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const
 
 //========= 戦闘関数=========
 // ダメージを受けてHPを減らし、怯ませ、0以下なら死亡させる。
-bool Enemy::ApplyDamage(float damage,CollisionWorld& collisionWorld)
+bool Enemy::ApplyDamage(float damage,CollisionWorld& collisionWorld,float flinchScale)
 {
 	// すでに死亡している場合は、ダメージも怯みも与えずfalseを返す。
 	if(!m_isAlive)return false;
 
-	// HPを減らし、怯みの時間を最初から数え直す。
+	// HPを減らし、怯みの時間を、倍率を掛けた長さで最初から数え直す。
 	m_currentHP -= damage;
-	m_flinchRemainingSeconds = ns_FLINCH_SECONDS;
+	m_flinchRemainingSeconds = ns_FLINCH_SECONDS * flinchScale;
 
 	// HPが残っていれば、死亡せずに戻る。
 	if(m_currentHP > 0.0f)return false;

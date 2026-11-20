@@ -1,8 +1,9 @@
 ﻿#pragma once
 
 // 射撃の更新（弾薬・連射・リロードの進行と、命中判定の結果の反映）と、命中表示を担当する。
-// 武器1丁の状態はWeaponSystemが持ち、このクラスが所有する。弾道の終点をCollisionの可視化へ伝え、敵レイヤーへ命中した場合に、敵へダメージを与える。
+// 武器1丁の状態はWeaponSystemが持ち、このクラスが所有する。弾道の終点をCollisionの可視化へ伝え、敵レイヤーへ命中した場合に、敵へダメージと怯みを与える。
 // 武器の装備（種類の切替）を受け付ける。購入・強化・所持数の管理は担当しない。暫定の切替の入力（数字キー）だけを持つ。
+// 特殊強化の効果（敵へ与える怯み時間の倍率）は、呼出側から受け取る。強化の取得数は管理しない。
 // プレイヤーの動作の更新・視線の更新・近接攻撃・敵の行動・ヒットストップの管理は担当しない。
 
 //========= Scene インクルード=========
@@ -36,7 +37,7 @@ struct SHOT_CONTROLLER_LINKS
 	CollisionDebugView* collisionDebugView{};
 };
 
-// 射撃を更新し、命中した敵へダメージを与え、命中表示の時間を管理する。
+// 射撃を更新し、命中した敵へダメージと怯みを与え、命中表示の時間を管理する。
 class ShotController final
 {
 public:
@@ -47,11 +48,11 @@ public:
 	[[nodiscard]] bool Initialize(const SHOT_CONTROLLER_LINKS& links);
 	// 参照先を手放す。未初期化でも、繰り返しても呼出可能。
 	void Uninit();
-	// 初期武器（連射銃）を、満タンの弾薬で装備し直し、命中表示を消す。参照先は変えない。
+	// 初期武器（連射銃）を、満タンの弾薬で装備し直し、命中表示を消し、怯み時間の倍率を1.0へ戻す。参照先は変えない。
 	void Reset();
 
 	//========= 更新関数=========
-	// 暫定の武器切替の入力を処理し、射撃・リロードを更新して、弾が敵へ命中していればダメージを与える。Initialize成功後に呼ぶ。
+	// 暫定の武器切替の入力を処理し、射撃・リロードを更新して、弾が敵へ命中していればダメージと怯みを与える。Initialize成功後に呼ぶ。
 	// gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。
 	void Update(float gameplayDeltaTime);
 	// 命中表示の残り時間を進める。Captureやヒットストップに関係なく毎フレーム呼ぶ。
@@ -64,6 +65,9 @@ public:
 	void EquipWeapon(WEAPON_TYPE weaponType);
 	// デバッグ用に、弾薬を消費しない設定を切り替える。
 	void ToggleInfiniteAmmo() { m_weaponSystem.ToggleInfiniteAmmo(); }
+	// 射撃で敵へ与える怯み時間の倍率を設定する。特殊強化（制圧射撃）の効果。ResetやUninitでは引き継がないため、呼出側が毎回の更新で渡す。
+	// flinchScale: 怯み時間の倍率。1.0で通常。正の値であること。
+	void SetFlinchScale(float flinchScale) { m_flinchScale = flinchScale; }
 
 	//========= Getter関数=========
 	// 武器の読み取り専用参照を返す。HUDの弾薬・リロード表示に使う。戻り値の参照は、このControllerの寿命を超えて保持しない。
@@ -99,4 +103,6 @@ private:
 	WeaponSystem m_weaponSystem{};
 	// 直近の命中を表示する残り時間。単位は秒。0より大きい間、命中した旨を表示する。
 	float m_hitMarkerRemainingSeconds{};
+	// 射撃で敵へ与える怯み時間の倍率。1.0で通常。特殊強化（制圧射撃）で大きくなる。
+	float m_flinchScale{1.0f};
 };

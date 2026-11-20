@@ -48,6 +48,17 @@ public:
 	[[nodiscard]] int ConsumeMouseWheelDelta();
 	// FPS操作用の表示・中央固定・領域制限を要求している設定かを返す。OS操作の成功を保証する値ではない。
 	[[nodiscard]] bool IsMouseCaptureEnabled() const { return m_isMouseCaptureEnabled; }
+	// 現在のマウスカーソルの位置を、登録したWindowのクライアント座標で返す。状態を消費しない。報酬の選択など、カーソルで操作するUIが使う。
+	// 戻り値: クライアント領域の左上を原点にした位置。右向きX・下向きY、単位はpixel。領域の外では負の値や領域より大きい値になる。
+	// Windowが未登録の場合や、Win32 APIが失敗した場合は、変換されていない値を返す。成否は検証しない。
+	[[nodiscard]] POINT GetCursorClientPosition() const
+	{
+		// スクリーン座標のカーソル位置を取得し、登録したWindowのクライアント座標へ変換する。
+		POINT cursor_position{};
+		GetCursorPos(&cursor_position);
+		ScreenToClient(m_windowHandle,&cursor_position);
+		return cursor_position;
+	}
 
 	//========= マウス操作設定関数=========
 	// 設定変更時だけ差分とホイール回転量を破棄し、カーソル表示・中央固定・領域制限を切り替える。

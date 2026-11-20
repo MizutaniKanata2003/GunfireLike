@@ -1,14 +1,18 @@
 ﻿#include "../H/GameSession.h"
 
-// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
+// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択とその効果の反映、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
+
+//========= C++標準ライブラリ インクルード=========
+#include <string> // 報酬の選択をログへ記録する際に、カードの見出しを連結する。
 
 //========= Windows インクルード=========
-#include <windows.h> // VK_F1・VK_F2・VK_F4・VK_RETURNの仮想キーコードで、Capture切替・タイトルへ戻る要求・最初の部屋からの再開・報酬の選び終えるキーを指定する。
+#include <windows.h> // VK_F1・VK_F2・VK_F4・VK_LBUTTONの仮想キーコードで、Capture切替・タイトルへ戻る要求・最初の部屋からの再開・報酬カードのクリックを指定する。
 
 //========= 外部ライブラリ インクルード=========
 #include <DirectXMath.h>
 
 //========= Framework インクルード=========
+#include "Framework/2D/H/HudCanvas.h"
 #include "Framework/Audio/H/AudioSystem.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
 #include "Framework/Etc/H/InitCheck.h"
@@ -20,7 +24,7 @@
 #include "Scene/Common/Combat/H/CombatResolver.h"
 #include "Scene/Common/Combat/H/CombatTable.h"
 
-// このクラスの投影面（Clip面）の距離に使用する固定設定をまとめる。戦闘の数値はCombatTableにある。
+// このクラスの投影面（Clip面）の距離と、報酬選択の入力の補助に使用する固定設定をまとめる。戦闘の数値はCombatTableにある。
 namespace
 {
 	//========= Projection設定=========
@@ -28,6 +32,46 @@ namespace
 	constexpr float ns_NEAR_CLIP = 0.1f;
 	// View空間での遠距離Clip面の距離。単位はワールド距離単位。これより遠い物は描画されない。
 	constexpr float ns_FAR_CLIP = 1000.0f;
+
+	//========= 報酬選択の入力設定=========
+	// カードを、キーで選ぶ時の、最初のカードに対応するキー。1から順に、カードの並びと同じ。クリックが使えない場合の代わりの操作。
+	constexpr unsigned char ns_REWARD_FIRST_KEY = '1';
+	// 描画先の大きさが無効な場合に、カーソルを置く、基準Canvasの外の位置。どのカードにも乗らない。
+	constexpr float ns_CURSOR_OUTSIDE_CANVAS = -1000.0f;
+
+	//========= 報酬選択の入力の補助関数=========
+	// カーソルのクライアント座標を、基準Canvas上の座標へ変換する。HUDの描画と同じ倍率と余白（HudCanvas）の逆変換。
+	// inputSystem: カーソルの位置の取得元。
+	// graphicsSystem: 描画先の大きさの取得元。
+	// 戻り値: 基準Canvas上のカーソルの位置。描画先の大きさが無効な場合は、どのカードにも乗らない位置。
+	XMFLOAT2 ConvertCursorToCanvas(const InputSystem& inputSystem,const GraphicsSystem& graphicsSystem)
+	{
+		// HUDの描画と同じ、描画先の大きさから決まる倍率と余白を求める。倍率が0なら、変換できない。
+		const HudCanvas hud_canvas{graphicsSystem.GetRenderWidth(),graphicsSystem.GetRenderHeight()};
+		const float canvas_scale = hud_canvas.GetScale();
+		if(canvas_scale <= 0.0f)return XMFLOAT2{ns_CURSOR_OUTSIDE_CANVAS,ns_CURSOR_OUTSIDE_CANVAS};
+
+		// 描画先の座標から余白を引き、倍率で割って、基準Canvas上の座標へ戻す。
+		const POINT cursor_position = inputSystem.GetCursorClientPosition();
+		const XMFLOAT2& canvas_offset = hud_canvas.GetOffset();
+		return XMFLOAT2{(static_cast<float>(cursor_position.x) - canvas_offset.x) / canvas_scale,
+			(static_cast<float>(cursor_position.y) - canvas_offset.y) / canvas_scale};
+	}
+
+	// 数字キー（1から順）のうち、この更新で押されたキーに対応するカードの添字を返す。複数が押された場合は、最後のキーを返す。
+	// inputSystem: キー入力の取得元。
+	// 戻り値: 押されたキーに対応するカードの添字。どれも押されていなければ-1。
+	int FindTriggeredRewardKey(const InputSystem& inputSystem)
+	{
+		// カードの数だけ、1から順にキーを調べる。
+		int triggered_index = -1;
+		for(int card_index = 0; card_index < REWARD_TABLE::ns_CARD_COUNT; ++card_index){
+			if(inputSystem.IsKeyTriggered(static_cast<unsigned char>(ns_REWARD_FIRST_KEY + card_index))){
+				triggered_index = card_index;
+			}
+		}
+		return triggered_index;
+	}
 }
 
 //========= 生成関数=========
@@ -51,10 +95,12 @@ void GameSession::Initialize()
 	m_enemyController.ResetAttackState();
 	m_timeScale.Reset();
 
-	// 通貨を開始時の所持額へ戻し、敵の生死の記録を空にする。前回のプレイの敵を、倒された敵として扱わない。報酬選択も、解除する。
+	// 通貨を開始時の所持額へ戻し、敵の生死の記録を空にする。前回のプレイの敵を、倒された敵として扱わない。
 	m_wallet.Initialize(ECONOMY_TABLE::ns_INITIAL_BALANCE);
 	m_wasEnemyAlive.fill(false);
-	m_reward.Reset();
+
+	// 報酬の取得数を0へ戻し、報酬選択を解除する。カードのボタンの矩形も、設定し直す。
+	m_reward.Initialize();
 }
 
 // 描画Resourceと生成Objectの準備に成功した後にだけ、ゲーム操作とBGMへ切り替える。
@@ -103,6 +149,9 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 
 	// マウスを解放している間と、報酬選択中は、カメラ・移動・戦闘の操作更新をまとめて停止し、ここで戻る。
 	if(!m_inputSystem.IsMouseCaptureEnabled() || m_reward.IsSelecting())return GAME_SESSION_RESULT::e_CONTINUE;
+
+	// カードを選んだ直後は、選んだクリックや数字キーが、射撃や武器の切替として重ねて反応しないよう、ここで戻る。左クリックが離されたら、解除する。
+	if(m_reward.UpdateInputGuard(m_inputSystem.IsKeyPressed(VK_LBUTTON)))return GAME_SESSION_RESULT::e_CONTINUE;
 
 	// 視点とプレイヤーを先に更新し、その結果の位置と動作の状態を使って、戦闘・射撃・敵の行動を更新する。
 	// 射撃・近接攻撃で倒された敵の撃破報酬は、次の更新を待たず、ここで通貨へ加える。
@@ -225,7 +274,7 @@ bool GameSession::UpdateSessionInput()
 		m_inputSystem.SetMouseCaptureEnabled(!m_inputSystem.IsMouseCaptureEnabled());
 	}
 
-	// F4では最初の部屋から作り直す。旧ウェーブと、旧ウェーブの弾・範囲の予告は、同じ更新の生成処理で置き換わる。通貨は、そのまま引き継ぐ。
+	// F4では最初の部屋から作り直す。旧ウェーブと、旧ウェーブの弾・範囲の予告は、同じ更新の生成処理で置き換わる。通貨と報酬の取得数は、そのまま引き継ぐ。
 	if(m_inputSystem.IsKeyTriggered(VK_F4)){
 		m_stage.Restart();
 		m_enemyController.ResetAttackState();
@@ -264,22 +313,36 @@ void GameSession::UpdateTimers(float deltaTime,float gameplayDeltaTime)
 	m_collisionDebugView.Update(deltaTime);
 }
 
-// 部屋のクリアで報酬選択へ入る判定と、選び終えた時に抜ける判定を行う。
+// 部屋のクリアで報酬選択へ入る判定と、カードが選ばれた時に抜ける判定を行い、取得した報酬の効果を各クラスへ渡す。
 void GameSession::UpdateReward()
 {
-	// 部屋の進行状態と、選び終える操作（Enter。E3でカードの選択へ置き換える暫定の操作）を渡して、状態の変化を受け取る。
-	const REWARD_UPDATE_RESULT reward_result = m_reward.Update(m_stage.GetRoomController().GetPhase(),m_inputSystem.IsKeyTriggered(VK_RETURN));
+	// 部屋の進行状態と、カーソルの位置（基準Canvas上）、左クリック、カードの番号のキーを渡して、状態の変化を受け取る。
+	const REWARD_UPDATE_RESULT reward_result = m_reward.Update(m_stage.GetRoomController().GetPhase(),
+																														 ConvertCursorToCanvas(m_inputSystem,m_graphicsSystem),
+																														 m_inputSystem.IsKeyTriggered(VK_LBUTTON),FindTriggeredRewardKey(m_inputSystem));
 
-	// 入った更新では、Captureを解除して、マウスをUIの操作へ渡す。ゲームの操作と時間は、Updateが止める。
+	// 入った更新では、Captureを解除して、マウスをカードの操作へ渡す。ゲームの操作と時間は、Updateが止める。
 	if(reward_result == REWARD_UPDATE_RESULT::e_STARTED){
 		m_inputSystem.SetMouseCaptureEnabled(false);
-		Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,L"部屋のクリアで、報酬選択へ入りました。Enterで選び終えます。");
+		Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,L"部屋のクリアで、報酬選択へ入りました。");
 	}
 	// 抜けた更新では、Captureを戻して、ゲームの操作へ戻る。出口は、すでに開いている。
 	else if(reward_result == REWARD_UPDATE_RESULT::e_FINISHED){
 		m_inputSystem.SetMouseCaptureEnabled(true);
-		Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,L"報酬選択を終えました。");
+
+		// 上限に達した報酬を選んだ場合は、強化の代わりに通貨を与える。そうでなければ、選ばれた報酬を、ログへ記録する。
+		if(m_reward.WasLastChoiceCapped()){
+			m_wallet.Add(REWARD_TABLE::ns_CAPPED_CURRENCY_REWARD);
+			Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,L"報酬が上限のため、通貨へ置き換えました。");
+		}
+		else{
+			Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,
+										std::wstring{L"報酬を選びました: "} + REWARD_TABLE::ns_REWARDS[m_reward.GetLastChosenIndex()].title);
+		}
 	}
+
+	// 取得している特殊強化の効果を、使う側へ渡す。制圧射撃は、射撃で敵へ与える怯み時間の倍率として、射撃の担当へ渡す。毎回渡して、再開や初期化の後も、取得数と一致させる。
+	m_player.GetShotController().SetFlinchScale(m_reward.GetSuppressiveFlinchScale());
 }
 
 // 視点・プレイヤーの動作・出口の通過・殴打でのリロードのキャンセル・視野角を更新する。
@@ -451,5 +514,7 @@ void GameSession::DrawHud()
 	hud_state.isAiming = m_player.GetPlayerController().IsAiming();
 	hud_state.currency = m_wallet.GetBalance();
 	hud_state.isRewardSelecting = m_reward.IsSelecting();
+	hud_state.hoveredRewardIndex = m_reward.GetHoveredIndex();
+	hud_state.rewardOwnedCounts = m_reward.GetAcquiredCounts();
 	m_gameHud.Draw(m_graphicsSystem,hud_state);
 }

@@ -56,8 +56,9 @@ public:
 	// ダメージを受け、HPを減らして怯ませる。HPが0以下になったらColliderを解除して死亡にする。
 	// damage: 受けるダメージ。正の値。
 	// collisionWorld: Initializeで渡したのと同じCollisionWorld。死亡時にColliderを解除する。
+	// flinchScale: 怯みの時間に掛ける倍率。1.0で通常。特殊強化（制圧射撃）で、射撃の怯みを伸ばす時に1.0より大きい値を渡す。正の値であること。省略すると1.0。
 	// 戻り値: このダメージで死亡したらtrue。すでに死亡している場合はダメージを受けずfalse。
-	bool ApplyDamage(float damage,CollisionWorld& collisionWorld);
+	bool ApplyDamage(float damage,CollisionWorld& collisionWorld,float flinchScale = 1.0f);
 	// 転倒させる。転倒中は怯みも解除され、蹴りの対象にならない。すでに転倒中、死亡している、または範囲攻撃型（転倒しない種類）の場合は何もしない。
 	// 戻り値: 新しく転倒させたらtrue。何もしなかった場合はfalse。
 	bool ApplyKnockdown();
