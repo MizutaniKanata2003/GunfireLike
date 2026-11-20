@@ -86,8 +86,10 @@ private:
 	// deltaTime: 実時間の経過時間。単位は秒。表示用と反動の時間に使う。報酬選択中は0。
 	// gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。回復アイテムの間隔に使う。
 	void UpdateTimers(float deltaTime,float gameplayDeltaTime);
-	// 部屋のクリアで報酬選択へ入る判定と、選び終えた時に抜ける判定を行い、入る時はCaptureを解除、抜ける時はCaptureを再開する。
+	// 部屋のクリアで報酬選択へ入る判定と、選び終えた時に抜ける判定を行い、入る時はCaptureを解除、抜ける時はCaptureを再開する。取得した報酬の効果のうち、常に効くもの（制圧射撃）を、使う側へ渡す。
 	void UpdateReward();
+	// ジャスト回避が成立した時の効果を反映する。スローを開始し、回避反撃を取得していれば、一定時間、射撃のダメージを増やす。
+	void StartJustDodgeEffects();
 	// 視点・プレイヤーの動作・出口の通過・殴打でのリロードのキャンセル・視野角を更新する。Capture中だけ呼ぶ。
 	// deltaTime: 実時間の経過時間。単位は秒。視野角の補間に使う。
 	// gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。プレイヤーの動作に使う。
@@ -96,10 +98,10 @@ private:
 	// gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。プレイヤーの戦闘と射撃に使う。
 	// worldDeltaTime: スローを反映した経過時間。単位は秒。敵の行動と弾に使う。
 	void UpdateCombat(float gameplayDeltaTime,float worldDeltaTime);
-	// 確認用の攻撃が当たる瞬間を判定し、結果に応じてプレイヤーへのダメージとスローを反映する。
+	// 確認用の攻撃が当たる瞬間を判定し、結果に応じてプレイヤーへのダメージとジャスト回避の効果を反映する。
 	// worldDeltaTime: スローを反映した経過時間。単位は秒。ヒットストップ中は0。
 	void UpdateDodgeJudge(float worldDeltaTime);
-	// 敵の攻撃イベントを受け取り、命中ならプレイヤーへの被弾の反応を、ジャスト回避ならスローを反映し、求められた場合は直近の判定結果を記録する。
+	// 敵の攻撃イベントを受け取り、命中ならプレイヤーへの被弾の反応を、ジャスト回避ならその効果を反映し、求められた場合は直近の判定結果を記録する。
 	// attackEvent: EnemyControllerが通知した攻撃イベント。敵の更新の途中で呼ばれる。
 	void ApplyEnemyAttackEvent(const ENEMY_ATTACK_EVENT& attackEvent);
 	// 現在の部屋とウェーブの敵をEnemyControllerへ生成させ、成功した場合は、スライディングの転倒記録を初期化して、進行管理へ生成完了を通知する。
@@ -145,7 +147,7 @@ private:
 	StageController m_stage{};
 	// 通貨の所持額。敵を倒した時の報酬で増える。
 	Wallet m_wallet{};
-	// 部屋のクリア後の報酬選択の状態。選択中は、時間とプレイヤーの操作を止める。
+	// 部屋のクリア後の報酬選択の状態と、特殊強化の取得数。選択中は、時間とプレイヤーの操作を止める。
 	RewardController m_reward{};
 
 	//========= 撃破の検出=========

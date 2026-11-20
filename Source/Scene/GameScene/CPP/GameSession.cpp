@@ -1,6 +1,6 @@
 ﻿#include "../H/GameSession.h"
 
-// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択とその効果の反映、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
+// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択とその効果の反映、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <string> // 報酬の選択をログへ記録する際に、カードの見出しを連結する。
@@ -341,8 +341,22 @@ void GameSession::UpdateReward()
 		}
 	}
 
-	// 取得している特殊強化の効果を、使う側へ渡す。制圧射撃は、射撃で敵へ与える怯み時間の倍率として、射撃の担当へ渡す。毎回渡して、再開や初期化の後も、取得数と一致させる。
+	// 常に効く特殊強化の効果を、使う側へ渡す。制圧射撃は、射撃で敵へ与える怯み時間の倍率として、射撃の担当へ渡す。毎回渡して、再開や初期化の後も、取得数と一致させる。
+	// 回避反撃は、ジャスト回避の時だけ効くため、ここでは渡さない（StartJustDodgeEffectsが渡す）。
 	m_player.GetShotController().SetFlinchScale(m_reward.GetSuppressiveFlinchScale());
+}
+
+// ジャスト回避が成立した時の効果を反映する。
+void GameSession::StartJustDodgeEffects()
+{
+	// ジャスト回避のスローを開始する。連続した場合は、時間を数え直す。
+	m_timeScale.StartSlowMotion();
+
+	// 回避反撃を取得している（倍率が1.0より大きい）場合だけ、一定時間、射撃のダメージを増やす。未取得なら、何も増やさない。
+	const float damage_scale = m_reward.GetCounterDodgeDamageScale();
+	if(damage_scale > 1.0f){
+		m_player.GetShotController().ActivateDamageBoost(damage_scale,REWARD_TABLE::ns_COUNTER_DODGE_SECONDS);
+	}
 }
 
 // 視点・プレイヤーの動作・出口の通過・殴打でのリロードのキャンセル・視野角を更新する。
@@ -370,7 +384,7 @@ void GameSession::UpdateCombat(float gameplayDeltaTime,float worldDeltaTime)
 	m_collisionDebugView.UpdateRay(m_player.GetCamera(),m_stage.GetCollisionWorld());
 }
 
-// 確認用の攻撃が当たる瞬間の判定結果を、プレイヤーへのダメージとスローへ反映する。
+// 確認用の攻撃が当たる瞬間の判定結果を、プレイヤーへのダメージとジャスト回避の効果へ反映する。
 void GameSession::UpdateDodgeJudge(float worldDeltaTime)
 {
 	// 予告した攻撃が当たる瞬間だけ、結果が返る。結果の記録は、GameDebugControllerが行う。
@@ -380,13 +394,13 @@ void GameSession::UpdateDodgeJudge(float worldDeltaTime)
 	if(judge_result == DODGE_JUDGE_RESULT::e_HIT){
 		m_player.GetPlayerCombat().ApplyHitReaction(COMBAT_TABLE::ns_SIMULATED_ATTACK_DAMAGE,COMBAT_TABLE::ns_DAMAGE_HIT_STOP_SECONDS);
 	}
-	// ジャスト回避の場合は、スローを開始する。連続した場合は、時間を数え直す。
+	// ジャスト回避の場合は、スローと回避反撃を開始する。
 	else if(judge_result == DODGE_JUDGE_RESULT::e_JUST_DODGED){
-		m_timeScale.StartSlowMotion();
+		StartJustDodgeEffects();
 	}
 }
 
-// 敵の攻撃イベントを、プレイヤーへの被弾・スロー・表示用の記録へ反映する。
+// 敵の攻撃イベントを、プレイヤーへの被弾・ジャスト回避の効果・表示用の記録へ反映する。
 void GameSession::ApplyEnemyAttackEvent(const ENEMY_ATTACK_EVENT& attackEvent)
 {
 	// 表示用の記録が求められた場合だけ、直近の判定結果を更新する。接近型の結果は求めない。
@@ -398,9 +412,9 @@ void GameSession::ApplyEnemyAttackEvent(const ENEMY_ATTACK_EVENT& attackEvent)
 	if(attackEvent.result == DODGE_JUDGE_RESULT::e_HIT){
 		m_player.GetPlayerCombat().ApplyHitReaction(attackEvent.damage,COMBAT_TABLE::ns_DAMAGE_HIT_STOP_SECONDS);
 	}
-	// 実際に回避中のジャスト回避の場合は、スローを開始する。連続した場合は、時間を数え直す。
+	// 実際に回避中のジャスト回避の場合は、スローと回避反撃を開始する。
 	else if(attackEvent.shouldStartSlowMotion){
-		m_timeScale.StartSlowMotion();
+		StartJustDodgeEffects();
 	}
 }
 

@@ -1,9 +1,9 @@
 ﻿#include "../H/ShotController.h"
 
-// 射撃の更新、武器の装備、弾道の終点の通知、命中した敵へのダメージと怯み、命中表示の時間管理を実装する。
+// 射撃の更新、武器の装備、弾道の終点の通知、命中した敵へのダメージと怯み（特殊強化の効果を含む）、命中表示の時間管理を実装する。
 
 //========= C++標準ライブラリ インクルード=========
-#include <algorithm> // std::maxで、命中表示の残り時間を0未満にしない。
+#include <algorithm> // std::maxで、命中表示とダメージの増加の残り時間を0未満にしない。
 #include <string> // std::wstringで、武器の切替のログに、武器の表示名を連結する。
 
 //========= Debug インクルード=========
@@ -75,18 +75,23 @@ void ShotController::Uninit()
 	m_collisionDebugView = nullptr;
 }
 
-// 初期武器を満タンの弾薬で装備し直し、命中表示を消し、怯み時間の倍率を通常へ戻す。
+// 初期武器を満タンの弾薬で装備し直し、命中表示を消し、特殊強化の効果を通常へ戻す。
 void ShotController::Reset()
 {
 	m_weaponSystem.Initialize(WEAPON_TABLE::ns_ASSAULT_RIFLE);
 	m_hitMarkerRemainingSeconds = 0.0f;
 	m_flinchScale = 1.0f;
+	m_damageBoostScale = 1.0f;
+	m_damageBoostRemainingSeconds = 0.0f;
 }
 
 //========= 更新関数=========
 // 武器の切替・射撃・リロードを更新し、敵へ命中していればダメージと怯みを与える。
 void ShotController::Update(float gameplayDeltaTime)
 {
+	// ジャスト回避の後のダメージの増加の残り時間を進め、0未満にしない。このフレームの射撃にも、残りがあれば反映する。
+	m_damageBoostRemainingSeconds = std::max(0.0f,m_damageBoostRemainingSeconds - gameplayDeltaTime);
+
 	// 数字キーによる暫定の武器切替を、射撃の更新より先に処理する。切り替えたフレームから、新しい武器で射撃する。
 	UpdateWeaponSelection();
 
@@ -110,12 +115,14 @@ void ShotController::Update(float gameplayDeltaTime)
 		}
 	}
 
-	// 敵レイヤーに命中した場合だけ、Colliderの識別値からダメージを与える相手を探す。ダメージは、使用中の武器の値を使い、怯み時間は、特殊強化の倍率を掛ける。
+	// 敵レイヤーに命中した場合だけ、Colliderの識別値からダメージを与える相手を探す。ダメージは、使用中の武器の値に、増加中なら倍率を掛け、怯み時間は、特殊強化の倍率を掛ける。
 	if(weapon_result.didHit && weapon_result.hitInfo.layer == COLLISION_LAYER::ns_ENEMY){
 		Enemy* const hit_enemy = m_enemyManager->FindLivingEnemy(weapon_result.hitInfo.userData);
 		// 対応する生存中の敵が見つかった場合だけ、ダメージと命中表示を反映する。
 		if(hit_enemy != nullptr){
-			hit_enemy->ApplyDamage(m_playerCombat->GetAttackDamage(m_weaponSystem.GetWeaponData().damage,*hit_enemy),*m_collisionWorld,m_flinchScale);
+			const float damage_scale = IsDamageBoostActive() ? m_damageBoostScale : 1.0f;
+			const float weapon_damage = m_weaponSystem.GetWeaponData().damage * damage_scale;
+			hit_enemy->ApplyDamage(m_playerCombat->GetAttackDamage(weapon_damage,*hit_enemy),*m_collisionWorld,m_flinchScale);
 			m_hitMarkerRemainingSeconds = ns_HIT_MARKER_SECONDS;
 		}
 	}

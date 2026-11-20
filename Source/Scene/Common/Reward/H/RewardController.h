@@ -2,7 +2,7 @@
 
 // 部屋のクリア後に、報酬のカードを選ぶ状態（報酬選択）へ入り、カードを選ぶと抜ける流れと、報酬（特殊強化）の取得数を管理する。
 // カードの当たりとホバーはUiButtonで判定する。時間の停止・入力の切替・画面の表示は、呼出側が行う。
-// 取得数から、強化の効果の大きさ（現在は、制圧射撃の怯み時間の倍率）を返す。効果を使う側へ値を渡すのは、呼出側が行う。
+// 取得数から、強化の効果の大きさ（制圧射撃の怯み時間の倍率、回避反撃の射撃ダメージの倍率）を返す。効果を使う側へ値を渡すのは、呼出側が行う。
 
 //========= C++標準ライブラリ インクルード=========
 #include <array> // std::arrayで、カードごとのボタンと取得数を固定長で保持する。
@@ -15,7 +15,7 @@
 #include "Scene/Common/UI/H/UiButton.h"
 #include "Scene/Common/UI/H/UiLayout.h"
 
-// 報酬の表をまとめる。文字は、HUDのFontで描けるASCIIだけにする。文言と数値は仮で、プレイ確認後に調整する。
+// 報酬の表をまとめる。カードの見出しは、HUDのFontで描ける英字とし、説明は日本語にする。説明に使う文字は、Fontへ含めること（Tools/MakeGunfireFont.bat）。文言と数値は仮で、プレイ確認後に調整する。
 namespace REWARD_TABLE
 {
 	//========= 報酬の数と種類=========
@@ -25,7 +25,7 @@ namespace REWARD_TABLE
 	enum class REWARD_TYPE
 	{
 		e_SUPPRESSIVE_FIRE, // 制圧射撃。射撃で敵に与える怯みの時間を伸ばす。
-		e_COUNTER_DODGE,    // 回避反撃。E5で効果を実装する。
+		e_COUNTER_DODGE,    // 回避反撃。ジャスト回避の後、一定時間、射撃のダメージを増やす。
 		e_FOLLOW_UP_STRIKE  // 殴打追撃。E6で効果を実装する。
 	};
 
@@ -39,21 +39,27 @@ namespace REWARD_TABLE
 	// 制圧射撃のレベルごとの、射撃で敵に与える怯み時間の倍率。添字はレベル（0が未取得）。企画書の「怯み蓄積増加」を、現在の敵の仕組み（被弾で一定時間怯む）に合わせた仮の効果。
 	inline constexpr float ns_SUPPRESSIVE_FLINCH_SCALES[ns_MAX_LEVEL + 1]{1.0f,1.5f,2.0f,2.5f};
 
+	//========= 回避反撃の効果=========
+	// 回避反撃のレベルごとの、ジャスト回避の後の射撃ダメージの倍率。添字はレベル（0が未取得）。企画書の「ジャスト回避後、一定時間の射撃ダメージ増加」に当たる仮値。
+	inline constexpr float ns_COUNTER_DODGE_DAMAGE_SCALES[ns_MAX_LEVEL + 1]{1.0f,1.3f,1.6f,2.0f};
+	// ジャスト回避の後に、射撃ダメージが増える時間。単位は秒。ジャスト回避のスローの影響を受けない、プレイヤー側の時間で数える。企画書で未確定の仮値。
+	inline constexpr float ns_COUNTER_DODGE_SECONDS = 4.0f;
+
 	//========= 報酬の定義=========
 	// 報酬1種類分の表示内容。
 	struct REWARD_DEFINITION
 	{
-		// カードの見出し。静的な文字列定数を指し、所有しない。
+		// カードの見出し。英字だけ。静的な文字列定数を指し、所有しない。
 		const wchar_t* title;
-		// カードの説明。改行（\n）で区切った複数行。静的な文字列定数を指し、所有しない。
+		// カードの説明。日本語。改行（\n）で区切った複数行で、1行は、カードの幅に収まる、全角11文字以内にする。静的な文字列定数を指し、所有しない。
 		const wchar_t* description;
 	};
 
 	// 報酬の表。並びは、REWARD_TYPEと同じ。
 	inline constexpr REWARD_DEFINITION ns_REWARDS[ns_CARD_COUNT]{
-		{L"SUPPRESSIVE FIRE",L"Sustained fire\nstaggers enemies\nfor longer."},
-		{L"COUNTER DODGE",L"A just dodge\npowers up your\nnext attack."},
-		{L"FOLLOW-UP STRIKE",L"A melee hit is\nfollowed by\na second blow."}
+		{L"SUPPRESSIVE FIRE",L"射撃で当てた敵の\n怯み時間が\n長くなる。"},
+		{L"COUNTER DODGE",L"ジャスト回避の後、\n一定時間、射撃の\nダメージが増える。"},
+		{L"FOLLOW-UP STRIKE",L"殴打を当てた敵が\n射撃で受ける\nダメージが増える。"}
 	};
 }
 
@@ -152,12 +158,19 @@ public:
 	// 制圧射撃の現在のレベルに応じた、射撃で敵に与える怯み時間の倍率を返す。未取得なら1.0。
 	[[nodiscard]] float GetSuppressiveFlinchScale() const
 	{
-		const int level = m_acquiredCounts[static_cast<int>(REWARD_TABLE::REWARD_TYPE::e_SUPPRESSIVE_FIRE)];
-		return REWARD_TABLE::ns_SUPPRESSIVE_FLINCH_SCALES[level];
+		return REWARD_TABLE::ns_SUPPRESSIVE_FLINCH_SCALES[GetLevel(REWARD_TABLE::REWARD_TYPE::e_SUPPRESSIVE_FIRE)];
+	}
+	// 回避反撃の現在のレベルに応じた、ジャスト回避の後の射撃ダメージの倍率を返す。未取得なら1.0（増えない）。
+	[[nodiscard]] float GetCounterDodgeDamageScale() const
+	{
+		return REWARD_TABLE::ns_COUNTER_DODGE_DAMAGE_SCALES[GetLevel(REWARD_TABLE::REWARD_TYPE::e_COUNTER_DODGE)];
 	}
 
 private:
 	//========= 補助関数=========
+	// 報酬の現在のレベル（取得数）を返す。0以上で、上限以下。
+	// rewardType: 調べる報酬の種類。
+	[[nodiscard]] int GetLevel(REWARD_TABLE::REWARD_TYPE rewardType) const { return m_acquiredCounts[static_cast<int>(rewardType)]; }
 	// カードのホバーとクリックを更新し、選ばれたカードがあれば、取得数を増やして報酬選択を抜ける。
 	// 引数と戻り値は、Updateと同じ。
 	[[nodiscard]] REWARD_UPDATE_RESULT UpdateSelection(const XMFLOAT2& cursorCanvasPosition,bool isClickTriggered,int keyChoiceIndex)
