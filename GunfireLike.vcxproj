@@ -281,6 +281,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\3D\H\ObjModelRenderer.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\AreaTelegraph.h" />
     <ClInclude Include="Source\Scene\Common\Player\H\PlayerSuite.h" />
+    <ClInclude Include="Source\Scene\Common\Player\H\Wallet.h" />
     <ClInclude Include="Source\Scene\Common\Stage\H\ExitDoor.h" />
     <ClInclude Include="Source\Scene\Common\Object\H\ObjectConfig.h" />
     <ClInclude Include="Source\Scene\Common\Camera\H\CameraFovController.h" />
@@ -289,6 +290,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\Common\Combat\H\JustDodgeJudge.h" />
     <ClInclude Include="Source\Scene\Common\Stage\H\RoomController.h" />
     <ClInclude Include="Source\Scene\Common\Stage\H\StageController.h" />
+    <ClInclude Include="Source\Scene\Common\UI\H\Wallet.h" />
     <ClInclude Include="Source\Scene\Common\Weapon\H\ShotController.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\Enemy.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\EnemyApproach.h" />

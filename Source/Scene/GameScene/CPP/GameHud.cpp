@@ -1,11 +1,11 @@
 ﻿#include "../H/GameHud.h"
 
-// HUDの画像の読込・描画と、弾薬・リロード・回復アイテム数の文字の描画を実装する。
+// HUDの画像の読込・描画と、弾薬・リロード・回復アイテム数・通貨の文字の描画を実装する。
 // 画像の配置は表から読み、状態に応じた拡縮・色・表示割合・文字の大きさだけをこのファイルで決める。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::clampでHPの割合を0〜1へ制限し、std::minで文字の拡大率を領域に収まる値に制限する。
-#include <string> // std::to_wstringで弾薬数・進み具合の数字を文字列へ変換し、結合する。
+#include <string> // std::to_wstringで弾薬数・進み具合・通貨の数字を文字列へ変換し、結合する。
 
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/GraphicsSystem.h"
@@ -37,6 +37,8 @@ namespace
 	const XMVECTORF32 ns_RELOAD_TEXT_COLOR{{{1.0f,0.6f,0.2f,1.0f}}};
 	// 回復アイテム数の文字の色。緑がかった白。
 	const XMVECTORF32 ns_HEAL_TEXT_COLOR{{{0.8f,1.0f,0.8f,1.0f}}};
+	// 通貨の数字の色。金色。通貨のアイコンの色に合わせる。
+	const XMVECTORF32 ns_CURRENCY_TEXT_COLOR{{{1.0f,0.85f,0.3f,1.0f}}};
 
 	//========= 弾薬の文字の配置=========
 	// 弾薬の枠の左端から、数字を置く領域の左端までの距離。基準Canvas上の大きさ。左側の弾のアイコンを避けるための値。
@@ -59,6 +61,14 @@ namespace
 	constexpr float ns_HEAL_TEXT_AREA_WIDTH = 120.0f;
 	// 回復アイテム数の領域の高さ。HPバーの上端との間の高さ。基準Canvas上の大きさ。
 	constexpr float ns_HEAL_TEXT_AREA_HEIGHT = 28.0f;
+
+	//========= 通貨の数字の配置=========
+	// 通貨の数字の高さの目標。基準Canvas上の大きさ。アイコン（48）より小さくして、上下の余白を残す。
+	constexpr float ns_CURRENCY_TEXT_TARGET_HEIGHT = 30.0f;
+	// 通貨の数字を置く領域の幅。アイコンの左隣に置く。5桁（上限99999）が収まる大きさ。基準Canvas上の大きさ。
+	constexpr float ns_CURRENCY_TEXT_AREA_WIDTH = 132.0f;
+	// 通貨の数字を置く領域の右端と、アイコンの左端との間の余白。基準Canvas上の大きさ。
+	constexpr float ns_CURRENCY_TEXT_GAP = 8.0f;
 }
 
 //========= 初期化・描画関数=========
@@ -85,6 +95,7 @@ bool GameHud::Initialize(GraphicsSystem& graphicsSystem)
 	m_hpFrameTexture = m_spriteRenderer.LoadTexture(graphicsSystem,HUD_LAYOUT::ns_HP_FRAME.texturePath);
 	m_hpFillTexture = m_spriteRenderer.LoadTexture(graphicsSystem,HUD_LAYOUT::ns_HP_FILL.texturePath);
 	m_ammoFrameTexture = m_spriteRenderer.LoadTexture(graphicsSystem,HUD_LAYOUT::ns_AMMO_FRAME.texturePath);
+	m_currencyIconTexture = m_spriteRenderer.LoadTexture(graphicsSystem,HUD_LAYOUT::ns_CURRENCY_ICON.texturePath);
 	m_lowHpWarningTexture = m_spriteRenderer.LoadTexture(graphicsSystem,HUD_LAYOUT::ns_LOW_HP_WARNING.texturePath);
 	return true;
 }
@@ -116,8 +127,9 @@ void GameHud::Draw(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 		m_spriteRenderer.DrawSprite(graphicsSystem,m_hpFillTexture,HUD_LAYOUT::ns_HP_FILL.position,HUD_LAYOUT::ns_HP_FILL.size,fill_color,health_ratio);
 	}
 
-	// 弾薬の枠を描く。数字は、画像の後に文字として描く。
+	// 弾薬の枠と、通貨のアイコンを描く。数字は、画像の後に文字として描く。
 	m_spriteRenderer.DrawSprite(graphicsSystem,m_ammoFrameTexture,HUD_LAYOUT::ns_AMMO_FRAME.position,HUD_LAYOUT::ns_AMMO_FRAME.size,ns_WHITE,1.0f);
+	m_spriteRenderer.DrawSprite(graphicsSystem,m_currencyIconTexture,HUD_LAYOUT::ns_CURRENCY_ICON.position,HUD_LAYOUT::ns_CURRENCY_ICON.size,ns_WHITE,1.0f);
 
 	// 文字を描く。装填弾数と予備弾薬を「装填 / 予備」の形で枠の右側へ、リロード中なら進み具合を枠の真上へ描く。
 	m_textRenderer.Begin();
@@ -131,6 +143,12 @@ void GameHud::Draw(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 	const XMFLOAT2 heal_area_position{HUD_LAYOUT::ns_HP_FRAME.position.x,HUD_LAYOUT::ns_HP_FRAME.position.y - ns_HEAL_TEXT_AREA_HEIGHT};
 	const XMFLOAT2 heal_area_size{ns_HEAL_TEXT_AREA_WIDTH,ns_HEAL_TEXT_AREA_HEIGHT};
 	DrawFittedText(L"Q x" + std::to_wstring(state.healItemCount),heal_area_position,heal_area_size,ns_HEAL_TEXT_TARGET_HEIGHT,ns_HEAL_TEXT_COLOR);
+
+	// 通貨の所持額を、アイコンの左隣へ描く。領域の右端がアイコンの左端から余白だけ離れる位置に置き、高さはアイコンと同じにして、上下の中央へ揃える。
+	const XMFLOAT2 currency_area_position{HUD_LAYOUT::ns_CURRENCY_ICON.position.x - ns_CURRENCY_TEXT_GAP - ns_CURRENCY_TEXT_AREA_WIDTH,
+		HUD_LAYOUT::ns_CURRENCY_ICON.position.y};
+	const XMFLOAT2 currency_area_size{ns_CURRENCY_TEXT_AREA_WIDTH,HUD_LAYOUT::ns_CURRENCY_ICON.size.y};
+	DrawFittedText(std::to_wstring(state.currency),currency_area_position,currency_area_size,ns_CURRENCY_TEXT_TARGET_HEIGHT,ns_CURRENCY_TEXT_COLOR);
 
 	// リロード中の場合だけ、進み具合を百分率で、弾薬の枠の真上の領域へ描く。進み具合の小数は切り捨てる。
 	if(state.isReloading){
@@ -153,6 +171,7 @@ void GameHud::Uninit()
 	m_hpFrameTexture = 0;
 	m_hpFillTexture = 0;
 	m_ammoFrameTexture = 0;
+	m_currencyIconTexture = 0;
 	m_lowHpWarningTexture = 0;
 }
 

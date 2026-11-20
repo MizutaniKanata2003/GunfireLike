@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// ゲーム中のHUD（照準・HPバー・弾薬・リロード表示・回復アイテム数・低HP警告）を、画像と文字で描画する。
+// ゲーム中のHUD（照準・HPバー・弾薬・リロード表示・回復アイテム数・通貨・低HP警告）を、画像と文字で描画する。
 // 画像の配置はUiLayoutの表から読み、描画する値はGAME_HUD_STATEとして受け取る。値の決定・ゲームの進行は担当しない。
 
 //========= C++標準ライブラリ インクルード=========
@@ -39,6 +39,10 @@ struct GAME_HUD_STATE
 	//========= 構え=========
 	// 構えているか。trueなら照準を小さく描く。
 	bool isAiming{};
+
+	//========= 通貨=========
+	// 現在の通貨の所持額。右上のアイコンの隣に、数字で表示する。
+	int currency{};
 };
 
 // 画像と文字でHUDを描画するクラス。
@@ -51,7 +55,7 @@ public:
 	// 戻り値: 全ての初期化と読込に成功すればtrue。失敗した場合は、部分Resourceを解放してfalse。
 	// COMの初期化は呼出側が済ませておくこと。
 	[[nodiscard]] bool Initialize(GraphicsSystem& graphicsSystem);
-	// 低HP警告・照準・HPバー・弾薬の枠の画像を描き、続けて弾薬・リロード・回復アイテム数の文字を描く。
+	// 低HP警告・照準・HPバー・弾薬の枠・通貨のアイコンの画像を描き、続けて弾薬・リロード・回復アイテム数・通貨の文字を描く。
 	// graphicsSystem: 描画基盤。呼出前に、画面UI用のRender Pass（e_SCREEN_UI）を設定しておくこと。
 	// state: 描画する値。参照は保持しない。
 	// 画像の読込に失敗している場合、その画像は描かれない。
@@ -86,4 +90,6 @@ private:
 	HudTextureHandle m_ammoFrameTexture{};
 	// 低HP警告の画像。
 	HudTextureHandle m_lowHpWarningTexture{};
+	// 通貨のアイコンの画像。
+	HudTextureHandle m_currencyIconTexture{};
 };
