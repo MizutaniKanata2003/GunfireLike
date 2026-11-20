@@ -1,9 +1,10 @@
 ﻿#pragma once
 
-// プレイヤーが所持している武器の記録と、武器ごとの強化の段階・強化に使った費用を担当する。所持数の上限と下限を守り、武器の種類ごとの所持の有無を返す。
-// 武器の装備・弾薬・性能値・購入と売却と強化の画面は担当しない。購入・売却・強化と装備の流れは、呼出側が行う。
+// プレイヤーが所持している武器の記録と、武器ごとの強化の段階・強化に使った費用・切替で保存した弾薬を担当する。所持数の上限と下限を守り、武器の種類ごとの所持の有無を返す。
+// 武器の装備・弾薬の消費・性能値・購入と売却と強化の画面は担当しない。購入・売却・強化・切替と装備の流れは、呼出側が行う。
 
 //========= C++標準ライブラリ インクルード=========
+#include <algorithm> // std::minとstd::maxで、保存した予備弾薬の加算を上限内に収める。
 #include <array> // std::arrayで、武器の種類ごとの所持の有無と強化の状態を固定長で保持する。
 
 //========= Scene インクルード=========
@@ -19,12 +20,21 @@ namespace WEAPON_INVENTORY_TABLE
 	inline constexpr int ns_MIN_WEAPONS = 1;
 }
 
-// 所持している武器と、武器ごとの強化を記録する。
+// 武器を持ち替えた時に保存する、その武器の弾薬。
+struct WEAPON_AMMO_RECORD
+{
+	// 装填弾数。
+	int magazineAmmo{};
+	// 予備弾薬の数。
+	int reserveAmmo{};
+};
+
+// 所持している武器と、武器ごとの強化・保存した弾薬を記録する。
 class WeaponInventory final
 {
 public:
 	//========= 初期化関数=========
-	// 所持と強化を初期状態へ戻す。初期武器の連射銃だけを、所持している状態にする。新しいプレイの開始の時に呼ぶ。
+	// 所持・強化・保存した弾薬を初期状態へ戻す。初期武器の連射銃だけを、所持している状態にする。新しいプレイの開始の時に呼ぶ。
 	void Initialize()
 	{
 		m_isOwned.fill(false);
@@ -33,6 +43,8 @@ public:
 			levels.fill(0);
 		}
 		m_upgradeSpent.fill(0);
+		m_hasSavedAmmo.fill(false);
+		m_savedAmmo.fill(WEAPON_AMMO_RECORD{});
 	}
 
 	//========= 更新関数=========
@@ -49,7 +61,7 @@ public:
 		m_isOwned[weapon_index] = true;
 		return true;
 	}
-	// 武器を所持から外す。その武器の強化の段階と、強化に使った費用も、消す。
+	// 武器を所持から外す。その武器の強化の段階・強化に使った費用・保存した弾薬も、消す。
 	// weaponType: 外す武器の種類。表の範囲内であること。
 	// 戻り値: 外せたらtrue。所持していない、所持数が下限に達している、または範囲外の種類の場合は、何も変えずfalse。
 	[[nodiscard]] bool TryRemove(WEAPON_TYPE weaponType)
@@ -61,6 +73,8 @@ public:
 		m_isOwned[weapon_index] = false;
 		m_upgradeLevels[weapon_index].fill(0);
 		m_upgradeSpent[weapon_index] = 0;
+		m_hasSavedAmmo[weapon_index] = false;
+		m_savedAmmo[weapon_index] = WEAPON_AMMO_RECORD{};
 		return true;
 	}
 	// 所持している武器の、1項目の強化を、1段階上げる。
@@ -81,6 +95,32 @@ public:
 		++level;
 		m_upgradeSpent[weapon_index] += price;
 		return true;
+	}
+	// 持ち替える前の武器の弾薬を、保存する。同じ武器へ持ち替えた時に、この弾薬を戻す。
+	// weaponIndex: 武器の種類の値（表の添字）。所持している武器であること。範囲外や未所持の場合は、何もしない。
+	// magazineAmmo: 保存する装填弾数。
+	// reserveAmmo: 保存する予備弾薬の数。
+	void SaveAmmo(int weaponIndex,int magazineAmmo,int reserveAmmo)
+	{
+		if(!IsOwned(static_cast<WEAPON_TYPE>(weaponIndex)))return;
+
+		m_savedAmmo[weaponIndex] = WEAPON_AMMO_RECORD{std::max(0,magazineAmmo),std::max(0,reserveAmmo)};
+		m_hasSavedAmmo[weaponIndex] = true;
+	}
+	// 保存した予備弾薬を増やす。上限を超える分は加えない。装備していない武器の弾薬の購入から呼ぶ。
+	// weaponIndex: 武器の種類の値（表の添字）。保存した弾薬がある武器であること。
+	// amount: 増やす弾数。0以下の場合は何もしない。
+	// maxReserve: 予備弾薬の上限。
+	// 戻り値: 実際に加えた弾数。保存した弾薬がない、または範囲外の場合は0。
+	int AddSavedReserve(int weaponIndex,int amount,int maxReserve)
+	{
+		// 保存した弾薬がない武器や、増やす数が正でない場合は、何も加えない。
+		if(!HasSavedAmmo(weaponIndex) || amount <= 0)return 0;
+
+		WEAPON_AMMO_RECORD& record = m_savedAmmo[weaponIndex];
+		const int added_ammo = std::min(amount,std::max(0,maxReserve - record.reserveAmmo));
+		record.reserveAmmo += added_ammo;
+		return added_ammo;
 	}
 
 	//========= Getter関数=========
@@ -125,6 +165,18 @@ public:
 	{
 		return (weaponIndex >= 0 && weaponIndex < WEAPON_TABLE::ns_WEAPON_COUNT) ? m_upgradeSpent[weaponIndex] : 0;
 	}
+	// 保存した弾薬があるかを返す。持ち替えて手放した武器と、売却済み・購入直後の武器を区別する。範囲外は、ないとして扱う。
+	// weaponIndex: 武器の種類の値（表の添字）。
+	[[nodiscard]] bool HasSavedAmmo(int weaponIndex) const
+	{
+		return weaponIndex >= 0 && weaponIndex < WEAPON_TABLE::ns_WEAPON_COUNT && m_hasSavedAmmo[weaponIndex];
+	}
+	// 保存した弾薬を返す。保存した弾薬がない場合は、全て0。
+	// weaponIndex: 武器の種類の値（表の添字）。
+	[[nodiscard]] WEAPON_AMMO_RECORD GetSavedAmmo(int weaponIndex) const
+	{
+		return HasSavedAmmo(weaponIndex) ? m_savedAmmo[weaponIndex] : WEAPON_AMMO_RECORD{};
+	}
 	// 所持している武器の数を返す。
 	[[nodiscard]] int GetCount() const
 	{
@@ -147,6 +199,10 @@ private:
 	std::array<WEAPON_UPGRADE_LEVELS,WEAPON_TABLE::ns_WEAPON_COUNT> m_upgradeLevels{};
 	// 武器の種類ごとの、強化に使った費用の合計。所持していない武器は0。
 	std::array<int,WEAPON_TABLE::ns_WEAPON_COUNT> m_upgradeSpent{};
+	// 武器の種類ごとの、保存した弾薬があるか。
+	std::array<bool,WEAPON_TABLE::ns_WEAPON_COUNT> m_hasSavedAmmo{};
+	// 武器の種類ごとの、保存した弾薬。保存した弾薬がない武器は、使わない。
+	std::array<WEAPON_AMMO_RECORD,WEAPON_TABLE::ns_WEAPON_COUNT> m_savedAmmo{};
 	// 範囲外の武器に対して返す、全て0の強化の段階。
 	WEAPON_UPGRADE_LEVELS m_zeroLevels{};
 };

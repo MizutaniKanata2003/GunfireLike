@@ -4,7 +4,6 @@
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで、命中表示とダメージの増加の残り時間を0未満にしない。
-#include <string> // std::wstringで、武器の切替のログに、武器の表示名を連結する。
 
 //========= Debug インクルード=========
 #include "Debug/H/CollisionDebugView.h"
@@ -24,7 +23,7 @@
 #include "Scene/Common/Player/H/PlayerController.h"
 #include "Scene/Common/Weapon/H/WeaponTable.h"
 
-// 射撃の表示と、暫定の武器切替に使用する固定設定をまとめる。
+// 射撃の表示に使用する固定設定をまとめる。
 namespace
 {
 	//========= 射撃の表示設定=========
@@ -32,10 +31,6 @@ namespace
 	constexpr float ns_SHOT_TRACE_DISPLAY_LENGTH = 30.0f;
 	// 命中を示す表示を続ける時間。単位は秒。
 	constexpr float ns_HIT_MARKER_SECONDS = 0.3f;
-
-	//========= 暫定の武器切替=========
-	// 武器を切り替える数字キー。表の武器の並び（連射銃・散弾銃・単発高威力銃）と同じ順で、1・2・3。武器の所持・購入の実装までの暫定の操作。
-	constexpr unsigned char ns_WEAPON_SELECT_KEYS[]{'1','2','3'};
 }
 
 //========= 初期化・終了関数=========
@@ -86,14 +81,11 @@ void ShotController::Reset()
 }
 
 //========= 更新関数=========
-// 武器の切替・射撃・リロードを更新し、敵へ命中していればダメージと怯みを与える。
+// 射撃・リロードを更新し、敵へ命中していればダメージと怯みを与える。
 void ShotController::Update(float gameplayDeltaTime)
 {
 	// ジャスト回避の後のダメージの増加の残り時間を進め、0未満にしない。このフレームの射撃にも、残りがあれば反映する。
 	m_damageBoostRemainingSeconds = std::max(0.0f,m_damageBoostRemainingSeconds - gameplayDeltaTime);
-
-	// 数字キーによる暫定の武器切替を、射撃の更新より先に処理する。切り替えたフレームから、新しい武器で射撃する。
-	UpdateWeaponSelection();
 
 	// 射撃を更新する。リロード・連射間隔・弾薬の処理と、命中判定は武器が行い、ダメージの反映だけをここで行う。回避・蹴り・殴打の間は射撃できない。
 	const WEAPON_UPDATE_RESULT weapon_result = m_weaponSystem.Update(gameplayDeltaTime,*m_inputSystem,m_playerController->IsAiming(),
@@ -163,20 +155,5 @@ void ShotController::EquipWeapon(WEAPON_TYPE weaponType,const WEAPON_DATA& weapo
 	// 参照先の登録後なら、この武器の反動の設定を、カメラへ渡す。登録の前（Reset）では、Initializeが渡す。
 	if(m_camera != nullptr){
 		m_camera->SetRecoilProfile(weaponData.recoilProfile);
-	}
-}
-
-//========= 補助関数=========
-// 数字キーが押された瞬間に、対応する武器を装備する。
-void ShotController::UpdateWeaponSelection()
-{
-	// 切替のキーを順に調べる。表の武器の数より多いキーは、対応する武器がないため、調べない。
-	for(int key_index = 0; key_index < WEAPON_TABLE::ns_WEAPON_COUNT && key_index < static_cast<int>(sizeof(ns_WEAPON_SELECT_KEYS)); ++key_index){
-		// 押された瞬間のキーに対応する武器を装備し、切替をログへ記録して、この更新の切替を終える。
-		if(m_inputSystem->IsKeyTriggered(ns_WEAPON_SELECT_KEYS[key_index])){
-			EquipWeapon(static_cast<WEAPON_TYPE>(key_index));
-			Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,std::wstring{L"武器を切り替えました: "} + WEAPON_TABLE::ns_WEAPONS[key_index].displayName);
-			return;
-		}
 	}
 }

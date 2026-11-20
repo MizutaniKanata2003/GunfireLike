@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 // 武器1丁の弾薬・連射間隔・リロードの状態を保持し、射撃入力に応じてRayによる命中判定（HitScan）と視線の反動を行う。
-// ダメージの適用や敵の状態更新は担当せず、命中した相手の情報を結果として返す。武器の切替・購入・強化は担当しないが、購入した予備弾薬の加算と、強化後の性能値への差し替えは受け付ける。
+// ダメージの適用や敵の状態更新は担当せず、命中した相手の情報を結果として返す。武器の切替・購入・強化は担当しないが、購入した予備弾薬の加算と、強化後の性能値への差し替えと、持ち替えた時の弾薬の復元は受け付ける。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::minとstd::maxで、予備弾薬の加算を上限内に収め、装填弾数を装弾数の上限内に収める。
@@ -76,6 +76,15 @@ public:
 		const int added_ammo = std::min(amount,addable_ammo);
 		m_reserveAmmo += added_ammo;
 		return added_ammo;
+	}
+	// 装填弾数と予備弾薬を、指定した値へ設定する。持ち替える前に保存した弾薬を、戻すために使う。装填弾数は、0〜装弾数の上限へ収め、予備弾薬は、0以上へ収める。リロードの進行は、解除する。
+	// magazineAmmo: 設定する装填弾数。
+	// reserveAmmo: 設定する予備弾薬の数。
+	void SetAmmo(int magazineAmmo,int reserveAmmo)
+	{
+		m_magazineAmmo = std::clamp(magazineAmmo,0,m_weaponData.magazineSize);
+		m_reserveAmmo = std::max(0,reserveAmmo);
+		CancelReload();
 	}
 	// 性能値を、強化後の値へ差し替える。装填弾数・予備弾薬・連射間隔・リロードの進行は、そのまま引き継ぐ。装填弾数が、新しい装弾数の上限を超える場合だけ、上限へ収める。強化の購入から呼ぶ。
 	// weaponData: 差し替える性能値。同じ武器の強化後の値であること。値をコピーする。

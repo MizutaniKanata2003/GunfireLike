@@ -90,12 +90,12 @@ enum class SHOP_ROW_STATE
 	e_TOO_EXPENSIVE   // 所持していなくて、通貨が足りない。
 };
 
-// 弾薬の行の、購入の状態。弾薬は、装備している武器の分だけ購入できる（武器ごとの予備弾薬の保存は、F1の切替の実装で行う）。
+// 弾薬の行の、購入の状態。弾薬は、所持している全ての武器について購入できる（装備していない武器は、保存した予備弾薬へ加える）。
 enum class SHOP_AMMO_STATE
 {
 	e_AVAILABLE,     // 購入できる。
 	e_NOT_OWNED,     // 武器を所持していない。
-	e_NOT_EQUIPPED,  // 武器を所持しているが、装備していない。
+	e_NOT_EQUIPPED,  // 現在は発生しない。HUDの文字の整理（GameHud.cpp）で、この値の参照を外してから、削除する。
 	e_AMMO_FULL,     // 予備弾薬が上限に達している。
 	e_TOO_EXPENSIVE  // 通貨が足りない。
 };
@@ -103,10 +103,10 @@ enum class SHOP_AMMO_STATE
 // 強化の行の、購入の状態。強化は、装備している武器にだけ行う。
 enum class SHOP_UPGRADE_STATE
 {
-	e_AVAILABLE,    // 強化できる。
-	e_MAX_LEVEL,    // 段階が上限に達している。
+	e_AVAILABLE,     // 強化できる。
+	e_MAX_LEVEL,     // 段階が上限に達している。
 	e_TOO_EXPENSIVE, // 通貨が足りない。
-	e_NO_WEAPON     // 装備中の武器が判別できない。
+	e_NO_WEAPON      // 装備中の武器が判別できない。
 };
 
 // ショップの更新で起きた出来事。
@@ -136,10 +136,10 @@ struct SHOP_CONTEXT
 {
 	// 現在の通貨の所持額。
 	int balance{};
-	// 装備している武器の種類の値（表の添字）。判別できない場合は-1。
+	// 装備している武器の種類の値（表の添字）。判別できない場合は-1。強化の対象を決めるために使う。
 	int equippedWeaponIndex{-1};
-	// 装備している武器の予備弾薬の数。
-	int equippedReserveAmmo{};
+	// 武器ごとの予備弾薬の数。添字は、WEAPON_TYPEの値と同じ。装備中の武器は現在の値、装備していない武器は保存した値。所持していない武器は、使わない。
+	std::array<int,SHOP_TABLE::ns_ROW_COUNT> reserveAmmo{};
 };
 
 // 武器と弾薬の購入、武器の売却、武器の強化の画面の状態を持つ。
@@ -185,7 +185,7 @@ public:
 	//========= 更新関数=========
 	// 各行の状態を更新し、ボタンのホバーとクリックから、購入・売却・強化・ページ切替・閉じる操作を判定する。ショップが開いている間だけ、毎回の更新で呼ぶ。
 	// input: カーソルの位置・クリック・キーの入力。
-	// context: 通貨・装備中の武器・予備弾薬。購入できるかの判定に使う。
+	// context: 通貨・装備中の武器・武器ごとの予備弾薬。購入できるかの判定に使う。
 	// inventory: 現在の武器の所持と強化の段階。所持済み・上限・売却・強化の判定に使う。
 	// 戻り値: この更新で起きた出来事。閉じている場合は、e_NONE。
 	[[nodiscard]] SHOP_UPDATE_RESULT Update(const SHOP_INPUT& input,const SHOP_CONTEXT& context,const WeaponInventory& inventory)
@@ -325,7 +325,7 @@ private:
 		return SHOP_UPDATE_RESULT::e_NONE;
 	}
 	// 武器・弾薬・強化の、各行の状態と、売却の価格を決める。
-	// context: 通貨・装備中の武器・予備弾薬。
+	// context: 通貨・装備中の武器・武器ごとの予備弾薬。
 	// inventory: 現在の武器の所持と強化の段階。
 	void UpdateStates(const SHOP_CONTEXT& context,const WeaponInventory& inventory)
 	{
@@ -355,14 +355,11 @@ private:
 				m_rowStates[row_index] = SHOP_ROW_STATE::e_AVAILABLE;
 			}
 
-			// 弾薬の購入の状態。未所持、未装備、上限、通貨不足の順に調べる。
+			// 弾薬の購入の状態。未所持、上限、通貨不足の順に調べる。装備の有無は問わない。
 			if(!is_owned){
 				m_ammoStates[row_index] = SHOP_AMMO_STATE::e_NOT_OWNED;
 			}
-			else if(context.equippedWeaponIndex != row_index){
-				m_ammoStates[row_index] = SHOP_AMMO_STATE::e_NOT_EQUIPPED;
-			}
-			else if(context.equippedReserveAmmo >= SHOP_TABLE::ns_AMMO_RESERVE_CAPS[row_index]){
+			else if(context.reserveAmmo[row_index] >= SHOP_TABLE::ns_AMMO_RESERVE_CAPS[row_index]){
 				m_ammoStates[row_index] = SHOP_AMMO_STATE::e_AMMO_FULL;
 			}
 			else if(context.balance < SHOP_TABLE::ns_AMMO_PRICES[row_index]){

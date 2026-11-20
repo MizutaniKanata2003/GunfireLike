@@ -1,9 +1,9 @@
 ﻿#include "../H/GameSession.h"
 
-// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択とその効果の反映、ショップでの武器と弾薬の購入・武器の売却・武器の強化、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
+// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択とその効果の反映、ショップでの武器と弾薬の購入・武器の売却・武器の強化、武器の持ち替え、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
 
 //========= C++標準ライブラリ インクルード=========
-#include <string> // 報酬の選択と購入・売却・強化をログへ記録する際に、見出しや名前を連結する。
+#include <string> // 報酬の選択と購入・売却・強化・持ち替えをログへ記録する際に、見出しや名前を連結する。
 
 //========= Windows インクルード=========
 #include <windows.h> // VK_F1・VK_F2・VK_F4・VK_LBUTTON・VK_RETURNの仮想キーコードで、Capture切替・タイトルへ戻る要求・最初の部屋からの再開・カードやボタンのクリック・ショップを閉じるキーを指定する。
@@ -24,7 +24,7 @@
 #include "Scene/Common/Combat/H/CombatResolver.h"
 #include "Scene/Common/Combat/H/CombatTable.h"
 
-// このクラスの投影面（Clip面）の距離と、報酬選択・ショップの入力の補助に使用する固定設定をまとめる。戦闘の数値はCombatTableにある。
+// このクラスの投影面（Clip面）の距離と、報酬選択・ショップ・武器の持ち替えの入力の補助に使用する固定設定をまとめる。戦闘の数値はCombatTableにある。
 namespace
 {
 	//========= Projection設定=========
@@ -33,15 +33,15 @@ namespace
 	// View空間での遠距離Clip面の距離。単位はワールド距離単位。これより遠い物は描画されない。
 	constexpr float ns_FAR_CLIP = 1000.0f;
 
-	//========= 報酬選択・ショップの入力設定=========
-	// カードや購入ボタンを、キーで選ぶ時の、最初のものに対応するキー。1から順に、並びと同じ。クリックが使えない場合の代わりの操作。
+	//========= 報酬選択・ショップ・持ち替えの入力設定=========
+	// カードや購入ボタン・武器を、キーで選ぶ時の、最初のものに対応するキー。1から順に、並びと同じ。クリックが使えない場合の代わりの操作。
 	constexpr unsigned char ns_UI_FIRST_KEY = '1';
 	// ショップのページ切替に使うキー。
 	constexpr unsigned char ns_SHOP_SWITCH_KEY = 'U';
 	// 描画先の大きさが無効な場合に、カーソルを置く、基準Canvasの外の位置。どのカードやボタンにも乗らない。
 	constexpr float ns_CURSOR_OUTSIDE_CANVAS = -1000.0f;
 
-	//========= 報酬選択・ショップの入力の補助関数=========
+	//========= 入力の補助関数=========
 	// カーソルのクライアント座標を、基準Canvas上の座標へ変換する。HUDの描画と同じ倍率と余白（HudCanvas）の逆変換。
 	// inputSystem: カーソルの位置の取得元。
 	// graphicsSystem: 描画先の大きさの取得元。
@@ -140,7 +140,7 @@ void GameSession::Initialize()
 	// 報酬の取得数を0へ戻し、報酬選択を解除する。カードのボタンの矩形も、設定し直す。
 	m_reward.Initialize();
 
-	// 武器の所持と強化を初期状態へ戻し、ショップを閉じる。ボタンの矩形も、設定し直す。
+	// 武器の所持・強化・保存した弾薬を初期状態へ戻し、ショップを閉じる。ボタンの矩形も、設定し直す。
 	m_inventory.Initialize();
 	m_shop.Initialize();
 }
@@ -193,11 +193,13 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 	// マウスを解放している間と、報酬選択中・ショップが開いている間は、カメラ・移動・戦闘の操作更新をまとめて停止し、ここで戻る。
 	if(!m_inputSystem.IsMouseCaptureEnabled() || m_reward.IsSelecting() || m_shop.IsOpen())return GAME_SESSION_RESULT::e_CONTINUE;
 
-	// カードやボタンを選んだ直後は、選んだクリックや数字キーが、射撃や武器の切替として重ねて反応しないよう、ここで戻る。左クリックが離されたら、解除する。
+	// カードやボタンを選んだ直後は、選んだクリックや数字キーが、射撃や武器の持ち替えとして重ねて反応しないよう、ここで戻る。左クリックが離されたら、解除する。
 	if(m_reward.UpdateInputGuard(m_inputSystem.IsKeyPressed(VK_LBUTTON)))return GAME_SESSION_RESULT::e_CONTINUE;
 
+	// 武器の持ち替えを、射撃の更新より先に処理する。持ち替えたフレームから、新しい武器で射撃する。
 	// 視点とプレイヤーを先に更新し、その結果の位置と動作の状態を使って、戦闘・射撃・敵の行動を更新する。
 	// 射撃・近接攻撃で倒された敵の撃破報酬は、次の更新を待たず、ここで通貨へ加える。
+	UpdateWeaponSwitch();
 	UpdatePlayer(deltaTime,time_deltas.gameplayDeltaTime);
 	UpdateCombat(time_deltas.gameplayDeltaTime,time_deltas.worldDeltaTime);
 	UpdateKillRewards();
@@ -398,7 +400,7 @@ void GameSession::UpdateShop()
 	// 閉じている間は、何もしない。
 	if(!m_shop.IsOpen())return;
 
-	// カーソルの位置（基準Canvas上）、左クリック、ボタンに対応するキーを渡す。購入できるかの判定には、通貨・装備中の武器・予備弾薬を渡す。
+	// カーソルの位置（基準Canvas上）、左クリック、ボタンに対応するキーを渡す。購入できるかの判定には、通貨・装備中の武器・武器ごとの予備弾薬を渡す。
 	const WeaponSystem& weapon = m_player.GetShotController().GetWeaponSystem();
 	SHOP_INPUT shop_input{};
 	shop_input.cursorCanvasPosition = ConvertCursorToCanvas(m_inputSystem,m_graphicsSystem);
@@ -407,7 +409,12 @@ void GameSession::UpdateShop()
 	SHOP_CONTEXT shop_context{};
 	shop_context.balance = m_wallet.GetBalance();
 	shop_context.equippedWeaponIndex = FindWeaponIndex(weapon.GetWeaponData());
-	shop_context.equippedReserveAmmo = weapon.GetReserveAmmo();
+
+	// 予備弾薬は、装備中の武器なら現在の値、装備していない武器なら保存した値を渡す。
+	for(int weapon_index = 0; weapon_index < WEAPON_TABLE::ns_WEAPON_COUNT; ++weapon_index){
+		shop_context.reserveAmmo[weapon_index] = (weapon_index == shop_context.equippedWeaponIndex) ? weapon.GetReserveAmmo()
+			: m_inventory.GetSavedAmmo(weapon_index).reserveAmmo;
+	}
 	const SHOP_UPDATE_RESULT shop_result = m_shop.Update(shop_input,shop_context,m_inventory);
 
 	// 武器の購入・売却、弾薬の購入、強化が求められた場合は、反映する。
@@ -430,6 +437,20 @@ void GameSession::UpdateShop()
 	}
 }
 
+// 数字キーが押された瞬間に、所持している武器へ持ち替える。
+void GameSession::UpdateWeaponSwitch()
+{
+	// 押された数字キーに対応する武器を求める。押されていない場合や、所持していない武器の場合は、何もしない。
+	const int weapon_index = FindTriggeredNumberKey(m_inputSystem,WEAPON_TABLE::ns_WEAPON_COUNT);
+	if(weapon_index < 0 || !m_inventory.IsOwned(static_cast<WEAPON_TYPE>(weapon_index)))return;
+
+	// 装備中の武器と同じ場合は、持ち替えない。
+	if(FindWeaponIndex(m_player.GetShotController().GetWeaponSystem().GetWeaponData()) == weapon_index)return;
+
+	SwitchToWeapon(weapon_index);
+	Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,std::wstring{L"武器を持ち替えました: "} + SHOP_TABLE::ns_WEAPON_NAMES[weapon_index]);
+}
+
 // ショップでの武器の購入を反映する。
 void GameSession::ApplyShopPurchase()
 {
@@ -447,8 +468,8 @@ void GameSession::ApplyShopPurchase()
 		return;
 	}
 
-	// 購入した武器を、装備する。弾薬は、その武器の初期値になる。
-	EquipOwnedWeapon(row_index);
+	// 購入した武器へ持ち替える。持ち替える前の武器の弾薬は、保存される。購入した武器の弾薬は、その武器の初期値になる。
+	SwitchToWeapon(row_index);
 	Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,std::wstring{L"武器を購入しました: "} + SHOP_TABLE::ns_WEAPON_NAMES[row_index]);
 }
 
@@ -467,7 +488,7 @@ void GameSession::ApplyShopSale()
 	// 売却で得る通貨を、加える。
 	m_wallet.Add(sell_price);
 
-	// 装備中の武器を手放した場合は、所持している別の武器（表の並びで最も先）を、代わりに装備する。所持の下限があるため、必ず1丁は残る。
+	// 装備中の武器を手放した場合は、所持している別の武器（表の並びで最も先）を、代わりに装備する。保存した弾薬があれば戻る。所持の下限があるため、必ず1丁は残る。
 	if(was_equipped){
 		const int next_weapon_index = m_inventory.FindFirstOwnedIndex();
 		if(next_weapon_index >= 0){
@@ -483,15 +504,16 @@ void GameSession::ApplyShopAmmoPurchase()
 	// 購入する弾薬の行と、その価格・1回で増える弾数・上限を、ショップの表から取り出す。行の添字は、武器の種類の値と同じ。
 	const int row_index = m_shop.GetLastPurchaseIndex();
 	const int price = SHOP_TABLE::ns_AMMO_PRICES[row_index];
-
-	// 装備中の武器の弾薬でなければ、増やす先がないため、何も変えずに戻る。ショップの状態の判定を通っていれば、起きない。
-	if(FindWeaponIndex(m_player.GetShotController().GetWeaponSystem().GetWeaponData()) != row_index)return;
+	const int pack_size = SHOP_TABLE::ns_AMMO_PACK_SIZES[row_index];
+	const int reserve_cap = SHOP_TABLE::ns_AMMO_RESERVE_CAPS[row_index];
 
 	// 通貨を支払う。足りない場合は、何も変えずに戻る。
 	if(!m_wallet.TrySpend(price))return;
 
-	// 予備弾薬を、上限内で増やす。1発も増やせなかった場合は、支払った通貨を戻して、何も変えない。
-	const int added_ammo = m_player.GetShotController().AddReserveAmmo(SHOP_TABLE::ns_AMMO_PACK_SIZES[row_index],SHOP_TABLE::ns_AMMO_RESERVE_CAPS[row_index]);
+	// 装備中の武器なら、使用中の予備弾薬を、装備していない武器なら、保存した予備弾薬を、上限内で増やす。1発も増やせなかった場合は、支払った通貨を戻して、何も変えない。
+	const bool is_equipped = FindWeaponIndex(m_player.GetShotController().GetWeaponSystem().GetWeaponData()) == row_index;
+	const int added_ammo = is_equipped ? m_player.GetShotController().AddReserveAmmo(pack_size,reserve_cap)
+		: m_inventory.AddSavedReserve(row_index,pack_size,reserve_cap);
 	if(added_ammo <= 0){
 		m_wallet.Add(price);
 		return;
@@ -524,12 +546,34 @@ void GameSession::ApplyShopUpgrade()
 								std::wstring{L"武器を強化しました: "} + SHOP_TABLE::ns_WEAPON_NAMES[weapon_index] + L" " + WEAPON_UPGRADE_TABLE::ns_ITEM_NAMES[item_index]);
 }
 
+// 装備中の武器の弾薬を保存してから、別の武器へ持ち替える。
+void GameSession::SwitchToWeapon(int weaponIndex)
+{
+	// 装備中の武器を求める。同じ武器への持ち替えは、弾薬の保存と復元が不要なため、何もしない。
+	const WeaponSystem& weapon = m_player.GetShotController().GetWeaponSystem();
+	const int current_weapon_index = FindWeaponIndex(weapon.GetWeaponData());
+	if(current_weapon_index == weaponIndex)return;
+
+	// 持ち替える前の武器の弾薬を、保存する。同じ武器へ戻った時に、この弾薬が戻る。
+	if(current_weapon_index >= 0){
+		m_inventory.SaveAmmo(current_weapon_index,weapon.GetMagazineAmmo(),weapon.GetReserveAmmo());
+	}
+	EquipOwnedWeapon(weaponIndex);
+}
+
 // 所持している武器を、強化を反映した性能値で装備する。
 void GameSession::EquipOwnedWeapon(int weaponIndex)
 {
-	// 表の基本の性能値へ、その武器の強化の段階を反映した値で、装備する。
-	m_player.GetShotController().EquipWeapon(static_cast<WEAPON_TYPE>(weaponIndex),
-																					 BuildUpgradedWeaponData(WEAPON_TABLE::ns_WEAPONS[weaponIndex],m_inventory.GetUpgradeLevels(weaponIndex)));
+	// 表の基本の性能値へ、その武器の強化の段階を反映した値で、装備する。装備すると、弾薬は満タンの初期値になる。
+	ShotController& shot_controller = m_player.GetShotController();
+	shot_controller.EquipWeapon(static_cast<WEAPON_TYPE>(weaponIndex),
+															BuildUpgradedWeaponData(WEAPON_TABLE::ns_WEAPONS[weaponIndex],m_inventory.GetUpgradeLevels(weaponIndex)));
+
+	// 保存した弾薬がある場合は、持ち替える前の弾薬へ戻す。
+	if(m_inventory.HasSavedAmmo(weaponIndex)){
+		const WEAPON_AMMO_RECORD saved_ammo = m_inventory.GetSavedAmmo(weaponIndex);
+		shot_controller.SetAmmo(saved_ammo.magazineAmmo,saved_ammo.reserveAmmo);
+	}
 }
 
 // ジャスト回避が成立した時の効果を反映する。
