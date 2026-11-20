@@ -126,16 +126,19 @@ namespace
 	const XMFLOAT2 ns_SHOP_SLOTS_AREA_SIZE{360.0f,50.0f};
 	// 所持数の高さの目標。基準Canvas上の大きさ。
 	constexpr float ns_SHOP_SLOTS_TARGET_HEIGHT = 30.0f;
-	// 各行の武器名を置く領域の、左端のX座標と幅。基準Canvas上の座標と大きさ。行の高さは、配置表の行の高さと同じにする。
+	// 各行の左側（武器名と予備弾薬）を置く領域の、左端のX座標と幅。基準Canvas上の座標と大きさ。武器の購入ボタン（左端580）の手前に収める。
 	constexpr float ns_SHOP_NAME_AREA_X = 200.0f;
-	constexpr float ns_SHOP_NAME_AREA_WIDTH = 380.0f;
+	constexpr float ns_SHOP_NAME_AREA_WIDTH = 360.0f;
+	// 行の上端から、武器名の領域の上端までの距離と、領域の高さ。基準Canvas上の大きさ。行の高さ（96）の上側へ置く。
+	constexpr float ns_SHOP_NAME_AREA_OFFSET_Y = 8.0f;
+	constexpr float ns_SHOP_NAME_AREA_HEIGHT = 44.0f;
 	// 武器名の高さの目標。基準Canvas上の大きさ。
-	constexpr float ns_SHOP_NAME_TARGET_HEIGHT = 34.0f;
-	// 各行の価格を置く領域の、左端のX座標と幅。基準Canvas上の座標と大きさ。購入ボタン（左端840）の手前に収める。
-	constexpr float ns_SHOP_PRICE_AREA_X = 590.0f;
-	constexpr float ns_SHOP_PRICE_AREA_WIDTH = 230.0f;
-	// 価格の高さの目標。基準Canvas上の大きさ。
-	constexpr float ns_SHOP_PRICE_TARGET_HEIGHT = 30.0f;
+	constexpr float ns_SHOP_NAME_TARGET_HEIGHT = 30.0f;
+	// 行の上端から、予備弾薬の領域の上端までの距離と、領域の高さ。基準Canvas上の大きさ。行の高さ（96）の下側へ置く。
+	constexpr float ns_SHOP_RESERVE_AREA_OFFSET_Y = 52.0f;
+	constexpr float ns_SHOP_RESERVE_AREA_HEIGHT = 36.0f;
+	// 予備弾薬の高さの目標。基準Canvas上の大きさ。
+	constexpr float ns_SHOP_RESERVE_TARGET_HEIGHT = 22.0f;
 	// ボタンの文字の高さの目標。基準Canvas上の大きさ。ボタンの高さ（64）に収まる大きさ。
 	constexpr float ns_SHOP_BUTTON_TEXT_TARGET_HEIGHT = 30.0f;
 	// 操作の案内を置く領域の左上の位置。基準Canvas上の座標。最後の行（下端478）と、閉じるボタン（上端546）の間へ置く。
@@ -146,15 +149,32 @@ namespace
 	constexpr float ns_SHOP_GUIDE_TARGET_HEIGHT = 24.0f;
 
 	//========= ショップのボタンの文字=========
-	// 購入の状態に応じた、ボタンの文字を返す。
+	// 武器の購入の状態に応じた、ボタンの文字を返す。購入できる時は、価格を添える。
 	// rowState: 武器の行の購入の状態。
-	const wchar_t* GetShopButtonLabel(SHOP_ROW_STATE rowState)
+	// price: 武器の価格。
+	std::wstring GetWeaponButtonLabel(SHOP_ROW_STATE rowState,int price)
 	{
 		switch(rowState){
-		case SHOP_ROW_STATE::e_AVAILABLE:      return L"BUY";
+		case SHOP_ROW_STATE::e_AVAILABLE:      return L"BUY " + std::to_wstring(price);
 		case SHOP_ROW_STATE::e_OWNED:          return L"OWNED";
 		case SHOP_ROW_STATE::e_INVENTORY_FULL: return L"FULL";
 		case SHOP_ROW_STATE::e_TOO_EXPENSIVE:  return L"NEED MORE";
+		}
+		return L"";
+	}
+
+	// 弾薬の購入の状態に応じた、ボタンの文字を返す。購入できる時は、増える弾数と価格を添える。
+	// ammoState: 弾薬の行の購入の状態。
+	// packSize: 1回の購入で増える弾数。
+	// price: 弾薬の価格。
+	std::wstring GetAmmoButtonLabel(SHOP_AMMO_STATE ammoState,int packSize,int price)
+	{
+		switch(ammoState){
+		case SHOP_AMMO_STATE::e_AVAILABLE:     return L"AMMO +" + std::to_wstring(packSize) + L" / " + std::to_wstring(price);
+		case SHOP_AMMO_STATE::e_NOT_OWNED:     return L"NO WEAPON";
+		case SHOP_AMMO_STATE::e_NOT_EQUIPPED:  return L"EQUIP FIRST";
+		case SHOP_AMMO_STATE::e_AMMO_FULL:     return L"AMMO FULL";
+		case SHOP_AMMO_STATE::e_TOO_EXPENSIVE: return L"NEED MORE";
 		}
 		return L"";
 	}
@@ -360,10 +380,17 @@ void GameHud::DrawShopSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STAT
 	// パネルを先に描く。
 	m_spriteRenderer.DrawSprite(graphicsSystem,m_shopPanelTexture,SHOP_LAYOUT::ns_PANEL.position,SHOP_LAYOUT::ns_PANEL.size,ns_WHITE,1.0f);
 
-	// 全てのボタンを、行の順に、閉じるボタンを最後に描く。押せない行は、押せない時の画像にする。押せるボタンは、カーソルが乗っていればホバー用の画像にする。
+	// 全てのボタンを、武器の購入、弾薬の購入、閉じるボタンの順に描く。押せないボタンは、押せない時の画像にする。押せるボタンは、カーソルが乗っていればホバー用の画像にする。
 	for(int button_index = 0; button_index < SHOP_LAYOUT::ns_BUTTON_COUNT; ++button_index){
-		const bool is_close_button = button_index == SHOP_TABLE::ns_CLOSE_INDEX;
-		const bool is_pressable = is_close_button || state.shopRowStates[button_index] == SHOP_ROW_STATE::e_AVAILABLE;
+		// ボタンの種類ごとに、押せる状態かを調べる。閉じるボタンは、常に押せる。
+		bool is_pressable = true;
+		if(button_index < SHOP_TABLE::ns_AMMO_BUTTON_OFFSET){
+			is_pressable = state.shopRowStates[button_index] == SHOP_ROW_STATE::e_AVAILABLE;
+		}
+		else if(button_index < SHOP_TABLE::ns_CLOSE_INDEX){
+			is_pressable = state.shopAmmoStates[button_index - SHOP_TABLE::ns_AMMO_BUTTON_OFFSET] == SHOP_AMMO_STATE::e_AVAILABLE;
+		}
+
 		HudTextureHandle button_texture = m_shopButtonDisabledTexture;
 		if(is_pressable){
 			button_texture = (button_index == state.hoveredShopIndex) ? m_shopButtonHoverTexture : m_shopButtonTexture;
@@ -379,21 +406,31 @@ void GameHud::DrawShopTexts(const GAME_HUD_STATE& state)
 	DrawFittedText(L"SHOP",ns_SHOP_TITLE_AREA_POSITION,ns_SHOP_TITLE_AREA_SIZE,ns_SHOP_TITLE_TARGET_HEIGHT,ns_REWARD_TITLE_COLOR);
 	DrawFittedText(L"SLOTS " + std::to_wstring(state.ownedWeaponCount) + L" / " + std::to_wstring(WEAPON_INVENTORY_TABLE::ns_MAX_WEAPONS),
 								 ns_SHOP_SLOTS_AREA_POSITION,ns_SHOP_SLOTS_AREA_SIZE,ns_SHOP_SLOTS_TARGET_HEIGHT,ns_REWARD_BODY_COLOR);
-	DrawFittedText(L"CLICK BUY  (OR PRESS 1 / 2 / 3)    ENTER: CLOSE",ns_SHOP_GUIDE_AREA_POSITION,ns_SHOP_GUIDE_AREA_SIZE,ns_SHOP_GUIDE_TARGET_HEIGHT,
+	DrawFittedText(L"CLICK  (OR 1-3: WEAPON  4-6: AMMO)    ENTER: CLOSE",ns_SHOP_GUIDE_AREA_POSITION,ns_SHOP_GUIDE_AREA_SIZE,ns_SHOP_GUIDE_TARGET_HEIGHT,
 								 ns_REWARD_BODY_COLOR);
 
-	// 各行の武器名・価格・ボタンの文字を描く。価格が0の武器（最初から所持している武器）は、価格を「-」にする。
+	// 各行の武器名・予備弾薬・2つのボタンの文字を描く。予備弾薬は、装備している武器の行にだけ、「RESERVE 現在 / 上限」の形で表示する。
 	for(int row_index = 0; row_index < SHOP_TABLE::ns_ROW_COUNT; ++row_index){
 		const float row_top = SHOP_LAYOUT::ns_ROW_TOP + SHOP_LAYOUT::ns_ROW_HEIGHT * static_cast<float>(row_index);
-		const int price = SHOP_TABLE::ns_WEAPON_PRICES[row_index];
-		DrawFittedText(SHOP_TABLE::ns_WEAPON_NAMES[row_index],XMFLOAT2{ns_SHOP_NAME_AREA_X,row_top},XMFLOAT2{ns_SHOP_NAME_AREA_WIDTH,SHOP_LAYOUT::ns_ROW_HEIGHT},
-									 ns_SHOP_NAME_TARGET_HEIGHT,ns_REWARD_BODY_COLOR);
-		DrawFittedText(price > 0 ? L"PRICE " + std::to_wstring(price) : std::wstring{L"-"},XMFLOAT2{ns_SHOP_PRICE_AREA_X,row_top},
-									 XMFLOAT2{ns_SHOP_PRICE_AREA_WIDTH,SHOP_LAYOUT::ns_ROW_HEIGHT},ns_SHOP_PRICE_TARGET_HEIGHT,ns_CURRENCY_TEXT_COLOR);
+		DrawFittedText(SHOP_TABLE::ns_WEAPON_NAMES[row_index],XMFLOAT2{ns_SHOP_NAME_AREA_X,row_top + ns_SHOP_NAME_AREA_OFFSET_Y},
+									 XMFLOAT2{ns_SHOP_NAME_AREA_WIDTH,ns_SHOP_NAME_AREA_HEIGHT},ns_SHOP_NAME_TARGET_HEIGHT,ns_REWARD_BODY_COLOR);
+		if(row_index == state.equippedWeaponIndex){
+			DrawFittedText(L"RESERVE " + std::to_wstring(state.reserveAmmo) + L" / " + std::to_wstring(SHOP_TABLE::ns_AMMO_RESERVE_CAPS[row_index]),
+										 XMFLOAT2{ns_SHOP_NAME_AREA_X,row_top + ns_SHOP_RESERVE_AREA_OFFSET_Y},XMFLOAT2{ns_SHOP_NAME_AREA_WIDTH,ns_SHOP_RESERVE_AREA_HEIGHT},
+										 ns_SHOP_RESERVE_TARGET_HEIGHT,ns_CURRENCY_TEXT_COLOR);
+		}
 
+		// 武器の購入ボタンの文字。購入できる時だけ白、他は灰色。
 		const SHOP_ROW_STATE row_state = state.shopRowStates[row_index];
-		DrawFittedText(GetShopButtonLabel(row_state),SHOP_LAYOUT::ns_BUTTON_POSITIONS[row_index],SHOP_LAYOUT::ns_BUTTON_SIZE,ns_SHOP_BUTTON_TEXT_TARGET_HEIGHT,
+		DrawFittedText(GetWeaponButtonLabel(row_state,SHOP_TABLE::ns_WEAPON_PRICES[row_index]),SHOP_LAYOUT::ns_BUTTON_POSITIONS[row_index],
+									 SHOP_LAYOUT::ns_BUTTON_SIZE,ns_SHOP_BUTTON_TEXT_TARGET_HEIGHT,
 									 row_state == SHOP_ROW_STATE::e_AVAILABLE ? ns_SHOP_BUTTON_TEXT_COLOR : ns_SHOP_BUTTON_DISABLED_TEXT_COLOR);
+
+		// 弾薬の購入ボタンの文字。購入できる時だけ白、他は灰色。
+		const SHOP_AMMO_STATE ammo_state = state.shopAmmoStates[row_index];
+		DrawFittedText(GetAmmoButtonLabel(ammo_state,SHOP_TABLE::ns_AMMO_PACK_SIZES[row_index],SHOP_TABLE::ns_AMMO_PRICES[row_index]),
+									 SHOP_LAYOUT::ns_BUTTON_POSITIONS[SHOP_TABLE::ns_AMMO_BUTTON_OFFSET + row_index],SHOP_LAYOUT::ns_BUTTON_SIZE,
+									 ns_SHOP_BUTTON_TEXT_TARGET_HEIGHT,ammo_state == SHOP_AMMO_STATE::e_AVAILABLE ? ns_SHOP_BUTTON_TEXT_COLOR : ns_SHOP_BUTTON_DISABLED_TEXT_COLOR);
 	}
 
 	// 閉じるボタンの文字を描く。

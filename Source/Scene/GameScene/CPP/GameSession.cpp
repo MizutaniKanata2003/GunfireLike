@@ -1,9 +1,9 @@
 ﻿#include "../H/GameSession.h"
 
-// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択とその効果の反映、ショップでの武器の購入、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
+// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択とその効果の反映、ショップでの武器と弾薬の購入、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
 
 //========= C++標準ライブラリ インクルード=========
-#include <string> // 報酬の選択と武器の購入をログへ記録する際に、見出しや名前を連結する。
+#include <string> // 報酬の選択と購入をログへ記録する際に、見出しや名前を連結する。
 
 //========= Windows インクルード=========
 #include <windows.h> // VK_F1・VK_F2・VK_F4・VK_LBUTTON・VK_RETURNの仮想キーコードで、Capture切替・タイトルへ戻る要求・最初の部屋からの再開・カードやボタンのクリック・ショップを閉じるキーを指定する。
@@ -73,7 +73,7 @@ namespace
 		return triggered_index;
 	}
 
-	// ショップの、この更新で押されたキーに対応するボタンの添字を返す。数字キーは武器の行の購入、Enterは閉じるボタンに対応する。
+	// ショップの、この更新で押されたキーに対応するボタンの添字を返す。数字キーは、武器の購入（1〜3）と弾薬の購入（4〜6）、Enterは閉じるボタンに対応する。
 	// inputSystem: キー入力の取得元。
 	// 戻り値: 押されたキーに対応するボタンの添字。どれも押されていなければ-1。
 	int FindTriggeredShopKey(const InputSystem& inputSystem)
@@ -81,7 +81,23 @@ namespace
 		// Enterは、閉じるボタンの代わりにする。数字キーより優先する。
 		if(inputSystem.IsKeyTriggered(VK_RETURN))return SHOP_TABLE::ns_CLOSE_INDEX;
 
-		return FindTriggeredNumberKey(inputSystem,SHOP_TABLE::ns_ROW_COUNT);
+		// 閉じるボタンの手前までの、購入ボタンの数だけ、数字キーを調べる。
+		return FindTriggeredNumberKey(inputSystem,SHOP_TABLE::ns_CLOSE_INDEX);
+	}
+
+	//========= 装備中の武器の判別=========
+	// 装備中の武器の性能値から、武器の種類の値（表の添字）を求める。表示名の文字列の指す先が、表の同じ武器の表示名と一致するかで判別する。
+	// 武器の性能値は、表の値をコピーするため、表示名のポインターも、表のものと同じになる。
+	// weaponData: 装備中の武器の性能値。
+	// 戻り値: 武器の種類の値。表にない場合は-1。
+	int FindWeaponIndex(const WEAPON_DATA& weaponData)
+	{
+		for(int weapon_index = 0; weapon_index < WEAPON_TABLE::ns_WEAPON_COUNT; ++weapon_index){
+			if(WEAPON_TABLE::ns_WEAPONS[weapon_index].displayName == weaponData.displayName){
+				return weapon_index;
+			}
+		}
+		return -1;
 	}
 }
 
@@ -371,16 +387,24 @@ void GameSession::UpdateShop()
 	// 閉じている間は、何もしない。
 	if(!m_shop.IsOpen())return;
 
-	// カーソルの位置（基準Canvas上）、左クリック、ボタンに対応するキーを渡して、購入と閉じる操作の結果を受け取る。
+	// カーソルの位置（基準Canvas上）、左クリック、ボタンに対応するキーを渡す。購入できるかの判定には、通貨・装備中の武器・予備弾薬を渡す。
+	const WeaponSystem& weapon = m_player.GetShotController().GetWeaponSystem();
 	SHOP_INPUT shop_input{};
 	shop_input.cursorCanvasPosition = ConvertCursorToCanvas(m_inputSystem,m_graphicsSystem);
 	shop_input.isClickTriggered = m_inputSystem.IsKeyTriggered(VK_LBUTTON);
 	shop_input.keyChoiceIndex = FindTriggeredShopKey(m_inputSystem);
-	const SHOP_UPDATE_RESULT shop_result = m_shop.Update(shop_input,m_wallet.GetBalance(),m_inventory);
+	SHOP_CONTEXT shop_context{};
+	shop_context.balance = m_wallet.GetBalance();
+	shop_context.equippedWeaponIndex = FindWeaponIndex(weapon.GetWeaponData());
+	shop_context.equippedReserveAmmo = weapon.GetReserveAmmo();
+	const SHOP_UPDATE_RESULT shop_result = m_shop.Update(shop_input,shop_context,m_inventory);
 
-	// 購入が求められた場合は、購入を反映する。
+	// 武器か弾薬の購入が求められた場合は、購入を反映する。
 	if(shop_result == SHOP_UPDATE_RESULT::e_PURCHASE_REQUESTED){
 		ApplyShopPurchase();
+	}
+	else if(shop_result == SHOP_UPDATE_RESULT::e_AMMO_PURCHASE_REQUESTED){
+		ApplyShopAmmoPurchase();
 	}
 	// 閉じた場合は、Captureを戻して、ゲームの操作へ戻る。選んだクリックが射撃にならないよう、入力の保護が、続けて働く。
 	else if(shop_result == SHOP_UPDATE_RESULT::e_CLOSED){
@@ -409,6 +433,29 @@ void GameSession::ApplyShopPurchase()
 	// 購入した武器を、装備する。弾薬は、その武器の初期値になる。
 	m_player.GetShotController().EquipWeapon(weapon_type);
 	Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,std::wstring{L"武器を購入しました: "} + SHOP_TABLE::ns_WEAPON_NAMES[row_index]);
+}
+
+// ショップでの弾薬の購入を反映する。
+void GameSession::ApplyShopAmmoPurchase()
+{
+	// 購入する弾薬の行と、その価格・1回で増える弾数・上限を、ショップの表から取り出す。行の添字は、武器の種類の値と同じ。
+	const int row_index = m_shop.GetLastPurchaseIndex();
+	const int price = SHOP_TABLE::ns_AMMO_PRICES[row_index];
+
+	// 装備中の武器の弾薬でなければ、増やす先がないため、何も変えずに戻る。ショップの状態の判定を通っていれば、起きない。
+	if(FindWeaponIndex(m_player.GetShotController().GetWeaponSystem().GetWeaponData()) != row_index)return;
+
+	// 通貨を支払う。足りない場合は、何も変えずに戻る。
+	if(!m_wallet.TrySpend(price))return;
+
+	// 予備弾薬を、上限内で増やす。1発も増やせなかった場合は、支払った通貨を戻して、何も変えない。
+	const int added_ammo = m_player.GetShotController().AddReserveAmmo(SHOP_TABLE::ns_AMMO_PACK_SIZES[row_index],SHOP_TABLE::ns_AMMO_RESERVE_CAPS[row_index]);
+	if(added_ammo <= 0){
+		m_wallet.Add(price);
+		return;
+	}
+	Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,
+								std::wstring{L"弾薬を購入しました: "} + SHOP_TABLE::ns_WEAPON_NAMES[row_index] + L" +" + std::to_wstring(added_ammo));
 }
 
 // ジャスト回避が成立した時の効果を反映する。
@@ -598,6 +645,8 @@ void GameSession::DrawHud()
 	hud_state.isShopOpen = m_shop.IsOpen();
 	hud_state.hoveredShopIndex = m_shop.GetHoveredIndex();
 	hud_state.shopRowStates = m_shop.GetRowStates();
+	hud_state.shopAmmoStates = m_shop.GetAmmoStates();
 	hud_state.ownedWeaponCount = m_inventory.GetCount();
+	hud_state.equippedWeaponIndex = FindWeaponIndex(weapon.GetWeaponData());
 	m_gameHud.Draw(m_graphicsSystem,hud_state);
 }

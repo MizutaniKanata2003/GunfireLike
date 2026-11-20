@@ -65,14 +65,14 @@ namespace REWARD_LAYOUT
 	inline constexpr XMFLOAT2 ns_CARD_POSITIONS[ns_CARD_COUNT]{{60.0f,150.0f},{460.0f,150.0f},{860.0f,150.0f}};
 }
 
-// ショップ（武器の購入画面）の画像の配置をまとめる。画像は、Assets/Textures/UI/へ置く。
+// ショップ（武器と弾薬の購入画面）の画像の配置をまとめる。画像は、Assets/Textures/UI/へ置く。
 namespace SHOP_LAYOUT
 {
 	//========= 行とボタンの数=========
 	// 武器の行の数。武器の種類の数（SHOP_TABLE）と同じにする。
 	inline constexpr int ns_ROW_COUNT = 3;
-	// ボタンの数。武器の行ごとの購入ボタンと、閉じるボタン。
-	inline constexpr int ns_BUTTON_COUNT = ns_ROW_COUNT + 1;
+	// ボタンの数。武器の購入ボタン、弾薬の購入ボタン、閉じるボタン。
+	inline constexpr int ns_BUTTON_COUNT = ns_ROW_COUNT * 2 + 1;
 
 	//========= パネル=========
 	// 画面中央（640,360）に中心が来る、960×540のパネルの枠。
@@ -89,10 +89,15 @@ namespace SHOP_LAYOUT
 	inline constexpr const wchar_t* ns_BUTTON_PATH = L"Assets/Textures/UI/ShopButton.png";
 	// ボタンの画像（カーソルが乗っている時）。240×64。
 	inline constexpr const wchar_t* ns_BUTTON_HOVER_PATH = L"Assets/Textures/UI/ShopButtonHover.png";
-	// ボタンの画像（押せない時。所持済み・上限・通貨不足）。240×64。
+	// ボタンの画像（押せない時。所持済み・上限・通貨不足など）。240×64。
 	inline constexpr const wchar_t* ns_BUTTON_DISABLED_PATH = L"Assets/Textures/UI/ShopButtonDisabled.png";
 	// ボタン1つの幅と高さ。基準Canvas上の大きさ。
 	inline constexpr XMFLOAT2 ns_BUTTON_SIZE{240.0f,64.0f};
-	// ボタンの左上の位置。武器の行ごとの購入ボタン（行の右側、行の中央に揃える）と、パネルの下側の中央の閉じるボタンの順。
-	inline constexpr XMFLOAT2 ns_BUTTON_POSITIONS[ns_BUTTON_COUNT]{{840.0f,206.0f},{840.0f,302.0f},{840.0f,398.0f},{520.0f,546.0f}};
+	// ボタンの左上の位置。武器の購入ボタン3つ（行の中ほど）、弾薬の購入ボタン3つ（行の右端）、パネルの下側の中央の閉じるボタンの順。
+	// 購入ボタンは、行の中央に揃える（行の上端から16下）。右端のボタンの右端は1080で、パネルの右端（1120）から40の余白を残す。
+	inline constexpr XMFLOAT2 ns_BUTTON_POSITIONS[ns_BUTTON_COUNT]{
+		{580.0f,206.0f},{580.0f,302.0f},{580.0f,398.0f},
+		{840.0f,206.0f},{840.0f,302.0f},{840.0f,398.0f},
+		{520.0f,546.0f}
+	};
 }

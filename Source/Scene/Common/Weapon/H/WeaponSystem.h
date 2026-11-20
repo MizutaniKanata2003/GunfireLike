@@ -1,9 +1,10 @@
 ﻿#pragma once
 
 // 武器1丁の弾薬・連射間隔・リロードの状態を保持し、射撃入力に応じてRayによる命中判定（HitScan）と視線の反動を行う。
-// ダメージの適用や敵の状態更新は担当せず、命中した相手の情報を結果として返す。武器の切替・購入・強化は担当しない。
+// ダメージの適用や敵の状態更新は担当せず、命中した相手の情報を結果として返す。武器の切替・購入・強化は担当しないが、購入した予備弾薬の加算だけは受け付ける。
 
 //========= C++標準ライブラリ インクルード=========
+#include <algorithm> // std::minとstd::maxで、予備弾薬の加算を上限内に収める。
 #include <random> // std::mt19937で弾のばらつきと反動の左右の乱数を生成する。
 
 //========= Framework インクルード=========
@@ -60,6 +61,21 @@ public:
 	{
 		m_isReloading = false;
 		m_reloadElapsedSeconds = 0.0f;
+	}
+	// 予備弾薬を増やす。上限を超える分は加えない。装填弾数とリロードの状態は変えない。弾薬の購入から呼ぶ。
+	// amount: 増やす弾数。0以下の場合は何もしない。
+	// maxReserve: 予備弾薬の上限。現在の予備弾薬が上限以上なら、何も加えない。
+	// 戻り値: 実際に加えた弾数。0以上。
+	int AddReserveAmmo(int amount,int maxReserve)
+	{
+		// 増やす数が正でない場合は、何も加えない。
+		if(amount <= 0)return 0;
+
+		// 上限までの空きと、増やす数の少ない方だけ加える。空きがなければ0になる。
+		const int addable_ammo = std::max(0,maxReserve - m_reserveAmmo);
+		const int added_ammo = std::min(amount,addable_ammo);
+		m_reserveAmmo += added_ammo;
+		return added_ammo;
 	}
 	// デバッグ用に、弾薬を消費しない設定を切り替える。有効の間は、装填弾数が0でも発射でき、発射しても弾薬が減らない。
 	void ToggleInfiniteAmmo() { m_isInfiniteAmmo = !m_isInfiniteAmmo; }
