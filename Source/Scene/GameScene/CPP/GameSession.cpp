@@ -1,9 +1,9 @@
 ﻿#include "../H/GameSession.h"
 
-// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択とその効果の反映、ショップでの武器と弾薬の購入、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
+// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択とその効果の反映、ショップでの武器と弾薬の購入と武器の売却、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
 
 //========= C++標準ライブラリ インクルード=========
-#include <string> // 報酬の選択と購入をログへ記録する際に、見出しや名前を連結する。
+#include <string> // 報酬の選択と購入・売却をログへ記録する際に、見出しや名前を連結する。
 
 //========= Windows インクルード=========
 #include <windows.h> // VK_F1・VK_F2・VK_F4・VK_LBUTTON・VK_RETURNの仮想キーコードで、Capture切替・タイトルへ戻る要求・最初の部屋からの再開・カードやボタンのクリック・ショップを閉じるキーを指定する。
@@ -73,7 +73,7 @@ namespace
 		return triggered_index;
 	}
 
-	// ショップの、この更新で押されたキーに対応するボタンの添字を返す。数字キーは、武器の購入（1〜3）と弾薬の購入（4〜6）、Enterは閉じるボタンに対応する。
+	// ショップの、この更新で押されたキーに対応するボタンの添字を返す。数字キーは、武器の購入と売却（1〜3）と弾薬の購入（4〜6）、Enterは閉じるボタンに対応する。
 	// inputSystem: キー入力の取得元。
 	// 戻り値: 押されたキーに対応するボタンの添字。どれも押されていなければ-1。
 	int FindTriggeredShopKey(const InputSystem& inputSystem)
@@ -81,7 +81,7 @@ namespace
 		// Enterは、閉じるボタンの代わりにする。数字キーより優先する。
 		if(inputSystem.IsKeyTriggered(VK_RETURN))return SHOP_TABLE::ns_CLOSE_INDEX;
 
-		// 閉じるボタンの手前までの、購入ボタンの数だけ、数字キーを調べる。
+		// 閉じるボタンの手前までの、購入と売却のボタンの数だけ、数字キーを調べる。
 		return FindTriggeredNumberKey(inputSystem,SHOP_TABLE::ns_CLOSE_INDEX);
 	}
 
@@ -175,7 +175,7 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 	UpdateTimers(frame_delta_time,time_deltas.gameplayDeltaTime);
 	UpdateKillRewards();
 
-	// 部屋のクリアの結果を受けて、報酬選択へ入る・抜ける。抜けた更新で、続けてショップを開く。ショップが開いている間は、購入と閉じる操作を処理する。
+	// 部屋のクリアの結果を受けて、報酬選択へ入る・抜ける。抜けた更新で、続けてショップを開く。ショップが開いている間は、購入・売却・閉じる操作を処理する。
 	UpdateReward();
 	UpdateShop();
 
@@ -381,7 +381,7 @@ void GameSession::UpdateReward()
 	m_player.GetPlayerCombat().SetFollowUpStrike(m_reward.GetFollowUpDamageScale(),REWARD_TABLE::ns_FOLLOW_UP_SECONDS);
 }
 
-// ショップが開いている間、購入と閉じる操作を処理する。
+// ショップが開いている間、購入・売却と閉じる操作を処理する。
 void GameSession::UpdateShop()
 {
 	// 閉じている間は、何もしない。
@@ -399,9 +399,12 @@ void GameSession::UpdateShop()
 	shop_context.equippedReserveAmmo = weapon.GetReserveAmmo();
 	const SHOP_UPDATE_RESULT shop_result = m_shop.Update(shop_input,shop_context,m_inventory);
 
-	// 武器か弾薬の購入が求められた場合は、購入を反映する。
+	// 武器の購入・売却、弾薬の購入が求められた場合は、反映する。
 	if(shop_result == SHOP_UPDATE_RESULT::e_PURCHASE_REQUESTED){
 		ApplyShopPurchase();
+	}
+	else if(shop_result == SHOP_UPDATE_RESULT::e_SELL_REQUESTED){
+		ApplyShopSale();
 	}
 	else if(shop_result == SHOP_UPDATE_RESULT::e_AMMO_PURCHASE_REQUESTED){
 		ApplyShopAmmoPurchase();
@@ -433,6 +436,30 @@ void GameSession::ApplyShopPurchase()
 	// 購入した武器を、装備する。弾薬は、その武器の初期値になる。
 	m_player.GetShotController().EquipWeapon(weapon_type);
 	Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,std::wstring{L"武器を購入しました: "} + SHOP_TABLE::ns_WEAPON_NAMES[row_index]);
+}
+
+// ショップでの武器の売却を反映する。
+void GameSession::ApplyShopSale()
+{
+	// 売却する武器と価格を、ショップの表から取り出す。行の添字は、武器の種類の値と同じ。
+	const int row_index = m_shop.GetLastPurchaseIndex();
+	const WEAPON_TYPE weapon_type = static_cast<WEAPON_TYPE>(row_index);
+
+	// 売却する武器を装備中かを、手放す前に調べる。外せなかった場合（最後の1丁など）は、何も変えずに戻る。
+	const bool was_equipped = FindWeaponIndex(m_player.GetShotController().GetWeaponSystem().GetWeaponData()) == row_index;
+	if(!m_inventory.TryRemove(weapon_type))return;
+
+	// 売却の価格を、通貨へ加える。
+	m_wallet.Add(SHOP_TABLE::ns_WEAPON_SELL_PRICES[row_index]);
+
+	// 装備中の武器を手放した場合は、所持している別の武器（表の並びで最も先）を、代わりに装備する。所持の下限があるため、必ず1丁は残る。
+	if(was_equipped){
+		const int next_weapon_index = m_inventory.FindFirstOwnedIndex();
+		if(next_weapon_index >= 0){
+			m_player.GetShotController().EquipWeapon(static_cast<WEAPON_TYPE>(next_weapon_index));
+		}
+	}
+	Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,std::wstring{L"武器を売却しました: "} + SHOP_TABLE::ns_WEAPON_NAMES[row_index]);
 }
 
 // ショップでの弾薬の購入を反映する。
