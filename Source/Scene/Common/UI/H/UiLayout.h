@@ -51,7 +51,7 @@ namespace REWARD_LAYOUT
 	inline constexpr int ns_CARD_COUNT = 3;
 
 	//========= 背景=========
-	// 報酬選択の間、画面全体を暗くする半透明の背景。1280×720。
+	// 報酬選択の間、画面全体を暗くする半透明の背景。1280×720。ショップも、同じ画像を使う。
 	inline constexpr UI_IMAGE_LAYOUT ns_BACKDROP{L"Assets/Textures/UI/RewardBackdrop.png",{0.0f,0.0f},{1280.0f,720.0f}};
 
 	//========= カード=========
@@ -63,4 +63,36 @@ namespace REWARD_LAYOUT
 	inline constexpr XMFLOAT2 ns_CARD_SIZE{360.0f,480.0f};
 	// カードの左上の位置。左から順に並べ、カードの間は40。左右の余白は60ずつで、3枚が画面の中央に収まる。上下は、見出しと案内の間へ置く。
 	inline constexpr XMFLOAT2 ns_CARD_POSITIONS[ns_CARD_COUNT]{{60.0f,150.0f},{460.0f,150.0f},{860.0f,150.0f}};
+}
+
+// ショップ（武器の購入画面）の画像の配置をまとめる。画像は、Assets/Textures/UI/へ置く。
+namespace SHOP_LAYOUT
+{
+	//========= 行とボタンの数=========
+	// 武器の行の数。武器の種類の数（SHOP_TABLE）と同じにする。
+	inline constexpr int ns_ROW_COUNT = 3;
+	// ボタンの数。武器の行ごとの購入ボタンと、閉じるボタン。
+	inline constexpr int ns_BUTTON_COUNT = ns_ROW_COUNT + 1;
+
+	//========= パネル=========
+	// 画面中央（640,360）に中心が来る、960×540のパネルの枠。
+	inline constexpr UI_IMAGE_LAYOUT ns_PANEL{L"Assets/Textures/UI/ShopPanel.png",{160.0f,90.0f},{960.0f,540.0f}};
+
+	//========= 行=========
+	// 最初の行の上端のY座標。パネルの上端（90）から、見出しの領域の分だけ下げた位置。基準Canvas上の座標。
+	inline constexpr float ns_ROW_TOP = 190.0f;
+	// 行の高さと、行の間隔。基準Canvas上の大きさ。行は、隙間なく並ぶ。
+	inline constexpr float ns_ROW_HEIGHT = 96.0f;
+
+	//========= ボタン=========
+	// ボタンの画像（通常）。240×64。
+	inline constexpr const wchar_t* ns_BUTTON_PATH = L"Assets/Textures/UI/ShopButton.png";
+	// ボタンの画像（カーソルが乗っている時）。240×64。
+	inline constexpr const wchar_t* ns_BUTTON_HOVER_PATH = L"Assets/Textures/UI/ShopButtonHover.png";
+	// ボタンの画像（押せない時。所持済み・上限・通貨不足）。240×64。
+	inline constexpr const wchar_t* ns_BUTTON_DISABLED_PATH = L"Assets/Textures/UI/ShopButtonDisabled.png";
+	// ボタン1つの幅と高さ。基準Canvas上の大きさ。
+	inline constexpr XMFLOAT2 ns_BUTTON_SIZE{240.0f,64.0f};
+	// ボタンの左上の位置。武器の行ごとの購入ボタン（行の右側、行の中央に揃える）と、パネルの下側の中央の閉じるボタンの順。
+	inline constexpr XMFLOAT2 ns_BUTTON_POSITIONS[ns_BUTTON_COUNT]{{840.0f,206.0f},{840.0f,302.0f},{840.0f,398.0f},{520.0f,546.0f}};
 }

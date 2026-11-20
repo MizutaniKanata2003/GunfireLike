@@ -1,12 +1,12 @@
 ﻿#include "../H/GameSession.h"
 
-// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択とその効果の反映、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
+// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択とその効果の反映、ショップでの武器の購入、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
 
 //========= C++標準ライブラリ インクルード=========
-#include <string> // 報酬の選択をログへ記録する際に、カードの見出しを連結する。
+#include <string> // 報酬の選択と武器の購入をログへ記録する際に、見出しや名前を連結する。
 
 //========= Windows インクルード=========
-#include <windows.h> // VK_F1・VK_F2・VK_F4・VK_LBUTTONの仮想キーコードで、Capture切替・タイトルへ戻る要求・最初の部屋からの再開・報酬カードのクリックを指定する。
+#include <windows.h> // VK_F1・VK_F2・VK_F4・VK_LBUTTON・VK_RETURNの仮想キーコードで、Capture切替・タイトルへ戻る要求・最初の部屋からの再開・カードやボタンのクリック・ショップを閉じるキーを指定する。
 
 //========= 外部ライブラリ インクルード=========
 #include <DirectXMath.h>
@@ -24,7 +24,7 @@
 #include "Scene/Common/Combat/H/CombatResolver.h"
 #include "Scene/Common/Combat/H/CombatTable.h"
 
-// このクラスの投影面（Clip面）の距離と、報酬選択の入力の補助に使用する固定設定をまとめる。戦闘の数値はCombatTableにある。
+// このクラスの投影面（Clip面）の距離と、報酬選択・ショップの入力の補助に使用する固定設定をまとめる。戦闘の数値はCombatTableにある。
 namespace
 {
 	//========= Projection設定=========
@@ -33,17 +33,17 @@ namespace
 	// View空間での遠距離Clip面の距離。単位はワールド距離単位。これより遠い物は描画されない。
 	constexpr float ns_FAR_CLIP = 1000.0f;
 
-	//========= 報酬選択の入力設定=========
-	// カードを、キーで選ぶ時の、最初のカードに対応するキー。1から順に、カードの並びと同じ。クリックが使えない場合の代わりの操作。
-	constexpr unsigned char ns_REWARD_FIRST_KEY = '1';
-	// 描画先の大きさが無効な場合に、カーソルを置く、基準Canvasの外の位置。どのカードにも乗らない。
+	//========= 報酬選択・ショップの入力設定=========
+	// カードや購入ボタンを、キーで選ぶ時の、最初のものに対応するキー。1から順に、並びと同じ。クリックが使えない場合の代わりの操作。
+	constexpr unsigned char ns_UI_FIRST_KEY = '1';
+	// 描画先の大きさが無効な場合に、カーソルを置く、基準Canvasの外の位置。どのカードやボタンにも乗らない。
 	constexpr float ns_CURSOR_OUTSIDE_CANVAS = -1000.0f;
 
-	//========= 報酬選択の入力の補助関数=========
+	//========= 報酬選択・ショップの入力の補助関数=========
 	// カーソルのクライアント座標を、基準Canvas上の座標へ変換する。HUDの描画と同じ倍率と余白（HudCanvas）の逆変換。
 	// inputSystem: カーソルの位置の取得元。
 	// graphicsSystem: 描画先の大きさの取得元。
-	// 戻り値: 基準Canvas上のカーソルの位置。描画先の大きさが無効な場合は、どのカードにも乗らない位置。
+	// 戻り値: 基準Canvas上のカーソルの位置。描画先の大きさが無効な場合は、どのカードやボタンにも乗らない位置。
 	XMFLOAT2 ConvertCursorToCanvas(const InputSystem& inputSystem,const GraphicsSystem& graphicsSystem)
 	{
 		// HUDの描画と同じ、描画先の大きさから決まる倍率と余白を求める。倍率が0なら、変換できない。
@@ -58,19 +58,30 @@ namespace
 			(static_cast<float>(cursor_position.y) - canvas_offset.y) / canvas_scale};
 	}
 
-	// 数字キー（1から順）のうち、この更新で押されたキーに対応するカードの添字を返す。複数が押された場合は、最後のキーを返す。
+	// 数字キー（1から順）のうち、この更新で押されたキーに対応する添字を返す。複数が押された場合は、最後のキーを返す。
 	// inputSystem: キー入力の取得元。
-	// 戻り値: 押されたキーに対応するカードの添字。どれも押されていなければ-1。
-	int FindTriggeredRewardKey(const InputSystem& inputSystem)
+	// count: 対応させる項目の数。この数だけ、1から順にキーを調べる。
+	// 戻り値: 押されたキーに対応する添字。どれも押されていなければ-1。
+	int FindTriggeredNumberKey(const InputSystem& inputSystem,int count)
 	{
-		// カードの数だけ、1から順にキーを調べる。
 		int triggered_index = -1;
-		for(int card_index = 0; card_index < REWARD_TABLE::ns_CARD_COUNT; ++card_index){
-			if(inputSystem.IsKeyTriggered(static_cast<unsigned char>(ns_REWARD_FIRST_KEY + card_index))){
-				triggered_index = card_index;
+		for(int item_index = 0; item_index < count; ++item_index){
+			if(inputSystem.IsKeyTriggered(static_cast<unsigned char>(ns_UI_FIRST_KEY + item_index))){
+				triggered_index = item_index;
 			}
 		}
 		return triggered_index;
+	}
+
+	// ショップの、この更新で押されたキーに対応するボタンの添字を返す。数字キーは武器の行の購入、Enterは閉じるボタンに対応する。
+	// inputSystem: キー入力の取得元。
+	// 戻り値: 押されたキーに対応するボタンの添字。どれも押されていなければ-1。
+	int FindTriggeredShopKey(const InputSystem& inputSystem)
+	{
+		// Enterは、閉じるボタンの代わりにする。数字キーより優先する。
+		if(inputSystem.IsKeyTriggered(VK_RETURN))return SHOP_TABLE::ns_CLOSE_INDEX;
+
+		return FindTriggeredNumberKey(inputSystem,SHOP_TABLE::ns_ROW_COUNT);
 	}
 }
 
@@ -101,6 +112,10 @@ void GameSession::Initialize()
 
 	// 報酬の取得数を0へ戻し、報酬選択を解除する。カードのボタンの矩形も、設定し直す。
 	m_reward.Initialize();
+
+	// 武器の所持を初期武器だけに戻し、ショップを閉じる。ボタンの矩形も、設定し直す。
+	m_inventory.Initialize();
+	m_shop.Initialize();
 }
 
 // 描画Resourceと生成Objectの準備に成功した後にだけ、ゲーム操作とBGMへ切り替える。
@@ -131,8 +146,8 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 		SkipCurrentWave();
 	}
 
-	// 報酬選択中は、時間を進めない。ヒットストップ・スロー・回復アイテムの間隔・表示の時間も、この更新では0を渡して、選択が終わるまで止める。
-	const float frame_delta_time = m_reward.IsSelecting() ? 0.0f : deltaTime;
+	// 報酬選択中とショップが開いている間は、時間を進めない。ヒットストップ・スロー・回復アイテムの間隔・表示の時間も、この更新では0を渡して、画面を閉じるまで止める。
+	const float frame_delta_time = (m_reward.IsSelecting() || m_shop.IsOpen()) ? 0.0f : deltaTime;
 
 	// ヒットストップとスローの残り時間を進め、プレイヤー側の時間と、敵・判定側の時間を求める。ヒットストップ中は、どちらも0になる。
 	// スロー中は、敵・判定側の時間だけが遅くなる。プレイヤーと武器は、スローの影響を受けない。
@@ -144,13 +159,14 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 	UpdateTimers(frame_delta_time,time_deltas.gameplayDeltaTime);
 	UpdateKillRewards();
 
-	// 部屋のクリアの結果を受けて、報酬選択へ入る・抜ける。入った更新では、以降のプレイヤーの更新を行わない。
+	// 部屋のクリアの結果を受けて、報酬選択へ入る・抜ける。抜けた更新で、続けてショップを開く。ショップが開いている間は、購入と閉じる操作を処理する。
 	UpdateReward();
+	UpdateShop();
 
-	// マウスを解放している間と、報酬選択中は、カメラ・移動・戦闘の操作更新をまとめて停止し、ここで戻る。
-	if(!m_inputSystem.IsMouseCaptureEnabled() || m_reward.IsSelecting())return GAME_SESSION_RESULT::e_CONTINUE;
+	// マウスを解放している間と、報酬選択中・ショップが開いている間は、カメラ・移動・戦闘の操作更新をまとめて停止し、ここで戻る。
+	if(!m_inputSystem.IsMouseCaptureEnabled() || m_reward.IsSelecting() || m_shop.IsOpen())return GAME_SESSION_RESULT::e_CONTINUE;
 
-	// カードを選んだ直後は、選んだクリックや数字キーが、射撃や武器の切替として重ねて反応しないよう、ここで戻る。左クリックが離されたら、解除する。
+	// カードやボタンを選んだ直後は、選んだクリックや数字キーが、射撃や武器の切替として重ねて反応しないよう、ここで戻る。左クリックが離されたら、解除する。
 	if(m_reward.UpdateInputGuard(m_inputSystem.IsKeyPressed(VK_LBUTTON)))return GAME_SESSION_RESULT::e_CONTINUE;
 
 	// 視点とプレイヤーを先に更新し、その結果の位置と動作の状態を使って、戦闘・射撃・敵の行動を更新する。
@@ -274,17 +290,18 @@ bool GameSession::UpdateSessionInput()
 		m_inputSystem.SetMouseCaptureEnabled(!m_inputSystem.IsMouseCaptureEnabled());
 	}
 
-	// F4では最初の部屋から作り直す。旧ウェーブと、旧ウェーブの弾・範囲の予告は、同じ更新の生成処理で置き換わる。通貨と報酬の取得数は、そのまま引き継ぐ。
+	// F4では最初の部屋から作り直す。旧ウェーブと、旧ウェーブの弾・範囲の予告は、同じ更新の生成処理で置き換わる。通貨・報酬の取得数・武器の所持は、そのまま引き継ぐ。
 	if(m_inputSystem.IsKeyTriggered(VK_F4)){
 		m_stage.Restart();
 		m_enemyController.ResetAttackState();
 		m_player.GetPlayerCombat().ClearSlideKnockdownRecord();
 
-		// 報酬選択の最中に再開した場合は、解除したCaptureを戻して、選択を終える。
-		if(m_reward.IsSelecting()){
+		// 報酬選択かショップの最中に再開した場合は、解除したCaptureを戻して、選択と購入画面を終える。
+		if(m_reward.IsSelecting() || m_shop.IsOpen()){
 			m_inputSystem.SetMouseCaptureEnabled(true);
 		}
 		m_reward.Reset();
+		m_shop.Close();
 	}
 	return false;
 }
@@ -319,17 +336,16 @@ void GameSession::UpdateReward()
 	// 部屋の進行状態と、カーソルの位置（基準Canvas上）、左クリック、カードの番号のキーを渡して、状態の変化を受け取る。
 	const REWARD_UPDATE_RESULT reward_result = m_reward.Update(m_stage.GetRoomController().GetPhase(),
 																														 ConvertCursorToCanvas(m_inputSystem,m_graphicsSystem),
-																														 m_inputSystem.IsKeyTriggered(VK_LBUTTON),FindTriggeredRewardKey(m_inputSystem));
+																														 m_inputSystem.IsKeyTriggered(VK_LBUTTON),
+																														 FindTriggeredNumberKey(m_inputSystem,REWARD_TABLE::ns_CARD_COUNT));
 
 	// 入った更新では、Captureを解除して、マウスをカードの操作へ渡す。ゲームの操作と時間は、Updateが止める。
 	if(reward_result == REWARD_UPDATE_RESULT::e_STARTED){
 		m_inputSystem.SetMouseCaptureEnabled(false);
 		Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,L"部屋のクリアで、報酬選択へ入りました。");
 	}
-	// 抜けた更新では、Captureを戻して、ゲームの操作へ戻る。出口は、すでに開いている。
+	// 抜けた更新では、選ばれた報酬を反映し、続けてショップを開く。Captureは、ショップを閉じるまで解除したままにする。出口は、すでに開いている。
 	else if(reward_result == REWARD_UPDATE_RESULT::e_FINISHED){
-		m_inputSystem.SetMouseCaptureEnabled(true);
-
 		// 上限に達した報酬を選んだ場合は、強化の代わりに通貨を与える。そうでなければ、選ばれた報酬を、ログへ記録する。
 		if(m_reward.WasLastChoiceCapped()){
 			m_wallet.Add(REWARD_TABLE::ns_CAPPED_CURRENCY_REWARD);
@@ -339,6 +355,7 @@ void GameSession::UpdateReward()
 			Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,
 										std::wstring{L"報酬を選びました: "} + REWARD_TABLE::ns_REWARDS[m_reward.GetLastChosenIndex()].title);
 		}
+		m_shop.Open();
 	}
 
 	// 常に効く特殊強化の効果を、使う側へ渡す。毎回渡して、再開や初期化の後も、取得数と一致させる。
@@ -346,6 +363,52 @@ void GameSession::UpdateReward()
 	// 回避反撃は、ジャスト回避の時だけ効くため、ここでは渡さない（StartJustDodgeEffectsが渡す）。
 	m_player.GetShotController().SetFlinchScale(m_reward.GetSuppressiveFlinchScale());
 	m_player.GetPlayerCombat().SetFollowUpStrike(m_reward.GetFollowUpDamageScale(),REWARD_TABLE::ns_FOLLOW_UP_SECONDS);
+}
+
+// ショップが開いている間、購入と閉じる操作を処理する。
+void GameSession::UpdateShop()
+{
+	// 閉じている間は、何もしない。
+	if(!m_shop.IsOpen())return;
+
+	// カーソルの位置（基準Canvas上）、左クリック、ボタンに対応するキーを渡して、購入と閉じる操作の結果を受け取る。
+	SHOP_INPUT shop_input{};
+	shop_input.cursorCanvasPosition = ConvertCursorToCanvas(m_inputSystem,m_graphicsSystem);
+	shop_input.isClickTriggered = m_inputSystem.IsKeyTriggered(VK_LBUTTON);
+	shop_input.keyChoiceIndex = FindTriggeredShopKey(m_inputSystem);
+	const SHOP_UPDATE_RESULT shop_result = m_shop.Update(shop_input,m_wallet.GetBalance(),m_inventory);
+
+	// 購入が求められた場合は、購入を反映する。
+	if(shop_result == SHOP_UPDATE_RESULT::e_PURCHASE_REQUESTED){
+		ApplyShopPurchase();
+	}
+	// 閉じた場合は、Captureを戻して、ゲームの操作へ戻る。選んだクリックが射撃にならないよう、入力の保護が、続けて働く。
+	else if(shop_result == SHOP_UPDATE_RESULT::e_CLOSED){
+		m_inputSystem.SetMouseCaptureEnabled(true);
+		Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,L"ショップを閉じました。");
+	}
+}
+
+// ショップでの武器の購入を反映する。
+void GameSession::ApplyShopPurchase()
+{
+	// 購入する武器と価格を、ショップの表から取り出す。行の添字は、武器の種類の値と同じ。
+	const int row_index = m_shop.GetLastPurchaseIndex();
+	const WEAPON_TYPE weapon_type = static_cast<WEAPON_TYPE>(row_index);
+	const int price = SHOP_TABLE::ns_WEAPON_PRICES[row_index];
+
+	// 通貨を支払う。足りない場合は、何も変えずに戻る。
+	if(!m_wallet.TrySpend(price))return;
+
+	// 武器を所持に加える。加えられなかった場合は、支払った通貨を戻して、何も変えない。
+	if(!m_inventory.TryAdd(weapon_type)){
+		m_wallet.Add(price);
+		return;
+	}
+
+	// 購入した武器を、装備する。弾薬は、その武器の初期値になる。
+	m_player.GetShotController().EquipWeapon(weapon_type);
+	Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,std::wstring{L"武器を購入しました: "} + SHOP_TABLE::ns_WEAPON_NAMES[row_index]);
 }
 
 // ジャスト回避が成立した時の効果を反映する。
@@ -532,5 +595,9 @@ void GameSession::DrawHud()
 	hud_state.isRewardSelecting = m_reward.IsSelecting();
 	hud_state.hoveredRewardIndex = m_reward.GetHoveredIndex();
 	hud_state.rewardOwnedCounts = m_reward.GetAcquiredCounts();
+	hud_state.isShopOpen = m_shop.IsOpen();
+	hud_state.hoveredShopIndex = m_shop.GetHoveredIndex();
+	hud_state.shopRowStates = m_shop.GetRowStates();
+	hud_state.ownedWeaponCount = m_inventory.GetCount();
 	m_gameHud.Draw(m_graphicsSystem,hud_state);
 }

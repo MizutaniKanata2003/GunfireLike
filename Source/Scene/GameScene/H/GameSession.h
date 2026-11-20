@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// 1回のプレイの流れを担当する。初期化・更新・描画・終了の中で、ステージ・プレイヤー側一式・敵・時間（ヒットストップとスロー）・通貨・報酬選択・デバッグ・HUD・Collision可視化の順序と仲介を行う。
+// 1回のプレイの流れを担当する。初期化・更新・描画・終了の中で、ステージ・プレイヤー側一式・敵・時間（ヒットストップとスロー）・通貨・報酬選択・ショップ・武器の所持・デバッグ・HUD・Collision可視化の順序と仲介を行う。
 // 移動・戦闘・射撃などの個別の規則は、各クラスが持つ。Scene遷移は担当せず、タイトルへ戻る要求を、更新の結果として呼出側へ返す。
 
 //========= C++標準ライブラリ インクルード=========
@@ -20,7 +20,9 @@
 #include "Scene/Common/Player/H/PlayerSuite.h"
 #include "Scene/Common/Player/H/Wallet.h"
 #include "Scene/Common/Reward/H/RewardController.h"
+#include "Scene/Common/Shop/H/ShopController.h"
 #include "Scene/Common/Stage/H/StageController.h"
+#include "Scene/Common/Weapon/H/WeaponInventory.h"
 #include "Scene/GameScene/H/GameHud.h"
 
 //========= 前方宣言=========
@@ -35,7 +37,7 @@ enum class GAME_SESSION_RESULT
 	e_RETURN_TO_TITLE // タイトルへ戻る要求があった。呼出側がScene遷移を予約する。
 };
 
-// ステージ・プレイヤー側一式・敵・時間・通貨・報酬選択・デバッグ・HUDを仲介して、1回のプレイを進めるクラス。
+// ステージ・プレイヤー側一式・敵・時間・通貨・報酬選択・ショップ・武器の所持・デバッグ・HUDを仲介して、1回のプレイを進めるクラス。
 class GameSession final
 {
 public:
@@ -47,14 +49,14 @@ public:
 	GameSession(InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem);
 
 	//========= ライフサイクル関数=========
-	// プレイヤー側一式・ステージ・判定の状態・通貨・報酬選択・敵の弾と範囲の予告・デバッグ設定を初期状態へ戻し、カメラをプレイヤー位置へ合わせる。
+	// プレイヤー側一式・ステージ・判定の状態・通貨・報酬選択・ショップ・武器の所持・敵の弾と範囲の予告・デバッグ設定を初期状態へ戻し、カメラをプレイヤー位置へ合わせる。
 	void Initialize();
 	// ステージ・HUD・Collision可視化を初期化し、敵の弾、範囲の予告、第1部屋の敵を生成して、成功後にFPS操作とGame用BGMを有効にする。
 	// 戻り値: 各初期化・Object生成・敵の配置が成功したらtrue。falseを検出した場合はFinalize後にfalseを返し、CaptureとBGMは変更しない。
 	[[nodiscard]] bool Init();
-	// F2・F1・F4の入力、デバッグ操作を処理し、時間・部屋・報酬選択・プレイヤー・戦闘・敵・撃破の報酬の順に更新する。
-	// deltaTime: 実時間の経過時間。単位は秒。各更新へは、ヒットストップ中は0、スロー中はプレイヤー以外へ縮めた値を、それぞれ渡す。報酬選択中は、時間を進めない。
-	// Capture解除中と報酬選択中は、視点・移動・戦闘・敵の行動の更新を行わない。F2が押された場合は後続の更新を行わない。
+	// F2・F1・F4の入力、デバッグ操作を処理し、時間・部屋・報酬選択・ショップ・プレイヤー・戦闘・敵・撃破の報酬の順に更新する。
+	// deltaTime: 実時間の経過時間。単位は秒。各更新へは、ヒットストップ中は0、スロー中はプレイヤー以外へ縮めた値を、それぞれ渡す。報酬選択中とショップが開いている間は、時間を進めない。
+	// Capture解除中と、報酬選択中・ショップが開いている間は、視点・移動・戦闘・敵の行動の更新を行わない。F2が押された場合は後続の更新を行わない。
 	// 戻り値: F2が押されたらe_RETURN_TO_TITLE。それ以外はe_CONTINUE。
 	[[nodiscard]] GAME_SESSION_RESULT Update(float deltaTime);
 	// 描画先サイズに合わせて行列を作り、3D・画像のHUD・読み取り専用のデバッグUIを、この順に描画する。
@@ -76,18 +78,22 @@ private:
 	[[nodiscard]] bool InitPlayerAndDebug();
 
 	//========= 更新の補助関数=========
-	// F2の確認、F1のCapture切替、F4の最初の部屋からの再開を処理する。再開では、報酬選択も解除する。
+	// F2の確認、F1のCapture切替、F4の最初の部屋からの再開を処理する。再開では、報酬選択とショップも解除する。
 	// 戻り値: F2が押された場合はtrue。呼出側は、後続の更新を行わず戻る。
 	[[nodiscard]] bool UpdateSessionInput();
 	// 確認用の攻撃の判定と、敵の怯み・転倒・部屋の進行・出口の開閉を、Captureに関係なく更新する。
-	// worldDeltaTime: スローを反映した経過時間。単位は秒。ヒットストップ中と報酬選択中は0。
+	// worldDeltaTime: スローを反映した経過時間。単位は秒。ヒットストップ中と、報酬選択中・ショップが開いている間は0。
 	void UpdateWorldAndRoom(float worldDeltaTime);
 	// 回復アイテムの間隔・Collision可視化の表示時間・命中表示・反動のずれを、Captureに関係なく更新する。
-	// deltaTime: 実時間の経過時間。単位は秒。表示用と反動の時間に使う。報酬選択中は0。
+	// deltaTime: 実時間の経過時間。単位は秒。表示用と反動の時間に使う。報酬選択中とショップが開いている間は0。
 	// gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。回復アイテムの間隔に使う。
 	void UpdateTimers(float deltaTime,float gameplayDeltaTime);
-	// 部屋のクリアで報酬選択へ入る判定と、選び終えた時に抜ける判定を行い、入る時はCaptureを解除、抜ける時はCaptureを再開する。取得した報酬の効果のうち、常に効くもの（制圧射撃）を、使う側へ渡す。
+	// 部屋のクリアで報酬選択へ入る判定と、カードが選ばれた時に抜ける判定を行い、入る時はCaptureを解除する。カードが選ばれたら、続けてショップを開く。取得した報酬の効果のうち、常に効くもの（制圧射撃・殴打追撃）を、使う側へ渡す。
 	void UpdateReward();
+	// ショップが開いている間、カーソルとキーから購入と閉じる操作を判定する。購入が求められたら、購入を反映する。閉じる時は、Captureを再開する。
+	void UpdateShop();
+	// ショップでの武器の購入を反映する。通貨を支払い、武器を所持に加え、その武器を装備する。どちらかに失敗した場合は、何も変えない。
+	void ApplyShopPurchase();
 	// ジャスト回避が成立した時の効果を反映する。スローを開始し、回避反撃を取得していれば、一定時間、射撃のダメージを増やす。
 	void StartJustDodgeEffects();
 	// 視点・プレイヤーの動作・出口の通過・殴打でのリロードのキャンセル・視野角を更新する。Capture中だけ呼ぶ。
@@ -123,7 +129,7 @@ private:
 	// viewMatrix: World空間からView空間への変換行列。
 	// projectionMatrix: View空間からClip空間への変換行列。
 	void DrawWorld(const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix);
-	// 3Dの上に、画像のHUD（照準・HPバー・弾薬・リロード表示・回復アイテム数・通貨・報酬選択の表示・低HP警告）を描画する。
+	// 3Dの上に、画像のHUD（照準・HPバー・弾薬・リロード表示・回復アイテム数・通貨・報酬選択・ショップの表示・低HP警告）を描画する。
 	void DrawHud();
 
 	//========= System参照=========
@@ -145,10 +151,14 @@ private:
 	GameDebugController m_debugController{};
 	// 共有Renderer・床と壁・出口・CollisionWorld・部屋の進行を所有する。敵の生成と全滅判定は、GameSessionが仲介する。
 	StageController m_stage{};
-	// 通貨の所持額。敵を倒した時の報酬で増える。
+	// 通貨の所持額。敵を倒した時の報酬で増え、ショップの購入で減る。
 	Wallet m_wallet{};
 	// 部屋のクリア後の報酬選択の状態と、特殊強化の取得数。選択中は、時間とプレイヤーの操作を止める。
 	RewardController m_reward{};
+	// 所持している武器の記録。ショップの購入で増える。
+	WeaponInventory m_inventory{};
+	// 武器の購入画面の状態。報酬選択の後に開き、開いている間は、時間とプレイヤーの操作を止める。
+	ShopController m_shop{};
 
 	//========= 撃破の検出=========
 	// 敵の枠ごとの、前回の確認での生死。生きていた枠が、今回は死亡になっていれば、倒されたとみなす。生成や初期化の後は、現在の状態へ揃える。

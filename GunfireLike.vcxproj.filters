@@ -434,6 +434,12 @@
     <ClInclude Include="Source\Scene\Common\UI\H\UiButton.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Scene\Common\Shop\H\ShopController.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Scene\Common\Weapon\H\WeaponInventory.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Source\Framework\Shaders\BasicColorVS.hlsl" />
