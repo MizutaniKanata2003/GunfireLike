@@ -237,6 +237,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Scene\Common\Object\CPP\SceneObjectFactory.cpp" />
     <ClCompile Include="Source\Scene\Common\Stage\CPP\StageField.cpp" />
     <ClCompile Include="Source\Scene\Common\Weapon\CPP\WeaponSystem.cpp" />
+    <ClCompile Include="Source\Scene\GameScene\CPP\EconomyController.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameHud.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameScene.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameSession.cpp" />
@@ -323,6 +324,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\Common\Weapon\H\WeaponSystem.h" />
     <ClInclude Include="Source\Scene\Common\Weapon\H\WeaponTable.h" />
     <ClInclude Include="Source\Scene\Common\Weapon\H\WeaponUpgrade.h" />
+    <ClInclude Include="Source\Scene\GameScene\H\EconomyController.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameHud.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameScene.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameSession.h" />

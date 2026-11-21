@@ -1,9 +1,9 @@
 ﻿#include "../H/GameSession.h"
 
-// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、敵の撃破の報酬、部屋のクリア後の報酬選択とその効果の反映、ショップでの武器と弾薬の購入・武器の売却・武器の強化、武器の持ち替え、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
+// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、部屋のクリア後の報酬選択とその効果の反映、ショップでの武器と弾薬の購入・武器の売却・武器の強化、武器の持ち替え、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
 
 //========= C++標準ライブラリ インクルード=========
-#include <string> // 報酬の選択と購入・売却・強化・持ち替えをログへ記録する際に、見出しや名前を連結する。
+#include <string> // 購入・売却・強化・持ち替えをログへ記録する際に、名前を連結する。
 
 //========= Windows インクルード=========
 #include <windows.h> // VK_F1・VK_F2・VK_F4・VK_LBUTTON・VK_RETURNの仮想キーコードで、Capture切替・タイトルへ戻る要求・最初の部屋からの再開・カードやボタンのクリック・ショップを閉じるキーを指定する。
@@ -133,12 +133,8 @@ void GameSession::Initialize()
 	m_enemyController.ResetAttackState();
 	m_timeScale.Reset();
 
-	// 通貨を開始時の所持額へ戻し、敵の生死の記録を空にする。前回のプレイの敵を、倒された敵として扱わない。
-	m_wallet.Initialize(ECONOMY_TABLE::ns_INITIAL_BALANCE);
-	m_wasEnemyAlive.fill(false);
-
-	// 報酬の取得数を0へ戻し、報酬選択を解除する。カードのボタンの矩形も、設定し直す。
-	m_reward.Initialize();
+	// 通貨・報酬選択・敵の生死の記録を初期状態へ戻す。前回のプレイの敵を、倒された敵として扱わない。
+	m_economy.Initialize();
 
 	// 武器の所持・強化・保存した弾薬を初期状態へ戻し、ショップを閉じる。ボタンの矩形も、設定し直す。
 	m_inventory.Initialize();
@@ -174,7 +170,7 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 	}
 
 	// 報酬選択中とショップが開いている間は、時間を進めない。ヒットストップ・スロー・回復アイテムの間隔・表示の時間も、この更新では0を渡して、画面を閉じるまで止める。
-	const float frame_delta_time = (m_reward.IsSelecting() || m_shop.IsOpen()) ? 0.0f : deltaTime;
+	const float frame_delta_time = (m_economy.GetReward().IsSelecting() || m_shop.IsOpen()) ? 0.0f : deltaTime;
 
 	// ヒットストップとスローの残り時間を進め、プレイヤー側の時間と、敵・判定側の時間を求める。ヒットストップ中は、どちらも0になる。
 	// スロー中は、敵・判定側の時間だけが遅くなる。プレイヤーと武器は、スローの影響を受けない。
@@ -184,17 +180,17 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 	// その後、ここまでに倒された敵（デバッグ操作で倒した敵を含む）の撃破報酬を、通貨へ加える。
 	UpdateWorldAndRoom(time_deltas.worldDeltaTime);
 	UpdateTimers(frame_delta_time,time_deltas.gameplayDeltaTime);
-	UpdateKillRewards();
+	m_economy.UpdateKillRewards(m_enemyController.GetEnemyManager());
 
 	// 部屋のクリアの結果を受けて、報酬選択へ入る・抜ける。抜けた更新で、続けてショップを開く。ショップが開いている間は、購入・売却・強化・閉じる操作を処理する。
 	UpdateReward();
 	UpdateShop();
 
 	// マウスを解放している間と、報酬選択中・ショップが開いている間は、カメラ・移動・戦闘の操作更新をまとめて停止し、ここで戻る。
-	if(!m_inputSystem.IsMouseCaptureEnabled() || m_reward.IsSelecting() || m_shop.IsOpen())return GAME_SESSION_RESULT::e_CONTINUE;
+	if(!m_inputSystem.IsMouseCaptureEnabled() || m_economy.GetReward().IsSelecting() || m_shop.IsOpen())return GAME_SESSION_RESULT::e_CONTINUE;
 
 	// カードやボタンを選んだ直後は、選んだクリックや数字キーが、射撃や武器の持ち替えとして重ねて反応しないよう、ここで戻る。左クリックが離されたら、解除する。
-	if(m_reward.UpdateInputGuard(m_inputSystem.IsKeyPressed(VK_LBUTTON)))return GAME_SESSION_RESULT::e_CONTINUE;
+	if(m_economy.GetReward().UpdateInputGuard(m_inputSystem.IsKeyPressed(VK_LBUTTON)))return GAME_SESSION_RESULT::e_CONTINUE;
 
 	// 武器の持ち替えを、射撃の更新より先に処理する。持ち替えたフレームから、新しい武器で射撃する。
 	// 視点とプレイヤーを先に更新し、その結果の位置と動作の状態を使って、戦闘・射撃・敵の行動を更新する。
@@ -202,7 +198,7 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 	UpdateWeaponSwitch();
 	UpdatePlayer(deltaTime,time_deltas.gameplayDeltaTime);
 	UpdateCombat(time_deltas.gameplayDeltaTime,time_deltas.worldDeltaTime);
-	UpdateKillRewards();
+	m_economy.UpdateKillRewards(m_enemyController.GetEnemyManager());
 	return GAME_SESSION_RESULT::e_CONTINUE;
 }
 
@@ -326,10 +322,10 @@ bool GameSession::UpdateSessionInput()
 		m_player.GetPlayerCombat().ClearSlideKnockdownRecord();
 
 		// 報酬選択かショップの最中に再開した場合は、解除したCaptureを戻して、選択と購入画面を終える。
-		if(m_reward.IsSelecting() || m_shop.IsOpen()){
+		if(m_economy.GetReward().IsSelecting() || m_shop.IsOpen()){
 			m_inputSystem.SetMouseCaptureEnabled(true);
 		}
-		m_reward.Reset();
+		m_economy.ResetRewardSelection();
 		m_shop.Close();
 	}
 	return false;
@@ -363,35 +359,28 @@ void GameSession::UpdateTimers(float deltaTime,float gameplayDeltaTime)
 void GameSession::UpdateReward()
 {
 	// 部屋の進行状態と、カーソルの位置（基準Canvas上）、左クリック、カードの番号のキーを渡して、状態の変化を受け取る。
-	const REWARD_UPDATE_RESULT reward_result = m_reward.Update(m_stage.GetRoomController().GetPhase(),
-																														 ConvertCursorToCanvas(m_inputSystem,m_graphicsSystem),
-																														 m_inputSystem.IsKeyTriggered(VK_LBUTTON),
-																														 FindTriggeredNumberKey(m_inputSystem,REWARD_TABLE::ns_CARD_COUNT));
+	// 上限に達した報酬の置換の通貨と、選ばれた報酬のログは、EconomyControllerが処理する。
+	const REWARD_UPDATE_RESULT reward_result = m_economy.UpdateReward(m_stage.GetRoomController().GetPhase(),
+																																		ConvertCursorToCanvas(m_inputSystem,m_graphicsSystem),
+																																		m_inputSystem.IsKeyTriggered(VK_LBUTTON),
+																																		FindTriggeredNumberKey(m_inputSystem,REWARD_TABLE::ns_CARD_COUNT));
 
 	// 入った更新では、Captureを解除して、マウスをカードの操作へ渡す。ゲームの操作と時間は、Updateが止める。
 	if(reward_result == REWARD_UPDATE_RESULT::e_STARTED){
 		m_inputSystem.SetMouseCaptureEnabled(false);
 		Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,L"部屋のクリアで、報酬選択へ入りました。");
 	}
-	// 抜けた更新では、選ばれた報酬を反映し、続けてショップを開く。Captureは、ショップを閉じるまで解除したままにする。出口は、すでに開いている。
+	// 抜けた更新では、続けてショップを開く。Captureは、ショップを閉じるまで解除したままにする。出口は、すでに開いている。
 	else if(reward_result == REWARD_UPDATE_RESULT::e_FINISHED){
-		// 上限に達した報酬を選んだ場合は、強化の代わりに通貨を与える。そうでなければ、選ばれた報酬を、ログへ記録する。
-		if(m_reward.WasLastChoiceCapped()){
-			m_wallet.Add(REWARD_TABLE::ns_CAPPED_CURRENCY_REWARD);
-			Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,L"報酬が上限のため、通貨へ置き換えました。");
-		}
-		else{
-			Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,
-										std::wstring{L"報酬を選びました: "} + REWARD_TABLE::ns_REWARDS[m_reward.GetLastChosenIndex()].title);
-		}
 		m_shop.Open();
 	}
 
 	// 常に効く特殊強化の効果を、使う側へ渡す。毎回渡して、再開や初期化の後も、取得数と一致させる。
 	// 制圧射撃は、射撃で敵へ与える怯み時間の倍率として、射撃の担当へ渡す。殴打追撃は、殴打が当たった敵へ付ける印の倍率と時間として、戦闘の担当へ渡す。
 	// 回避反撃は、ジャスト回避の時だけ効くため、ここでは渡さない（StartJustDodgeEffectsが渡す）。
-	m_player.GetShotController().SetFlinchScale(m_reward.GetSuppressiveFlinchScale());
-	m_player.GetPlayerCombat().SetFollowUpStrike(m_reward.GetFollowUpDamageScale(),REWARD_TABLE::ns_FOLLOW_UP_SECONDS);
+	const RewardController& reward = m_economy.GetReward();
+	m_player.GetShotController().SetFlinchScale(reward.GetSuppressiveFlinchScale());
+	m_player.GetPlayerCombat().SetFollowUpStrike(reward.GetFollowUpDamageScale(),REWARD_TABLE::ns_FOLLOW_UP_SECONDS);
 }
 
 // ショップが開いている間、購入・売却・強化と閉じる操作を処理する。
@@ -407,7 +396,7 @@ void GameSession::UpdateShop()
 	shop_input.isClickTriggered = m_inputSystem.IsKeyTriggered(VK_LBUTTON);
 	shop_input.keyChoiceIndex = FindTriggeredShopKey(m_inputSystem,m_shop.GetPage());
 	SHOP_CONTEXT shop_context{};
-	shop_context.balance = m_wallet.GetBalance();
+	shop_context.balance = m_economy.GetWallet().GetBalance();
 	shop_context.equippedWeaponIndex = FindWeaponIndex(weapon.GetWeaponData());
 
 	// 予備弾薬は、装備中の武器なら現在の値、装備していない武器なら保存した値を渡す。
@@ -458,13 +447,14 @@ void GameSession::ApplyShopPurchase()
 	const int row_index = m_shop.GetLastPurchaseIndex();
 	const WEAPON_TYPE weapon_type = static_cast<WEAPON_TYPE>(row_index);
 	const int price = SHOP_TABLE::ns_WEAPON_PRICES[row_index];
+	Wallet& wallet = m_economy.GetWallet();
 
 	// 通貨を支払う。足りない場合は、何も変えずに戻る。
-	if(!m_wallet.TrySpend(price))return;
+	if(!wallet.TrySpend(price))return;
 
 	// 武器を所持に加える。加えられなかった場合は、支払った通貨を戻して、何も変えない。
 	if(!m_inventory.TryAdd(weapon_type)){
-		m_wallet.Add(price);
+		wallet.Add(price);
 		return;
 	}
 
@@ -486,7 +476,7 @@ void GameSession::ApplyShopSale()
 	if(!m_inventory.TryRemove(weapon_type))return;
 
 	// 売却で得る通貨を、加える。
-	m_wallet.Add(sell_price);
+	m_economy.GetWallet().Add(sell_price);
 
 	// 装備中の武器を手放した場合は、所持している別の武器（表の並びで最も先）を、代わりに装備する。保存した弾薬があれば戻る。所持の下限があるため、必ず1丁は残る。
 	if(was_equipped){
@@ -506,16 +496,17 @@ void GameSession::ApplyShopAmmoPurchase()
 	const int price = SHOP_TABLE::ns_AMMO_PRICES[row_index];
 	const int pack_size = SHOP_TABLE::ns_AMMO_PACK_SIZES[row_index];
 	const int reserve_cap = SHOP_TABLE::ns_AMMO_RESERVE_CAPS[row_index];
+	Wallet& wallet = m_economy.GetWallet();
 
 	// 通貨を支払う。足りない場合は、何も変えずに戻る。
-	if(!m_wallet.TrySpend(price))return;
+	if(!wallet.TrySpend(price))return;
 
 	// 装備中の武器なら、使用中の予備弾薬を、装備していない武器なら、保存した予備弾薬を、上限内で増やす。1発も増やせなかった場合は、支払った通貨を戻して、何も変えない。
 	const bool is_equipped = FindWeaponIndex(m_player.GetShotController().GetWeaponSystem().GetWeaponData()) == row_index;
 	const int added_ammo = is_equipped ? m_player.GetShotController().AddReserveAmmo(pack_size,reserve_cap)
 		: m_inventory.AddSavedReserve(row_index,pack_size,reserve_cap);
 	if(added_ammo <= 0){
-		m_wallet.Add(price);
+		wallet.Add(price);
 		return;
 	}
 	Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,
@@ -532,11 +523,12 @@ void GameSession::ApplyShopUpgrade()
 
 	// 次の段階へ上げる価格を求め、通貨を支払う。足りない場合は、何も変えずに戻る。
 	const int price = WEAPON_UPGRADE_TABLE::GetPrice(item_index,m_inventory.GetUpgradeLevel(weapon_index,item_index));
-	if(!m_wallet.TrySpend(price))return;
+	Wallet& wallet = m_economy.GetWallet();
+	if(!wallet.TrySpend(price))return;
 
 	// 段階を1つ上げる。上げられなかった場合（上限など）は、支払った通貨を戻して、何も変えない。
 	if(!m_inventory.TryUpgrade(static_cast<WEAPON_TYPE>(weapon_index),item_index,price)){
-		m_wallet.Add(price);
+		wallet.Add(price);
 		return;
 	}
 
@@ -583,7 +575,7 @@ void GameSession::StartJustDodgeEffects()
 	m_timeScale.StartSlowMotion();
 
 	// 回避反撃を取得している（倍率が1.0より大きい）場合だけ、一定時間、射撃のダメージを増やす。未取得なら、何も増やさない。
-	const float damage_scale = m_reward.GetCounterDodgeDamageScale();
+	const float damage_scale = m_economy.GetReward().GetCounterDodgeDamageScale();
 	if(damage_scale > 1.0f){
 		m_player.GetShotController().ActivateDamageBoost(damage_scale,REWARD_TABLE::ns_COUNTER_DODGE_SECONDS);
 	}
@@ -655,7 +647,7 @@ bool GameSession::TrySpawnCurrentWave()
 	const bool is_spawned = m_enemyController.TrySpawnWave(m_stage.GetRoomNumber(),m_stage.GetWaveNumber());
 
 	// 敵の枠ごとの生死の記録を、生成後の状態へ揃える。解除された旧ウェーブの敵を、倒された敵として扱わず、撃破報酬を与えない。
-	SyncEnemyAliveFlags();
+	m_economy.SyncEnemyAliveFlags(m_enemyController.GetEnemyManager());
 
 	// 登録に失敗した場合は、EnemyControllerが失敗を記録し、EnemyManagerが生成済みの枠を解除して空にする。進行管理へ生成完了を通知せず、失敗を返す。
 	if(!is_spawned)return false;
@@ -691,34 +683,6 @@ void GameSession::UpdateExitPass()
 	m_player.ReturnToStart();
 }
 
-// 新しく倒された敵の撃破報酬を、通貨へ加える。
-void GameSession::UpdateKillRewards()
-{
-	// 全枠を先頭から調べ、前回は生きていて、今回は死亡になっている枠だけを、倒された敵として、種類に応じた報酬を通貨へ加える。
-	const auto& enemies = m_enemyController.GetEnemyManager().GetEnemies();
-	for(std::size_t slot_index = 0; slot_index < enemies.size(); ++slot_index){
-		const Enemy& enemy = enemies[slot_index];
-		const bool is_alive = enemy.IsAlive();
-		// 前回は生きていて、今回は死亡の枠だけに、報酬を与える。死亡のまま残る枠には、繰り返し与えない。
-		if(m_wasEnemyAlive[slot_index] && !is_alive){
-			m_wallet.Add(ECONOMY_TABLE::GetKillReward(enemy.GetKind()));
-		}
-
-		// 次の確認のために、今回の生死を記録する。
-		m_wasEnemyAlive[slot_index] = is_alive;
-	}
-}
-
-// 敵の枠ごとの生死の記録を、現在の状態へ揃える。
-void GameSession::SyncEnemyAliveFlags()
-{
-	// 全枠の現在の生死を記録し直す。報酬は与えない。
-	const auto& enemies = m_enemyController.GetEnemyManager().GetEnemies();
-	for(std::size_t slot_index = 0; slot_index < enemies.size(); ++slot_index){
-		m_wasEnemyAlive[slot_index] = enemies[slot_index].IsAlive();
-	}
-}
-
 //========= 描画の補助関数=========
 // 床・壁・範囲の予告・出口・敵・敵の弾・Collisionの線を、この順に3Dで描画する。
 void GameSession::DrawWorld(const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix)
@@ -746,6 +710,7 @@ void GameSession::DrawHud()
 
 	// 現在の値をHUDへ渡して描画する。弾薬とリロードの値は、射撃を担当するShotControllerの武器から読み取る。
 	const WeaponSystem& weapon = m_player.GetShotController().GetWeaponSystem();
+	const RewardController& reward = m_economy.GetReward();
 	const int equipped_weapon_index = FindWeaponIndex(weapon.GetWeaponData());
 	GAME_HUD_STATE hud_state{};
 	hud_state.currentHP = m_player.GetPlayerHealth().GetCurrentHP();
@@ -757,10 +722,10 @@ void GameSession::DrawHud()
 	hud_state.isReloading = weapon.IsReloading();
 	hud_state.reloadProgress = weapon.GetReloadProgress();
 	hud_state.isAiming = m_player.GetPlayerController().IsAiming();
-	hud_state.currency = m_wallet.GetBalance();
-	hud_state.isRewardSelecting = m_reward.IsSelecting();
-	hud_state.hoveredRewardIndex = m_reward.GetHoveredIndex();
-	hud_state.rewardOwnedCounts = m_reward.GetAcquiredCounts();
+	hud_state.currency = m_economy.GetWallet().GetBalance();
+	hud_state.isRewardSelecting = reward.IsSelecting();
+	hud_state.hoveredRewardIndex = reward.GetHoveredIndex();
+	hud_state.rewardOwnedCounts = reward.GetAcquiredCounts();
 	hud_state.isShopOpen = m_shop.IsOpen();
 	hud_state.shopPage = m_shop.GetPage();
 	hud_state.hoveredShopIndex = m_shop.GetHoveredIndex();

@@ -1,10 +1,7 @@
 ﻿#pragma once
 
-// 1回のプレイの流れを担当する。初期化・更新・描画・終了の中で、ステージ・プレイヤー側一式・敵・時間（ヒットストップとスロー）・通貨・報酬選択・ショップ・武器の所持と強化と切替・デバッグ・HUD・Collision可視化の順序と仲介を行う。
+// 1回のプレイの流れを担当する。初期化・更新・描画・終了の中で、ステージ・プレイヤー側一式・敵・時間（ヒットストップとスロー）・通貨と報酬・ショップ・武器の所持と強化と切替・デバッグ・HUD・Collision可視化の順序と仲介を行う。
 // 移動・戦闘・射撃などの個別の規則は、各クラスが持つ。Scene遷移は担当せず、タイトルへ戻る要求を、更新の結果として呼出側へ返す。
-
-//========= C++標準ライブラリ インクルード=========
-#include <array> // std::arrayで、敵の枠ごとの、前回の更新での生死を固定長で保持する。
 
 //========= Debug インクルード=========
 #include "Debug/H/CollisionDebugView.h"
@@ -16,13 +13,11 @@
 //========= Scene インクルード=========
 #include "Scene/Common/Combat/H/TimeScaleController.h"
 #include "Scene/Common/Enemy/H/EnemyController.h"
-#include "Scene/Common/Enemy/H/EnemyWaveTable.h"
 #include "Scene/Common/Player/H/PlayerSuite.h"
-#include "Scene/Common/Player/H/Wallet.h"
-#include "Scene/Common/Reward/H/RewardController.h"
 #include "Scene/Common/Shop/H/ShopController.h"
 #include "Scene/Common/Stage/H/StageController.h"
 #include "Scene/Common/Weapon/H/WeaponInventory.h"
+#include "Scene/GameScene/H/EconomyController.h"
 #include "Scene/GameScene/H/GameHud.h"
 
 //========= 前方宣言=========
@@ -37,7 +32,7 @@ enum class GAME_SESSION_RESULT
 	e_RETURN_TO_TITLE // タイトルへ戻る要求があった。呼出側がScene遷移を予約する。
 };
 
-// ステージ・プレイヤー側一式・敵・時間・通貨・報酬選択・ショップ・武器の所持と強化と切替・デバッグ・HUDを仲介して、1回のプレイを進めるクラス。
+// ステージ・プレイヤー側一式・敵・時間・通貨と報酬・ショップ・武器の所持と強化と切替・デバッグ・HUDを仲介して、1回のプレイを進めるクラス。
 class GameSession final
 {
 public:
@@ -49,7 +44,7 @@ public:
 	GameSession(InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem);
 
 	//========= ライフサイクル関数=========
-	// プレイヤー側一式・ステージ・判定の状態・通貨・報酬選択・ショップ・武器の所持と強化・敵の弾と範囲の予告・デバッグ設定を初期状態へ戻し、カメラをプレイヤー位置へ合わせる。
+	// プレイヤー側一式・ステージ・判定の状態・通貨と報酬・ショップ・武器の所持と強化・敵の弾と範囲の予告・デバッグ設定を初期状態へ戻し、カメラをプレイヤー位置へ合わせる。
 	void Initialize();
 	// ステージ・HUD・Collision可視化を初期化し、敵の弾、範囲の予告、第1部屋の敵を生成して、成功後にFPS操作とGame用BGMを有効にする。
 	// 戻り値: 各初期化・Object生成・敵の配置が成功したらtrue。falseを検出した場合はFinalize後にfalseを返し、CaptureとBGMは変更しない。
@@ -132,11 +127,6 @@ private:
 	void SkipCurrentWave();
 	// 出口の通過を判定し、次の部屋へ進んだ場合だけ、プレイヤーを開始位置へ戻す。
 	void UpdateExitPass();
-	// 前回の確認から、新しく倒された敵（生きていた枠が、死亡になった）を調べ、種類に応じた撃破報酬を、通貨へ加える。
-	// 射撃・近接・デバッグのどの手段で倒された場合も、同じ扱いにする。
-	void UpdateKillRewards();
-	// 敵の枠ごとの生死の記録を、現在の状態へ揃える。報酬は与えない。
-	void SyncEnemyAliveFlags();
 
 	//========= 描画の補助関数=========
 	// 床・壁・範囲の予告・出口・敵・敵の弾・Collisionの線を、この順に3Dで描画する。
@@ -165,18 +155,12 @@ private:
 	GameDebugController m_debugController{};
 	// 共有Renderer・床と壁・出口・CollisionWorld・部屋の進行を所有する。敵の生成と全滅判定は、GameSessionが仲介する。
 	StageController m_stage{};
-	// 通貨の所持額。敵を倒した時の報酬と武器の売却で増え、ショップの購入・強化で減る。
-	Wallet m_wallet{};
-	// 部屋のクリア後の報酬選択の状態と、特殊強化の取得数。選択中は、時間とプレイヤーの操作を止める。
-	RewardController m_reward{};
+	// 通貨の所持額・部屋のクリア後の報酬選択と特殊強化の取得数・敵の撃破報酬の検出を担当する。選択中は、時間とプレイヤーの操作を止める。
+	EconomyController m_economy{};
 	// 所持している武器と、武器ごとの強化・切替で保存した弾薬の記録。ショップの購入・売却・強化と、持ち替えで変わる。
 	WeaponInventory m_inventory{};
 	// 武器と弾薬の購入、武器の売却、武器の強化の画面の状態。報酬選択の後に開き、開いている間は、時間とプレイヤーの操作を止める。
 	ShopController m_shop{};
-
-	//========= 撃破の検出=========
-	// 敵の枠ごとの、前回の確認での生死。生きていた枠が、今回は死亡になっていれば、倒されたとみなす。生成や初期化の後は、現在の状態へ揃える。
-	std::array<bool,ENEMY_WAVE_TABLE::ns_SLOT_COUNT> m_wasEnemyAlive{};
 
 	//========= HUDとデバッグ=========
 	// 画像で描くHUD。
