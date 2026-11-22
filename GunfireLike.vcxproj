@@ -222,6 +222,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Scene\Common\Combat\CPP\CombatResolver.cpp" />
     <ClCompile Include="Source\Scene\Common\Combat\CPP\JustDodgeJudge.cpp" />
     <ClCompile Include="Source\Scene\Common\Stage\CPP\StageController.cpp" />
+    <ClCompile Include="Source\Scene\Common\UI\CPP\ButtonMenuView.cpp" />
     <ClCompile Include="Source\Scene\Common\Weapon\CPP\ShotController.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\GraphicsSystem.cpp" />
     <ClCompile Include="Source\main.cpp" />
@@ -292,6 +293,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\Common\Player\H\Wallet.h" />
     <ClInclude Include="Source\Scene\Common\Reward\H\RewardController.h" />
     <ClInclude Include="Source\Scene\Common\Shop\H\ShopController.h" />
+    <ClInclude Include="Source\Scene\Common\UI\H\ButtonMenuView.h" />
     <ClInclude Include="Source\Scene\Common\UI\H\UiButton.h" />
     <ClInclude Include="Source\Scene\Common\Stage\H\ExitDoor.h" />
     <ClInclude Include="Source\Scene\Common\Object\H\ObjectConfig.h" />

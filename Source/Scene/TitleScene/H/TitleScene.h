@@ -1,15 +1,11 @@
 ﻿#pragma once
 
 // タイトルの画像（背景・ロゴ・開始ボタン）と操作の案内の描画、開始ボタンのクリックまたはEnterによるGameSceneへの遷移予約、タイトル開始時の入力・BGM設定を担当する。
-// Scene切替とフェード進行はSceneManagerへ任せ、共有Systemは所有しない。
-
-//========= Framework インクルード=========
-#include "Framework/2D/H/HudSpriteRenderer.h"
-#include "Framework/2D/H/HudTextRenderer.h"
+// 画像・文字の描画Resourceと、ボタンの判定は、ButtonMenuViewが担当する。Scene切替とフェード進行はSceneManagerへ任せ、共有Systemは所有しない。
 
 //========= Scene インクルード=========
 #include "Scene/Common/Core/H/IScene.h"
-#include "Scene/Common/UI/H/UiButton.h"
+#include "Scene/Common/UI/H/ButtonMenuView.h"
 
 //========= 前方宣言=========
 class AudioSystem;
@@ -17,7 +13,7 @@ class GraphicsSystem;
 class InputSystem;
 class SceneManager;
 
-// タイトル用の画像・文字の描画Resourceと、開始ボタンを所有するScene。
+// タイトルのSceneとして、ボタン1つのメニュー画面（ButtonMenuView）の呼出しと、開始の入力に応じた遷移の予約を行うクラス。
 class TitleScene final: public IScene
 {
 public:
@@ -32,18 +28,17 @@ public:
 	//========= Sceneライフサイクル関数=========
 	// Resource生成前の初期状態を準備する。このSceneの現行実装では処理を行わない。
 	void Initialize() override;
-	// 画像・文字の描画を初期化し、画像を読み込み、開始ボタンの矩形を設定して、成功後にマウスキャプチャ解除とタイトルBGM再生を行う。
+	// メニュー画面を初期化し、成功後にマウスキャプチャ解除とタイトルBGM再生を行う。
 	// 画像の読込失敗は、その画像だけを描かず、全体の失敗にはしない。
-	// 戻り値: 画像・文字の描画の初期化成功ならtrue、false返却を検出した場合はFinalize後にfalse。
+	// 戻り値: メニュー画面の初期化成功ならtrue、失敗した場合はFinalize後にfalse。
 	// 下位処理の例外は捕捉しない。
 	bool Init() override;
 	// 開始ボタンのクリックまたはEnterのトリガー入力に応じて、GameSceneへの遷移を予約する。
 	// deltaTime: 経過時間。単位は秒。タイトルには時間経過による更新がないため使用しない。
 	void Update(float deltaTime) override;
-	// UI用Render Passで、背景・ロゴ・開始ボタンの画像と、操作の案内の文字を描画する。描画先の幅または高さが0なら何もしない。
-	// 描画後はOPAQUE Passへ設定する。呼出前のPassを保存・復元する処理ではない。
+	// メニュー画面（背景・ロゴ・開始ボタンの画像と、操作の案内の文字）を描画する。描画先の幅または高さが0なら何もしない。
 	void Draw() override;
-	// 所有する画像・文字の描画Resourceを解放する。繰り返し呼出可能。CaptureやBGMの設定は変更しない。
+	// メニュー画面の描画Resourceを解放する。繰り返し呼出可能。CaptureやBGMの設定は変更しない。
 	void Finalize() override;
 
 private:
@@ -58,18 +53,6 @@ private:
 	AudioSystem& m_audioSystem;
 
 	//========= Scene所有状態=========
-	// タイトルの画像の描画Resourceを所有する。Finalizeで明示的に解放する。
-	HudSpriteRenderer m_spriteRenderer{};
-	// 操作の案内の文字の描画Resourceを所有する。Finalizeで明示的に解放する。
-	HudTextRenderer m_hudTextRenderer{};
-	// 背景の画像の識別値。読込失敗や未初期化は0で、0の画像は描かない。
-	HudTextureHandle m_backgroundTexture{};
-	// ロゴの画像の識別値。0なら描かない。
-	HudTextureHandle m_logoTexture{};
-	// 開始ボタンの画像（通常）の識別値。0なら描かない。
-	HudTextureHandle m_startButtonTexture{};
-	// 開始ボタンの画像（カーソルが乗っている時）の識別値。0なら描かない。
-	HudTextureHandle m_startButtonHoverTexture{};
-	// 開始ボタンの当たりとホバーの判定。
-	UiButton m_startButton{};
+	// 背景・ロゴ・開始ボタンの画像と、操作の案内の文字を描く、メニュー画面。Finalizeで明示的に解放する。
+	ButtonMenuView m_menu{};
 };
