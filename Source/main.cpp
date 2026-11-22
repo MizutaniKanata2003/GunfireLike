@@ -1,8 +1,10 @@
 ﻿// Windowsアプリケーションの起動・メッセージ転送・フレーム処理・明示的な終了を担当する。
 // 各SystemとSceneManagerをローカルに保持し、生成順・失敗分岐・終了順は既存実装を維持する。
+// フレームごとの処理時間の測定（FPSのタイトル表示と、低FPSのログ）と、このWindowでのIME（半角/全角キーの入力窓）の無効化も行う。
 
 //========= Windows インクルード=========
 #include <windows.h>
+#include <imm.h> // ImmDisableIMEで、このアプリのスレッドのIMEを無効にし、半角/全角キーで入力窓が出ないようにする。
 #include <objbase.h>
 
 //========= 外部ライブラリ インクルード=========
@@ -13,12 +15,16 @@
 #include "Framework/Audio/H/AudioSystem.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
 #include "Framework/Etc/H/AppConfig.h"
+#include "Framework/Etc/H/FrameMonitor.h"
 #include "Framework/Etc/H/GameTimer.h"
 #include "Framework/Imgui/H/ImGuiManager.h"
 #include "Framework/Input/H/InputSystem.h"
 
 //========= Scene インクルード=========
 #include "Scene/Common/Core/H/SceneManager.h"
+
+//========= ライブラリ指定=========
+#pragma comment(lib,"imm32.lib") // ImmDisableIMEの実装を含む。
 
 //========= 外部関数宣言=========
 // Win32バックエンドへウィンドウメッセージを転送する。外部APIの名前と型は変更しない。
@@ -40,7 +46,7 @@ struct WINDOW_CONTEXT
 };
 
 //========= Windowメッセージ関数=========
-// 入力・ImGuiへの通知、Resize、終了要求を処理し、それ以外は既定処理へ渡す。
+// 入力・ImGuiへの通知、Resize、IMEの表示の抑止、終了要求を処理し、それ以外は既定処理へ渡す。
 // windowHandle: メッセージを受け取ったWindow。GWLP_USERDATAから非所有参照を取得する。
 // message: Win32メッセージ番号。
 // wParam: メッセージ固有の追加情報。
@@ -64,7 +70,7 @@ LRESULT CALLBACK WindowProcedure(HWND windowHandle,UINT message,WPARAM wParam,LP
 		}
 	}
 
-	// Resizeと終了通知だけをここで処理し、その他の挙動はWin32既定処理へ任せる。
+	// Resize・IMEの表示の抑止・終了通知だけをここで処理し、その他の挙動はWin32既定処理へ任せる。
 	switch(message){
 	case WM_SIZE:
 	// サイズ0を含め、WM_SIZEから取得した値をそのままGraphicsSystemへ渡す。
@@ -74,6 +80,10 @@ LRESULT CALLBACK WindowProcedure(HWND windowHandle,UINT message,WPARAM wParam,LP
 		graphics_system->Resize(width,height);
 	}
 	return 0;
+
+	case WM_IME_SETCONTEXT:
+	// IMEの入力窓・候補窓・状態の表示を、全て出さない旨の指定へ書き換えて、既定処理へ渡す。ImmDisableIMEで無効にしても、他のIMEからの表示が残らないための二重の対策。
+	return DefWindowProcW(windowHandle,message,wParam,lParam & ~static_cast<LPARAM>(ISC_SHOWUIALL));
 
 	case WM_DESTROY:
 	// メインループ側で通常終了へ進むよう、終了メッセージを登録する。
@@ -100,6 +110,9 @@ int WINAPI WinMain(HINSTANCE instance,HINSTANCE,LPSTR,int showCommand)
 	const HRESULT com_result = CoInitializeEx(nullptr,COINIT_MULTITHREADED | COINIT_DISABLE_OLE1DDE);
 	if(FAILED(com_result))return -100;
 
+	// このスレッドのIMEを無効にする。Windowの生成より前に呼ぶ。半角/全角キーを押しても、IMEの入力窓や、入力モードの表示が出なくなる。結果は確認しない。
+	ImmDisableIME(0);
+
 	// WindowProcedureと表示用Class情報を登録し、失敗した場合はCOMだけを終了する。
 	WNDCLASSEXW window_class{};
 	window_class.cbSize = sizeof(window_class);
@@ -118,7 +131,7 @@ int WINAPI WinMain(HINSTANCE instance,HINSTANCE,LPSTR,int showCommand)
 
 	// Windowを生成する。この時点ではGWLP_USERDATAへSystem参照を登録していない。
 	HWND window_handle = CreateWindowExW(0,Config::WINDOW_CLASS_NAME,Config::WINDOW_TITLE,WS_OVERLAPPEDWINDOW,CW_USEDEFAULT,CW_USEDEFAULT,
-																			window_rect.right - window_rect.left,window_rect.bottom - window_rect.top,nullptr,nullptr,instance,nullptr);
+																			 window_rect.right - window_rect.left,window_rect.bottom - window_rect.top,nullptr,nullptr,instance,nullptr);
 	if(window_handle == nullptr){
 		// Window生成に失敗したため、登録したClassとCOMを終了する。
 		UnregisterClassW(Config::WINDOW_CLASS_NAME,instance);
@@ -175,6 +188,10 @@ int WINAPI WinMain(HINSTANCE instance,HINSTANCE,LPSTR,int showCommand)
 	ShowWindow(window_handle,showCommand);
 	UpdateWindow(window_handle);
 
+	// フレームの処理時間の測定を始める。FPSは、基準のタイトルの後ろへ表示する。
+	FrameMonitor frame_monitor;
+	frame_monitor.Initialize(window_handle,Config::WINDOW_TITLE);
+
 	// 各Systemが生存している間にSceneを初期化し、TitleSceneの開始を試行する。
 	SceneManager scene_manager;
 	scene_manager.Initialize(input_system,graphics_system,audio_system);
@@ -182,6 +199,8 @@ int WINAPI WinMain(HINSTANCE instance,HINSTANCE,LPSTR,int showCommand)
 	// 終了メッセージを受けるまで、メッセージ処理とゲームフレームを繰り返す。
 	bool is_running = true;
 	while(is_running){
+		frame_monitor.BeginFrame();
+
 		// 保留中のメッセージを取り出す。WM_QUIT後も既存どおりループ内の転送処理を維持する。
 		MSG message{};
 		while(PeekMessage(&message,nullptr,0,0,PM_REMOVE)){
@@ -194,6 +213,7 @@ int WINAPI WinMain(HINSTANCE instance,HINSTANCE,LPSTR,int showCommand)
 
 		// 終了通知を受けたフレームでは、System更新と描画へ進まない。
 		if(!is_running)break;
+		frame_monitor.EndPhase(FRAME_PHASE::e_MESSAGE);
 
 		// 時間・入力・音声をこの順で更新し、Sceneへ渡すフレーム情報を準備する。
 		game_timer.Update();
@@ -205,9 +225,11 @@ int WINAPI WinMain(HINSTANCE instance,HINSTANCE,LPSTR,int showCommand)
 			PostQuitMessage(0);
 			continue;
 		}
+		frame_monitor.EndPhase(FRAME_PHASE::e_SYSTEM);
 
 		// Sceneと遷移演出を更新してから、更新後の状態を描画する。
 		scene_manager.Update(game_timer.GetDeltaTime());
+		frame_monitor.EndPhase(FRAME_PHASE::e_SCENE_UPDATE);
 
 		// 既存の背景色で描画を開始し、ImGuiフレームをSceneの描画前に準備する。
 		const float clear_color[4]{0.06f,0.09f,0.14f,1.0f};
@@ -217,9 +239,11 @@ int WINAPI WinMain(HINSTANCE instance,HINSTANCE,LPSTR,int showCommand)
 		// Sceneとフェードの描画命令を登録する。描画データの確定はこの後に行う。
 		scene_manager.Draw();
 
-		// ImGuiの描画データを出力してから、GraphicsSystemでフレームを表示する。
+		// ImGuiの描画データを出力してから、GraphicsSystemでフレームを表示する。表示の時間は、FrameMonitorが、画面表示の段階として測る。
 		imgui_manager.EndFrame();
+		frame_monitor.EndPhase(FRAME_PHASE::e_DRAW);
 		graphics_system.EndFrame();
+		frame_monitor.EndFrame();
 	}
 
 	// 下位Resourceを持つSceneとImGuiを、依存する描画・音声基盤より先に終了する。

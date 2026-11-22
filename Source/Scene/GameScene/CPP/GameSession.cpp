@@ -90,18 +90,6 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 		SkipCurrentWave();
 	}
 
-	// プレイの終了（プレイヤーの死亡・最終部屋のクリア）を判定する。終了した後は、実時間で待ち時間だけを数える。
-	m_runController.Update(deltaTime,m_player.GetPlayerHealth().IsDead(),m_stage.GetRoomNumber(),m_stage.GetRoomController().GetPhase());
-
-	// 終了した後は、世界と報酬選択・ショップの更新を行わず、最後の画面のまま止める。報酬選択やショップを、終了の瞬間に開かないため、他の更新より前に戻る。
-	if(!m_runController.IsPlaying()){
-		// 待ち時間が過ぎるまでは、プレイを続けているものとして、画面を保つ。
-		if(!m_runController.HasEndDelayElapsed())return GAME_SESSION_RESULT::e_CONTINUE;
-
-		// 待ち時間が過ぎたら、死亡はやり直しを、クリアはクリア後の画面への遷移を、呼出側へ求める。
-		return m_runController.GetState() == RUN_STATE::e_CLEARED ? GAME_SESSION_RESULT::e_CLEARED : GAME_SESSION_RESULT::e_RETRY;
-	}
-
 	// 報酬選択中とショップが開いている間は、時間を進めない。
 	// ヒットストップ・スロー・回復アイテムの間隔・表示の時間も、この更新では0を渡して、画面を閉じるまで止める。
 	const float frame_delta_time = (m_economy.GetReward().IsSelecting() || m_shopFlow.IsOpen()) ? 0.0f : deltaTime;
@@ -115,6 +103,18 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 	UpdateWorldAndRoom(time_deltas.worldDeltaTime);
 	UpdateTimers(frame_delta_time,time_deltas.gameplayDeltaTime);
 	m_economy.UpdateKillRewards(m_enemyController.GetEnemyManager());
+
+	// プレイの終了（プレイヤーの死亡・最終部屋のクリア）を判定する。部屋の進行（最終部屋の出口の開放）を反映した後に判定するため、ここで呼ぶ。終了した後は、実時間で待ち時間だけを数える。
+	m_runController.Update(deltaTime,m_player.GetPlayerHealth().IsDead(),m_stage.GetRoomNumber(),m_stage.GetRoomController().GetPhase());
+
+	// 終了した後は、報酬選択・ショップ・操作の更新を行わず、最後の画面のまま止める。最終部屋のクリアで、報酬選択やショップを開かないため、報酬選択の更新より前に戻る。
+	if(!m_runController.IsPlaying()){
+		// 待ち時間が過ぎるまでは、プレイを続けているものとして、画面を保つ。
+		if(!m_runController.HasEndDelayElapsed())return GAME_SESSION_RESULT::e_CONTINUE;
+
+		// 待ち時間が過ぎたら、死亡はやり直しを、クリアはクリア後の画面への遷移を、呼出側へ求める。
+		return m_runController.GetState() == RUN_STATE::e_CLEARED ? GAME_SESSION_RESULT::e_CLEARED : GAME_SESSION_RESULT::e_RETRY;
+	}
 
 	// 部屋のクリアの結果を受けて、報酬選択へ入る・抜ける。抜けた更新で、続けてショップを開く。
 	// ショップが開いている間は、購入・売却・強化・閉じる操作を処理する。
@@ -277,12 +277,13 @@ bool GameSession::UpdateSessionInput()
 	return false;
 }
 
-// 確認用の攻撃の判定と、敵の怯み・転倒・部屋の進行・出口の開閉を、Captureに関係なく更新する。
+// 確認用の攻撃の判定と、敵の怯み・転倒・敵どうしの押し離し・部屋の進行・出口の開閉を、Captureに関係なく更新する。
 void GameSession::UpdateWorldAndRoom(float worldDeltaTime)
 {
-	// 確認用の攻撃の判定、敵の怯み・転倒を、Captureに関係なく進める。
+	// 確認用の攻撃の判定、敵の怯み・転倒を、Captureに関係なく進める。続けて、重なった敵どうしを押し離す。
 	UpdateDodgeJudge(worldDeltaTime);
 	m_enemyController.GetEnemyManager().Update(worldDeltaTime);
+	m_enemyController.GetEnemyManager().SeparateEnemies(m_stage.GetCollisionWorld());
 
 	// 生成待ちなら現在のウェーブを生成し、結果を記録する。失敗した場合は再試行せず、F4で最初からやり直すまで敵なしで待つ。
 	if(m_stage.ShouldSpawnWave()){

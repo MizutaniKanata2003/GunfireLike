@@ -1,9 +1,11 @@
 ﻿#pragma once
 
 // 1ウェーブ分の敵とColliderの登録・解除を管理する。敵の攻撃と部屋の遷移は担当しない。
+// 敵どうしの重なりを、互いに押し離して解消する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <array> // std::arrayで敵と出現枠の対応を固定する。
+#include <cmath> // std::sqrtで、敵どうしの水平距離を求める。
 #include <cstddef> // std::size_tで出現枠を走査する。
 #include <cstdint> // std::uint32_tで命中判定用の敵IDを扱う。
 
@@ -11,6 +13,14 @@
 #include "Scene/Common/Combat/H/CombatResolver.h"
 #include "Scene/Common/Enemy/H/Enemy.h"
 #include "Scene/Common/Enemy/H/EnemyWaveTable.h"
+
+// 敵どうしの押し離しに使う数値をまとめる。
+namespace ENEMY_SEPARATION
+{
+	//========= 数値=========
+	// 2体の中心の水平距離が、この値より小さい場合は、押す向きを決められないため、X方向へ押す。単位はワールド距離単位。中心がほぼ一致した場合の、0で割る除算を避けるための値。
+	inline constexpr float ns_MIN_DIRECTION_DISTANCE = 0.0001f;
+}
 
 // ウェーブ内の敵を所有する。終了時はRegistryとCollisionWorldの解放前にClearを呼ぶ。
 class EnemyManager final
@@ -70,6 +80,19 @@ public:
 		// 全枠を先頭から更新し、第1枠だけでなく全ての敵の怯み・転倒を同じ時間で進める。
 		for(Enemy& enemy : m_enemies){
 			enemy.Update(deltaTime);
+		}
+	}
+
+	// 生きている敵どうしの、体の球が水平に重なっている組を、重なりが無くなるまで、互いに押し離す。体の大きい（半径の大きい）敵ほど、動かされにくい。
+	// 地形への押し込みは、各敵の移動の処理が補正する。毎フレーム呼ぶと、敵どうしが重なったままにならない。
+	// collisionWorld: 敵のColliderを登録したCollisionWorld。
+	void SeparateEnemies(CollisionWorld& collisionWorld)
+	{
+		// 全ての組を、1回ずつ調べる。
+		for(std::size_t first_index = 0; first_index < m_enemies.size(); ++first_index){
+			for(std::size_t second_index = first_index + 1; second_index < m_enemies.size(); ++second_index){
+				SeparatePair(m_enemies[first_index],m_enemies[second_index],collisionWorld);
+			}
 		}
 	}
 
@@ -152,6 +175,44 @@ public:
 	}
 
 private:
+	//========= 補助関数=========
+	// 2体の敵の体の球が、水平に重なっている場合だけ、重なりの分を、互いに反対の向きへ押し離す。押す量は、半径の二乗（大きさの目安）に反比例して配分する。高さは変えない。
+	// first: 1体目の敵。死亡中なら何もしない。
+	// second: 2体目の敵。死亡中なら何もしない。
+	// collisionWorld: 敵のColliderを登録したCollisionWorld。移動の押し戻しに使う。
+	static void SeparatePair(Enemy& first,Enemy& second,CollisionWorld& collisionWorld)
+	{
+		// どちらかが死亡している組は、重なっても押し離さない。
+		if(!first.IsAlive() || !second.IsAlive())return;
+
+		// 水平の距離と、重なりが生じる距離（半径の和）を求める。重なっていなければ戻る。
+		const COLLISION_SPHERE first_sphere = first.GetBodySphere();
+		const COLLISION_SPHERE second_sphere = second.GetBodySphere();
+		const float offset_x = second_sphere.center.x - first_sphere.center.x;
+		const float offset_z = second_sphere.center.z - first_sphere.center.z;
+		const float distance = std::sqrt(offset_x * offset_x + offset_z * offset_z);
+		const float contact_distance = first_sphere.radius + second_sphere.radius;
+		if(distance >= contact_distance)return;
+
+		// 1体目から2体目へ向かう単位ベクトルを求める。中心がほぼ一致している場合は、向きが決まらないため、X方向とする。
+		const bool has_direction = distance > ENEMY_SEPARATION::ns_MIN_DIRECTION_DISTANCE;
+		const float direction_x = has_direction ? offset_x / distance : 1.0f;
+		const float direction_z = has_direction ? offset_z / distance : 0.0f;
+
+		// 重なりの分を、半径の二乗の逆比で配分する。大きい敵ほど、動く量が小さい。
+		const float overlap = contact_distance - distance;
+		const float first_weight = first_sphere.radius * first_sphere.radius;
+		const float second_weight = second_sphere.radius * second_sphere.radius;
+		const float first_push = overlap * second_weight / (first_weight + second_weight);
+		const float second_push = overlap * first_weight / (first_weight + second_weight);
+
+		// 互いに反対の向きへ移動させる。地形との重なりは、TryMoveToが押し戻す。
+		static_cast<void>(first.TryMoveTo(XMFLOAT3{first_sphere.center.x - direction_x * first_push,first_sphere.center.y,
+											first_sphere.center.z - direction_z * first_push},collisionWorld));
+		static_cast<void>(second.TryMoveTo(XMFLOAT3{second_sphere.center.x + direction_x * second_push,second_sphere.center.y,
+											second_sphere.center.z + direction_z * second_push},collisionWorld));
+	}
+
 	//========= 所有状態=========
 	// 編成表と同じ順序の敵。初期状態では全枠が未登録。
 	std::array<Enemy,ENEMY_WAVE_TABLE::ns_SLOT_COUNT> m_enemies{};
