@@ -21,6 +21,21 @@
 #include "Scene/Common/Player/H/PlayerController.h"
 #include "Scene/Common/Player/H/PlayerHealth.h"
 
+// 敵の更新に使う、位置の補助関数をまとめる。
+namespace
+{
+	// 2点の水平距離（X・Z平面の距離）を返す。高さは使わない。
+	// fromPosition: 距離の起点。
+	// toPosition: 距離の終点。
+	// 戻り値: 水平距離。単位はワールド距離単位。
+	float CalculateHorizontalDistance(const XMFLOAT3& fromPosition,const XMFLOAT3& toPosition)
+	{
+		const float offset_x = toPosition.x - fromPosition.x;
+		const float offset_z = toPosition.z - fromPosition.z;
+		return std::sqrt(offset_x * offset_x + offset_z * offset_z);
+	}
+}
+
 //========= 初期化・終了関数=========
 // 参照先と通知先を登録し、敵の弾と範囲の予告のCube Rendererを借用し、ボスの更新へ参照先を渡す。
 bool EnemyController::Initialize(const ENEMY_CONTROLLER_LINKS& links)
@@ -173,26 +188,35 @@ void EnemyController::UpdateActions(float worldDeltaTime)
 	}
 }
 
+// 戦闘不能な敵の攻撃予告を取り消し、再攻撃待ちを設定する。
+bool EnemyController::CancelIfIncapacitated(std::size_t slotIndex,float recoverySeconds)
+{
+	// 生きていて、怯み・転倒をしておらず、プレイヤーも死亡していなければ、戦闘不能ではない。
+	const Enemy& enemy = m_enemyManager.GetEnemies()[slotIndex];
+	if(enemy.IsAlive() && !enemy.IsFlinching() && !enemy.IsKnockedDown() && !m_playerHealth->IsDead())return false;
+
+	// 予告中断時だけ再攻撃待ちを設定し、行動不能が続いても毎回は設定しない。
+	JustDodgeJudge& judge = m_attackJudges[slotIndex];
+	if(judge.HasIncomingAttack()){
+		judge.Initialize();
+		m_recoverySeconds[slotIndex] = recoverySeconds;
+	}
+	return true;
+}
+
 // 接近型の敵だけ、予告中は追従を止め、予告が終わったフレームで一度だけ命中を判定する。
 void EnemyController::UpdateMeleeSlot(std::size_t slotIndex,float worldDeltaTime)
 {
+	// 戦闘不能になった敵の予告は、時間停止中でも取り消して持ち越さない。
+	if(CancelIfIncapacitated(slotIndex,COMBAT_TABLE::ns_ENEMY_MELEE_RECOVERY_SECONDS))return;
+
+	// ヒットストップで敵側の時間が進まない場合は、新しい予告も始めない。
+	if(worldDeltaTime <= 0.0f)return;
+
 	// この枠の敵と、その敵専用の予告・再攻撃待ちを参照する。
 	Enemy& enemy = m_enemyManager.GetEnemies()[slotIndex];
 	JustDodgeJudge& judge = m_attackJudges[slotIndex];
 	float& recovery_seconds = m_recoverySeconds[slotIndex];
-
-	// 戦闘不能になった敵の予告は、時間停止中でも取り消して持ち越さない。
-	if(!enemy.IsAlive() || enemy.IsFlinching() || enemy.IsKnockedDown() || m_playerHealth->IsDead()){
-		// 予告中断時だけ再攻撃待ちを設定し、行動不能が続いても毎回は設定しない。
-		if(judge.HasIncomingAttack()){
-			judge.Initialize();
-			recovery_seconds = COMBAT_TABLE::ns_ENEMY_MELEE_RECOVERY_SECONDS;
-		}
-		return;
-	}
-
-	// ヒットストップで敵側の時間が進まない場合は、新しい予告も始めない。
-	if(worldDeltaTime <= 0.0f)return;
 
 	// 追従の停止距離と同じXZ平面で測る。二乗同士を比較し、平方根を取らずに範囲を求める。
 	const XMFLOAT3 enemy_position = enemy.GetBodySphere().center;
@@ -245,30 +269,21 @@ void EnemyController::UpdateMeleeSlot(std::size_t slotIndex,float worldDeltaTime
 // 予告中は移動せず、予告が終わったフレームで弾を生成する。予告以外では、距離を保つ。
 void EnemyController::UpdateRangedSlot(std::size_t slotIndex,float worldDeltaTime)
 {
+	// 戦闘不能になった敵の予告は、時間停止中でも取り消して持ち越さない。
+	if(CancelIfIncapacitated(slotIndex,ENEMY_RANGED::ns_RECOVERY_SECONDS))return;
+
+	// ヒットストップで敵側の時間が進まない場合は、移動も新しい予告も始めない。
+	if(worldDeltaTime <= 0.0f)return;
+
 	// この枠の敵と、その敵専用の予告・再攻撃待ちを参照する。
 	Enemy& enemy = m_enemyManager.GetEnemies()[slotIndex];
 	JustDodgeJudge& judge = m_attackJudges[slotIndex];
 	float& recovery_seconds = m_recoverySeconds[slotIndex];
 
-	// 戦闘不能になった敵の予告は、時間停止中でも取り消して持ち越さない。
-	if(!enemy.IsAlive() || enemy.IsFlinching() || enemy.IsKnockedDown() || m_playerHealth->IsDead()){
-		// 予告中断時だけ再攻撃待ちを設定し、行動不能が続いても毎回は設定しない。
-		if(judge.HasIncomingAttack()){
-			judge.Initialize();
-			recovery_seconds = ENEMY_RANGED::ns_RECOVERY_SECONDS;
-		}
-		return;
-	}
-
-	// ヒットストップで敵側の時間が進まない場合は、移動も新しい予告も始めない。
-	if(worldDeltaTime <= 0.0f)return;
-
 	// 敵とプレイヤーの水平距離を求める。高さは使わない。
 	const XMFLOAT3 enemy_position = enemy.GetBodySphere().center;
 	const XMFLOAT3& player_position = m_playerController->GetPosition();
-	const float offset_x = player_position.x - enemy_position.x;
-	const float offset_z = player_position.z - enemy_position.z;
-	const float distance = std::sqrt(offset_x * offset_x + offset_z * offset_z);
+	const float distance = CalculateHorizontalDistance(enemy_position,player_position);
 
 	// 予告中はその場に立ち止まり、予告の終わりだけ、発射のタイミングに達した旨を受け取る。
 	if(judge.HasIncomingAttack()){
@@ -306,24 +321,19 @@ void EnemyController::UpdateRangedSlot(std::size_t slotIndex,float worldDeltaTim
 // 予告中は移動せず、予告の終わりに、固定した範囲の内にいるプレイヤーへ判定する。予告以外では、攻撃を始める距離まで近づく。
 void EnemyController::UpdateAreaSlot(std::size_t slotIndex,float worldDeltaTime)
 {
-	// この枠の敵と、その敵専用の予告・再攻撃待ちを参照する。
-	Enemy& enemy = m_enemyManager.GetEnemies()[slotIndex];
-	JustDodgeJudge& judge = m_attackJudges[slotIndex];
-	float& recovery_seconds = m_recoverySeconds[slotIndex];
-
 	// 戦闘不能になった敵の予告と、床の範囲の表示は、時間停止中でも取り消して持ち越さない。
-	if(!enemy.IsAlive() || enemy.IsFlinching() || enemy.IsKnockedDown() || m_playerHealth->IsDead()){
-		// 予告中断時だけ再攻撃待ちを設定し、行動不能が続いても毎回は設定しない。
-		if(judge.HasIncomingAttack()){
-			judge.Initialize();
-			recovery_seconds = ENEMY_AREA::ns_RECOVERY_SECONDS;
-		}
+	if(CancelIfIncapacitated(slotIndex,ENEMY_AREA::ns_RECOVERY_SECONDS)){
 		m_areaTelegraph.End(slotIndex);
 		return;
 	}
 
 	// ヒットストップで敵側の時間が進まない場合は、移動も新しい予告も始めない。
 	if(worldDeltaTime <= 0.0f)return;
+
+	// この枠の敵と、その敵専用の予告・再攻撃待ちを参照する。
+	Enemy& enemy = m_enemyManager.GetEnemies()[slotIndex];
+	JustDodgeJudge& judge = m_attackJudges[slotIndex];
+	float& recovery_seconds = m_recoverySeconds[slotIndex];
 
 	// 敵とプレイヤーの位置を取得する。範囲の判定にも、接近の判断にも使う。
 	const XMFLOAT3 enemy_position = enemy.GetBodySphere().center;
@@ -358,13 +368,8 @@ void EnemyController::UpdateAreaSlot(std::size_t slotIndex,float worldDeltaTime)
 	// 再攻撃待ちは敵側の時間で減らす。残り時間が負にならないようにする。
 	recovery_seconds = std::max(0.0f,recovery_seconds - worldDeltaTime);
 
-	// 敵とプレイヤーの水平距離を求める。高さは使わない。
-	const float offset_x = player_position.x - enemy_position.x;
-	const float offset_z = player_position.z - enemy_position.z;
-	const float distance = std::sqrt(offset_x * offset_x + offset_z * offset_z);
-
 	// 攻撃を始める距離より遠い間は近づく。近づいた更新では、予告を始めない。
-	if(distance > ENEMY_AREA::ns_ENGAGE_DISTANCE){
+	if(CalculateHorizontalDistance(enemy_position,player_position) > ENEMY_AREA::ns_ENGAGE_DISTANCE){
 		ENEMY_AREA::Approach(enemy,player_position,worldDeltaTime,*m_collisionWorld);
 		return;
 	}
