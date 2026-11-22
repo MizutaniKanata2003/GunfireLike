@@ -1,13 +1,13 @@
 ﻿#include "../H/WeaponSystem.h"
 
-// 連射間隔・リロード・弾薬の管理と、Rayによる射撃の判定、視線の反動を実装する。
+// 連射間隔・リロード・弾薬の管理と、Rayによる射撃の判定（弾ごと）、視線の反動を実装する。
 // ダメージの適用は呼出側が行う。数値は性能値の表から受け取り、このファイルでは固定しない。
 
 //========= Windows インクルード=========
 #include <windows.h> // VK_LBUTTONで射撃入力、'R'のキーコードでリロード入力を判定する。
 
 //========= C++標準ライブラリ インクルード=========
-#include <algorithm> // std::maxで連射間隔の残り時間を0以上に保ち、std::minでリロードの補充数と進み具合の上限を制限する。
+#include <algorithm> // std::maxで連射間隔の残り時間を0以上に保ち、std::minでリロードの補充数と進み具合の上限を制限し、std::clampで弾の数を範囲内に収める。
 #include <cmath> // std::tan・std::sqrt・std::cos・std::sinで、弾のばらつきの方向を円錐内から求める。
 #include <cstdint> // std::uint32_tで、命中判定の対象にするレイヤーのbitのマスクを保持する。
 
@@ -88,20 +88,17 @@ WEAPON_UPDATE_RESULT WeaponSystem::Update(float deltaTime,const InputSystem& inp
 	if(!isShootingAllowed || !input.IsKeyPressed(VK_LBUTTON) || m_fireCooldownSeconds > 0.0f)return result;
 	if(m_magazineAmmo <= 0 && !m_isInfiniteAmmo)return result;
 
-	// 弾を1発消費し、次の弾までの連射間隔を設定する。弾薬を消費しないデバッグ設定が有効なら、弾は減らさない。
+	// 弾薬を1つ消費し、次の発射までの連射間隔を設定する。弾薬を消費しないデバッグ設定が有効なら、弾は減らさない。
+	// 複数の弾（ペレット）を撃つ武器でも、減るのは1回の発射につき1つ。
 	if(!m_isInfiniteAmmo){
 		--m_magazineAmmo;
 	}
 	m_fireCooldownSeconds = m_weaponData.fireIntervalSeconds;
 
-	// 構えているかに応じた散布で、視線方向を中心にした弾の方向を決める。反動は方向を決めた後に加える。
+	// 構えているかに応じた散布で、弾ごとの方向と命中を決める。反動は方向を決めた後に、1回の発射につき1回だけ加える。
 	const float spread_degrees = isAiming ? m_weaponData.aimSpreadDegrees : m_weaponData.hipSpreadDegrees;
 	result.didFire = true;
-	result.shotRay.origin = camera.GetPosition();
-	result.shotRay.direction = BuildShotDirection(camera,spread_degrees);
-
-	// 最も近い地形または敵への命中を調べる。命中しなければ、結果の命中情報は初期値のまま。
-	result.didHit = collisionWorld.Raycast(result.shotRay,m_weaponData.maxRange,ns_SHOT_LAYER_MASK,result.rayHit,result.hitInfo);
+	CastPellets(camera,spread_degrees,collisionWorld,result);
 
 	// 反動として視線を上へ動かし、左右へは乱数で振る。度をラジアンへ換算して渡す。
 	std::uniform_real_distribution<float> yaw_distribution(-m_weaponData.recoilYawDegrees,m_weaponData.recoilYawDegrees);
@@ -121,6 +118,22 @@ float WeaponSystem::GetReloadProgress() const
 }
 
 //========= 補助関数=========
+// 弾（ペレット）ごとに、別の方向のRayを作り、命中を調べる。
+void WeaponSystem::CastPellets(const FpsCamera& camera,float spreadDegrees,const CollisionWorld& collisionWorld,WEAPON_UPDATE_RESULT& result)
+{
+	// 撃つ弾の数を、1から上限の範囲へ収める。性能値の誤りで、結果の配列の外へ書き込まないため。
+	result.pelletCount = std::clamp(m_weaponData.pelletCount,1,WEAPON_TABLE::ns_MAX_PELLET_COUNT);
+
+	// 弾の数だけ、始点はカメラ位置、方向は散布の範囲から弾ごとに選んで、最も近い地形または敵への命中を調べる。
+	// 弾の方向は互いに独立で、命中しなかった弾は、命中情報が初期値のまま残る。
+	for(int pellet_index = 0; pellet_index < result.pelletCount; ++pellet_index){
+		SHOT_PELLET_RESULT& pellet = result.pellets[pellet_index];
+		pellet.ray.origin = camera.GetPosition();
+		pellet.ray.direction = BuildShotDirection(camera,spreadDegrees);
+		pellet.didHit = collisionWorld.Raycast(pellet.ray,m_weaponData.maxRange,ns_SHOT_LAYER_MASK,pellet.rayHit,pellet.hitInfo);
+	}
+}
+
 // 視線方向・右方向・上方向の3つで作る円錐の内側から、方向を1つ選ぶ。
 XMFLOAT3 WeaponSystem::BuildShotDirection(const FpsCamera& camera,float spreadDegrees)
 {

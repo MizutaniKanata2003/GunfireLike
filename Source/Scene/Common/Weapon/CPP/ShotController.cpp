@@ -1,6 +1,6 @@
 ﻿#include "../H/ShotController.h"
 
-// 射撃の更新、武器の装備、弾道の終点の通知、命中した敵へのダメージと怯み（特殊強化の効果を含む）、命中表示の時間管理を実装する。
+// 射撃の更新、武器の装備、弾道の終点の通知、命中した敵へのダメージと怯み（弾ごと。特殊強化の効果を含む）、命中表示の時間管理を実装する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで、命中表示とダメージの増加の残り時間を0未満にしない。
@@ -23,7 +23,7 @@
 #include "Scene/Common/Player/H/PlayerController.h"
 #include "Scene/Common/Weapon/H/WeaponTable.h"
 
-// 射撃の表示に使用する固定設定をまとめる。
+// 射撃の表示に使用する固定設定と、弾道の終点を求める補助関数をまとめる。
 namespace
 {
 	//========= 射撃の表示設定=========
@@ -31,6 +31,22 @@ namespace
 	constexpr float ns_SHOT_TRACE_DISPLAY_LENGTH = 30.0f;
 	// 命中を示す表示を続ける時間。単位は秒。
 	constexpr float ns_HIT_MARKER_SECONDS = 0.3f;
+
+	//========= 弾道の補助関数=========
+	// 弾1つの弾道の終点を求める。命中していれば命中点、していなければ弾の方向へ表示用の長さだけ進んだ点。
+	// pellet: 終点を求める弾の結果。
+	// 戻り値: 弾道の終点のワールド座標。
+	XMFLOAT3 GetShotTraceEnd(const SHOT_PELLET_RESULT& pellet)
+	{
+		// 命中した場合は、終点を命中点にする。
+		if(pellet.didHit)return pellet.rayHit.point;
+
+		// 命中しなかった場合は、弾の方向へ表示用の長さだけ進んだ点を終点にする。
+		const XMFLOAT3& origin = pellet.ray.origin;
+		const XMFLOAT3& direction = pellet.ray.direction;
+		return XMFLOAT3{origin.x + direction.x * ns_SHOT_TRACE_DISPLAY_LENGTH,origin.y + direction.y * ns_SHOT_TRACE_DISPLAY_LENGTH,
+			origin.z + direction.z * ns_SHOT_TRACE_DISPLAY_LENGTH};
+	}
 }
 
 //========= 初期化・終了関数=========
@@ -87,37 +103,33 @@ void ShotController::Update(float gameplayDeltaTime)
 	// ジャスト回避の後のダメージの増加の残り時間を進め、0未満にしない。このフレームの射撃にも、残りがあれば反映する。
 	m_damageBoostRemainingSeconds = std::max(0.0f,m_damageBoostRemainingSeconds - gameplayDeltaTime);
 
-	// 射撃を更新する。リロード・連射間隔・弾薬の処理と、命中判定は武器が行い、ダメージの反映だけをここで行う。回避・蹴り・殴打の間は射撃できない。
+	// 射撃を更新する。リロード・連射間隔・弾薬の処理と、弾ごとの命中判定は武器が行い、ダメージの反映だけをここで行う。
+	// 回避・蹴り・殴打の間は射撃できない。
 	const WEAPON_UPDATE_RESULT weapon_result = m_weaponSystem.Update(gameplayDeltaTime,*m_inputSystem,m_playerController->IsAiming(),
 																																	 m_playerController->IsShootingAllowed(),*m_camera,*m_collisionWorld);
 
-	// 弾を発射した場合は、弾道の終点を可視化へ伝える。命中していれば命中点、していなければ弾の方向へ表示用の長さだけ進んだ点。
-	if(weapon_result.didFire){
-		const XMFLOAT3& shot_origin = weapon_result.shotRay.origin;
-		const XMFLOAT3& shot_direction = weapon_result.shotRay.direction;
-		// 命中した場合は、終点を命中点にする。
-		if(weapon_result.didHit){
-			m_collisionDebugView->NotifyShot(weapon_result.rayHit.point);
-		}
-		// 命中しなかった場合は、弾の方向へ表示用の長さだけ進んだ点を終点にする。
-		else{
-			m_collisionDebugView->NotifyShot(XMFLOAT3{shot_origin.x + shot_direction.x * ns_SHOT_TRACE_DISPLAY_LENGTH,
-																								shot_origin.y + shot_direction.y * ns_SHOT_TRACE_DISPLAY_LENGTH,
-																								shot_origin.z + shot_direction.z * ns_SHOT_TRACE_DISPLAY_LENGTH});
-		}
-	}
+	// 発射していない更新は、弾道の通知もダメージもないため、ここで戻る。
+	if(!weapon_result.didFire)return;
 
-	// 敵レイヤーに命中した場合だけ、Colliderの識別値からダメージを与える相手を探す。
-	// ダメージは、使用中の武器の値（強化を含む）に、ジャスト回避の後の増加（回避反撃）と、敵に付いた印（殴打追撃）の倍率を掛け、怯み時間は、制圧射撃の倍率を掛ける。
-	if(weapon_result.didHit && weapon_result.hitInfo.layer == COLLISION_LAYER::ns_ENEMY){
-		Enemy* const hit_enemy = m_enemyManager->FindLivingEnemy(weapon_result.hitInfo.userData);
-		// 対応する生存中の敵が見つかった場合だけ、ダメージと命中表示を反映する。
-		if(hit_enemy != nullptr){
-			const float boost_scale = IsDamageBoostActive() ? m_damageBoostScale : 1.0f;
-			const float weapon_damage = m_weaponSystem.GetWeaponData().damage * boost_scale * hit_enemy->GetShotDamageScale();
-			hit_enemy->ApplyDamage(m_playerCombat->GetAttackDamage(weapon_damage,*hit_enemy),*m_collisionWorld,m_flinchScale);
-			m_hitMarkerRemainingSeconds = ns_HIT_MARKER_SECONDS;
-		}
+	// 弾道の終点を可視化へ伝える。可視化は弾道を1本だけ表示するため、複数の弾を撃つ武器では、先頭の弾の終点を使う。
+	m_collisionDebugView->NotifyShot(GetShotTraceEnd(weapon_result.pellets[0]));
+
+	// 弾ごとに、敵レイヤーへ命中した場合だけ、ダメージを与える。ダメージは、使用中の武器の弾1つあたりの値（強化を含む）に、
+	// ジャスト回避の後の増加（回避反撃）と、敵に付いた印（殴打追撃）の倍率を掛ける。怯み時間は、制圧射撃の倍率を掛ける。
+	// 全ての弾は、ダメージを与える前に判定済みで、先に倒した敵への弾は、生存中の敵として見つからず、何もしない。
+	const float boost_scale = IsDamageBoostActive() ? m_damageBoostScale : 1.0f;
+	for(int pellet_index = 0; pellet_index < weapon_result.pelletCount; ++pellet_index){
+		const SHOT_PELLET_RESULT& pellet = weapon_result.pellets[pellet_index];
+		// 命中しなかった弾と、敵以外（地形）へ命中した弾は、ダメージを与えず、次の弾へ進む。
+		if(!pellet.didHit || pellet.hitInfo.layer != COLLISION_LAYER::ns_ENEMY)continue;
+
+		// Colliderの識別値から、ダメージを与える相手を探す。対応する生存中の敵がいなければ、次の弾へ進む。
+		Enemy* const hit_enemy = m_enemyManager->FindLivingEnemy(pellet.hitInfo.userData);
+		if(hit_enemy == nullptr)continue;
+
+		const float weapon_damage = m_weaponSystem.GetWeaponData().damage * boost_scale * hit_enemy->GetShotDamageScale();
+		hit_enemy->ApplyDamage(m_playerCombat->GetAttackDamage(weapon_damage,*hit_enemy),*m_collisionWorld,m_flinchScale);
+		m_hitMarkerRemainingSeconds = ns_HIT_MARKER_SECONDS;
 	}
 }
 
