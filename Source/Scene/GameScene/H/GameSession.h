@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// 1回のプレイの流れを担当する。初期化・更新・描画・終了の中で、ステージ・プレイヤー側一式・敵・時間（ヒットストップとスロー）・通貨と報酬・ショップ・武器の所持と強化と切替・デバッグ・描画の順序と仲介を行う。
+// 1回のプレイの流れを担当する。初期化・更新・描画・終了の中で、ステージ・プレイヤー側一式・敵・時間（ヒットストップとスロー）・通貨と報酬・ショップと武器の所持・デバッグ・描画の順序と仲介を行う。
 // 移動・戦闘・射撃などの個別の規則は、各クラスが持つ。Scene遷移は担当せず、タイトルへ戻る要求を、更新の結果として呼出側へ返す。
 
 //========= Debug インクルード=========
@@ -13,11 +13,10 @@
 #include "Scene/Common/Combat/H/TimeScaleController.h"
 #include "Scene/Common/Enemy/H/EnemyController.h"
 #include "Scene/Common/Player/H/PlayerSuite.h"
-#include "Scene/Common/Shop/H/ShopController.h"
 #include "Scene/Common/Stage/H/StageController.h"
-#include "Scene/Common/Weapon/H/WeaponInventory.h"
 #include "Scene/GameScene/H/EconomyController.h"
 #include "Scene/GameScene/H/GameRenderer.h"
+#include "Scene/GameScene/H/ShopFlow.h"
 
 //========= 前方宣言=========
 class AudioSystem;
@@ -31,7 +30,7 @@ enum class GAME_SESSION_RESULT
 	e_RETURN_TO_TITLE // タイトルへ戻る要求があった。呼出側がScene遷移を予約する。
 };
 
-// ステージ・プレイヤー側一式・敵・時間・通貨と報酬・ショップ・武器の所持と強化と切替・デバッグ・描画を仲介して、1回のプレイを進めるクラス。
+// ステージ・プレイヤー側一式・敵・時間・通貨と報酬・ショップと武器の所持・デバッグ・描画を仲介して、1回のプレイを進めるクラス。
 class GameSession final
 {
 public:
@@ -43,7 +42,7 @@ public:
 	GameSession(InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem);
 
 	//========= ライフサイクル関数=========
-	// プレイヤー側一式・ステージ・判定の状態・通貨と報酬・ショップ・武器の所持と強化・敵の弾と範囲の予告・デバッグ設定を初期状態へ戻し、カメラをプレイヤー位置へ合わせる。
+	// プレイヤー側一式・ステージ・判定の状態・通貨と報酬・ショップと武器の所持と強化・敵の弾と範囲の予告・デバッグ設定を初期状態へ戻し、カメラをプレイヤー位置へ合わせる。
 	void Initialize();
 	// ステージ・描画（HUDとCollision可視化）を初期化し、敵の弾、範囲の予告、第1部屋の敵を生成して、成功後にFPS操作とGame用BGMを有効にする。
 	// 戻り値: 各初期化・Object生成・敵の配置が成功したらtrue。falseを検出した場合はFinalize後にfalseを返し、CaptureとBGMは変更しない。
@@ -67,8 +66,8 @@ private:
 	// 敵の更新へ、使用する参照と通知先を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
 	// 戻り値: 登録に成功したらtrue。
 	[[nodiscard]] bool InitEnemyController();
-	// プレイヤー側一式とデバッグ操作へ、使用する参照と通知先を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
-	// 戻り値: 両方の登録に成功したらtrue。
+	// プレイヤー側一式・ショップ・デバッグ操作へ、使用する参照と通知先を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
+	// 戻り値: 全ての登録に成功したらtrue。
 	[[nodiscard]] bool InitPlayerAndDebug();
 
 	//========= 更新の補助関数=========
@@ -84,24 +83,8 @@ private:
 	void UpdateTimers(float deltaTime,float gameplayDeltaTime);
 	// 部屋のクリアで報酬選択へ入る判定と、カードが選ばれた時に抜ける判定を行い、入る時はCaptureを解除する。カードが選ばれたら、続けてショップを開く。取得した報酬の効果のうち、常に効くもの（制圧射撃・殴打追撃）を、使う側へ渡す。
 	void UpdateReward();
-	// ショップが開いている間、カーソルとキーから購入・売却・強化・閉じる操作を判定する。購入・売却・強化が求められたら、反映する。閉じる時は、Captureを再開する。
+	// ショップが開いている間、カーソルとキーの入力をShopFlowへ渡す。閉じる操作があった場合は、Captureを再開する。
 	void UpdateShop();
-	// 数字キー（1から順に、表の武器の並び）が押された瞬間に、所持している武器へ持ち替える。未所持の武器や、装備中の武器のキーは、何もしない。Capture中で、報酬選択・ショップが閉じている間だけ呼ぶ。
-	void UpdateWeaponSwitch();
-	// ショップでの武器の購入を反映する。通貨を支払い、武器を所持に加え、その武器へ持ち替える。どちらかに失敗した場合は、何も変えない。
-	void ApplyShopPurchase();
-	// ショップでの武器の売却を反映する。武器を所持から外し、売却で得る通貨（強化に使った費用の回収を含む）を通貨へ加える。手放した武器を装備していた場合は、所持している別の武器を装備する。外せなかった場合は、何も変えない。
-	void ApplyShopSale();
-	// ショップでの弾薬の購入を反映する。装備中の武器なら予備弾薬を、装備していない武器なら保存した予備弾薬を、上限内で増やし、通貨を支払う。1発も増やせなかった場合は、何も変えない。
-	void ApplyShopAmmoPurchase();
-	// ショップでの強化の購入を反映する。装備中の武器の、選ばれた項目の段階を1つ上げ、通貨を支払い、使用中の武器の性能値を強化後の値へ差し替える。装備中の武器が判別できない場合や、上げられなかった場合は、何も変えない。
-	void ApplyShopUpgrade();
-	// 装備中の武器の弾薬を保存してから、所持している別の武器へ持ち替える。装備中の武器と同じ種類が指定された場合は、何もしない。
-	// weaponIndex: 持ち替える先の武器の種類の値（表の添字）。表の範囲内で、所持していること。
-	void SwitchToWeapon(int weaponIndex);
-	// 所持している武器を、強化を反映した性能値で装備する。保存した弾薬があれば戻し、なければ、強化後の装弾数で満タンになる。
-	// weaponIndex: 装備する武器の種類の値（表の添字）。表の範囲内であること。
-	void EquipOwnedWeapon(int weaponIndex);
 	// ジャスト回避が成立した時の効果を反映する。スローを開始し、回避反撃を取得していれば、一定時間、射撃のダメージを増やす。
 	void StartJustDodgeEffects();
 	// 視点・プレイヤーの動作・出口の通過・殴打でのリロードのキャンセル・視野角を更新する。Capture中だけ呼ぶ。
@@ -152,10 +135,8 @@ private:
 	StageController m_stage{};
 	// 通貨の所持額・部屋のクリア後の報酬選択と特殊強化の取得数・敵の撃破報酬の検出を担当する。選択中は、時間とプレイヤーの操作を止める。
 	EconomyController m_economy{};
-	// 所持している武器と、武器ごとの強化・切替で保存した弾薬の記録。ショップの購入・売却・強化と、持ち替えで変わる。
-	WeaponInventory m_inventory{};
-	// 武器と弾薬の購入、武器の売却、武器の強化の画面の状態。報酬選択の後に開き、開いている間は、時間とプレイヤーの操作を止める。
-	ShopController m_shop{};
+	// 武器の所持・強化・持ち替えと、武器と弾薬の購入・売却・強化の画面を担当する。画面は、報酬選択の後に開き、開いている間は、時間とプレイヤーの操作を止める。
+	ShopFlow m_shopFlow{};
 	// 3Dのワールド・画像のHUD・Collision可視化の描画を担当する。Collision可視化は、プレイヤー・デバッグが借用する。
 	GameRenderer m_renderer{};
 };

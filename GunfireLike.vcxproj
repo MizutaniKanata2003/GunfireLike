@@ -242,6 +242,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Scene\GameScene\CPP\GameRenderer.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameScene.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameSession.cpp" />
+    <ClCompile Include="Source\Scene\GameScene\CPP\ShopFlow.cpp" />
     <ClCompile Include="Source\Scene\TitleScene\CPP\TitleScene.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -330,6 +331,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\GameScene\H\GameRenderer.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameScene.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameSession.h" />
+    <ClInclude Include="Source\Scene\GameScene\H\ShopFlow.h" />
     <ClInclude Include="Source\Scene\TitleScene\H\TitleScene.h" />
   </ItemGroup>
   <ItemGroup>
