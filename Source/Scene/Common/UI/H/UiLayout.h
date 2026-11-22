@@ -111,3 +111,21 @@ namespace SHOP_LAYOUT
 		{520.0f,546.0f}
 	};
 }
+
+// タイトル画面の画像の配置をまとめる。画像は、Assets/Textures/UI/へ置く。ロゴとボタンの横の位置は、画面の中央（640）に、画像の中心を合わせる。
+namespace TITLE_LAYOUT
+{
+	//========= 背景=========
+	// 画面全体を覆う背景。1280×720。
+	inline constexpr UI_IMAGE_LAYOUT ns_BACKGROUND{L"Assets/Textures/UI/TitleBackground.png",{0.0f,0.0f},{1280.0f,720.0f}};
+
+	//========= ロゴ=========
+	// ゲーム名のロゴ。800×200。画面の上側に置く。
+	inline constexpr UI_IMAGE_LAYOUT ns_LOGO{L"Assets/Textures/UI/TitleLogo.png",{240.0f,120.0f},{800.0f,200.0f}};
+
+	//========= 開始ボタン=========
+	// 開始ボタンの画像（通常）。320×80。「START」の文字を、画像に含める。
+	inline constexpr UI_IMAGE_LAYOUT ns_START_BUTTON{L"Assets/Textures/UI/TitleButton.png",{480.0f,400.0f},{320.0f,80.0f}};
+	// 開始ボタンの画像（カーソルが乗っている時）。320×80。位置と大きさは、通常と同じ。
+	inline constexpr const wchar_t* ns_START_BUTTON_HOVER_PATH = L"Assets/Textures/UI/TitleButtonHover.png";
+}
