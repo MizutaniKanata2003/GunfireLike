@@ -1,6 +1,6 @@
 ﻿#include "../H/EnemyController.h"
 
-// 敵の種類別の更新（接近型の追従と近接、射撃型の距離維持と発射、範囲攻撃型の接近と範囲の予告・判定）、敵の弾の更新、ウェーブの生成、敵側の描画を実装する。
+// 敵の種類別の更新（接近型の追従と近接、射撃型の距離維持と発射、範囲攻撃型の接近と範囲の予告・判定、ボスの攻撃結果の通知）、敵の弾の更新、ウェーブの生成、敵側の描画を実装する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで、再攻撃待ちの残り時間を0未満にしない。
@@ -22,7 +22,7 @@
 #include "Scene/Common/Player/H/PlayerHealth.h"
 
 //========= 初期化・終了関数=========
-// 参照先と通知先を登録し、敵の弾と範囲の予告のCube Rendererを借用する。
+// 参照先と通知先を登録し、敵の弾と範囲の予告のCube Rendererを借用し、ボスの更新へ参照先を渡す。
 bool EnemyController::Initialize(const ENEMY_CONTROLLER_LINKS& links)
 {
 	// 参照先または通知先が1つでも欠けている場合は、以後の更新で空の参照を使ってしまうため、何も登録せず失敗を返す。
@@ -50,7 +50,14 @@ bool EnemyController::Initialize(const ENEMY_CONTROLLER_LINKS& links)
 		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"EnemyControllerの範囲の予告の初期化に失敗しました。");
 		return false;
 	}
-	return true;
+
+	// ボスの更新に使う参照先を渡す。叩きつけの範囲は、上で初期化した範囲の予告へ表示する。失敗は、BossControllerが記録する。
+	BOSS_CONTROLLER_LINKS boss_links{};
+	boss_links.playerController = m_playerController;
+	boss_links.playerHealth = m_playerHealth;
+	boss_links.collisionWorld = m_collisionWorld;
+	boss_links.areaTelegraph = &m_areaTelegraph;
+	return m_bossController.Initialize(boss_links);
 }
 
 // 全枠のColliderを解除し、敵の弾・範囲の予告を解放して、参照先を手放す。
@@ -62,6 +69,8 @@ void EnemyController::Uninit()
 	}
 
 	// 借用したCube Rendererを手放し、参照先と通知先を空に戻す。敵の弾と範囲の予告は、共有Registryより先に解放する。
+	// ボスは範囲の予告を借用しているため、範囲の予告より先に参照を手放す。
+	m_bossController.Uninit();
 	m_enemyProjectiles.Uninit();
 	m_areaTelegraph.Uninit();
 	m_modelRegistry = nullptr;
@@ -71,7 +80,7 @@ void EnemyController::Uninit()
 	m_onAttackEvent = nullptr;
 }
 
-// 全枠の攻撃予告と再攻撃待ちを初期状態へ戻し、飛行中の敵の弾と範囲の予告を消す。
+// 全枠の攻撃予告と再攻撃待ちを初期状態へ戻し、飛行中の敵の弾と範囲の予告を消し、ボスの攻撃の状態を戻す。
 void EnemyController::ResetAttackState()
 {
 	// 全枠の攻撃予告を破棄し、再配置後の敵が旧予告で攻撃しないようにする。
@@ -80,9 +89,10 @@ void EnemyController::ResetAttackState()
 	}
 	m_recoverySeconds.fill(0.0f);
 
-	// 旧ウェーブの飛行中の弾と範囲の予告を消す。
+	// 旧ウェーブの飛行中の弾と範囲の予告を消す。ボスの予告と待ち時間も戻し、新しいボスが、最初の攻撃までの待ち時間から始まるようにする。
 	m_enemyProjectiles.Clear();
 	m_areaTelegraph.Clear();
+	m_bossController.Reset();
 }
 
 //========= 生成関数=========
@@ -134,7 +144,8 @@ void EnemyController::UpdateActions(float worldDeltaTime)
 	// 全枠を先頭から更新する。死亡枠や行動不能の敵は、枠ごとの更新の中で予告を中断する。
 	for(std::size_t slot_index = 0; slot_index < m_attackJudges.size(); ++slot_index){
 		// 敵の種類ごとに、対応する更新を呼ぶ。
-		switch(m_enemyManager.GetEnemies()[slot_index].GetKind()){
+		const ENEMY_KIND kind = m_enemyManager.GetEnemies()[slot_index].GetKind();
+		switch(kind){
 			// 接近型は、追従と近接の攻撃予告・命中を更新する。
 		case ENEMY_KIND::e_MELEE:
 		UpdateMeleeSlot(slot_index,worldDeltaTime);
@@ -149,10 +160,16 @@ void EnemyController::UpdateActions(float worldDeltaTime)
 		case ENEMY_KIND::e_AREA:
 		UpdateAreaSlot(slot_index,worldDeltaTime);
 		break;
+
+		// ボスは、接近と、振り下ろし・叩きつけの予告と判定を更新する。
+		case ENEMY_KIND::e_BOSS:
+		UpdateBossSlot(slot_index,worldDeltaTime);
+		break;
 		}
 
-		// 予告の状態を、その敵の表示へ反映する。死亡・怯みなどで予告が中断された場合は、解除される。
-		m_enemyManager.GetEnemies()[slot_index].SetTelegraphing(m_attackJudges[slot_index].HasIncomingAttack());
+		// 予告の状態を、その敵の表示へ反映する。死亡・怯みなどで予告が中断された場合は、解除される。ボスの予告は、BossControllerが持つ。
+		const bool is_telegraphing = kind == ENEMY_KIND::e_BOSS ? m_bossController.IsTelegraphing() : m_attackJudges[slot_index].HasIncomingAttack();
+		m_enemyManager.GetEnemies()[slot_index].SetTelegraphing(is_telegraphing);
 	}
 }
 
@@ -357,6 +374,18 @@ void EnemyController::UpdateAreaSlot(std::size_t slotIndex,float worldDeltaTime)
 		m_areaTelegraph.Begin(slotIndex,player_position);
 		judge.StartIncomingAttack(ENEMY_AREA::ns_WINDUP_SECONDS);
 	}
+}
+
+// ボスをBossControllerに更新させ、攻撃の判定がプレイヤーへ及んだ場合は、攻撃イベントとして通知する。
+void EnemyController::UpdateBossSlot(std::size_t slotIndex,float worldDeltaTime)
+{
+	// 接近・攻撃の予告・判定は、BossControllerが行う。ボスの結果は、表示用の記録に含める。
+	const BOSS_UPDATE_RESULT boss_result = m_bossController.Update(m_enemyManager.GetEnemies()[slotIndex],slotIndex,worldDeltaTime);
+
+	// 攻撃の判定がプレイヤーへ及ばなかった（予告中・空振り・攻撃なし）場合は、通知しない。
+	if(!boss_result.hasAttackEvent)return;
+
+	NotifyAttackEvent(ENEMY_ATTACK_EVENT{boss_result.result,boss_result.damage,true,boss_result.shouldStartSlowMotion});
 }
 
 // 弾を進め、プレイヤーへ命中・回避した弾の結果を、攻撃イベントとして通知する。

@@ -214,6 +214,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Framework\2D\CPP\HudTextRenderer.cpp" />
     <ClCompile Include="Source\Framework\3D\CPP\ObjModelRenderer.cpp" />
     <ClCompile Include="Source\Scene\Common\Enemy\CPP\AreaTelegraph.cpp" />
+    <ClCompile Include="Source\Scene\Common\Enemy\CPP\BossController.cpp" />
     <ClCompile Include="Source\Scene\Common\Player\CPP\PlayerSuite.cpp" />
     <ClCompile Include="Source\Scene\Common\Stage\CPP\ExitDoor.cpp" />
     <ClCompile Include="Source\Scene\Common\Stage\CPP\RoomController.cpp" />
@@ -283,6 +284,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\2D\H\HudTextRenderer.h" />
     <ClInclude Include="Source\Framework\3D\H\ObjModelRenderer.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\AreaTelegraph.h" />
+    <ClInclude Include="Source\Scene\Common\Enemy\H\BossController.h" />
     <ClInclude Include="Source\Scene\Common\Player\H\PlayerSuite.h" />
     <ClInclude Include="Source\Scene\Common\Player\H\Wallet.h" />
     <ClInclude Include="Source\Scene\Common\Reward\H\RewardController.h" />
