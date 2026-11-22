@@ -21,11 +21,15 @@ namespace
 	// 戻り値: 武器の種類の値。表にない場合は-1。
 	int FindWeaponIndex(const WEAPON_DATA& weaponData)
 	{
+		// 表の全ての武器を先頭から調べ、表示名のポインターが一致する武器の添字を返す。
 		for(int weapon_index = 0; weapon_index < WEAPON_TABLE::ns_WEAPON_COUNT; ++weapon_index){
+			// 表示名の指す先が同じなら、この武器が装備中の武器。
 			if(WEAPON_TABLE::ns_WEAPONS[weapon_index].displayName == weaponData.displayName){
 				return weapon_index;
 			}
 		}
+
+		// どの武器とも一致しない場合は、判別できない。
 		return -1;
 	}
 }
@@ -77,21 +81,21 @@ bool ShopFlow::Update(const SHOP_FLOW_INPUT& input)
 	shop_context.balance = m_wallet->GetBalance();
 	shop_context.equippedWeaponIndex = FindEquippedWeaponIndex();
 
-	// 予備弾薬は、装備中の武器なら現在の値、装備していない武器なら保存した値を渡す。
+	// 予備弾薬は、装備中の武器なら現在の値、装備していない武器なら保存した値を渡す。全ての武器を、先頭から順に設定する。
 	for(int weapon_index = 0; weapon_index < WEAPON_TABLE::ns_WEAPON_COUNT; ++weapon_index){
 		shop_context.reserveAmmo[weapon_index] = (weapon_index == shop_context.equippedWeaponIndex) ? weapon.GetReserveAmmo()
 			: m_inventory.GetSavedAmmo(weapon_index).reserveAmmo;
 	}
 	const SHOP_UPDATE_RESULT shop_result = m_shop.Update(shop_input,shop_context,m_inventory);
 
-	// 武器の購入・売却、弾薬の購入、強化が求められた場合は、反映する。閉じる操作は、戻り値で呼出側へ伝える。
+	// 武器の購入・売却、弾薬の購入、強化が求められた場合は、反映する。閉じる操作は、戻り値で呼出側へ伝える。何も求められなかった場合は、何もしない。
 	switch(shop_result){
-	case SHOP_UPDATE_RESULT::e_PURCHASE_REQUESTED:      ApplyPurchase();     break;
-	case SHOP_UPDATE_RESULT::e_SELL_REQUESTED:          ApplySale();         break;
-	case SHOP_UPDATE_RESULT::e_AMMO_PURCHASE_REQUESTED: ApplyAmmoPurchase(); break;
-	case SHOP_UPDATE_RESULT::e_UPGRADE_REQUESTED:       ApplyUpgrade();      break;
-	case SHOP_UPDATE_RESULT::e_CLOSED:                  return true;
-	case SHOP_UPDATE_RESULT::e_NONE:                    break;
+	case SHOP_UPDATE_RESULT::e_PURCHASE_REQUESTED:      ApplyPurchase();     break; // 武器の購入を反映する。
+	case SHOP_UPDATE_RESULT::e_SELL_REQUESTED:          ApplySale();         break; // 武器の売却を反映する。
+	case SHOP_UPDATE_RESULT::e_AMMO_PURCHASE_REQUESTED: ApplyAmmoPurchase(); break; // 弾薬の購入を反映する。
+	case SHOP_UPDATE_RESULT::e_UPGRADE_REQUESTED:       ApplyUpgrade();      break; // 強化の購入を反映する。
+	case SHOP_UPDATE_RESULT::e_CLOSED:                  return true; // 閉じる操作があったことを、呼出側へ伝える。
+	case SHOP_UPDATE_RESULT::e_NONE:                    break; // 何も求められていない。
 	}
 	return false;
 }
@@ -99,8 +103,10 @@ bool ShopFlow::Update(const SHOP_FLOW_INPUT& input)
 // 数字キーに対応する武器へ持ち替える。
 void ShopFlow::UpdateWeaponSwitch(int numberKeyIndex)
 {
-	// 押されていない場合、範囲外の場合、所持していない武器の場合、参照先が未登録の場合は、何もしない。
+	// 参照先が未登録の場合と、キーが押されていない・範囲外の場合は、持ち替える武器が決まらないため、何もしない。
 	if(m_shotController == nullptr || numberKeyIndex < 0 || numberKeyIndex >= WEAPON_TABLE::ns_WEAPON_COUNT)return;
+
+	// 所持していない武器へは、持ち替えない。
 	if(!m_inventory.IsOwned(static_cast<WEAPON_TYPE>(numberKeyIndex)))return;
 
 	// 装備中の武器と同じ場合は、持ち替えない。
@@ -114,25 +120,31 @@ void ShopFlow::UpdateWeaponSwitch(int numberKeyIndex)
 // HUDへ渡す状態のうち、ショップと武器の所持に関する項目を書き込む。
 void ShopFlow::FillHudState(GAME_HUD_STATE& hudState) const
 {
+	// 装備中の武器の種類を求め、強化の段階の取得に使う。
 	const int equipped_weapon_index = FindEquippedWeaponIndex();
-	hudState.isShopOpen = m_shop.IsOpen();
-	hudState.shopPage = m_shop.GetPage();
-	hudState.hoveredShopIndex = m_shop.GetHoveredIndex();
-	hudState.shopRowStates = m_shop.GetRowStates();
-	hudState.shopSellPrices = m_shop.GetSellPrices();
-	hudState.shopAmmoStates = m_shop.GetAmmoStates();
-	hudState.shopUpgradeStates = m_shop.GetUpgradeStates();
-	hudState.shopUpgradeLevels = m_inventory.GetUpgradeLevels(equipped_weapon_index);
-	hudState.ownedWeaponCount = m_inventory.GetCount();
-	hudState.equippedWeaponIndex = equipped_weapon_index;
+
+	// ショップの値を、HUDのショップの状態（shop）へまとめて書き込む。
+	HUD_SHOP_STATE& shop = hudState.shop;
+	shop.isOpen = m_shop.IsOpen();
+	shop.page = m_shop.GetPage();
+	shop.hoveredIndex = m_shop.GetHoveredIndex();
+	shop.rowStates = m_shop.GetRowStates();
+	shop.sellPrices = m_shop.GetSellPrices();
+	shop.ammoStates = m_shop.GetAmmoStates();
+	shop.upgradeStates = m_shop.GetUpgradeStates();
+	shop.upgradeLevels = m_inventory.GetUpgradeLevels(equipped_weapon_index);
+	shop.ownedWeaponCount = m_inventory.GetCount();
+	shop.equippedWeaponIndex = equipped_weapon_index;
 }
 
 //========= 補助関数=========
 // 押されたキーに対応するボタンの添字を求める。
 int ShopFlow::ResolveKeyChoice(const SHOP_FLOW_INPUT& input) const
 {
-	// Enterは、閉じるボタンの代わりにする。Uは、ページ切替ボタンの代わりにする。どちらも、数字キーより優先する。
+	// Enterは、閉じるボタンの代わりにする。数字キーより優先する。
 	if(input.isCloseKeyTriggered)return SHOP_TABLE::ns_CLOSE_INDEX;
+
+	// Uは、ページ切替ボタンの代わりにする。数字キーより優先する。
 	if(input.isSwitchKeyTriggered)return SHOP_TABLE::ns_SWITCH_INDEX;
 
 	// 数字キーが押されていない場合は、対応するボタンがない。
@@ -177,9 +189,10 @@ void ShopFlow::ApplySale()
 	const WEAPON_TYPE weapon_type = static_cast<WEAPON_TYPE>(row_index);
 
 	// 売却する武器を装備中かと、売却で得る通貨（強化に使った費用の回収を含む）を、手放す前に調べる。
-	// 外せなかった場合（最後の1丁など）は、何も変えずに戻る。
 	const bool was_equipped = FindEquippedWeaponIndex() == row_index;
 	const int sell_price = SHOP_TABLE::GetSellPrice(row_index,m_inventory.GetUpgradeSpent(row_index));
+
+	// 武器を手放す。外せなかった場合（最後の1丁など）は、何も変えずに戻る。
 	if(!m_inventory.TryRemove(weapon_type))return;
 
 	// 売却で得る通貨を、加える。
@@ -189,6 +202,8 @@ void ShopFlow::ApplySale()
 	// 所持の下限があるため、必ず1丁は残る。
 	if(was_equipped){
 		const int next_weapon_index = m_inventory.FindFirstOwnedIndex();
+
+		// 代わりの武器が見つかった場合だけ、装備する。
 		if(next_weapon_index >= 0){
 			EquipOwnedWeapon(next_weapon_index);
 		}
@@ -209,10 +224,11 @@ void ShopFlow::ApplyAmmoPurchase()
 	if(!m_wallet->TrySpend(price))return;
 
 	// 装備中の武器なら、使用中の予備弾薬を、装備していない武器なら、保存した予備弾薬を、上限内で増やす。
-	// 1発も増やせなかった場合は、支払った通貨を戻して、何も変えない。
 	const bool is_equipped = FindEquippedWeaponIndex() == row_index;
 	const int added_ammo = is_equipped ? m_shotController->AddReserveAmmo(pack_size,reserve_cap)
 		: m_inventory.AddSavedReserve(row_index,pack_size,reserve_cap);
+
+	// 1発も増やせなかった場合は、支払った通貨を戻して、何も変えない。
 	if(added_ammo <= 0){
 		m_wallet->Add(price);
 		return;
@@ -252,7 +268,7 @@ void ShopFlow::SwitchToWeapon(int weaponIndex)
 	const int current_weapon_index = FindEquippedWeaponIndex();
 	if(current_weapon_index == weaponIndex)return;
 
-	// 持ち替える前の武器の弾薬を、保存する。同じ武器へ戻った時に、この弾薬が戻る。
+	// 持ち替える前の武器が判別できる場合だけ、その弾薬を保存する。同じ武器へ戻った時に、この弾薬が戻る。
 	if(current_weapon_index >= 0){
 		const WeaponSystem& weapon = m_shotController->GetWeaponSystem();
 		m_inventory.SaveAmmo(current_weapon_index,weapon.GetMagazineAmmo(),weapon.GetReserveAmmo());

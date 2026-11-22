@@ -133,7 +133,7 @@ void GameHud::Draw(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 	}
 
 	// ショップが開いている間だけ、ショップの文字を描く。
-	if(state.isShopOpen){
+	if(state.shop.isOpen){
 		DrawShopTexts(state);
 	}
 	m_textRenderer.End();
@@ -165,7 +165,7 @@ void GameHud::Uninit()
 void GameHud::DrawSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 {
 	// 報酬選択中とショップが開いている間は、画面全体を暗くする背景を最初に描き、他のHUDとカード・パネルがその上に重なるようにする。
-	if(state.isRewardSelecting || state.isShopOpen){
+	if(state.isRewardSelecting || state.shop.isOpen){
 		m_spriteRenderer.DrawSprite(graphicsSystem,m_rewardBackdropTexture,REWARD_LAYOUT::ns_BACKDROP.position,REWARD_LAYOUT::ns_BACKDROP.size,
 																GAME_HUD_STYLE::ns_WHITE,1.0f);
 	}
@@ -179,8 +179,8 @@ void GameHud::DrawSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& s
 	}
 
 	// ショップが開いている間は、パネルとボタンを描く。文字は、後の文字の描画で、上に重ねる。
-	if(state.isShopOpen){
-		DrawShopSprites(graphicsSystem,state);
+	if(state.shop.isOpen){
+		DrawShopSprites(graphicsSystem,state.shop);
 	}
 }
 
