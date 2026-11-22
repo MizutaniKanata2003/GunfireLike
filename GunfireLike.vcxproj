@@ -207,7 +207,6 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Framework\Input\CPP\InputSystem.cpp" />
     <ClCompile Include="Source\Framework\2D\CPP\FadeOverlay.cpp" />
     <ClCompile Include="Source\Framework\Imgui\CPP\ImGuiManager.cpp" />
-    <ClCompile Include="Source\Debug\CPP\DebugPlayer.cpp" />
     <ClCompile Include="Source\Framework\Input\CPP\FpsCamera.cpp" />
     <ClCompile Include="Source\Framework\3D\CPP\BasicMeshRenderer.cpp" />
     <ClCompile Include="Source\Framework\2D\CPP\HudRenderer.cpp" />
@@ -280,7 +279,6 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\Etc\H\GameTimer.h" />
     <ClInclude Include="Source\Framework\Input\H\InputSystem.h" />
     <ClInclude Include="Source\Framework\Imgui\H\ImGuiManager.h" />
-    <ClInclude Include="Source\Debug\H\DebugPlayer.h" />
     <ClInclude Include="Source\Framework\Input\H\FpsCamera.h" />
     <ClInclude Include="Source\Framework\Etc\H\GameObject.h" />
     <ClInclude Include="Source\Framework\3D\H\BasicMeshRenderer.h" />

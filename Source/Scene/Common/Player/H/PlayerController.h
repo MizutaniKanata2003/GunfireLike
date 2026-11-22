@@ -32,6 +32,34 @@ enum class PLAYER_MELEE_TYPE
 	e_PUNCH // 殴打の当たり。
 };
 
+// 1回の更新で読み取った、移動の入力。W・A・S・Dの合成方向と、視線を水平面へ投影した前方向を持つ。
+struct PLAYER_MOVE_INPUT
+{
+	// W・A・S・Dの合成方向があるか。入力なし・相殺の場合はfalse。
+	bool hasMoveInput{};
+	// 合成した移動方向のX成分。単位ベクトル。入力なしなら0。
+	float moveX{};
+	// 合成した移動方向のZ成分。単位ベクトル。入力なしなら0。
+	float moveZ{};
+	// 視線を水平面へ投影した前方向のX成分。殴打の踏み込みの向きに使う。
+	float forwardX{};
+	// 視線を水平面へ投影した前方向のZ成分。
+	float forwardZ{};
+};
+
+// 動作の状態から決めた、この更新の移動の内容。
+struct PLAYER_MOTION
+{
+	// 移動方向のX成分。単位ベクトル。移動しない場合は0。
+	float directionX{};
+	// 移動方向のZ成分。単位ベクトル。移動しない場合は0。
+	float directionZ{};
+	// 移動速度。単位はワールド距離単位/秒。
+	float speed{};
+	// 目標の視点の高さ。現在の高さは、この値へ滑らかに近づく。
+	float targetEyeHeight{};
+};
+
 // WASD移動・ダッシュ・しゃがみ・スライディング・回避・蹴り・殴打・構えを扱い、地形のAABBを通り抜けないように位置を補正するクラス。
 class PlayerController final
 {
@@ -74,19 +102,54 @@ public:
 	[[nodiscard]] float GetSecondsSinceDodgeStart() const { return m_secondsSinceDodgeStart; }
 
 private:
-	//========= 補助関数=========
+	//========= 入力の読取関数=========
+	// W・A・S・Dの入力を、カメラの水平な向きを基準に合成し、単位化する。入力がある場合は、直近の移動方向として記録する。
+	// input: キー入力の取得先。
+	// camera: 移動方向の基準にする視線の取得元。
+	// 戻り値: 移動の入力と、水平な前方向。
+	[[nodiscard]] PLAYER_MOVE_INPUT ReadMoveInput(const InputSystem& input,const FpsCamera& camera);
+
+	//========= 動作の状態の関数=========
 	// 動作の状態を切り替え、その状態の経過時間を0へ戻す。蹴り・殴打に入る場合は、当たりの通知を待つ状態にする。
 	// newState: 新しい動作の状態。
 	void EnterState(PLAYER_ACTION_STATE newState);
-	// 入力から、動作の状態の切替を判断する。
+	// 入力から、動作の状態の切替を判断する。時間で終わる動作の確認、新しい動作の開始、ダッシュ・しゃがみの切替を、この順に行う。
+	// input: 入力の取得先。
+	// moveInput: 移動の入力と、水平な前方向。
+	// canKick: 蹴れる相手がいるか。
+	void UpdateActionState(const InputSystem& input,const PLAYER_MOVE_INPUT& moveInput,bool canKick);
+	// 回避・スライディング・蹴り・殴打の中なら、時間が経つまで、他の入力で状態を変えず、長さを超えていれば次の状態へ移す。
+	// isCrouchPressed: Cキーを押しているか。スライディングの終了後に、しゃがみへ移るかの判断に使う。
+	// 戻り値: 時間で終わる動作の中だったらtrue。その場合、他の切替は行わない。
+	[[nodiscard]] bool UpdateTimedAction(bool isCrouchPressed);
+	// 回避・殴打・蹴り・スライディングの開始の入力を、この順に調べ、成立したものを開始する。
+	// input: 入力の取得先。
+	// moveInput: 移動の入力と、水平な前方向。
+	// canKick: 蹴れる相手がいるか。
+	// 戻り値: いずれかの動作を開始したらtrue。
+	[[nodiscard]] bool TryStartAction(const InputSystem& input,const PLAYER_MOVE_INPUT& moveInput,bool canKick);
+	// ダッシュの終了・開始と、しゃがみの開始・終了を、入力から切り替える。
 	// input: 入力の取得先。
 	// hasMoveInput: W・A・S・Dの合成方向があるか。
-	// moveX: 合成した移動方向のX成分。単位ベクトル。入力なしなら0。
-	// moveZ: 合成した移動方向のZ成分。単位ベクトル。入力なしなら0。
-	// forwardX: 視線を水平面へ投影した前方向のX成分。殴打の踏み込みの向きに使う。
-	// forwardZ: 視線を水平面へ投影した前方向のZ成分。
-	// canKick: 蹴れる相手がいるか。
-	void UpdateActionState(const InputSystem& input,bool hasMoveInput,float moveX,float moveZ,float forwardX,float forwardZ,bool canKick);
+	// isShiftPressed: 左Shiftを押しているか。
+	// isCrouchPressed: Cキーを押しているか。
+	void UpdateDashAndCrouch(const InputSystem& input,bool hasMoveInput,bool isShiftPressed,bool isCrouchPressed);
+	// 蹴り・殴打の当たる時刻を迎えていれば、当たりを通知できる状態にする。当たる時刻は、動作の種類で異なる。
+	void UpdateMeleeImpact();
+
+	//========= 移動の関数=========
+	// 動作の状態に応じた、移動方向・移動速度・目標の視点の高さを決める。
+	// moveInput: 移動の入力。入力の方向で動く状態に使う。
+	// 戻り値: この更新の移動の内容。
+	[[nodiscard]] PLAYER_MOTION DecideMotion(const PLAYER_MOVE_INPUT& moveInput) const;
+	// 入力の方向を使わない動作（スライディング・回避・蹴り・殴打）の移動の内容を、既存の内容へ上書きする。それ以外の状態では、何も変えない。
+	// motion: 上書きする移動の内容。入力で動く状態の初期値が入っている。
+	void ApplyFixedMotion(PLAYER_MOTION& motion) const;
+	// 視点の高さを目標へ近づけ、移動を最大距離ごとに分割して進め、毎回、地形のAABBから押し戻す。
+	// motion: この更新の移動の内容。
+	// deltaTime: この更新で進める経過時間。単位は秒。
+	// collisionWorld: 押し戻しの基準にするCollisionWorld。
+	void MoveAndResolve(const PLAYER_MOTION& motion,float deltaTime,const CollisionWorld& collisionWorld);
 
 	//========= 位置・状態=========
 	// プレイヤー（カメラ）のワールド座標。Yは現在の視点の高さで、状態に応じて滑らかに変わる。
