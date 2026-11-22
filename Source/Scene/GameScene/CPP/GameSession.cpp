@@ -1,15 +1,15 @@
 ﻿#include "../H/GameSession.h"
 
-// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、部屋のクリア後の報酬選択とその効果の反映、ショップへの入力の受渡し、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、描画とデバッグUIの呼出し、Resource終了を実装する。
+// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、部屋のクリア後の報酬選択とその効果の反映、
+// ショップへの入力の受渡し、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、描画とデバッグUIの呼出し、Resource終了を実装する。
 
 //========= Windows インクルード=========
-#include <windows.h> // VK_F1・VK_F2・VK_F4・VK_LBUTTON・VK_RETURNの仮想キーコードで、Capture切替・タイトルへ戻る要求・最初の部屋からの再開・カードやボタンのクリック・ショップを閉じるキーを指定する。
+#include <windows.h> // VK_F1・VK_F2・VK_F4・VK_LBUTTON・VK_RETURNの仮想キーコードで、Capture切替・タイトルへ戻る要求・再開・クリック・ショップを閉じるキーを指定する。
 
 //========= 外部ライブラリ インクルード=========
 #include <DirectXMath.h>
 
 //========= Framework インクルード=========
-#include "Framework/2D/H/HudCanvas.h"
 #include "Framework/Audio/H/AudioSystem.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
 #include "Framework/Etc/H/InitCheck.h"
@@ -20,8 +20,9 @@
 //========= Scene インクルード=========
 #include "Scene/Common/Combat/H/CombatResolver.h"
 #include "Scene/Common/Combat/H/CombatTable.h"
+#include "Scene/GameScene/H/GameInputHelper.h"
 
-// このクラスの投影面（Clip面）の距離と、報酬選択・ショップ・武器の持ち替えの入力の補助に使用する固定設定をまとめる。戦闘の数値はCombatTableにある。
+// 投影面（Clip面）の距離をまとめる。戦闘の数値はCombatTableに、入力の補助はGameInputHelperにある。
 namespace
 {
 	//========= Projection設定=========
@@ -29,48 +30,6 @@ namespace
 	constexpr float ns_NEAR_CLIP = 0.1f;
 	// View空間での遠距離Clip面の距離。単位はワールド距離単位。これより遠い物は描画されない。
 	constexpr float ns_FAR_CLIP = 1000.0f;
-
-	//========= 報酬選択・ショップ・持ち替えの入力設定=========
-	// カードや購入ボタン・武器を、キーで選ぶ時の、最初のものに対応するキー。1から順に、並びと同じ。クリックが使えない場合の代わりの操作。
-	constexpr unsigned char ns_UI_FIRST_KEY = '1';
-	// ショップのページ切替に使うキー。
-	constexpr unsigned char ns_SHOP_SWITCH_KEY = 'U';
-	// 描画先の大きさが無効な場合に、カーソルを置く、基準Canvasの外の位置。どのカードやボタンにも乗らない。
-	constexpr float ns_CURSOR_OUTSIDE_CANVAS = -1000.0f;
-
-	//========= 入力の補助関数=========
-	// カーソルのクライアント座標を、基準Canvas上の座標へ変換する。HUDの描画と同じ倍率と余白（HudCanvas）の逆変換。
-	// inputSystem: カーソルの位置の取得元。
-	// graphicsSystem: 描画先の大きさの取得元。
-	// 戻り値: 基準Canvas上のカーソルの位置。描画先の大きさが無効な場合は、どのカードやボタンにも乗らない位置。
-	XMFLOAT2 ConvertCursorToCanvas(const InputSystem& inputSystem,const GraphicsSystem& graphicsSystem)
-	{
-		// HUDの描画と同じ、描画先の大きさから決まる倍率と余白を求める。倍率が0なら、変換できない。
-		const HudCanvas hud_canvas{graphicsSystem.GetRenderWidth(),graphicsSystem.GetRenderHeight()};
-		const float canvas_scale = hud_canvas.GetScale();
-		if(canvas_scale <= 0.0f)return XMFLOAT2{ns_CURSOR_OUTSIDE_CANVAS,ns_CURSOR_OUTSIDE_CANVAS};
-
-		// 描画先の座標から余白を引き、倍率で割って、基準Canvas上の座標へ戻す。
-		const POINT cursor_position = inputSystem.GetCursorClientPosition();
-		const XMFLOAT2& canvas_offset = hud_canvas.GetOffset();
-		return XMFLOAT2{(static_cast<float>(cursor_position.x) - canvas_offset.x) / canvas_scale,
-			(static_cast<float>(cursor_position.y) - canvas_offset.y) / canvas_scale};
-	}
-
-	// 数字キー（1から順）のうち、この更新で押されたキーに対応する添字を返す。複数が押された場合は、最後のキーを返す。
-	// inputSystem: キー入力の取得元。
-	// count: 対応させる項目の数。この数だけ、1から順にキーを調べる。
-	// 戻り値: 押されたキーに対応する添字。どれも押されていなければ-1。
-	int FindTriggeredNumberKey(const InputSystem& inputSystem,int count)
-	{
-		int triggered_index = -1;
-		for(int item_index = 0; item_index < count; ++item_index){
-			if(inputSystem.IsKeyTriggered(static_cast<unsigned char>(ns_UI_FIRST_KEY + item_index))){
-				triggered_index = item_index;
-			}
-		}
-		return triggered_index;
-	}
 }
 
 //========= 生成関数=========
@@ -86,7 +45,8 @@ void GameSession::Initialize()
 	// プレイヤー側一式を既定へ戻し、カメラをプレイヤーの開始位置へ合わせる。
 	m_player.Initialize();
 
-	// 進行状態を第1部屋の第1ウェーブへ戻し、前回の生成失敗と、前回の生成ObjectとColliderを空にする。Rendererの生成、表からのObject生成、出口と敵の配置はInitで行う。
+	// 進行状態を第1部屋の第1ウェーブへ戻し、前回の生成失敗と、前回の生成ObjectとColliderを空にする。
+	// Rendererの生成、表からのObject生成、出口と敵の配置はInitで行う。
 	m_stage.Initialize();
 
 	// 判定・時間・表示の状態を既定へ戻す。
@@ -129,7 +89,8 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 		SkipCurrentWave();
 	}
 
-	// 報酬選択中とショップが開いている間は、時間を進めない。ヒットストップ・スロー・回復アイテムの間隔・表示の時間も、この更新では0を渡して、画面を閉じるまで止める。
+	// 報酬選択中とショップが開いている間は、時間を進めない。
+	// ヒットストップ・スロー・回復アイテムの間隔・表示の時間も、この更新では0を渡して、画面を閉じるまで止める。
 	const float frame_delta_time = (m_economy.GetReward().IsSelecting() || m_shopFlow.IsOpen()) ? 0.0f : deltaTime;
 
 	// ヒットストップとスローの残り時間を進め、プレイヤー側の時間と、敵・判定側の時間を求める。ヒットストップ中は、どちらも0になる。
@@ -142,20 +103,22 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 	UpdateTimers(frame_delta_time,time_deltas.gameplayDeltaTime);
 	m_economy.UpdateKillRewards(m_enemyController.GetEnemyManager());
 
-	// 部屋のクリアの結果を受けて、報酬選択へ入る・抜ける。抜けた更新で、続けてショップを開く。ショップが開いている間は、購入・売却・強化・閉じる操作を処理する。
+	// 部屋のクリアの結果を受けて、報酬選択へ入る・抜ける。抜けた更新で、続けてショップを開く。
+	// ショップが開いている間は、購入・売却・強化・閉じる操作を処理する。
 	UpdateReward();
 	UpdateShop();
 
 	// マウスを解放している間と、報酬選択中・ショップが開いている間は、カメラ・移動・戦闘の操作更新をまとめて停止し、ここで戻る。
 	if(!m_inputSystem.IsMouseCaptureEnabled() || m_economy.GetReward().IsSelecting() || m_shopFlow.IsOpen())return GAME_SESSION_RESULT::e_CONTINUE;
 
-	// カードやボタンを選んだ直後は、選んだクリックや数字キーが、射撃や武器の持ち替えとして重ねて反応しないよう、ここで戻る。左クリックが離されたら、解除する。
+	// カードやボタンを選んだ直後は、選んだクリックや数字キーが、射撃や武器の持ち替えとして重ねて反応しないよう、ここで戻る。
+	// 左クリックが離されたら、解除する。
 	if(m_economy.GetReward().UpdateInputGuard(m_inputSystem.IsKeyPressed(VK_LBUTTON)))return GAME_SESSION_RESULT::e_CONTINUE;
 
 	// 武器の持ち替えを、射撃の更新より先に処理する。持ち替えたフレームから、新しい武器で射撃する。
 	// 視点とプレイヤーを先に更新し、その結果の位置と動作の状態を使って、戦闘・射撃・敵の行動を更新する。
 	// 射撃・近接攻撃で倒された敵の撃破報酬は、次の更新を待たず、ここで通貨へ加える。
-	m_shopFlow.UpdateWeaponSwitch(FindTriggeredNumberKey(m_inputSystem,WEAPON_TABLE::ns_WEAPON_COUNT));
+	m_shopFlow.UpdateWeaponSwitch(GAME_INPUT_HELPER::FindTriggeredNumberKey(m_inputSystem,WEAPON_TABLE::ns_WEAPON_COUNT));
 	UpdatePlayer(deltaTime,time_deltas.gameplayDeltaTime);
 	UpdateCombat(time_deltas.gameplayDeltaTime,time_deltas.worldDeltaTime);
 	m_economy.UpdateKillRewards(m_enemyController.GetEnemyManager());
@@ -208,9 +171,8 @@ bool GameSession::InitRenderResources()
 	renderer_links.enemyController = &m_enemyController;
 	renderer_links.camera = &m_player.GetCamera();
 
-	// 2つの初期化を、この順に実行する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。後始末は、呼出側のInitがFinalizeで行う。
-	// 共有Renderer・床と壁・出口の初期化失敗を検出する。失敗した対象のログは、StageControllerが記録する。
-	// 描画（Collision可視化とHUD）の初期化失敗は、GameRendererが記録する。
+	// 2つの初期化を、この順に実行する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。
+	// 後始末は、呼出側のInitがFinalizeで行う。共有Renderer・床と壁・出口の失敗のログはStageControllerが、描画の失敗のログはGameRendererが記録する。
 	return m_stage.Init(m_graphicsSystem) && m_renderer.Initialize(m_graphicsSystem,renderer_links);
 }
 
@@ -285,7 +247,8 @@ bool GameSession::UpdateSessionInput()
 		m_inputSystem.SetMouseCaptureEnabled(!m_inputSystem.IsMouseCaptureEnabled());
 	}
 
-	// F4では最初の部屋から作り直す。旧ウェーブと、旧ウェーブの弾・範囲の予告は、同じ更新の生成処理で置き換わる。通貨・報酬の取得数・武器の所持と強化は、そのまま引き継ぐ。
+	// F4では最初の部屋から作り直す。旧ウェーブと、旧ウェーブの弾・範囲の予告は、同じ更新の生成処理で置き換わる。
+	// 通貨・報酬の取得数・武器の所持と強化は、そのまま引き継ぐ。
 	if(m_inputSystem.IsKeyTriggered(VK_F4)){
 		m_stage.Restart();
 		m_enemyController.ResetAttackState();
@@ -330,10 +293,10 @@ void GameSession::UpdateReward()
 {
 	// 部屋の進行状態と、カーソルの位置（基準Canvas上）、左クリック、カードの番号のキーを渡して、状態の変化を受け取る。
 	// 上限に達した報酬の置換の通貨と、選ばれた報酬のログは、EconomyControllerが処理する。
-	const REWARD_UPDATE_RESULT reward_result = m_economy.UpdateReward(m_stage.GetRoomController().GetPhase(),
-																																		ConvertCursorToCanvas(m_inputSystem,m_graphicsSystem),
-																																		m_inputSystem.IsKeyTriggered(VK_LBUTTON),
-																																		FindTriggeredNumberKey(m_inputSystem,REWARD_TABLE::ns_CARD_COUNT));
+	const XMFLOAT2 cursor_position = GAME_INPUT_HELPER::ConvertCursorToCanvas(m_inputSystem,m_graphicsSystem);
+	const int key_choice_index = GAME_INPUT_HELPER::FindTriggeredNumberKey(m_inputSystem,REWARD_TABLE::ns_CARD_COUNT);
+	const REWARD_UPDATE_RESULT reward_result = m_economy.UpdateReward(m_stage.GetRoomController().GetPhase(),cursor_position,
+																																		m_inputSystem.IsKeyTriggered(VK_LBUTTON),key_choice_index);
 
 	// 入った更新では、Captureを解除して、マウスをカードの操作へ渡す。ゲームの操作と時間は、Updateが止める。
 	if(reward_result == REWARD_UPDATE_RESULT::e_STARTED){
@@ -346,7 +309,8 @@ void GameSession::UpdateReward()
 	}
 
 	// 常に効く特殊強化の効果を、使う側へ渡す。毎回渡して、再開や初期化の後も、取得数と一致させる。
-	// 制圧射撃は、射撃で敵へ与える怯み時間の倍率として、射撃の担当へ渡す。殴打追撃は、殴打が当たった敵へ付ける印の倍率と時間として、戦闘の担当へ渡す。
+	// 制圧射撃は、射撃で敵へ与える怯み時間の倍率として、射撃の担当へ渡す。
+	// 殴打追撃は、殴打が当たった敵へ付ける印の倍率と時間として、戦闘の担当へ渡す。
 	// 回避反撃は、ジャスト回避の時だけ効くため、ここでは渡さない（StartJustDodgeEffectsが渡す）。
 	const RewardController& reward = m_economy.GetReward();
 	m_player.GetShotController().SetFlinchScale(reward.GetSuppressiveFlinchScale());
@@ -359,13 +323,14 @@ void GameSession::UpdateShop()
 	// 閉じている間は、何もしない。
 	if(!m_shopFlow.IsOpen())return;
 
-	// カーソルの位置（基準Canvas上）、左クリック、数字キー、Enter、Uを渡す。数字キーは、売買のページの武器と弾薬のボタンの数だけ調べる（強化のページは、先頭の5個を使う）。
+	// カーソルの位置（基準Canvas上）、左クリック、数字キー、Enter、Uを渡す。
+	// 数字キーは、売買のページの武器と弾薬のボタンの数だけ調べる（強化のページは、先頭の5個を使う）。
 	SHOP_FLOW_INPUT shop_input{};
-	shop_input.cursorCanvasPosition = ConvertCursorToCanvas(m_inputSystem,m_graphicsSystem);
+	shop_input.cursorCanvasPosition = GAME_INPUT_HELPER::ConvertCursorToCanvas(m_inputSystem,m_graphicsSystem);
 	shop_input.isClickTriggered = m_inputSystem.IsKeyTriggered(VK_LBUTTON);
-	shop_input.numberKeyIndex = FindTriggeredNumberKey(m_inputSystem,SHOP_TABLE::ns_UPGRADE_BUTTON_OFFSET);
+	shop_input.numberKeyIndex = GAME_INPUT_HELPER::FindTriggeredNumberKey(m_inputSystem,SHOP_TABLE::ns_UPGRADE_BUTTON_OFFSET);
 	shop_input.isCloseKeyTriggered = m_inputSystem.IsKeyTriggered(VK_RETURN);
-	shop_input.isSwitchKeyTriggered = m_inputSystem.IsKeyTriggered(ns_SHOP_SWITCH_KEY);
+	shop_input.isSwitchKeyTriggered = m_inputSystem.IsKeyTriggered(GAME_INPUT_HELPER::ns_SHOP_SWITCH_KEY);
 
 	// 閉じた場合は、Captureを戻して、ゲームの操作へ戻る。選んだクリックが射撃にならないよう、入力の保護が、続けて働く。
 	if(m_shopFlow.Update(shop_input)){
@@ -455,7 +420,8 @@ bool GameSession::TrySpawnCurrentWave()
 	// 敵の枠ごとの生死の記録を、生成後の状態へ揃える。解除された旧ウェーブの敵を、倒された敵として扱わず、撃破報酬を与えない。
 	m_economy.SyncEnemyAliveFlags(m_enemyController.GetEnemyManager());
 
-	// 登録に失敗した場合は、EnemyControllerが失敗を記録し、EnemyManagerが生成済みの枠を解除して空にする。進行管理へ生成完了を通知せず、失敗を返す。
+	// 登録に失敗した場合は、EnemyControllerが失敗を記録し、EnemyManagerが生成済みの枠を解除して空にする。
+	// 進行管理へ生成完了を通知せず、失敗を返す。
 	if(!is_spawned)return false;
 
 	// 新しい敵がスライディングの転倒記録を引き継がないよう初期化し、全滅判定を開始する。
@@ -482,7 +448,8 @@ void GameSession::SkipCurrentWave()
 // 出口を通過したプレイヤーを、次の部屋の開始位置へ移す。
 void GameSession::UpdateExitPass()
 {
-	// 出口が閉じている、位置が通過範囲の外にある、または進行管理が通過を受理しなかった場合は、何もしない。最終部屋の通過後や、受理済みの重複した通知では受理されない。
+	// 出口が閉じている、位置が通過範囲の外にある、または進行管理が通過を受理しなかった場合は、何もしない。
+	// 最終部屋の通過後や、受理済みの重複した通知では受理されない。
 	if(!m_stage.TryPassExit(m_player.GetPlayerController().GetPosition()))return;
 
 	// 次の部屋へ進んだので、プレイヤーを開始位置へ戻し、カメラ位置を合わせる。出口は、次の更新の進行状態の同期で閉じる。
@@ -493,7 +460,8 @@ void GameSession::UpdateExitPass()
 // 現在の値を集めて、画像のHUDの描画をGameRendererへ求める。
 void GameSession::DrawHud()
 {
-	// 現在の値をHUDへ渡して描画する。弾薬とリロードの値は、射撃を担当するShotControllerの武器から読み取る。ショップと武器の所持に関する項目は、ShopFlowが書き込む。
+	// 現在の値をHUDへ渡して描画する。弾薬とリロードの値は、射撃を担当するShotControllerの武器から読み取る。
+	// ショップと武器の所持に関する項目は、ShopFlowが書き込む。
 	const WeaponSystem& weapon = m_player.GetShotController().GetWeaponSystem();
 	const RewardController& reward = m_economy.GetReward();
 	GAME_HUD_STATE hud_state{};
