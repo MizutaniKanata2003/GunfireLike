@@ -2,6 +2,7 @@
 
 // ゲーム中のHUD（照準・HPバー・弾薬・リロード表示・回復アイテム数・通貨・低HP警告）と、報酬選択のカード、ショップ（武器と弾薬の購入・売却・強化の画面）を、画像と文字で描画する。
 // 画像の配置はUiLayoutの表から読み、描画する値はGAME_HUD_STATEとして受け取る。値の決定・ゲームの進行・クリックの判定は担当しない。
+// 実装は、GameHud.cpp（HUD・報酬選択）とGameHudShop.cpp（ショップ）に分ける。
 
 //========= C++標準ライブラリ インクルード=========
 #include <array> // std::arrayで、報酬ごとの取得数と、ショップの行ごとの状態を固定長で受け取る。
@@ -13,7 +14,8 @@
 
 //========= Scene インクルード=========
 #include "Scene/Common/Reward/H/RewardController.h" // 報酬の表（見出し・説明）と、カードの数を使用する。
-#include "Scene/Common/Shop/H/ShopController.h"    // ショップの表（価格・名前・弾薬の上限）と、ページ・行の状態を使用する。
+#include "Scene/Common/Shop/H/ShopController.h"   // ショップの表（価格・名前・弾薬の上限）と、ページ・行の状態を使用する。
+#include "Scene/GameScene/H/GameHudStyle.h"       // 文字を置く領域の型（HUD_TEXT_AREA）を使用する。
 
 //========= 前方宣言=========
 class GraphicsSystem;
@@ -99,21 +101,38 @@ public:
 	void Uninit();
 
 private:
-	//========= 補助関数=========
-	// 文字を、指定した領域の中央へ、領域に収まる大きさで描く。Begin・Endの間に呼ぶ。
-	// text: 描く文字列。空なら何もしない。
-	// areaPosition: 領域の左上の位置。基準Canvas上の座標。
-	// areaSize: 領域の幅と高さ。基準Canvas上の大きさ。
-	// targetHeight: 文字の高さの目標。基準Canvas上の大きさ。領域の幅に収まらない場合は、幅に合わせて小さくする。
-	// color: 文字のRGBA色。
-	void DrawFittedText(const std::wstring& text,const XMFLOAT2& areaPosition,const XMFLOAT2& areaSize,float targetHeight,const XMVECTORF32& color);
+	//========= 画像の描画関数（GameHud.cpp）=========
+	// 画像を、描く順に描く。暗幕、HUDの画像、報酬のカード、ショップの画像の順。
+	// graphicsSystem: 描画基盤。
+	// state: 描画する値。
+	void DrawSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state);
+	// 低HP警告・照準・HPバー・弾薬の枠・通貨のアイコンを描く。
+	// graphicsSystem: 描画基盤。
+	// state: 描画する値。HP・構えを使う。
+	void DrawStatusSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state);
+	// 照準を、配置表の中心を保ったまま、構え中は小さく描く。
+	// graphicsSystem: 描画基盤。
+	// isAiming: 構えているか。
+	void DrawCrosshair(GraphicsSystem& graphicsSystem,bool isAiming);
 	// 報酬のカードの枠を、カードの数だけ描く。カーソルが乗っているカードは、ホバー用の画像で描く。
 	// graphicsSystem: 描画基盤。
 	// hoveredIndex: カーソルが乗っているカードの添字。乗っていなければ-1。
 	void DrawRewardCards(GraphicsSystem& graphicsSystem,int hoveredIndex);
+
+	//========= 文字の描画関数（GameHud.cpp）=========
+	// 文字を、指定した領域の中央へ、領域に収まる大きさで描く。Begin・Endの間に呼ぶ。
+	// text: 描く文字列。空なら何もしない。
+	// area: 文字を置く領域。位置・大きさ・文字の高さの目標を持つ。
+	// color: 文字のRGBA色。
+	void DrawFittedText(const std::wstring& text,const HUD_TEXT_AREA& area,const XMVECTORF32& color);
+	// 弾薬・回復アイテム数・通貨・リロード表示の文字を描く。Begin・Endの間に呼ぶ。
+	// state: 描画する値。
+	void DrawHudTexts(const GAME_HUD_STATE& state);
 	// 報酬選択の文字（見出し・各カードの見出しと説明と取得数・操作の案内）を描く。Begin・Endの間に呼ぶ。
 	// ownedCounts: 報酬ごとの取得数。
 	void DrawRewardTexts(const std::array<int,REWARD_TABLE::ns_CARD_COUNT>& ownedCounts);
+
+	//========= ショップの描画関数（GameHudShop.cpp）=========
 	// ショップのパネルと、現在のページのボタンの画像を描く。押せるボタンは、カーソルが乗っていればホバー用の画像で、押せないボタンは、押せない時の画像で描く。
 	// graphicsSystem: 描画基盤。
 	// state: 描画する値。ショップの項目を使う。
@@ -121,12 +140,20 @@ private:
 	// ショップの文字を、現在のページに応じて描く。Begin・Endの間に呼ぶ。ページ切替と閉じるボタンの文字は、どちらのページでも描く。
 	// state: 描画する値。ショップの項目を使う。
 	void DrawShopTexts(const GAME_HUD_STATE& state);
-	// 売買のページの文字（見出し・所持数・各行の武器名と予備弾薬・武器と弾薬のボタンの文字・操作の案内）を描く。Begin・Endの間に呼ぶ。
+	// 売買のページの文字（見出し・所持数・操作の案内と、各行の文字）を描く。Begin・Endの間に呼ぶ。
 	// state: 描画する値。ショップの項目を使う。
 	void DrawShopTradeTexts(const GAME_HUD_STATE& state);
-	// 強化のページの文字（見出し・装備中の武器名・各項目の名前と段階・強化のボタンの文字）を描く。Begin・Endの間に呼ぶ。
+	// 売買のページの1行（武器名・予備弾薬・武器と弾薬のボタンの文字）を描く。Begin・Endの間に呼ぶ。
+	// state: 描画する値。
+	// rowIndex: 行の添字。武器の種類の値と同じ。
+	void DrawShopTradeRowTexts(const GAME_HUD_STATE& state,int rowIndex);
+	// 強化のページの文字（見出し・装備中の武器名と、各項目の文字）を描く。Begin・Endの間に呼ぶ。
 	// state: 描画する値。ショップの項目を使う。
 	void DrawShopUpgradeTexts(const GAME_HUD_STATE& state);
+	// 強化のページの1項目（名前と段階・強化のボタンの文字）を描く。Begin・Endの間に呼ぶ。
+	// state: 描画する値。
+	// itemIndex: 強化の項目の添字。
+	void DrawShopUpgradeRowTexts(const GAME_HUD_STATE& state,int itemIndex);
 
 	//========= 描画Renderer=========
 	// 画像を矩形で描画するRenderer。
