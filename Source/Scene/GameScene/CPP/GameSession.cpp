@@ -1,6 +1,6 @@
 ﻿#include "../H/GameSession.h"
 
-// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、部屋のクリア後の報酬選択とその効果の反映、
+// 1回のプレイの初期化、入力に応じた状態更新、プレイの終了の判定、射撃・近接攻撃・回避・回復・被弾の反映、部屋のクリア後の報酬選択とその効果の反映、
 // ショップへの入力の受渡し、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、描画とデバッグUIの呼出し、Resource終了を実装する。
 
 //========= Windows インクルード=========
@@ -57,8 +57,9 @@ void GameSession::Initialize()
 	// 通貨・報酬選択・敵の生死の記録を初期状態へ戻す。前回のプレイの敵を、倒された敵として扱わない。
 	m_economy.Initialize();
 
-	// 武器の所持・強化・保存した弾薬を初期状態へ戻し、ショップを閉じる。
+	// 武器の所持・強化・保存した弾薬を初期状態へ戻し、ショップを閉じる。プレイの状態も、プレイ中へ戻す。
 	m_shopFlow.Initialize();
+	m_runController.Initialize();
 }
 
 // 描画Resourceと生成Objectの準備に成功した後にだけ、ゲーム操作とBGMへ切り替える。
@@ -87,6 +88,18 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 	// Capture解除中も操作できるよう、Captureの判定より前に処理する。
 	if(m_debugController.UpdateCommands()){
 		SkipCurrentWave();
+	}
+
+	// プレイの終了（プレイヤーの死亡・最終部屋のクリア）を判定する。終了した後は、実時間で待ち時間だけを数える。
+	m_runController.Update(deltaTime,m_player.GetPlayerHealth().IsDead(),m_stage.GetRoomNumber(),m_stage.GetRoomController().GetPhase());
+
+	// 終了した後は、世界と報酬選択・ショップの更新を行わず、最後の画面のまま止める。報酬選択やショップを、終了の瞬間に開かないため、他の更新より前に戻る。
+	if(!m_runController.IsPlaying()){
+		// 待ち時間が過ぎるまでは、プレイを続けているものとして、画面を保つ。
+		if(!m_runController.HasEndDelayElapsed())return GAME_SESSION_RESULT::e_CONTINUE;
+
+		// 待ち時間が過ぎたら、死亡はやり直しを、クリアはクリア後の画面への遷移を、呼出側へ求める。
+		return m_runController.GetState() == RUN_STATE::e_CLEARED ? GAME_SESSION_RESULT::e_CLEARED : GAME_SESSION_RESULT::e_RETRY;
 	}
 
 	// 報酬選択中とショップが開いている間は、時間を進めない。

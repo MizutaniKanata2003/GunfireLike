@@ -1,6 +1,6 @@
 ﻿#include "../H/GameScene.h"
 
-// GameSceneのライフサイクルを、GameSessionへ中継し、タイトルへ戻る要求を、タイトルへの遷移予約へ反映する。
+// GameSceneのライフサイクルを、GameSessionへ中継し、プレイの結果（タイトルへ戻る・やり直し・クリア）を、遷移の予約へ反映する。
 
 //========= Scene インクルード=========
 #include "Scene/Common/Core/H/SceneManager.h"
@@ -25,12 +25,29 @@ bool GameScene::Init()
 	return m_session.Init();
 }
 
-// プレイを更新し、タイトルへ戻る要求があれば、遷移を予約する。
+// プレイを更新し、結果に応じた遷移を予約する。
 void GameScene::Update(float deltaTime)
 {
-	// プレイがタイトルへ戻る要求を返した場合だけ、タイトルへの遷移を予約する。それ以外は、何もしない。
-	if(m_session.Update(deltaTime) == GAME_SESSION_RESULT::e_RETURN_TO_TITLE){
-		m_sceneManager.RequestSceneChange<TitleScene>();
+	// プレイの結果ごとに、遷移の予約先を選ぶ。続ける場合は、何も予約しない。
+	switch(m_session.Update(deltaTime)){
+		// タイトルへ戻る要求は、タイトルへの遷移を予約する。
+	case GAME_SESSION_RESULT::e_RETURN_TO_TITLE:
+	m_sceneManager.RequestSceneChange<TitleScene>();
+	break;
+
+	// 死亡後のやり直しは、新しいGameSceneを予約する。新しいSceneのInitializeとInitで、通貨・武器・部屋・HPが、全て初期状態から始まる。
+	case GAME_SESSION_RESULT::e_RETRY:
+	m_sceneManager.RequestSceneChange<GameScene>();
+	break;
+
+	// クリアは、結果の画面（F8で追加）がまだないため、タイトルへの遷移を予約する。
+	case GAME_SESSION_RESULT::e_CLEARED:
+	m_sceneManager.RequestSceneChange<TitleScene>();
+	break;
+
+	// プレイを続ける場合は、何もしない。
+	case GAME_SESSION_RESULT::e_CONTINUE:
+	break;
 	}
 }
 

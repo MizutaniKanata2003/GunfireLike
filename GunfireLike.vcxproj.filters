@@ -470,6 +470,9 @@
     <ClInclude Include="Source\Scene\Common\Enemy\H\BossController.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Scene\GameScene\H\RunController.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Source\Framework\Shaders\BasicColorVS.hlsl" />

@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-// 1回のプレイの流れを担当する。初期化・更新・描画・終了の中で、ステージ・プレイヤー側一式・敵・時間（ヒットストップとスロー）・通貨と報酬・ショップと武器の所持・デバッグ・描画の順序と仲介を行う。
-// 移動・戦闘・射撃などの個別の規則は、各クラスが持つ。Scene遷移は担当せず、タイトルへ戻る要求を、更新の結果として呼出側へ返す。
+// 1回のプレイの流れを担当する。初期化・更新・描画・終了の中で、ステージ・プレイヤー側一式・敵・時間（ヒットストップとスロー）・通貨と報酬・ショップと武器の所持・プレイの終了・デバッグ・描画の順序と仲介を行う。
+// 移動・戦闘・射撃などの個別の規則は、各クラスが持つ。Scene遷移は担当せず、タイトルへ戻る・やり直す・クリアした、という要求を、更新の結果として呼出側へ返す。
 
 //========= Debug インクルード=========
 #include "Debug/H/GameDebugController.h"
@@ -16,6 +16,7 @@
 #include "Scene/Common/Stage/H/StageController.h"
 #include "Scene/GameScene/H/EconomyController.h"
 #include "Scene/GameScene/H/GameRenderer.h"
+#include "Scene/GameScene/H/RunController.h"
 #include "Scene/GameScene/H/ShopFlow.h"
 
 //========= 前方宣言=========
@@ -26,11 +27,13 @@ class InputSystem;
 // 更新の結果。呼出側が、次の動作を選ぶために使う。
 enum class GAME_SESSION_RESULT
 {
-	e_CONTINUE,       // プレイを続ける。
-	e_RETURN_TO_TITLE // タイトルへ戻る要求があった。呼出側がScene遷移を予約する。
+	e_CONTINUE,        // プレイを続ける。
+	e_RETURN_TO_TITLE, // タイトルへ戻る要求があった。呼出側がScene遷移を予約する。
+	e_RETRY,           // プレイヤーが死亡し、終了後の待ち時間が過ぎた。呼出側が、新しいプレイ（初期状態）を始める。
+	e_CLEARED          // 最終部屋をクリアし、終了後の待ち時間が過ぎた。呼出側が、クリア後の画面へ進む。
 };
 
-// ステージ・プレイヤー側一式・敵・時間・通貨と報酬・ショップと武器の所持・デバッグ・描画を仲介して、1回のプレイを進めるクラス。
+// ステージ・プレイヤー側一式・敵・時間・通貨と報酬・ショップと武器の所持・プレイの終了・デバッグ・描画を仲介して、1回のプレイを進めるクラス。
 class GameSession final
 {
 public:
@@ -42,15 +45,16 @@ public:
 	GameSession(InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem);
 
 	//========= ライフサイクル関数=========
-	// プレイヤー側一式・ステージ・判定の状態・通貨と報酬・ショップと武器の所持と強化・敵の弾と範囲の予告・デバッグ設定を初期状態へ戻し、カメラをプレイヤー位置へ合わせる。
+	// プレイヤー側一式・ステージ・判定の状態・通貨と報酬・ショップと武器の所持と強化・プレイの状態・敵の弾と範囲の予告・デバッグ設定を初期状態へ戻し、カメラをプレイヤー位置へ合わせる。
 	void Initialize();
 	// ステージ・描画（HUDとCollision可視化）を初期化し、敵の弾、範囲の予告、第1部屋の敵を生成して、成功後にFPS操作とGame用BGMを有効にする。
 	// 戻り値: 各初期化・Object生成・敵の配置が成功したらtrue。falseを検出した場合はFinalize後にfalseを返し、CaptureとBGMは変更しない。
 	[[nodiscard]] bool Init();
-	// F2・F1・F4の入力、デバッグ操作を処理し、時間・部屋・報酬選択・ショップ・武器の切替・プレイヤー・戦闘・敵・撃破の報酬の順に更新する。
+	// F2・F1・F4の入力、デバッグ操作、プレイの終了の判定を処理し、時間・部屋・報酬選択・ショップ・武器の切替・プレイヤー・戦闘・敵・撃破の報酬の順に更新する。
 	// deltaTime: 実時間の経過時間。単位は秒。各更新へは、ヒットストップ中は0、スロー中はプレイヤー以外へ縮めた値を、それぞれ渡す。報酬選択中とショップが開いている間は、時間を進めない。
 	// Capture解除中と、報酬選択中・ショップが開いている間は、視点・移動・戦闘・敵の行動の更新を行わない。F2が押された場合は後続の更新を行わない。
-	// 戻り値: F2が押されたらe_RETURN_TO_TITLE。それ以外はe_CONTINUE。
+	// プレイが終了（死亡・クリア）した後は、世界の更新を止め、終了後の待ち時間が過ぎるまで、最後の画面を保つ。
+	// 戻り値: F2が押されたらe_RETURN_TO_TITLE。死亡の待ち時間が過ぎたらe_RETRY。クリアの待ち時間が過ぎたらe_CLEARED。それ以外はe_CONTINUE。
 	[[nodiscard]] GAME_SESSION_RESULT Update(float deltaTime);
 	// 描画先サイズに合わせて行列を作り、3D・画像のHUD・読み取り専用のデバッグUIを、この順に描画する。
 	// 幅または高さが0なら何もしない。ImGuiフレーム開始後、描画データ確定前に呼ぶ。
@@ -126,7 +130,7 @@ private:
 	//========= 所有状態=========
 	// プレイヤー・HP・回復アイテム・カメラ・近接攻撃と接触と回復・射撃・視野角を所有する。ヒットストップは、TimeScaleControllerへ求める。
 	PlayerSuite m_player{};
-	// 現在のウェーブの敵・敵の弾・範囲の予告・敵ごとの攻撃予告を所有し、更新と描画を行う。Finalizeで、登録先のCollisionWorldと共有Rendererより先に解除する。
+	// 現在のウェーブの敵・敵の弾・範囲の予告・敵ごとの攻撃予告・ボスの行動を所有し、更新と描画を行う。Finalizeで、登録先のCollisionWorldと共有Rendererより先に解除する。
 	EnemyController m_enemyController{};
 	// ヒットストップとスローの残り時間を持ち、更新ごとに、プレイヤー側と、敵・判定側の経過時間を求める。
 	TimeScaleController m_timeScale{};
@@ -140,4 +144,6 @@ private:
 	ShopFlow m_shopFlow{};
 	// 3Dのワールド・画像のHUD・Collision可視化の描画を担当する。Collision可視化は、プレイヤー・デバッグが借用する。
 	GameRenderer m_renderer{};
+	// 1回のプレイの状態（プレイ中・死亡・クリア）と、終了後の待ち時間を担当する。終了した後は、世界の更新を止める。
+	RunController m_runController{};
 };

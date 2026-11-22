@@ -334,6 +334,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\GameScene\H\GameRenderer.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameScene.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameSession.h" />
+    <ClInclude Include="Source\Scene\GameScene\H\RunController.h" />
     <ClInclude Include="Source\Scene\GameScene\H\ShopFlow.h" />
     <ClInclude Include="Source\Scene\TitleScene\H\TitleScene.h" />
   </ItemGroup>
