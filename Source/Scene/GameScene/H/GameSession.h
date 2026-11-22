@@ -1,10 +1,9 @@
 ﻿#pragma once
 
-// 1回のプレイの流れを担当する。初期化・更新・描画・終了の中で、ステージ・プレイヤー側一式・敵・時間（ヒットストップとスロー）・通貨と報酬・ショップ・武器の所持と強化と切替・デバッグ・HUD・Collision可視化の順序と仲介を行う。
+// 1回のプレイの流れを担当する。初期化・更新・描画・終了の中で、ステージ・プレイヤー側一式・敵・時間（ヒットストップとスロー）・通貨と報酬・ショップ・武器の所持と強化と切替・デバッグ・描画の順序と仲介を行う。
 // 移動・戦闘・射撃などの個別の規則は、各クラスが持つ。Scene遷移は担当せず、タイトルへ戻る要求を、更新の結果として呼出側へ返す。
 
 //========= Debug インクルード=========
-#include "Debug/H/CollisionDebugView.h"
 #include "Debug/H/GameDebugController.h"
 
 //========= Framework インクルード=========
@@ -18,7 +17,7 @@
 #include "Scene/Common/Stage/H/StageController.h"
 #include "Scene/Common/Weapon/H/WeaponInventory.h"
 #include "Scene/GameScene/H/EconomyController.h"
-#include "Scene/GameScene/H/GameHud.h"
+#include "Scene/GameScene/H/GameRenderer.h"
 
 //========= 前方宣言=========
 class AudioSystem;
@@ -32,7 +31,7 @@ enum class GAME_SESSION_RESULT
 	e_RETURN_TO_TITLE // タイトルへ戻る要求があった。呼出側がScene遷移を予約する。
 };
 
-// ステージ・プレイヤー側一式・敵・時間・通貨と報酬・ショップ・武器の所持と強化と切替・デバッグ・HUDを仲介して、1回のプレイを進めるクラス。
+// ステージ・プレイヤー側一式・敵・時間・通貨と報酬・ショップ・武器の所持と強化と切替・デバッグ・描画を仲介して、1回のプレイを進めるクラス。
 class GameSession final
 {
 public:
@@ -46,7 +45,7 @@ public:
 	//========= ライフサイクル関数=========
 	// プレイヤー側一式・ステージ・判定の状態・通貨と報酬・ショップ・武器の所持と強化・敵の弾と範囲の予告・デバッグ設定を初期状態へ戻し、カメラをプレイヤー位置へ合わせる。
 	void Initialize();
-	// ステージ・HUD・Collision可視化を初期化し、敵の弾、範囲の予告、第1部屋の敵を生成して、成功後にFPS操作とGame用BGMを有効にする。
+	// ステージ・描画（HUDとCollision可視化）を初期化し、敵の弾、範囲の予告、第1部屋の敵を生成して、成功後にFPS操作とGame用BGMを有効にする。
 	// 戻り値: 各初期化・Object生成・敵の配置が成功したらtrue。falseを検出した場合はFinalize後にfalseを返し、CaptureとBGMは変更しない。
 	[[nodiscard]] bool Init();
 	// F2・F1・F4の入力、デバッグ操作を処理し、時間・部屋・報酬選択・ショップ・武器の切替・プレイヤー・戦闘・敵・撃破の報酬の順に更新する。
@@ -57,12 +56,12 @@ public:
 	// 描画先サイズに合わせて行列を作り、3D・画像のHUD・読み取り専用のデバッグUIを、この順に描画する。
 	// 幅または高さが0なら何もしない。ImGuiフレーム開始後、描画データ確定前に呼ぶ。
 	void Draw();
-	// デバッグ・プレイヤー側・敵を先に終了し、その後にステージ・HUD・Collision可視化を解放する。繰り返し呼出可能。CaptureやBGMは変更しない。
+	// デバッグ・プレイヤー側・敵を先に終了し、その後にステージ・描画を解放する。繰り返し呼出可能。CaptureやBGMは変更しない。
 	void Finalize();
 
 private:
 	//========= 初期化の補助関数=========
-	// ステージ・Collision可視化・HUDを初期化する。失敗の後始末は、呼出側のInitがFinalizeで行う。
+	// ステージ・描画（HUDとCollision可視化）を初期化する。失敗の後始末は、呼出側のInitがFinalizeで行う。
 	// 戻り値: 全て成功したらtrue。失敗した場合は、失敗した対象をログへ記録してfalse。
 	[[nodiscard]] bool InitRenderResources();
 	// 敵の更新へ、使用する参照と通知先を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
@@ -129,11 +128,7 @@ private:
 	void UpdateExitPass();
 
 	//========= 描画の補助関数=========
-	// 床・壁・範囲の予告・出口・敵・敵の弾・Collisionの線を、この順に3Dで描画する。
-	// viewMatrix: World空間からView空間への変換行列。
-	// projectionMatrix: View空間からClip空間への変換行列。
-	void DrawWorld(const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix);
-	// 3Dの上に、画像のHUD（照準・HPバー・弾薬・リロード表示・回復アイテム数・通貨・報酬選択・ショップの表示・低HP警告）を描画する。
+	// 現在の値（HP・弾薬・通貨・報酬選択・ショップの状態など）を集めて、画像のHUDの描画をGameRendererへ求める。
 	void DrawHud();
 
 	//========= System参照=========
@@ -161,10 +156,6 @@ private:
 	WeaponInventory m_inventory{};
 	// 武器と弾薬の購入、武器の売却、武器の強化の画面の状態。報酬選択の後に開き、開いている間は、時間とプレイヤーの操作を止める。
 	ShopController m_shop{};
-
-	//========= HUDとデバッグ=========
-	// 画像で描くHUD。
-	GameHud m_gameHud{};
-	// Collisionの可視化（Colliderの線・視線のRay・弾道）。F3で表示を切り替える。
-	CollisionDebugView m_collisionDebugView{};
+	// 3Dのワールド・画像のHUD・Collision可視化の描画を担当する。Collision可視化は、プレイヤー・デバッグが借用する。
+	GameRenderer m_renderer{};
 };

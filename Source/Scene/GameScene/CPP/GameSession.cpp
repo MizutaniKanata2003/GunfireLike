@@ -1,6 +1,6 @@
 ﻿#include "../H/GameSession.h"
 
-// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、部屋のクリア後の報酬選択とその効果の反映、ショップでの武器と弾薬の購入・武器の売却・武器の強化、武器の持ち替え、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、画像のHUD・デバッグUIの描画、Resource終了を実装する。
+// 1回のプレイの初期化、入力に応じた状態更新、射撃・近接攻撃・回避・回復・被弾の反映、部屋のクリア後の報酬選択とその効果の反映、ショップでの武器と弾薬の購入・武器の売却・武器の強化、武器の持ち替え、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、描画とデバッグUIの呼出し、Resource終了を実装する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <string> // 購入・売却・強化・持ち替えをログへ記録する際に、名前を連結する。
@@ -218,12 +218,12 @@ void GameSession::Draw()
 	const XMMATRIX view_matrix = m_player.GetCamera().GetViewMatrix();
 
 	// 3D・画像のHUD・デバッグUIの順に描画する。デバッグUIはゲームの状態を変更しない。
-	DrawWorld(view_matrix,projection_matrix);
+	m_renderer.DrawWorld(m_graphicsSystem,view_matrix,projection_matrix);
 	DrawHud();
 	m_debugController.DrawUi(m_stage.HasWaveSpawnFailed());
 }
 
-// 所有する敵・敵の弾・範囲の予告・プレイヤー側・ステージ・HUD・Collision可視化を終了する。
+// 所有する敵・敵の弾・範囲の予告・プレイヤー側・ステージ・描画を終了する。
 void GameSession::Finalize()
 {
 	// 遷移先のInit後に呼ばれても、遷移先が設定したCaptureやBGMを上書きしない。
@@ -234,21 +234,23 @@ void GameSession::Finalize()
 	m_stage.Uninit();
 
 	// HUDと線描画Rendererを解放する。
-	m_gameHud.Uninit();
-	m_collisionDebugView.Uninit();
+	m_renderer.Uninit();
 }
 
 //========= 初期化の補助関数=========
-// ステージ・Collision可視化・HUDを初期化する。
+// ステージ・描画（HUDとCollision可視化）を初期化する。
 bool GameSession::InitRenderResources()
 {
-	// 3つの初期化を、この順に実行する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。後始末は、呼出側のInitがFinalizeで行う。
+	// 描画が借用する参照先を用意する。ステージ・敵・カメラは、このクラスが所有するため、Finalizeまで有効。
+	GAME_RENDERER_LINKS renderer_links{};
+	renderer_links.stage = &m_stage;
+	renderer_links.enemyController = &m_enemyController;
+	renderer_links.camera = &m_player.GetCamera();
+
+	// 2つの初期化を、この順に実行する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。後始末は、呼出側のInitがFinalizeで行う。
 	// 共有Renderer・床と壁・出口の初期化失敗を検出する。失敗した対象のログは、StageControllerが記録する。
-	return m_stage.Init(m_graphicsSystem)
-		// Collision可視化の初期化失敗を検出する。
-		&& InitCheck::Succeeded(m_collisionDebugView.Initialize(m_graphicsSystem),e_LogCategory::e_SCENE,L"GameSessionの線描画Renderer初期化に失敗しました。")
-		// 画像のHUDの初期化失敗を検出する。個々の画像の読込失敗はここでは失敗にならない。
-		&& InitCheck::Succeeded(m_gameHud.Initialize(m_graphicsSystem),e_LogCategory::e_SCENE,L"GameSessionのHUD初期化に失敗しました。");
+	// 描画（Collision可視化とHUD）の初期化失敗は、GameRendererが記録する。
+	return m_stage.Init(m_graphicsSystem) && m_renderer.Initialize(m_graphicsSystem,renderer_links);
 }
 
 // 敵の更新へ、使用する参照と通知先を渡す。
@@ -272,11 +274,12 @@ bool GameSession::InitEnemyController()
 bool GameSession::InitPlayerAndDebug()
 {
 	// プレイヤー側一式に使う参照と、ヒットストップの通知先を用意する。ヒットストップは、すでに残っている場合は長い方を使う。
+	CollisionDebugView& collision_debug_view = m_renderer.GetCollisionDebugView();
 	PLAYER_SUITE_LINKS player_links{};
 	player_links.inputSystem = &m_inputSystem;
 	player_links.collisionWorld = &m_stage.GetCollisionWorld();
 	player_links.enemyManager = &m_enemyController.GetEnemyManager();
-	player_links.collisionDebugView = &m_collisionDebugView;
+	player_links.collisionDebugView = &collision_debug_view;
 	player_links.onHitStopRequested = [this](float hitStopSeconds){
 		m_timeScale.RequestHitStop(hitStopSeconds);
 	};
@@ -284,7 +287,7 @@ bool GameSession::InitPlayerAndDebug()
 	// デバッグ操作とデバッグUIに使う参照を用意する。ゲームの状態は、各クラスの公開関数を通じてだけ変更される。
 	GAME_DEBUG_CONTROLLER_LINKS debug_links{};
 	debug_links.inputSystem = &m_inputSystem;
-	debug_links.collisionDebugView = &m_collisionDebugView;
+	debug_links.collisionDebugView = &collision_debug_view;
 	debug_links.playerController = &m_player.GetPlayerController();
 	debug_links.playerHealth = &m_player.GetPlayerHealth();
 	debug_links.healItems = &m_player.GetHealItems();
@@ -352,7 +355,7 @@ void GameSession::UpdateTimers(float deltaTime,float gameplayDeltaTime)
 {
 	// プレイヤー側の回復アイテムの間隔・命中表示・反動のずれを進める。Collision可視化の表示用の残り時間は、実時間で進め、0未満にしない。
 	m_player.UpdateTimers(deltaTime,gameplayDeltaTime);
-	m_collisionDebugView.Update(deltaTime);
+	m_renderer.GetCollisionDebugView().Update(deltaTime);
 }
 
 // 部屋のクリアで報酬選択へ入る判定と、カードが選ばれた時に抜ける判定を行い、取得した報酬の効果を各クラスへ渡す。
@@ -603,7 +606,7 @@ void GameSession::UpdateCombat(float gameplayDeltaTime,float worldDeltaTime)
 	m_enemyController.Update(worldDeltaTime);
 
 	// 更新後のカメラから、Collision可視化の視線のRayを更新する。非表示の間は判定を行わない。
-	m_collisionDebugView.UpdateRay(m_player.GetCamera(),m_stage.GetCollisionWorld());
+	m_renderer.GetCollisionDebugView().UpdateRay(m_player.GetCamera(),m_stage.GetCollisionWorld());
 }
 
 // 確認用の攻撃が当たる瞬間の判定結果を、プレイヤーへのダメージとジャスト回避の効果へ反映する。
@@ -684,30 +687,9 @@ void GameSession::UpdateExitPass()
 }
 
 //========= 描画の補助関数=========
-// 床・壁・範囲の予告・出口・敵・敵の弾・Collisionの線を、この順に3Dで描画する。
-void GameSession::DrawWorld(const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix)
-{
-	// 床・壁・範囲の予告・出口・敵・敵の弾はOPAQUE Passで描画するため、描画前にPassを設定する。
-	m_graphicsSystem.SetRenderPass(e_RenderPass::e_OPAQUE);
-
-	// 生成済みの全Objectを、表の順（床→左壁→右壁→手前壁→奥壁）に描画する。
-	m_stage.DrawObjects(m_graphicsSystem,viewMatrix,projectionMatrix);
-
-	// 床の上に、範囲の予告を描画する。床の後に描き、敵や出口より先に描くことで、敵の体が予告の上に重なる。続けて出口を描画する。
-	m_enemyController.DrawAreaTelegraph(m_graphicsSystem,viewMatrix,projectionMatrix);
-	m_stage.DrawExit(m_graphicsSystem,viewMatrix,projectionMatrix);
-	// 続けて全枠の敵を出現順に描画し、その後に飛行中の敵の弾を描画する。死亡枠はEnemy::Drawが描画を省略する。
-	m_enemyController.DrawEnemies(m_graphicsSystem,viewMatrix,projectionMatrix);
-	// 敵と弾の後に、表示中ならCollisionの線を重ねる。
-	m_collisionDebugView.Draw(m_graphicsSystem,m_stage.GetCollisionWorld(),m_player.GetCamera(),viewMatrix,projectionMatrix);
-}
-
-// 3Dの上に、画像のHUDを描画する。
+// 現在の値を集めて、画像のHUDの描画をGameRendererへ求める。
 void GameSession::DrawHud()
 {
-	// 3Dの上に画像のHUDを重ねるため、深度比較なし・アルファ合成の画面UI用Passへ切り替える。
-	m_graphicsSystem.SetRenderPass(e_RenderPass::e_SCREEN_UI);
-
 	// 現在の値をHUDへ渡して描画する。弾薬とリロードの値は、射撃を担当するShotControllerの武器から読み取る。
 	const WeaponSystem& weapon = m_player.GetShotController().GetWeaponSystem();
 	const RewardController& reward = m_economy.GetReward();
@@ -736,5 +718,5 @@ void GameSession::DrawHud()
 	hud_state.shopUpgradeLevels = m_inventory.GetUpgradeLevels(equipped_weapon_index);
 	hud_state.ownedWeaponCount = m_inventory.GetCount();
 	hud_state.equippedWeaponIndex = equipped_weapon_index;
-	m_gameHud.Draw(m_graphicsSystem,hud_state);
+	m_renderer.DrawHud(m_graphicsSystem,hud_state);
 }

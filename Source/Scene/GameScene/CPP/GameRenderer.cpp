@@ -1,0 +1,77 @@
+﻿#include "../H/GameRenderer.h"
+
+// ゲーム中の3Dのワールド、画像のHUD、Collision可視化の初期化・描画・解放を実装する。
+
+//========= Framework インクルード=========
+#include "Framework/DirectX/H/GraphicsSystem.h"
+#include "Framework/Etc/H/InitCheck.h"
+#include "Framework/Etc/H/Logger.h"
+#include "Framework/Input/H/FpsCamera.h"
+
+//========= Scene インクルード=========
+#include "Scene/Common/Enemy/H/EnemyController.h"
+#include "Scene/Common/Stage/H/StageController.h"
+
+//========= 初期化・終了関数=========
+// 参照先を登録し、Collision可視化とHUDを初期化する。
+bool GameRenderer::Initialize(GraphicsSystem& graphicsSystem,const GAME_RENDERER_LINKS& links)
+{
+  // 参照先が1つでも欠けている場合は、以後の描画で空の参照を使ってしまうため、何も登録せず失敗を返す。
+  if(links.stage == nullptr || links.enemyController == nullptr || links.camera == nullptr){
+    Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameRendererの参照先の登録に失敗しました。");
+    return false;
+  }
+
+  // 参照先を登録する。以後の描画は、この参照先を使う。
+  m_stage = links.stage;
+  m_enemyController = links.enemyController;
+  m_camera = links.camera;
+
+  // 2つの初期化を、この順に実行する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。後始末は、呼出側のUninitで行う。
+  // Collision可視化の初期化失敗を検出する。
+  return InitCheck::Succeeded(m_collisionDebugView.Initialize(graphicsSystem),e_LogCategory::e_SCENE,L"GameRendererの線描画Renderer初期化に失敗しました。")
+         // 画像のHUDの初期化失敗を検出する。個々の画像の読込失敗はここでは失敗にならない。
+         && InitCheck::Succeeded(m_gameHud.Initialize(graphicsSystem),e_LogCategory::e_SCENE,L"GameRendererのHUD初期化に失敗しました。");
+}
+
+// HUDとCollision可視化を解放し、参照先を手放す。
+void GameRenderer::Uninit()
+{
+  // HUDと線描画Rendererを解放する。
+  m_gameHud.Uninit();
+  m_collisionDebugView.Uninit();
+
+  m_stage = nullptr;
+  m_enemyController = nullptr;
+  m_camera = nullptr;
+}
+
+//========= 描画関数=========
+// 床・壁・範囲の予告・出口・敵・敵の弾・Collisionの線を、この順に3Dで描画する。
+void GameRenderer::DrawWorld(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix)
+{
+  // 参照先が未登録の場合は、描画しない。
+  if(m_stage == nullptr || m_enemyController == nullptr || m_camera == nullptr)return;
+
+  // 床・壁・範囲の予告・出口・敵・敵の弾はOPAQUE Passで描画するため、描画前にPassを設定する。
+  graphicsSystem.SetRenderPass(e_RenderPass::e_OPAQUE);
+
+  // 生成済みの全Objectを、表の順（床→左壁→右壁→手前壁→奥壁）に描画する。
+  m_stage->DrawObjects(graphicsSystem,viewMatrix,projectionMatrix);
+
+  // 床の上に、範囲の予告を描画する。床の後に描き、敵や出口より先に描くことで、敵の体が予告の上に重なる。続けて出口を描画する。
+  m_enemyController->DrawAreaTelegraph(graphicsSystem,viewMatrix,projectionMatrix);
+  m_stage->DrawExit(graphicsSystem,viewMatrix,projectionMatrix);
+  // 続けて全枠の敵を出現順に描画し、その後に飛行中の敵の弾を描画する。死亡枠はEnemy::Drawが描画を省略する。
+  m_enemyController->DrawEnemies(graphicsSystem,viewMatrix,projectionMatrix);
+  // 敵と弾の後に、表示中ならCollisionの線を重ねる。
+  m_collisionDebugView.Draw(graphicsSystem,m_stage->GetCollisionWorld(),*m_camera,viewMatrix,projectionMatrix);
+}
+
+// 3Dの上に、画像のHUDを描画する。
+void GameRenderer::DrawHud(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& hudState)
+{
+  // 3Dの上に画像のHUDを重ねるため、深度比較なし・アルファ合成の画面UI用Passへ切り替える。
+  graphicsSystem.SetRenderPass(e_RenderPass::e_SCREEN_UI);
+  m_gameHud.Draw(graphicsSystem,hudState);
+}
