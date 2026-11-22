@@ -4,6 +4,7 @@
 
 //========= Scene インクルード=========
 #include "Scene/Common/Core/H/SceneManager.h"
+#include "Scene/ResultScene/H/ResultScene.h"
 #include "Scene/TitleScene/H/TitleScene.h"
 
 //========= 生成関数=========
@@ -40,9 +41,9 @@ void GameScene::Update(float deltaTime)
 	m_sceneManager.RequestSceneChange<GameScene>();
 	break;
 
-	// クリアは、結果の画面（F8で追加）がまだないため、タイトルへの遷移を予約する。
+	// クリアは、結果の画面への遷移を予約する。
 	case GAME_SESSION_RESULT::e_CLEARED:
-	m_sceneManager.RequestSceneChange<TitleScene>();
+	m_sceneManager.RequestSceneChange<ResultScene>();
 	break;
 
 	// プレイを続ける場合は、何もしない。

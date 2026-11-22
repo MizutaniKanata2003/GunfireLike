@@ -116,7 +116,7 @@ namespace SHOP_LAYOUT
 namespace TITLE_LAYOUT
 {
 	//========= 背景=========
-	// 画面全体を覆う背景。1280×720。
+	// 画面全体を覆う背景。1280×720。リザルトも、同じ画像を使う。
 	inline constexpr UI_IMAGE_LAYOUT ns_BACKGROUND{L"Assets/Textures/UI/TitleBackground.png",{0.0f,0.0f},{1280.0f,720.0f}};
 
 	//========= ロゴ=========
@@ -128,4 +128,18 @@ namespace TITLE_LAYOUT
 	inline constexpr UI_IMAGE_LAYOUT ns_START_BUTTON{L"Assets/Textures/UI/TitleButton.png",{480.0f,400.0f},{320.0f,80.0f}};
 	// 開始ボタンの画像（カーソルが乗っている時）。320×80。位置と大きさは、通常と同じ。
 	inline constexpr const wchar_t* ns_START_BUTTON_HOVER_PATH = L"Assets/Textures/UI/TitleButtonHover.png";
+}
+
+// リザルト画面（クリアの結果）の画像の配置をまとめる。画像は、Assets/Textures/UI/へ置く。背景は、タイトルと同じ画像（TITLE_LAYOUT::ns_BACKGROUND）を使う。
+namespace RESULT_LAYOUT
+{
+	//========= ロゴ=========
+	// クリアを示す見出し。800×200。画面の上側に置く。
+	inline constexpr UI_IMAGE_LAYOUT ns_LOGO{L"Assets/Textures/UI/ResultLogo.png",{240.0f,120.0f},{800.0f,200.0f}};
+
+	//========= タイトルへ戻るボタン=========
+	// タイトルへ戻るボタンの画像（通常）。320×80。「TITLE」の文字を、画像に含める。
+	inline constexpr UI_IMAGE_LAYOUT ns_TITLE_BUTTON{L"Assets/Textures/UI/ResultButton.png",{480.0f,400.0f},{320.0f,80.0f}};
+	// タイトルへ戻るボタンの画像（カーソルが乗っている時）。320×80。位置と大きさは、通常と同じ。
+	inline constexpr const wchar_t* ns_TITLE_BUTTON_HOVER_PATH = L"Assets/Textures/UI/ResultButtonHover.png";
 }
