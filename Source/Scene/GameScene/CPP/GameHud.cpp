@@ -128,8 +128,8 @@ void GameHud::Draw(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 	DrawHudTexts(state);
 
 	// 報酬選択中だけ、報酬選択の文字を描く。
-	if(state.isRewardSelecting){
-		DrawRewardTexts(state.rewardOwnedCounts);
+	if(state.reward.isSelecting){
+		DrawRewardTexts(state.reward);
 	}
 
 	// ショップが開いている間だけ、ショップの文字を描く。
@@ -165,7 +165,7 @@ void GameHud::Uninit()
 void GameHud::DrawSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 {
 	// 報酬選択中とショップが開いている間は、画面全体を暗くする背景を最初に描き、他のHUDとカード・パネルがその上に重なるようにする。
-	if(state.isRewardSelecting || state.shop.isOpen){
+	if(state.reward.isSelecting || state.shop.isOpen){
 		m_spriteRenderer.DrawSprite(graphicsSystem,m_rewardBackdropTexture,REWARD_LAYOUT::ns_BACKDROP.position,REWARD_LAYOUT::ns_BACKDROP.size,
 																GAME_HUD_STYLE::ns_WHITE,1.0f);
 	}
@@ -174,8 +174,8 @@ void GameHud::DrawSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& s
 	DrawStatusSprites(graphicsSystem,state);
 
 	// 報酬選択中は、他の画像の後に、カードの枠を描く。
-	if(state.isRewardSelecting){
-		DrawRewardCards(graphicsSystem,state.hoveredRewardIndex);
+	if(state.reward.isSelecting){
+		DrawRewardCards(graphicsSystem,state.reward.hoveredIndex);
 	}
 
 	// ショップが開いている間は、パネルとボタンを描く。文字は、後の文字の描画で、上に重ねる。
@@ -188,8 +188,8 @@ void GameHud::DrawSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& s
 void GameHud::DrawStatusSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 {
 	// 最大HPが正の場合だけ、HPの割合を0〜1で求める。0以下なら割合を0とし、HPに関する表示を省く。
-	const bool has_health = state.maxHP > 0.0f;
-	const float health_ratio = has_health ? std::clamp(state.currentHP / state.maxHP,0.0f,1.0f) : 0.0f;
+	const bool has_health = state.vitals.maxHP > 0.0f;
+	const float health_ratio = has_health ? std::clamp(state.vitals.currentHP / state.vitals.maxHP,0.0f,1.0f) : 0.0f;
 
 	// HPの割合が低HPの閾値以下なら、画面全体の警告を描き、他のHUDがその上に重なるようにする。
 	if(has_health && health_ratio <= ns_LOW_HP_RATIO){
@@ -261,12 +261,12 @@ void GameHud::DrawHudTexts(const GAME_HUD_STATE& state)
 	const HUD_TEXT_AREA ammo_area{XMFLOAT2{HUD_LAYOUT::ns_AMMO_FRAME.position.x + ns_AMMO_TEXT_AREA_LEFT,HUD_LAYOUT::ns_AMMO_FRAME.position.y},
 		XMFLOAT2{HUD_LAYOUT::ns_AMMO_FRAME.size.x - ns_AMMO_TEXT_AREA_LEFT - ns_AMMO_TEXT_AREA_RIGHT_MARGIN,
 		HUD_LAYOUT::ns_AMMO_FRAME.size.y},ns_AMMO_TEXT_TARGET_HEIGHT};
-	DrawFittedText(std::to_wstring(state.magazineAmmo) + L" / " + std::to_wstring(state.reserveAmmo),ammo_area,ns_AMMO_TEXT_COLOR);
+	DrawFittedText(std::to_wstring(state.ammo.magazineAmmo) + L" / " + std::to_wstring(state.ammo.reserveAmmo),ammo_area,ns_AMMO_TEXT_COLOR);
 
 	// 回復アイテムの所持数を、HPバーの真上へ「Q x数」の形で描く。HPバーの左端に合わせ、HPバーの上端から領域の高さだけ上に置く。
 	const HUD_TEXT_AREA heal_area{XMFLOAT2{HUD_LAYOUT::ns_HP_FRAME.position.x,HUD_LAYOUT::ns_HP_FRAME.position.y - ns_HEAL_TEXT_AREA_HEIGHT},
 		XMFLOAT2{ns_HEAL_TEXT_AREA_WIDTH,ns_HEAL_TEXT_AREA_HEIGHT},ns_HEAL_TEXT_TARGET_HEIGHT};
-	DrawFittedText(L"Q x" + std::to_wstring(state.healItemCount),heal_area,ns_HEAL_TEXT_COLOR);
+	DrawFittedText(L"Q x" + std::to_wstring(state.vitals.healItemCount),heal_area,ns_HEAL_TEXT_COLOR);
 
 	// 通貨の所持額を、アイコンの左隣へ描く。領域の右端がアイコンの左端から余白だけ離れる位置に置き、高さはアイコンと同じにして、上下の中央へ揃える。
 	const HUD_TEXT_AREA currency_area{XMFLOAT2{HUD_LAYOUT::ns_CURRENCY_ICON.position.x - ns_CURRENCY_TEXT_GAP - ns_CURRENCY_TEXT_AREA_WIDTH,
@@ -275,16 +275,16 @@ void GameHud::DrawHudTexts(const GAME_HUD_STATE& state)
 	DrawFittedText(std::to_wstring(state.currency),currency_area,GAME_HUD_STYLE::ns_CURRENCY_TEXT_COLOR);
 
 	// リロード中の場合だけ、進み具合を百分率で、弾薬の枠の真上の領域へ描く。進み具合の小数は切り捨てる。
-	if(state.isReloading){
+	if(state.ammo.isReloading){
 		const HUD_TEXT_AREA reload_area{XMFLOAT2{HUD_LAYOUT::ns_AMMO_FRAME.position.x,HUD_LAYOUT::ns_AMMO_FRAME.position.y - ns_RELOAD_TEXT_AREA_HEIGHT},
 			XMFLOAT2{HUD_LAYOUT::ns_AMMO_FRAME.size.x,ns_RELOAD_TEXT_AREA_HEIGHT},ns_RELOAD_TEXT_TARGET_HEIGHT};
-		const int reload_percent = static_cast<int>(std::clamp(state.reloadProgress,0.0f,1.0f) * 100.0f);
+		const int reload_percent = static_cast<int>(std::clamp(state.ammo.reloadProgress,0.0f,1.0f) * 100.0f);
 		DrawFittedText(L"RELOADING " + std::to_wstring(reload_percent) + L"%",reload_area,ns_RELOAD_TEXT_COLOR);
 	}
 }
 
 // 報酬選択の文字を描く。
-void GameHud::DrawRewardTexts(const std::array<int,REWARD_TABLE::ns_CARD_COUNT>& ownedCounts)
+void GameHud::DrawRewardTexts(const HUD_REWARD_STATE& reward)
 {
 	// 画面の見出しと、操作の案内を描く。
 	DrawFittedText(L"REWARD",ns_REWARD_TITLE_AREA,GAME_HUD_STYLE::ns_TITLE_TEXT_COLOR);
@@ -293,11 +293,11 @@ void GameHud::DrawRewardTexts(const std::array<int,REWARD_TABLE::ns_CARD_COUNT>&
 	// 各カードの見出し・説明・取得数を、カードの左上からの距離で配置して描く。
 	for(int card_index = 0; card_index < REWARD_LAYOUT::ns_CARD_COUNT; ++card_index){
 		const XMFLOAT2& card_position = REWARD_LAYOUT::ns_CARD_POSITIONS[card_index];
-		const REWARD_TABLE::REWARD_DEFINITION& reward = REWARD_TABLE::ns_REWARDS[card_index];
+		const REWARD_TABLE::REWARD_DEFINITION& definition = REWARD_TABLE::ns_REWARDS[card_index];
 
-		DrawFittedText(reward.title,GAME_HUD_STYLE::ShiftTextArea(ns_CARD_TITLE_AREA,card_position),GAME_HUD_STYLE::ns_TITLE_TEXT_COLOR);
-		DrawFittedText(reward.description,GAME_HUD_STYLE::ShiftTextArea(ns_CARD_DESCRIPTION_AREA,card_position),GAME_HUD_STYLE::ns_BODY_TEXT_COLOR);
-		DrawFittedText(L"OWNED x" + std::to_wstring(ownedCounts[card_index]),GAME_HUD_STYLE::ShiftTextArea(ns_CARD_OWNED_AREA,card_position),
+		DrawFittedText(definition.title,GAME_HUD_STYLE::ShiftTextArea(ns_CARD_TITLE_AREA,card_position),GAME_HUD_STYLE::ns_TITLE_TEXT_COLOR);
+		DrawFittedText(definition.description,GAME_HUD_STYLE::ShiftTextArea(ns_CARD_DESCRIPTION_AREA,card_position),GAME_HUD_STYLE::ns_BODY_TEXT_COLOR);
+		DrawFittedText(L"OWNED x" + std::to_wstring(reward.ownedCounts[card_index]),GAME_HUD_STYLE::ShiftTextArea(ns_CARD_OWNED_AREA,card_position),
 									 GAME_HUD_STYLE::ns_BODY_TEXT_COLOR);
 	}
 }

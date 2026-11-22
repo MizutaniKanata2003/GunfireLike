@@ -20,6 +20,52 @@
 //========= 前方宣言=========
 class GraphicsSystem;
 
+// HUDのうち、HPと回復アイテムの描画に必要な、ゲームの状態の値。
+struct HUD_VITALS_STATE
+{
+	//========= HP=========
+	// 現在のHP。
+	float currentHP{};
+	// 最大HP。0以下ならHPバーと低HP警告を描かない。
+	float maxHP{};
+
+	//========= 回復アイテム=========
+	// 所持している回復アイテムの数。HPバーの上に「Q x数」の形で表示する。
+	int healItemCount{};
+};
+
+// HUDのうち、弾薬とリロード表示の描画に必要な、ゲームの状態の値。
+struct HUD_AMMO_STATE
+{
+	//========= 弾数=========
+	// 現在の装填弾数。
+	int magazineAmmo{};
+	// 装弾数の上限。
+	int magazineSize{};
+	// 予備弾薬の数。弾薬の表示と、ショップの売買のページの予備弾薬の表示に使う。
+	int reserveAmmo{};
+
+	//========= リロード=========
+	// リロード中か。
+	bool isReloading{};
+	// リロードの進み具合。0〜1。
+	float reloadProgress{};
+};
+
+// HUDのうち、報酬選択の画面の描画に必要な、ゲームの状態の値。
+struct HUD_REWARD_STATE
+{
+	//========= 選択の状態=========
+	// 報酬選択の最中か。trueなら、画面を暗くして、見出しと、報酬のカードと、操作の案内を描く。
+	bool isSelecting{};
+	// カーソルが乗っているカードの添字。乗っていなければ-1。そのカードは、枠をホバー用の画像で描く。
+	int hoveredIndex{-1};
+
+	//========= 取得数=========
+	// 報酬ごとの取得数。添字は報酬の表の並びと同じ。各カードの下に「OWNED x数」の形で表示する。
+	std::array<int,REWARD_TABLE::ns_CARD_COUNT> ownedCounts{};
+};
+
 // HUDのうち、ショップの画面の描画に必要な、ゲームの状態の値。
 struct HUD_SHOP_STATE
 {
@@ -52,28 +98,18 @@ struct HUD_SHOP_STATE
 	int equippedWeaponIndex{-1};
 };
 
-// HUDの描画に必要な、ゲームの状態の値。ショップの値は、shopへまとめる。
+// HUDの描画に必要な、ゲームの状態の値。画面ごとの値は、構造体へまとめる。
 struct GAME_HUD_STATE
 {
-	//========= HP=========
-	// 現在のHP。
-	float currentHP{};
-	// 最大HP。0以下ならHPバーと低HP警告を描かない。
-	float maxHP{};
-	// 所持している回復アイテムの数。HPバーの上に「Q x数」の形で表示する。
-	int healItemCount{};
-
-	//========= 弾薬=========
-	// 現在の装填弾数。
-	int magazineAmmo{};
-	// 装弾数の上限。
-	int magazineSize{};
-	// 予備弾薬の数。
-	int reserveAmmo{};
-	// リロード中か。
-	bool isReloading{};
-	// リロードの進み具合。0〜1。
-	float reloadProgress{};
+	//========= 画面ごとの値=========
+	// HPと回復アイテムの値。
+	HUD_VITALS_STATE vitals{};
+	// 弾薬とリロードの値。
+	HUD_AMMO_STATE ammo{};
+	// 報酬選択の画面の値。
+	HUD_REWARD_STATE reward{};
+	// ショップの画面の値。
+	HUD_SHOP_STATE shop{};
 
 	//========= 構え=========
 	// 構えているか。trueなら照準を小さく描く。
@@ -82,18 +118,6 @@ struct GAME_HUD_STATE
 	//========= 通貨=========
 	// 現在の通貨の所持額。右上のアイコンの隣に、数字で表示する。
 	int currency{};
-
-	//========= 報酬選択=========
-	// 報酬選択の最中か。trueなら、画面を暗くして、見出しと、報酬のカードと、操作の案内を描く。
-	bool isRewardSelecting{};
-	// カーソルが乗っているカードの添字。乗っていなければ-1。そのカードは、枠をホバー用の画像で描く。
-	int hoveredRewardIndex{-1};
-	// 報酬ごとの取得数。添字は報酬の表の並びと同じ。各カードの下に「OWNED x数」の形で表示する。
-	std::array<int,REWARD_TABLE::ns_CARD_COUNT> rewardOwnedCounts{};
-
-	//========= ショップ=========
-	// ショップの画面の値。
-	HUD_SHOP_STATE shop{};
 };
 
 // 画像と文字でHUDを描画するクラス。
@@ -143,8 +167,8 @@ private:
 	// state: 描画する値。
 	void DrawHudTexts(const GAME_HUD_STATE& state);
 	// 報酬選択の文字（見出し・各カードの見出しと説明と取得数・操作の案内）を描く。Begin・Endの間に呼ぶ。
-	// ownedCounts: 報酬ごとの取得数。
-	void DrawRewardTexts(const std::array<int,REWARD_TABLE::ns_CARD_COUNT>& ownedCounts);
+	// reward: 描画する報酬選択の値。
+	void DrawRewardTexts(const HUD_REWARD_STATE& reward);
 
 	//========= ショップの描画関数（GameHudShop.cpp）=========
 	// ショップのパネルと、現在のページのボタンの画像を描く。押せるボタンは、カーソルが乗っていればホバー用の画像で、押せないボタンは、押せない時の画像で描く。
@@ -152,7 +176,7 @@ private:
 	// shop: 描画するショップの値。
 	void DrawShopSprites(GraphicsSystem& graphicsSystem,const HUD_SHOP_STATE& shop);
 	// ショップの文字を、現在のページに応じて描く。Begin・Endの間に呼ぶ。ページ切替と閉じるボタンの文字は、どちらのページでも描く。
-	// state: 描画する値。ショップの値（shop）と、売買のページで使う予備弾薬（reserveAmmo）を使う。
+	// state: 描画する値。ショップの値（shop）と、売買のページで使う予備弾薬（ammo）を使う。
 	void DrawShopTexts(const GAME_HUD_STATE& state);
 	// 売買のページの文字（見出し・所持数・操作の案内と、各行の文字）を描く。Begin・Endの間に呼ぶ。
 	// state: 描画する値。ショップの値と、予備弾薬を使う。

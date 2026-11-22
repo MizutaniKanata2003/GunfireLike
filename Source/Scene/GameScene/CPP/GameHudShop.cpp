@@ -222,7 +222,7 @@ void GameHud::DrawShopTradeRowTexts(const GAME_HUD_STATE& state,int rowIndex)
 
 	// 予備弾薬は、装備している武器の行にだけ、「RESERVE 現在 / 上限」の形で、行の下側へ描く。
 	if(rowIndex == state.shop.equippedWeaponIndex){
-		DrawFittedText(L"RESERVE " + std::to_wstring(state.reserveAmmo) + L" / " + std::to_wstring(SHOP_TABLE::ns_AMMO_RESERVE_CAPS[rowIndex]),
+		DrawFittedText(L"RESERVE " + std::to_wstring(state.ammo.reserveAmmo) + L" / " + std::to_wstring(SHOP_TABLE::ns_AMMO_RESERVE_CAPS[rowIndex]),
 									 GAME_HUD_STYLE::ShiftTextArea(ns_TRADE_RESERVE_AREA,row_origin),GAME_HUD_STYLE::ns_CURRENCY_TEXT_COLOR);
 	}
 
