@@ -1,6 +1,6 @@
 ﻿#include "../H/GraphicsSystem.h"
 
-// Device・SwapChainと描画先・Stateを生成し、Bind/Clear/Present、Resize、解放を実装する。
+// Device・SwapChainと描画先を生成し、Bind/Clear/Present、Resize、解放を実装する。描画Stateの生成・設定はRenderStateSetが担当する。
 // 既存設定・API順・失敗経路を維持し、Flip Model化やResizeのBind解除などの修正は混ぜない。
 // 描画領域は、BackBufferの内側に収めた16:9のViewportとして生成する。
 
@@ -12,7 +12,7 @@
 #include "Framework/DirectX/H/ViewportArea.h"
 #include "Framework/Etc/H/Logger.h"
 
-// Device生成の出力先、Device生成の補助関数、Blend設定用の静的配列を内部処理としてまとめる。
+// Device生成の出力先と、Device生成の補助関数を内部処理としてまとめる。
 namespace
 {
 	//========= Device生成の設定=========
@@ -46,15 +46,6 @@ namespace
 		// Adapterは指定せずHardwareを要求する。SDK版と要求配列、生成記述、出力先を対応させる。
 		return D3D11CreateDeviceAndSwapChain(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,deviceFlags,requested_feature_levels,ARRAYSIZE(requested_feature_levels),
 																				 D3D11_SDK_VERSION,&swapChainDesc,outputs.swapChain,outputs.device,&created_feature_level,outputs.context);
-	}
-
-	//========= Blend設定補助関数=========
-	// Bindへ渡す4成分配列へのポインターを返す。静的寿命であり、呼出側は書換え・解放しない。
-	const float* GetBlendFactor()
-	{
-		// 全成分0の既存設定。使用するBlend式がBLEND_FACTORを参照しない場合、RGB合成の係数には使われない。
-		static const float BLEND_FACTOR[4]{};
-		return BLEND_FACTOR;
 	}
 }
 
@@ -107,80 +98,10 @@ bool GraphicsSystem::Init(HWND windowHandle,unsigned int width,unsigned int heig
 	Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_GRAPHICS,L"Direct3D 11 Deviceを初期化しました。");
 	#endif
 
-	// AlphaToCoverageなし、独立Blendなし。RT0のRGBはSrc*SrcAlpha + Dest*(1-SrcAlpha)。
-	// Alpha自体はSrcAlpha + DestAlphaというONE/ONEの加算で、RGBと同じ係数には変えない。全RGBAを書込可能にする。
-	D3D11_BLEND_DESC blend_description{};
-	blend_description.AlphaToCoverageEnable = FALSE;
-	blend_description.IndependentBlendEnable = FALSE;
-	D3D11_RENDER_TARGET_BLEND_DESC& render_target_blend = blend_description.RenderTarget[0];
-	render_target_blend.BlendEnable = TRUE;
-	render_target_blend.SrcBlend = D3D11_BLEND_SRC_ALPHA;
-	render_target_blend.DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-	render_target_blend.BlendOp = D3D11_BLEND_OP_ADD;
-	render_target_blend.SrcBlendAlpha = D3D11_BLEND_ONE;
-	render_target_blend.DestBlendAlpha = D3D11_BLEND_ONE;
-	render_target_blend.BlendOpAlpha = D3D11_BLEND_OP_ADD;
-	render_target_blend.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-	const HRESULT blend_state_result = m_device->CreateBlendState(&blend_description,m_alphaBlendState.GetAddressOf());
-	// Blend State生成失敗なら、先行するDevice等もUninitして失敗を返す。
-	if(FAILED(blend_state_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateBlendState",blend_state_result);
-		Uninit();
-		return false;
-	}
-
-	// Sky/UI用はDepth無効・書込なし・Stencil無効。比較値ALWAYSも既存設定として維持する。
-	D3D11_DEPTH_STENCIL_DESC depth_disabled_description{};
-	depth_disabled_description.DepthEnable = FALSE;
-	depth_disabled_description.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-	depth_disabled_description.DepthFunc = D3D11_COMPARISON_ALWAYS;
-	depth_disabled_description.StencilEnable = FALSE;
-	const HRESULT depth_disabled_state_result = m_device->CreateDepthStencilState(&depth_disabled_description,m_depthDisabledState.GetAddressOf());
-	// Depth無効State生成失敗なら、成功済みBlendと基盤も終了する。
-	if(FAILED(depth_disabled_state_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateDepthStencilState",depth_disabled_state_result);
-		Uninit();
-		return false;
-	}
-
-	// 半透明3D用はLESS比較で奥行き判定するが、Depthの書込を止める。Stencilは使わない。
-	D3D11_DEPTH_STENCIL_DESC depth_read_only_description{};
-	depth_read_only_description.DepthEnable = TRUE;
-	depth_read_only_description.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-	depth_read_only_description.DepthFunc = D3D11_COMPARISON_LESS;
-	depth_read_only_description.StencilEnable = FALSE;
-	const HRESULT depth_read_only_state_result = m_device->CreateDepthStencilState(&depth_read_only_description,m_depthReadOnlyState.GetAddressOf());
-	// 読取専用Depth State生成失敗なら、全所有Resourceを部分終了する。
-	if(FAILED(depth_read_only_state_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateDepthStencilState",depth_read_only_state_result);
-		Uninit();
-		return false;
-	}
-
-	// 3D用はSOLID・背面Cull・DepthClip有効。ゼロ初期化によりFrontCounterClockwise等はFALSEのまま。
-	D3D11_RASTERIZER_DESC cull_back_rasterizer_description{};
-	cull_back_rasterizer_description.FillMode = D3D11_FILL_SOLID;
-	cull_back_rasterizer_description.CullMode = D3D11_CULL_BACK;
-	cull_back_rasterizer_description.DepthClipEnable = TRUE;
-	const HRESULT cull_back_rasterizer_state_result = m_device->CreateRasterizerState(&cull_back_rasterizer_description,
-																																										 m_cullBackRasterizerState.GetAddressOf());
-	// 背面Cull State生成失敗では先行Stateを含めて解放し、falseへ戻る。
-	if(FAILED(cull_back_rasterizer_state_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateRasterizerState",cull_back_rasterizer_state_result);
-		Uninit();
-		return false;
-	}
-
-	// Sky/UI用は両面を描くCullなし設定。SOLIDとDepthClip、その他のゼロ初期値は維持する。
-	D3D11_RASTERIZER_DESC cull_none_rasterizer_description{};
-	cull_none_rasterizer_description.FillMode = D3D11_FILL_SOLID;
-	cull_none_rasterizer_description.CullMode = D3D11_CULL_NONE;
-	cull_none_rasterizer_description.DepthClipEnable = TRUE;
-	const HRESULT cull_none_rasterizer_state_result = m_device->CreateRasterizerState(&cull_none_rasterizer_description,
-																																										 m_cullNoneRasterizerState.GetAddressOf());
-	// CullなしState生成失敗では全所有Resourceを部分終了する。
-	if(FAILED(cull_none_rasterizer_state_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateRasterizerState",cull_none_rasterizer_state_result);
+	// 5つの描画State（Alpha Blend・Depth×2・Rasterizer×2）を生成する。失敗したStateのログは、RenderStateSetが記録する。
+	// ComPtrは「*」で参照へ変換できないため、Get()で取り出したポインターを参照にして渡す。
+	// 失敗した場合は、成功済みのStateと基盤も含めて終了し、falseを返す。
+	if(!m_renderStates.Create(*m_device.Get())){
 		Uninit();
 		return false;
 	}
@@ -270,11 +191,7 @@ void GraphicsSystem::Uninit()
 	if(m_context)m_context->ClearState();
 
 	// Contextを保持したまま、各描画Stateの所有参照を解放する。
-	m_cullNoneRasterizerState.Reset();
-	m_cullBackRasterizerState.Reset();
-	m_alphaBlendState.Reset();
-	m_depthReadOnlyState.Reset();
-	m_depthDisabledState.Reset();
+	m_renderStates.Release();
 
 	// SwapChain→即時Context→Deviceの順に所有参照を解放する。外部が持つ別参照はこのResetでは消さない。
 	m_swapChain.Reset();
@@ -289,41 +206,7 @@ void GraphicsSystem::SetRenderPass(e_RenderPass renderPass)
 	// ContextなしではState設定APIを呼ばない。
 	if(!m_context)return;
 
-	// SampleMaskの全bit 1は全Sampleを許可する指定。Stencil参照値0も既存値を維持する。
-	// nullptrのBlend/Depthはそれぞれ既定State。GetBlendFactorは静的配列で、以前の値の保存先ではない。
-	switch(renderPass){
-		// 奥行き比較・書込とCullを止め、BlendなしでSkyを描く。以前のStateは復元しない。
-	case e_RenderPass::e_SKY:
-	m_context->OMSetBlendState(nullptr,GetBlendFactor(),0xffffffff);
-	m_context->OMSetDepthStencilState(m_depthDisabledState.Get(),0);
-	m_context->RSSetState(m_cullNoneRasterizerState.Get());
-	return;
-
-	// 既定Depth、背面Cull、Blendなしへ揃える。以前のStateは復元しない。
-	case e_RenderPass::e_OPAQUE:
-	m_context->OMSetBlendState(nullptr,GetBlendFactor(),0xffffffff);
-	m_context->OMSetDepthStencilState(nullptr,0);
-	m_context->RSSetState(m_cullBackRasterizerState.Get());
-	return;
-
-	// Depth比較を維持して書込だけを止め、Alpha Blendと背面Cullを使う。以前のStateは復元しない。
-	case e_RenderPass::e_TRANSPARENT:
-	m_context->OMSetBlendState(m_alphaBlendState.Get(),GetBlendFactor(),0xffffffff);
-	m_context->OMSetDepthStencilState(m_depthReadOnlyState.Get(),0);
-	m_context->RSSetState(m_cullBackRasterizerState.Get());
-	return;
-
-	// DepthとCullを止め、Alpha Blendで画面UIを描く。以前のStateは復元しない。
-	case e_RenderPass::e_SCREEN_UI:
-	m_context->OMSetBlendState(m_alphaBlendState.Get(),GetBlendFactor(),0xffffffff);
-	m_context->OMSetDepthStencilState(m_depthDisabledState.Get(),0);
-	m_context->RSSetState(m_cullNoneRasterizerState.Get());
-	return;
-
-	// 未定義値では新しいStateを設定せず、そのまま戻る。
-	default:
-	return;
-	}
+	m_renderStates.Apply(*m_context.Get(),renderPass);
 }
 
 // Blendだけを切り替え、他のStateは維持する。
@@ -332,8 +215,7 @@ void GraphicsSystem::SetAlphaBlendEnabled(bool isEnabled)
 	// Context未取得なら何も設定しない。
 	if(!m_context)return;
 
-	// trueは所有するAlpha Blend、falseは既定Blend。SampleMaskは全bit有効で、Depth・Cullは変更しない。
-	m_context->OMSetBlendState(isEnabled ? m_alphaBlendState.Get() : nullptr,GetBlendFactor(),0xffffffff);
+	m_renderStates.SetAlphaBlendEnabled(*m_context.Get(),isEnabled);
 }
 
 // Depthだけを切り替え、Blend・Cullは維持する。
@@ -342,8 +224,7 @@ void GraphicsSystem::SetDepthTestEnabled(bool isEnabled)
 	// Context未取得なら何も設定しない。
 	if(!m_context)return;
 
-	// trueは既定Depth、falseは比較と書込が無効なState。既定Depthへの復帰であり、呼出前Stateの復元ではない。
-	m_context->OMSetDepthStencilState(isEnabled ? nullptr : m_depthDisabledState.Get(),0);
+	m_renderStates.SetDepthTestEnabled(*m_context.Get(),isEnabled);
 }
 
 //========= 補助関数=========
