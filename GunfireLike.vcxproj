@@ -194,7 +194,8 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Debug\CPP\GameDebugUi.cpp" />
     <ClCompile Include="Source\Framework\2D\CPP\HudCanvas.cpp" />
     <ClCompile Include="Source\Framework\2D\CPP\HudSpriteRenderer.cpp" />
-    <ClCompile Include="Source\Framework\3D\CPP\DebugLineRenderer.cpp" />
+    <ClCompile Include="Source\Framework\3D\CPP\BasicColorPipeline.cpp" />
+    <ClCompile Include="Source\Debug\CPP\DebugLineRenderer.cpp" />
     <ClCompile Include="Source\Framework\Audio\CPP\AudioSystem.cpp" />
     <ClCompile Include="Source\Framework\Collision\CPP\CollisionDebugDrawer.cpp" />
     <ClCompile Include="Source\Framework\Collision\CPP\CollisionMath.cpp" />
@@ -259,7 +260,8 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Debug\H\GameDebugUi.h" />
     <ClInclude Include="Source\Framework\2D\H\HudCanvas.h" />
     <ClInclude Include="Source\Framework\2D\H\HudSpriteRenderer.h" />
-    <ClInclude Include="Source\Framework\3D\H\DebugLineRenderer.h" />
+    <ClInclude Include="Source\Framework\3D\H\BasicColorPipeline.h" />
+    <ClInclude Include="Source\Debug\H\DebugLineRenderer.h" />
     <ClInclude Include="Source\Framework\Audio\H\AudioSystem.h" />
     <ClInclude Include="Source\Framework\2D\H\FadeOverlay.h" />
     <ClInclude Include="Source\Framework\Collision\H\CollisionDebugDrawer.h" />

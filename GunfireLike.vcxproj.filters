@@ -87,7 +87,7 @@
     <ClCompile Include="Source\Framework\2D\CPP\HudCanvas.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\3D\CPP\DebugLineRenderer.cpp">
+    <ClCompile Include="Source\Debug\CPP\DebugLineRenderer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\Collision\CPP\CollisionDebugDrawer.cpp">
@@ -213,6 +213,9 @@
     <ClCompile Include="Source\Framework\DirectX\CPP\RenderStateSet.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Framework\3D\CPP\BasicColorPipeline.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Framework\Imgui\H\ImGuiManager.h">
@@ -293,7 +296,7 @@
     <ClInclude Include="Source\Framework\Etc\H\MathTypes.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\3D\H\DebugLineRenderer.h">
+    <ClInclude Include="Source\Debug\H\DebugLineRenderer.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\Collision\H\CollisionDebugDrawer.h">
@@ -498,6 +501,9 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\DirectX\H\RenderStateSet.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\3D\H\BasicColorPipeline.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>
