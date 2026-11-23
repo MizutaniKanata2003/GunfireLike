@@ -200,6 +200,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Framework\Collision\CPP\CollisionMath.cpp" />
     <ClCompile Include="Source\Framework\Collision\CPP\CollisionResolver.cpp" />
     <ClCompile Include="Source\Framework\Collision\CPP\CollisionWorld.cpp" />
+    <ClCompile Include="Source\Framework\DirectX\CPP\GraphicsErrorLog.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\ShaderBinaryLoader.cpp" />
     <ClCompile Include="Source\Framework\DirectX\CPP\TextureLoader.cpp" />
     <ClCompile Include="Source\Framework\Etc\CPP\GameTimer.cpp" />
@@ -267,6 +268,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\Collision\H\CollisionWorld.h" />
     <ClInclude Include="Source\Framework\DirectX\H\ConstantBuffer.h" />
     <ClInclude Include="Source\Framework\DirectX\H\GraphicsConstants.h" />
+    <ClInclude Include="Source\Framework\DirectX\H\GraphicsErrorLog.h" />
     <ClInclude Include="Source\Framework\DirectX\H\ShaderBinaryLoader.h" />
     <ClInclude Include="Source\Framework\DirectX\H\TextureLoader.h" />
     <ClInclude Include="Source\Framework\DirectX\H\VertexFormat.h" />

@@ -4,79 +4,48 @@
 // 既存設定・API順・失敗経路を維持し、Flip Model化やResizeのBind解除などの修正は混ぜない。
 // 描画領域は、BackBufferの内側に収めた16:9のViewportとして生成する。
 
-//========= C++標準ライブラリ インクルード=========
-#include <iomanip> // setfill・setwでHRESULTを0埋め8桁に整える。
-#include <sstream> // wostringstreamへ数値と書式指定を渡し、失敗値の表示文字列を生成する。
-#include <string> // wstringでAPI名・HRESULTを連結してLoggerへ渡す。
-
 //========= 外部ライブラリ インクルード=========
 #include <d3d11_1.h> // ID3D11DeviceContext1::ClearViewで、RTVの一部の矩形だけを塗る。
 
 //========= Framework インクルード=========
+#include "Framework/DirectX/H/GraphicsErrorLog.h"
 #include "Framework/DirectX/H/ViewportArea.h"
 #include "Framework/Etc/H/Logger.h"
 
-// HRESULT表示、Device生成のDebug有無、Blend設定用の静的配列を内部処理としてまとめる。
+// Device生成の出力先、Device生成の補助関数、Blend設定用の静的配列を内部処理としてまとめる。
 namespace
 {
-	//========= ログ補助関数=========
-	// HRESULTを0x付き大文字16進数8桁へ変換する。
-	// result: 表示するHRESULT。unsigned表現へ変換して既存の桁表記を維持する。
-	std::wstring GetHRESULTText(HRESULT result)
-	{
-		// 16進・大文字・0埋めを設定する。setw(8)は後続の数値部分の最小幅で、0xは別に付加する。
-		std::wostringstream stream{};
-		stream << L"0x" << std::uppercase << std::hex << std::setfill(L'0') << std::setw(8) << static_cast<unsigned long>(result);
-		return stream.str();
-	}
+	//========= Device生成の設定=========
+	// Device生成のFlagなし。Debug Layerを使わない、通常の生成を表す。
+	constexpr UINT ns_NO_DEVICE_FLAGS = 0;
 
-	// API名と失敗値をGraphics分類へ出力する。Resourceの後始末は呼出元が行う。
-	// functionName: 有効な終端付きAPI名。nullptr不可。
-	// result: 記録するHRESULT。
-	void WriteGraphicsError(const wchar_t* functionName,HRESULT result)
+	//========= Device生成の出力先=========
+	// Device・即時Context・SwapChainの出力先をまとめる。各ポインターは、GraphicsSystemが所有するComPtrのアドレスを指す。
+	struct DEVICE_OUTPUTS
 	{
-		// API名と結果を同じメッセージへ連結する。ログ生成の例外をここで捕捉する処理はない。
-		std::wstring message{functionName};
-		message += L" に失敗しました。HRESULT: ";
-		message += GetHRESULTText(result);
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_GRAPHICS,message);
-	}
+		// SwapChainの所有参照の出力先。
+		IDXGISwapChain** swapChain;
+		// Deviceの所有参照の出力先。
+		ID3D11Device** device;
+		// 即時Contextの所有参照の出力先。
+		ID3D11DeviceContext** context;
+	};
 
 	//========= Device生成関数=========
-	// Hardware Driverを使い、Debug LayerなしでDevice・即時Context・SwapChainを同時生成する。
+	// Hardware Driverを使い、Device・即時Context・SwapChainを同時生成する。要求するFeature Levelは11_0の1つだけで、採用されたLevelは使わない。
 	// swapChainDesc: 表示先Window・寸法・Buffer等の記述。呼出中だけ参照する。
-	// requestedFeatureLevels: 要求Feature Levelの有効な配列。
-	// requestedFeatureLevelCount: 上の配列の要素数。バイト数ではない。
-	// createdFeatureLevel: 採用されたFeature Levelの出力先。
-	// swapChain: SwapChain所有参照の出力先。
-	// device: Device所有参照の出力先。
-	// context: 即時Context所有参照の出力先。
+	// deviceFlags: D3D11_CREATE_DEVICE_FLAGの組合せ。Debug Layerを使う場合はD3D11_CREATE_DEVICE_DEBUG、使わない場合はns_NO_DEVICE_FLAGS。
+	// outputs: SwapChain・Device・即時Contextの出力先。
 	// 戻り値: D3D11CreateDeviceAndSwapChainのHRESULT。ログや巻き戻しは呼出元で行う。
-	HRESULT CreateDeviceAndSwapChain(const DXGI_SWAP_CHAIN_DESC& swapChainDesc,const D3D_FEATURE_LEVEL requestedFeatureLevels[],
-																	 UINT requestedFeatureLevelCount,D3D_FEATURE_LEVEL* createdFeatureLevel,
-																	 IDXGISwapChain** swapChain,ID3D11Device** device,ID3D11DeviceContext** context)
+	HRESULT CreateDeviceAndSwapChain(const DXGI_SWAP_CHAIN_DESC& swapChainDesc,UINT deviceFlags,const DEVICE_OUTPUTS& outputs)
 	{
-		// Adapterは指定せずHardwareを要求する。SDK版と要求配列、生成記述、出力先を対応させる。
-		return D3D11CreateDeviceAndSwapChain(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,0,requestedFeatureLevels,
-																				 requestedFeatureLevelCount,D3D11_SDK_VERSION,&swapChainDesc,swapChain,device,createdFeatureLevel,context);
-	}
+		// 要求は11_0の1要素。別Levelへの新しい分岐は追加しない。
+		const D3D_FEATURE_LEVEL requested_feature_levels[]{D3D_FEATURE_LEVEL_11_0};
+		D3D_FEATURE_LEVEL created_feature_level{};
 
-	// Hardware Driverを使い、Debug Layer付きでDevice・即時Context・SwapChainを同時生成する。
-	// swapChainDesc: 表示先Window・寸法・Buffer等の記述。呼出中だけ参照する。
-	// requestedFeatureLevels: 要求Feature Levelの有効な配列。
-	// requestedFeatureLevelCount: 上の配列の要素数。バイト数ではない。
-	// createdFeatureLevel: 採用されたFeature Levelの出力先。
-	// swapChain: SwapChain所有参照の出力先。
-	// device: Device所有参照の出力先。
-	// context: 即時Context所有参照の出力先。
-	// 戻り値: D3D11CreateDeviceAndSwapChainのHRESULT。ログや巻き戻しは呼出元で行う。
-	HRESULT CreateDebugDeviceAndSwapChain(const DXGI_SWAP_CHAIN_DESC& swapChainDesc,const D3D_FEATURE_LEVEL requestedFeatureLevels[],
-																				UINT requestedFeatureLevelCount,D3D_FEATURE_LEVEL* createdFeatureLevel,
-																				IDXGISwapChain** swapChain,ID3D11Device** device,ID3D11DeviceContext** context)
-	{
 		// Adapterは指定せずHardwareを要求する。SDK版と要求配列、生成記述、出力先を対応させる。
-		return D3D11CreateDeviceAndSwapChain(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,D3D11_CREATE_DEVICE_DEBUG,requestedFeatureLevels,
-																				 requestedFeatureLevelCount,D3D11_SDK_VERSION,&swapChainDesc,swapChain,device,createdFeatureLevel,context);
+		return D3D11CreateDeviceAndSwapChain(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,deviceFlags,requested_feature_levels,ARRAYSIZE(requested_feature_levels),
+																				 D3D11_SDK_VERSION,&swapChainDesc,outputs.swapChain,outputs.device,&created_feature_level,outputs.context);
 	}
 
 	//========= Blend設定補助関数=========
@@ -109,30 +78,26 @@ bool GraphicsSystem::Init(HWND windowHandle,unsigned int width,unsigned int heig
 	swap_chain_desc.Windowed = TRUE;
 	swap_chain_desc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 
-	// 要求は11_0の1要素。採用Levelの出力先は用意するが、別Levelへの新しい分岐は追加しない。
-	const D3D_FEATURE_LEVEL requested_feature_levels[]{D3D_FEATURE_LEVEL_11_0};
-	D3D_FEATURE_LEVEL created_feature_level{};
+	// SwapChain・Device・即時Contextの出力先は、このクラスが所有するComPtrのアドレスにする。
+	const DEVICE_OUTPUTS device_outputs{m_swapChain.GetAddressOf(),m_device.GetAddressOf(),m_context.GetAddressOf()};
 
 	// Debug構成では診断付き生成を先に試す。プリプロセッサは左端に配置する。
 	#if defined(_DEBUG)
-	HRESULT result = CreateDebugDeviceAndSwapChain(swap_chain_desc,requested_feature_levels,ARRAYSIZE(requested_feature_levels),
-																								 &created_feature_level,m_swapChain.GetAddressOf(),m_device.GetAddressOf(),m_context.GetAddressOf());
+	HRESULT result = CreateDeviceAndSwapChain(swap_chain_desc,D3D11_CREATE_DEVICE_DEBUG,device_outputs);
 	// Debug生成が失敗した場合は原因を限定せず通常生成へ再試行する。SDK Layers不足だけを判別する条件ではない。
 	if(FAILED(result)){
 		// 既存警告を記録して同じ設定で再試行する。ここに新しいResetやAdapter選択は追加しない。
 		Logger::Write(e_LogLevel::e_WARNING,e_LogCategory::e_GRAPHICS,L"D3D11 Debug Layerの有効化に失敗しました。通常Device作成へ再試行します。");
-		result = CreateDeviceAndSwapChain(swap_chain_desc,requested_feature_levels,ARRAYSIZE(requested_feature_levels),&created_feature_level,
-																			m_swapChain.GetAddressOf(),m_device.GetAddressOf(),m_context.GetAddressOf());
+		result = CreateDeviceAndSwapChain(swap_chain_desc,ns_NO_DEVICE_FLAGS,device_outputs);
 	}
 	#else
 		// Debug以外では診断付き生成を試さず、通常生成の結果を受け取る。
-	const HRESULT result = CreateDeviceAndSwapChain(swap_chain_desc,requested_feature_levels,ARRAYSIZE(requested_feature_levels),&created_feature_level,
-																									m_swapChain.GetAddressOf(),m_device.GetAddressOf(),m_context.GetAddressOf());
+	const HRESULT result = CreateDeviceAndSwapChain(swap_chain_desc,ns_NO_DEVICE_FLAGS,device_outputs);
 	#endif
 
 	// 最終的な基盤生成が失敗した場合は、ログ後に部分ResourceをUninitしてfalseを返す。
 	if(FAILED(result)){
-		WriteGraphicsError(L"D3D11CreateDeviceAndSwapChain",result);
+		GraphicsErrorLog::Write(L"D3D11CreateDeviceAndSwapChain",result);
 		Uninit();
 		return false;
 	}
@@ -159,7 +124,7 @@ bool GraphicsSystem::Init(HWND windowHandle,unsigned int width,unsigned int heig
 	const HRESULT blend_state_result = m_device->CreateBlendState(&blend_description,m_alphaBlendState.GetAddressOf());
 	// Blend State生成失敗なら、先行するDevice等もUninitして失敗を返す。
 	if(FAILED(blend_state_result)){
-		WriteGraphicsError(L"ID3D11Device::CreateBlendState",blend_state_result);
+		GraphicsErrorLog::Write(L"ID3D11Device::CreateBlendState",blend_state_result);
 		Uninit();
 		return false;
 	}
@@ -173,7 +138,7 @@ bool GraphicsSystem::Init(HWND windowHandle,unsigned int width,unsigned int heig
 	const HRESULT depth_disabled_state_result = m_device->CreateDepthStencilState(&depth_disabled_description,m_depthDisabledState.GetAddressOf());
 	// Depth無効State生成失敗なら、成功済みBlendと基盤も終了する。
 	if(FAILED(depth_disabled_state_result)){
-		WriteGraphicsError(L"ID3D11Device::CreateDepthStencilState",depth_disabled_state_result);
+		GraphicsErrorLog::Write(L"ID3D11Device::CreateDepthStencilState",depth_disabled_state_result);
 		Uninit();
 		return false;
 	}
@@ -187,7 +152,7 @@ bool GraphicsSystem::Init(HWND windowHandle,unsigned int width,unsigned int heig
 	const HRESULT depth_read_only_state_result = m_device->CreateDepthStencilState(&depth_read_only_description,m_depthReadOnlyState.GetAddressOf());
 	// 読取専用Depth State生成失敗なら、全所有Resourceを部分終了する。
 	if(FAILED(depth_read_only_state_result)){
-		WriteGraphicsError(L"ID3D11Device::CreateDepthStencilState",depth_read_only_state_result);
+		GraphicsErrorLog::Write(L"ID3D11Device::CreateDepthStencilState",depth_read_only_state_result);
 		Uninit();
 		return false;
 	}
@@ -198,10 +163,10 @@ bool GraphicsSystem::Init(HWND windowHandle,unsigned int width,unsigned int heig
 	cull_back_rasterizer_description.CullMode = D3D11_CULL_BACK;
 	cull_back_rasterizer_description.DepthClipEnable = TRUE;
 	const HRESULT cull_back_rasterizer_state_result = m_device->CreateRasterizerState(&cull_back_rasterizer_description,
-																																										m_cullBackRasterizerState.GetAddressOf());
+																																										 m_cullBackRasterizerState.GetAddressOf());
 	// 背面Cull State生成失敗では先行Stateを含めて解放し、falseへ戻る。
 	if(FAILED(cull_back_rasterizer_state_result)){
-		WriteGraphicsError(L"ID3D11Device::CreateRasterizerState",cull_back_rasterizer_state_result);
+		GraphicsErrorLog::Write(L"ID3D11Device::CreateRasterizerState",cull_back_rasterizer_state_result);
 		Uninit();
 		return false;
 	}
@@ -212,10 +177,10 @@ bool GraphicsSystem::Init(HWND windowHandle,unsigned int width,unsigned int heig
 	cull_none_rasterizer_description.CullMode = D3D11_CULL_NONE;
 	cull_none_rasterizer_description.DepthClipEnable = TRUE;
 	const HRESULT cull_none_rasterizer_state_result = m_device->CreateRasterizerState(&cull_none_rasterizer_description,
-																																										m_cullNoneRasterizerState.GetAddressOf());
+																																										 m_cullNoneRasterizerState.GetAddressOf());
 	// CullなしState生成失敗では全所有Resourceを部分終了する。
 	if(FAILED(cull_none_rasterizer_state_result)){
-		WriteGraphicsError(L"ID3D11Device::CreateRasterizerState",cull_none_rasterizer_state_result);
+		GraphicsErrorLog::Write(L"ID3D11Device::CreateRasterizerState",cull_none_rasterizer_state_result);
 		Uninit();
 		return false;
 	}
@@ -271,7 +236,7 @@ void GraphicsSystem::EndFrame()
 	// HRESULTを受け取る。Device消失検出後の再生成や、Presentの再試行は追加しない。
 	const HRESULT present_result = m_swapChain->Present(1,0);
 	// 失敗ならAPI名とHRESULTを記録するだけで、所有状態や戻り値を変更しない。
-	if(FAILED(present_result))WriteGraphicsError(L"IDXGISwapChain::Present",present_result);
+	if(FAILED(present_result))GraphicsErrorLog::Write(L"IDXGISwapChain::Present",present_result);
 }
 
 // 旧Viewを手放してからBufferをResizeし、新サイズの描画先を生成する。
@@ -287,7 +252,7 @@ void GraphicsSystem::Resize(unsigned int width,unsigned int height)
 	const HRESULT resize_buffers_result = m_swapChain->ResizeBuffers(0,width,height,DXGI_FORMAT_UNKNOWN,0);
 	// ResizeBuffers失敗時は旧Viewを復元せず戻る。保持サイズは既に0だが、Context側の参照は別に残り得る。
 	if(FAILED(resize_buffers_result)){
-		WriteGraphicsError(L"IDXGISwapChain::ResizeBuffers",resize_buffers_result);
+		GraphicsErrorLog::Write(L"IDXGISwapChain::ResizeBuffers",resize_buffers_result);
 		return;
 	}
 
@@ -393,7 +358,7 @@ bool GraphicsSystem::CreateRenderTargets(unsigned int width,unsigned int height)
 	const HRESULT get_buffer_result = m_swapChain->GetBuffer(0,IID_PPV_ARGS(back_buffer.GetAddressOf()));
 	// BackBuffer取得失敗ならViewの所有参照と保持サイズを解除してfalseを返す。
 	if(FAILED(get_buffer_result)){
-		WriteGraphicsError(L"IDXGISwapChain::GetBuffer",get_buffer_result);
+		GraphicsErrorLog::Write(L"IDXGISwapChain::GetBuffer",get_buffer_result);
 		ReleaseRenderTargets();
 		return false;
 	}
@@ -402,7 +367,7 @@ bool GraphicsSystem::CreateRenderTargets(unsigned int width,unsigned int height)
 	const HRESULT render_target_view_result = m_device->CreateRenderTargetView(back_buffer.Get(),nullptr,m_renderTargetView.GetAddressOf());
 	// RTV生成失敗なら描画先を部分解放する。一時BackBuffer参照もローカルの寿命に従って解放する。
 	if(FAILED(render_target_view_result)){
-		WriteGraphicsError(L"ID3D11Device::CreateRenderTargetView",render_target_view_result);
+		GraphicsErrorLog::Write(L"ID3D11Device::CreateRenderTargetView",render_target_view_result);
 		ReleaseRenderTargets();
 		return false;
 	}
@@ -422,7 +387,7 @@ bool GraphicsSystem::CreateRenderTargets(unsigned int width,unsigned int height)
 	const HRESULT depth_texture_result = m_device->CreateTexture2D(&depth_texture_desc,nullptr,depth_texture.GetAddressOf());
 	// Depth Texture生成失敗なら、成功済みRTVを含め描画先を解放して戻る。StateやDeviceはこの関数では解放しない。
 	if(FAILED(depth_texture_result)){
-		WriteGraphicsError(L"ID3D11Device::CreateTexture2D",depth_texture_result);
+		GraphicsErrorLog::Write(L"ID3D11Device::CreateTexture2D",depth_texture_result);
 		ReleaseRenderTargets();
 		return false;
 	}
@@ -431,7 +396,7 @@ bool GraphicsSystem::CreateRenderTargets(unsigned int width,unsigned int height)
 	const HRESULT depth_stencil_view_result = m_device->CreateDepthStencilView(depth_texture.Get(),nullptr,m_depthStencilView.GetAddressOf());
 	// DSV生成失敗ならRTV側も解放する。初期化元がInitなら、戻った先でさらに基盤全体を終了する。
 	if(FAILED(depth_stencil_view_result)){
-		WriteGraphicsError(L"ID3D11Device::CreateDepthStencilView",depth_stencil_view_result);
+		GraphicsErrorLog::Write(L"ID3D11Device::CreateDepthStencilView",depth_stencil_view_result);
 		ReleaseRenderTargets();
 		return false;
 	}
