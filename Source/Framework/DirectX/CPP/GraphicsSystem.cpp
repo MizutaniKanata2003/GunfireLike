@@ -12,7 +12,7 @@
 #include "Framework/DirectX/H/ViewportArea.h"
 #include "Framework/Etc/H/Logger.h"
 
-// Device生成の出力先と、Device生成の補助関数を内部処理としてまとめる。
+// Device生成の出力先と、SwapChainの記述・Device生成の補助関数を内部処理としてまとめる。
 namespace
 {
 	//========= Device生成の設定=========
@@ -30,6 +30,27 @@ namespace
 		// 即時Contextの所有参照の出力先。
 		ID3D11DeviceContext** context;
 	};
+
+	//========= SwapChainの記述関数=========
+	// Buffer数2、RGBA各8bit、非MSAA、Windowed、DISCARDという既存のBlt Modelの記述を作る。
+	// Width/Heightはpixel、Usageは描画先用途。その他のRefreshRate等はゼロ初期化のままで、選択理由は推測しない。
+	// windowHandle: 表示先の有効なWindow。
+	// width: BackBufferの幅。pixel単位。
+	// height: BackBufferの高さ。pixel単位。
+	DXGI_SWAP_CHAIN_DESC MakeSwapChainDesc(HWND windowHandle,unsigned int width,unsigned int height)
+	{
+		DXGI_SWAP_CHAIN_DESC swap_chain_desc{};
+		swap_chain_desc.BufferCount = 2;
+		swap_chain_desc.BufferDesc.Width = width;
+		swap_chain_desc.BufferDesc.Height = height;
+		swap_chain_desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		swap_chain_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		swap_chain_desc.OutputWindow = windowHandle;
+		swap_chain_desc.SampleDesc.Count = 1;
+		swap_chain_desc.Windowed = TRUE;
+		swap_chain_desc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+		return swap_chain_desc;
+	}
 
 	//========= Device生成関数=========
 	// Hardware Driverを使い、Device・即時Context・SwapChainを同時生成する。要求するFeature Levelは11_0の1つだけで、採用されたLevelは使わない。
@@ -56,47 +77,11 @@ bool GraphicsSystem::Init(HWND windowHandle,unsigned int width,unsigned int heig
 	// 出力ComPtrを旧参照から解放する。以後の初期化失敗で旧描画状態へ戻す処理はない。
 	Uninit();
 
-	// Buffer数2、RGBA各8bit、非MSAA、Windowed、DISCARDという既存のBlt Modelを維持する。
-	// Width/Heightはpixel、Usageは描画先用途。その他のRefreshRate等はゼロ初期化のままで、選択理由は推測しない。
-	DXGI_SWAP_CHAIN_DESC swap_chain_desc{};
-	swap_chain_desc.BufferCount = 2;
-	swap_chain_desc.BufferDesc.Width = width;
-	swap_chain_desc.BufferDesc.Height = height;
-	swap_chain_desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	swap_chain_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	swap_chain_desc.OutputWindow = windowHandle;
-	swap_chain_desc.SampleDesc.Count = 1;
-	swap_chain_desc.Windowed = TRUE;
-	swap_chain_desc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-
-	// SwapChain・Device・即時Contextの出力先は、このクラスが所有するComPtrのアドレスにする。
-	const DEVICE_OUTPUTS device_outputs{m_swapChain.GetAddressOf(),m_device.GetAddressOf(),m_context.GetAddressOf()};
-
-	// Debug構成では診断付き生成を先に試す。プリプロセッサは左端に配置する。
-	#if defined(_DEBUG)
-	HRESULT result = CreateDeviceAndSwapChain(swap_chain_desc,D3D11_CREATE_DEVICE_DEBUG,device_outputs);
-	// Debug生成が失敗した場合は原因を限定せず通常生成へ再試行する。SDK Layers不足だけを判別する条件ではない。
-	if(FAILED(result)){
-		// 既存警告を記録して同じ設定で再試行する。ここに新しいResetやAdapter選択は追加しない。
-		Logger::Write(e_LogLevel::e_WARNING,e_LogCategory::e_GRAPHICS,L"D3D11 Debug Layerの有効化に失敗しました。通常Device作成へ再試行します。");
-		result = CreateDeviceAndSwapChain(swap_chain_desc,ns_NO_DEVICE_FLAGS,device_outputs);
-	}
-	#else
-		// Debug以外では診断付き生成を試さず、通常生成の結果を受け取る。
-	const HRESULT result = CreateDeviceAndSwapChain(swap_chain_desc,ns_NO_DEVICE_FLAGS,device_outputs);
-	#endif
-
-	// 最終的な基盤生成が失敗した場合は、ログ後に部分ResourceをUninitしてfalseを返す。
-	if(FAILED(result)){
-		GraphicsErrorLog::Write(L"D3D11CreateDeviceAndSwapChain",result);
+	// 最終的な基盤生成が失敗した場合は、ログ後（CreateDevice内）に部分ResourceをUninitしてfalseを返す。
+	if(!CreateDevice(windowHandle,width,height)){
 		Uninit();
 		return false;
 	}
-
-	// Debug構成では成功を記録する。通常生成への再試行で成功した場合も同じ文言を使う。
-	#if defined(_DEBUG)
-	Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_GRAPHICS,L"Direct3D 11 Deviceを初期化しました。");
-	#endif
 
 	// 5つの描画State（Alpha Blend・Depth×2・Rasterizer×2）を生成する。失敗したStateのログは、RenderStateSetが記録する。
 	// ComPtrは「*」で参照へ変換できないため、Get()で取り出したポインターを参照にして渡す。
@@ -228,6 +213,40 @@ void GraphicsSystem::SetDepthTestEnabled(bool isEnabled)
 }
 
 //========= 補助関数=========
+// Device・即時Context・SwapChainを同時生成する。
+bool GraphicsSystem::CreateDevice(HWND windowHandle,unsigned int width,unsigned int height)
+{
+	// SwapChainの記述を作る。出力先は、このクラスが所有するComPtrのアドレスにする。
+	const DXGI_SWAP_CHAIN_DESC swap_chain_desc = MakeSwapChainDesc(windowHandle,width,height);
+	const DEVICE_OUTPUTS device_outputs{m_swapChain.GetAddressOf(),m_device.GetAddressOf(),m_context.GetAddressOf()};
+
+	// Debug構成では診断付き生成を先に試す。プリプロセッサは左端に配置する。
+	#if defined(_DEBUG)
+	HRESULT result = CreateDeviceAndSwapChain(swap_chain_desc,D3D11_CREATE_DEVICE_DEBUG,device_outputs);
+	// Debug生成が失敗した場合は原因を限定せず通常生成へ再試行する。SDK Layers不足だけを判別する条件ではない。
+	if(FAILED(result)){
+		// 既存警告を記録して同じ設定で再試行する。ここに新しいResetやAdapter選択は追加しない。
+		Logger::Write(e_LogLevel::e_WARNING,e_LogCategory::e_GRAPHICS,L"D3D11 Debug Layerの有効化に失敗しました。通常Device作成へ再試行します。");
+		result = CreateDeviceAndSwapChain(swap_chain_desc,ns_NO_DEVICE_FLAGS,device_outputs);
+	}
+	#else
+		// Debug以外では診断付き生成を試さず、通常生成の結果を受け取る。
+	const HRESULT result = CreateDeviceAndSwapChain(swap_chain_desc,ns_NO_DEVICE_FLAGS,device_outputs);
+	#endif
+
+	// 最終的な基盤生成が失敗した場合は、API名とHRESULTを記録して失敗を返す。部分Resourceの解放は、呼出側が行う。
+	if(FAILED(result)){
+		GraphicsErrorLog::Write(L"D3D11CreateDeviceAndSwapChain",result);
+		return false;
+	}
+
+	// Debug構成では成功を記録する。通常生成への再試行で成功した場合も同じ文言を使う。
+	#if defined(_DEBUG)
+	Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_GRAPHICS,L"Direct3D 11 Deviceを初期化しました。");
+	#endif
+	return true;
+}
+
 // BackBufferのRTV、Depth用Texture/DSV、16:9のViewportと保持サイズを準備する。
 bool GraphicsSystem::CreateRenderTargets(unsigned int width,unsigned int height)
 {

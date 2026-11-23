@@ -67,6 +67,13 @@ public:
 
 private:
 	//========= 補助関数=========
+	// Device・即時Context・SwapChainを同時生成する。Debug構成では、Debug Layer付きを先に試し、失敗したら通常生成へ再試行する。
+	// 失敗した場合は、API名とHRESULTをログへ記録する。生成済みの部分の解放は、呼出側が行う。
+	// windowHandle: 表示先の有効なWindow。借用し、保存しない。
+	// width: BackBufferの幅。pixel単位。
+	// height: BackBufferの高さ。pixel単位。
+	// 戻り値: 生成に成功したらtrue。
+	bool CreateDevice(HWND windowHandle,unsigned int width,unsigned int height);
 	// BackBufferのRTVとDepth用Texture/DSVを生成し、成功後に16:9のViewportと保持サイズを設定する。
 	// width: BackBufferとDepthの幅。pixel単位。SwapChainのBackBufferサイズとの対応は呼出側が維持する。
 	// height: BackBufferとDepthの高さ。pixel単位。Viewportは、この寸法の内側に収めた16:9の領域になる。
