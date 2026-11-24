@@ -262,8 +262,7 @@ bool ObjModelRenderer::Initialize(GraphicsSystem& graphicsSystem,const std::wstr
 }
 
 // 指定変換・色と、モデル全体で共有する画像の有無を使って描く。
-void ObjModelRenderer::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const XMMATRIX& viewMatrix,
-														const XMMATRIX& projectionMatrix,const XMFLOAT4& color)
+void ObjModelRenderer::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const CAMERA_MATRICES& camera,const XMFLOAT4& color)
 {
 	// 必須のBuffer・Shader・Layout・SamplerとIndex数がなければ転送・Bind・描画を省く。SRVなしは有効な単色状態。
 	if(!m_vertexBuffer || !m_indexBuffer || !m_pipeline.IsValid() || !m_textureSampler || m_indexCount == 0)return;
@@ -273,7 +272,7 @@ void ObjModelRenderer::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& world
 	if(context == nullptr)return;
 
 	// View*Projectionの順で合成し、Worldと共に転置する。HLSLへの格納契約を合わせる処理で、座標系変更ではない。
-	const XMMATRIX view_projection_matrix = XMMatrixTranspose(viewMatrix * projectionMatrix);
+	const XMMATRIX view_projection_matrix = XMMatrixTranspose(camera.view * camera.projection);
 	const XMMATRIX transposed_world_matrix = XMMatrixTranspose(worldMatrix);
 
 	// World→Clipの転置済み行列をCamera転送型のXMFLOAT4X4へ保存する。

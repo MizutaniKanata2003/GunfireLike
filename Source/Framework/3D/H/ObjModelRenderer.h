@@ -40,20 +40,11 @@ public:
 	// モデルを指定変換と色で描く。変更したIA・VS/PS・定数Buffer・SRV・Samplerは元へ戻さない。
 	// graphicsSystem: Context取得元。Render Target・Viewport・Blend・Depth・Rasterizerは利用側が設定する。
 	// worldMatrix: Local→World行列。内部で転置してObject転送型へ保存する。
-	// camera: View行列とProjection行列。view*projectionの順で合成する。
+	// camera: View行列とProjection行列。view*projectionの順で合成し、転置してCamera転送型へ保存する。
 	// color: RGBA色。既定(1,1,1,1)は不透明な白。単色出力または画像色との積に使い、clampは追加しない。
 	// 必須Resource・Context・Index数がなければ何もしない。UV倍率は(1,1)で、SRVの有無から画像使用値を作る。
-	// 移行中は、下の旧形式へ渡すだけの入口にする。旧形式を削除する際に、この形式へ本体を移す。
-	void Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const CAMERA_MATRICES& camera,const XMFLOAT4& color = XMFLOAT4{1.0f,1.0f,1.0f,1.0f})
-	{
-		Draw(graphicsSystem,worldMatrix,camera.view,camera.projection,color);
-	}
-	// 移行中の旧形式。引数が5個あり、13.5の基準を超える。呼出側を、上の形式へ移行した後に削除する。
-	// viewMatrix: World→View行列。viewMatrix*projectionMatrixの順で合成する。
-	// projectionMatrix: View→Clip行列。合成後に転置してCamera転送型へ保存する。
-	// その他の引数・動作は、上の形式と同じ。Bind先はCamera=VS b0、Object=VS/PS b1、Material=VS/PS b2、画像=PS t0、Sampler=PS s0。
-	void Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const XMMATRIX& viewMatrix,
-						const XMMATRIX& projectionMatrix,const XMFLOAT4& color = XMFLOAT4{1.0f,1.0f,1.0f,1.0f});
+	// Bind先はCamera=VS b0、Object=VS/PS b1、Material=VS/PS b2、画像=PS t0、Sampler=PS s0。
+	void Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const CAMERA_MATRICES& camera,const XMFLOAT4& color = XMFLOAT4{1.0f,1.0f,1.0f,1.0f});
 	// メンバーの所有参照を解放してIndex数を0にする。未初期化・部分初期化・終了済みでも呼出可能。
 	// ContextのBind解除・状態復元・GPU完了待機はしない。Context等の別参照は残り得る。
 	void Uninit();
