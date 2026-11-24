@@ -401,8 +401,10 @@ void EnemyController::UpdateProjectiles(float worldDeltaTime)
 
 	// 弾を進め、今回の更新で命中・回避した弾ごとの判定結果を受け取る。
 	std::vector<DODGE_JUDGE_RESULT> results;
-	m_enemyProjectiles.Update(worldDeltaTime,*m_collisionWorld,m_playerController->GetBodySphere(),m_playerController->IsInvincible(),is_dodging,
-														m_playerController->GetSecondsSinceDodgeStart(),results);
+	// 弾の更新に必要な、経過時間とプレイヤーの状態を1つにまとめる。
+	const ENEMY_PROJECTILE_UPDATE_INPUT update_input{worldDeltaTime,m_playerController->GetBodySphere(),m_playerController->IsInvincible(),is_dodging,
+		m_playerController->GetSecondsSinceDodgeStart()};
+	m_enemyProjectiles.Update(update_input,*m_collisionWorld,results);
 
 	// 受け取った結果を、出た順に通知する。全ての結果を表示用に記録し、ジャスト回避の場合は、スローの開始を求める。連続した場合は、呼出側が時間を数え直す。
 	for(const DODGE_JUDGE_RESULT result : results){

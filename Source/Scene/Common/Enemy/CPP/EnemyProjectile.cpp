@@ -68,11 +68,10 @@ bool EnemyProjectileManager::Spawn(const XMFLOAT3& origin,const XMFLOAT3& target
 }
 
 // 全ての弾を進め、飛び続ける弾だけを残す。
-void EnemyProjectileManager::Update(float deltaTime,const CollisionWorld& collisionWorld,const COLLISION_SPHERE& playerBody,bool isInvincible,bool isDodging,
-																		float secondsSinceDodgeStart,std::vector<DODGE_JUDGE_RESULT>& results)
+void EnemyProjectileManager::Update(const ENEMY_PROJECTILE_UPDATE_INPUT& input,const CollisionWorld& collisionWorld,std::vector<DODGE_JUDGE_RESULT>& results)
 {
 	// 時間が進まない、または時間が不正な場合は、弾を進めない。
-	if(!std::isfinite(deltaTime) || deltaTime <= 0.0f)return;
+	if(!std::isfinite(input.deltaTime) || input.deltaTime <= 0.0f)return;
 
 	// 飛び続ける弾の移し先を用意する。
 	std::vector<PROJECTILE_STATE> survivors;
@@ -80,7 +79,7 @@ void EnemyProjectileManager::Update(float deltaTime,const CollisionWorld& collis
 	// 全ての弾を生成順に進め、飛び続ける弾だけを新しい配列へ移す。消える弾は、判定結果を追加して除く。
 	for(PROJECTILE_STATE& projectile : m_projectiles){
 		// 飛び続ける弾だけを残す。
-		if(AdvanceProjectile(projectile,deltaTime,collisionWorld,playerBody,isInvincible,isDodging,secondsSinceDodgeStart,results)){
+		if(AdvanceProjectile(projectile,input,collisionWorld,results)){
 			survivors.push_back(projectile);
 		}
 	}
@@ -111,17 +110,16 @@ void EnemyProjectileManager::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX&
 
 //========= 補助関数=========
 // 寿命を減らし、進む距離を小分けにして、壁とプレイヤーへの命中を順に調べる。
-bool EnemyProjectileManager::AdvanceProjectile(PROJECTILE_STATE& projectile,float deltaTime,const CollisionWorld& collisionWorld,
-																							 const COLLISION_SPHERE& playerBody,bool isInvincible,bool isDodging,float secondsSinceDodgeStart,
+bool EnemyProjectileManager::AdvanceProjectile(PROJECTILE_STATE& projectile,const ENEMY_PROJECTILE_UPDATE_INPUT& input,const CollisionWorld& collisionWorld,
 																							 std::vector<DODGE_JUDGE_RESULT>& results)
 {
 	// 寿命を減らす。
-	projectile.remainingSeconds -= deltaTime;
+	projectile.remainingSeconds -= input.deltaTime;
 	// 寿命が尽きた弾は、壁やプレイヤーの判定を行わずに消す。
 	if(projectile.remainingSeconds <= 0.0f)return false;
 
 	// 速度と時間から、この更新で進む距離を求める。
-	float remaining_distance = ENEMY_PROJECTILE::ns_SPEED * deltaTime;
+	float remaining_distance = ENEMY_PROJECTILE::ns_SPEED * input.deltaTime;
 	// 進む距離を小分けにして、進み終えるまで、壁とプレイヤーへの命中を順に調べる。
 	while(remaining_distance > 0.0f){
 		// 残りの距離と1ステップの上限の小さい方だけ進める。壁の判定は、現在位置から進む向きへの線分で行い、薄い壁をすり抜けない。
@@ -137,14 +135,14 @@ bool EnemyProjectileManager::AdvanceProjectile(PROJECTILE_STATE& projectile,floa
 		projectile.position.y += projectile.direction.y * step_distance;
 		projectile.position.z += projectile.direction.z * step_distance;
 		// 重なった場合は、無敵・回避の状態から命中・回避・ジャスト回避を判定し、結果を追加して弾を消す。
-		if(CollisionMath::IntersectSphereSphere(COLLISION_SPHERE{projectile.position,ENEMY_PROJECTILE::ns_RADIUS},playerBody)){
+		if(CollisionMath::IntersectSphereSphere(COLLISION_SPHERE{projectile.position,ENEMY_PROJECTILE::ns_RADIUS},input.playerBody)){
 			// 回避の動作中だけ回避の開始からの経過時間を使い、それ以外の無敵（蹴り・殴打）は、ジャスト回避にならない大きな値にする。
-			const float dodge_age_seconds = isDodging ? secondsSinceDodgeStart : ENEMY_PROJECTILE::ns_NON_DODGE_AGE_SECONDS;
+			const float dodge_age_seconds = input.isDodging ? input.secondsSinceDodgeStart : ENEMY_PROJECTILE::ns_NON_DODGE_AGE_SECONDS;
 			// 予告時間0の使い捨ての判定で、この瞬間の結果だけを得る。
 			JustDodgeJudge judge;
 			judge.Initialize();
 			judge.StartIncomingAttack(0.0f);
-			results.push_back(judge.Update(0.0f,isInvincible,dodge_age_seconds));
+			results.push_back(judge.Update(0.0f,input.isInvincible,dodge_age_seconds));
 			return false;
 		}
 		remaining_distance -= step_distance;

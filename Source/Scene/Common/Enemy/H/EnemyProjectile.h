@@ -55,6 +55,22 @@ namespace ENEMY_PROJECTILE
 	inline constexpr XMFLOAT4 ns_COLOR{1.0f,0.85f,0.2f,1.0f};
 }
 
+//========= 更新の入力=========
+// 弾の更新に必要な、経過時間とプレイヤーの状態をまとめた入力。EnemyProjectileManager::Updateの引数の数を減らすための値の束で、更新は変更しない。
+struct ENEMY_PROJECTILE_UPDATE_INPUT
+{
+	// 敵側の経過時間。単位は秒。0以下、または有限でない値なら、弾を進めない。
+	float deltaTime{};
+	// プレイヤーの体の球。現在の位置と半径。
+	COLLISION_SPHERE playerBody{};
+	// プレイヤーが無敵か。回避・蹴り・殴打の無敵を含む。
+	bool isInvincible{};
+	// プレイヤーが回避の動作中か。ジャスト回避は、回避の動作中の無敵だけが対象になる。
+	bool isDodging{};
+	// 最後に回避を始めてからの経過時間。単位は秒。ジャスト回避の判定に使う。
+	float secondsSinceDodgeStart{};
+};
+
 // 飛行中の敵の弾を保持し、更新・描画する。
 class EnemyProjectileManager final
 {
@@ -76,15 +92,10 @@ public:
 	// 戻り値: 生成できたらtrue。上限に達している、または発射位置と目標の水平位置が一致して向きを決められない場合はfalse。
 	bool Spawn(const XMFLOAT3& origin,const XMFLOAT3& targetPosition);
 	// 全ての弾を進め、壁・プレイヤーへの命中、寿命による消滅を処理する。命中した弾は、判定結果を1つずつ結果へ追加して消える。
-	// deltaTime: 敵側の経過時間。単位は秒。0以下なら何も進めない。
+	// input: 経過時間と、プレイヤーの体の球・無敵・回避の状態。経過時間が0以下なら何も進めない。
 	// collisionWorld: 壁（STATICレイヤー）の判定に使うCollisionWorld。読み取りだけを行う。
-	// playerBody: プレイヤーの体の球。現在の位置と半径。
-	// isInvincible: プレイヤーが無敵か。回避・蹴り・殴打の無敵を含む。
-	// isDodging: プレイヤーが回避の動作中か。ジャスト回避は、回避の動作中の無敵だけが対象になる。
-	// secondsSinceDodgeStart: 最後に回避を始めてからの経過時間。単位は秒。ジャスト回避の判定に使う。
 	// results: 判定結果の出力先。この関数は、先に空にしない。命中した弾ごとに、e_HIT・e_DODGED・e_JUST_DODGEDのいずれかを追加する。
-	void Update(float deltaTime,const CollisionWorld& collisionWorld,const COLLISION_SPHERE& playerBody,bool isInvincible,bool isDodging,
-							float secondsSinceDodgeStart,std::vector<DODGE_JUDGE_RESULT>& results);
+	void Update(const ENEMY_PROJECTILE_UPDATE_INPUT& input,const CollisionWorld& collisionWorld,std::vector<DODGE_JUDGE_RESULT>& results);
 	// 飛行中の全ての弾を、Cubeで描く。未初期化なら何も描かない。
 	// graphicsSystem: Rendererが使う描画基盤。
 	// viewMatrix: World空間からView空間への変換行列。
@@ -111,16 +122,11 @@ private:
 	//========= 補助関数=========
 	// 1つの弾を進める。寿命・壁・プレイヤーへの命中を、進む距離を小分けにして順に調べる。
 	// projectile: 進める弾。
-	// deltaTime: この更新で進める経過時間。単位は秒。
+	// input: 経過時間と、プレイヤーの体の球・無敵・回避の状態。
 	// collisionWorld: 壁の判定に使うCollisionWorld。
-	// playerBody: プレイヤーの体の球。
-	// isInvincible: プレイヤーが無敵か。
-	// isDodging: プレイヤーが回避の動作中か。
-	// secondsSinceDodgeStart: 最後に回避を始めてからの経過時間。単位は秒。
 	// results: 判定結果の追加先。
 	// 戻り値: 弾が飛び続けるならtrue。壁・プレイヤーへの命中、寿命で消えるならfalse。
-	[[nodiscard]] static bool AdvanceProjectile(PROJECTILE_STATE& projectile,float deltaTime,const CollisionWorld& collisionWorld,
-																							const COLLISION_SPHERE& playerBody,bool isInvincible,bool isDodging,float secondsSinceDodgeStart,
+	[[nodiscard]] static bool AdvanceProjectile(PROJECTILE_STATE& projectile,const ENEMY_PROJECTILE_UPDATE_INPUT& input,const CollisionWorld& collisionWorld,
 																							std::vector<DODGE_JUDGE_RESULT>& results);
 
 	//========= 状態=========
