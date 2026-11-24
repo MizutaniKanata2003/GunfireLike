@@ -66,11 +66,11 @@ HudTextureHandle HudSpriteRenderer::LoadTexture(GraphicsSystem& graphicsSystem,s
 
 //========= 描画関数=========
 // Canvas座標をpixel座標の矩形へ変換し、画像を貼った単位Quadを描画する。
-void HudSpriteRenderer::DrawSprite(GraphicsSystem& graphicsSystem,HudTextureHandle texture,const XMFLOAT2& position,const XMFLOAT2& size,
-																	 const XMFLOAT4& color,float visibleWidthRatio)
+void HudSpriteRenderer::DrawSprite(GraphicsSystem& graphicsSystem,HudTextureHandle texture,const HUD_RECT& rectangle,const HUD_SPRITE_APPEARANCE& appearance)
 {
 	// 描く大きさが0以下、または表示割合が0以下なら、何も描かない。識別値が無効値、または範囲外でも、描く画像がないため何も描かない。
-	if(size.x <= 0.0f || size.y <= 0.0f || visibleWidthRatio <= 0.0f)return;
+	const float visible_width_ratio = appearance.visibleWidthRatio;
+	if(rectangle.width <= 0.0f || rectangle.height <= 0.0f || visible_width_ratio <= 0.0f)return;
 	if(texture == 0 || texture > m_textures.size())return;
 
 	// 必須のBuffer・Shader・Layout・Sampler・画像が揃わなければ、転送・Bind・描画を省く。
@@ -85,11 +85,11 @@ void HudSpriteRenderer::DrawSprite(GraphicsSystem& graphicsSystem,HudTextureHand
 
 	// Canvas座標の位置と大きさを、描画先のpixel座標へ変換する。位置には倍率と中央寄せのOffset、大きさには倍率だけを適用する。
 	const HudCanvas canvas{render_width,render_height};
-	const XMFLOAT2 screen_position = canvas.ToScreenPosition(position);
-	const XMFLOAT2 screen_size = canvas.ToScreenSize(size);
+	const XMFLOAT2 screen_position = canvas.ToScreenPosition(XMFLOAT2{rectangle.x,rectangle.y});
+	const XMFLOAT2 screen_size = canvas.ToScreenSize(XMFLOAT2{rectangle.width,rectangle.height});
 
 	// 単位Quadを、表示割合で縮めた幅と高さに拡縮し、左上のpixel座標へ移動するWorld行列を作る。行ベクトル形式で、拡縮→移動の順に合成する。
-	const XMMATRIX world_matrix = XMMatrixScaling(screen_size.x * visibleWidthRatio,screen_size.y,1.0f) *
+	const XMMATRIX world_matrix = XMMatrixScaling(screen_size.x * visible_width_ratio,screen_size.y,1.0f) *
 		XMMatrixTranslation(screen_position.x,screen_position.y,0.0f);
 
 	// pixel座標をClip座標へ変換する行列を作る。X方向はpixelを幅で割って2倍し-1する。Y方向は上下が逆のため、高さで割った値の符号を反転して+1する。
@@ -102,12 +102,12 @@ void HudSpriteRenderer::DrawSprite(GraphicsSystem& graphicsSystem,HudTextureHand
 	XMStoreFloat4x4(&camera_constants.viewProjectionMatrix,XMMatrixTranspose(view_projection_matrix));
 	OBJECT_CONSTANTS object_constants{};
 	XMStoreFloat4x4(&object_constants.worldMatrix,XMMatrixTranspose(world_matrix));
-	object_constants.color = color;
+	object_constants.color = appearance.color;
 
 	// UV倍率のXに表示割合を入れ、Quadの横方向のUVを0〜割合へ縮める。縮めた幅と合わせて、画像が伸び縮みせず左側の一部分だけが表示される。
 	// 画像使用値を1にして、BasicColorPSに画像の色とObject色の積を出力させる。
 	MATERIAL_CONSTANTS material_constants{};
-	material_constants.uvTiling = XMFLOAT2{visibleWidthRatio,1.0f};
+	material_constants.uvTiling = XMFLOAT2{visible_width_ratio,1.0f};
 	material_constants.useTexture = 1.0f;
 
 	// 3つの定数Bufferへ転送し、Quadと画像を接続して描画する。更新だけではBindされない。

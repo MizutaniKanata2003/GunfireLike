@@ -166,8 +166,9 @@ void GameHud::DrawSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& s
 {
 	// 報酬選択中とショップが開いている間は、画面全体を暗くする背景を最初に描き、他のHUDとカード・パネルがその上に重なるようにする。
 	if(state.reward.isSelecting || state.shop.isOpen){
-		m_spriteRenderer.DrawSprite(graphicsSystem,m_rewardBackdropTexture,REWARD_LAYOUT::ns_BACKDROP.position,REWARD_LAYOUT::ns_BACKDROP.size,
-																GAME_HUD_STYLE::ns_WHITE,1.0f);
+		const HUD_SPRITE_APPEARANCE white_appearance{GAME_HUD_STYLE::ns_WHITE,1.0f};
+		m_spriteRenderer.DrawSprite(graphicsSystem,m_rewardBackdropTexture,
+																HUD_RECT::FromPositionAndSize(REWARD_LAYOUT::ns_BACKDROP.position,REWARD_LAYOUT::ns_BACKDROP.size),white_appearance);
 	}
 
 	// 低HP警告・照準・HPバー・弾薬の枠・通貨のアイコンを描く。
@@ -191,25 +192,31 @@ void GameHud::DrawStatusSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_ST
 	const bool has_health = state.vitals.maxHP > 0.0f;
 	const float health_ratio = has_health ? std::clamp(state.vitals.currentHP / state.vitals.maxHP,0.0f,1.0f) : 0.0f;
 
+	// 画像本来の色（白）で、全体を描く見た目の指定。低HP警告・HPバーの枠・弾薬の枠・通貨のアイコンで使い回す。
+	const HUD_SPRITE_APPEARANCE white_appearance{GAME_HUD_STYLE::ns_WHITE,1.0f};
+
 	// HPの割合が低HPの閾値以下なら、画面全体の警告を描き、他のHUDがその上に重なるようにする。
 	if(has_health && health_ratio <= ns_LOW_HP_RATIO){
-		m_spriteRenderer.DrawSprite(graphicsSystem,m_lowHpWarningTexture,HUD_LAYOUT::ns_LOW_HP_WARNING.position,HUD_LAYOUT::ns_LOW_HP_WARNING.size,
-																GAME_HUD_STYLE::ns_WHITE,1.0f);
+		m_spriteRenderer.DrawSprite(graphicsSystem,m_lowHpWarningTexture,
+																HUD_RECT::FromPositionAndSize(HUD_LAYOUT::ns_LOW_HP_WARNING.position,HUD_LAYOUT::ns_LOW_HP_WARNING.size),white_appearance);
 	}
 	DrawCrosshair(graphicsSystem,state.isAiming);
 
 	// HPバーの枠を描き、続けて中身を、HPの割合の分だけ左から描く。低HPなら色を赤にする。最大HPがない場合は、HPバー自体を描かない。
 	if(has_health){
-		m_spriteRenderer.DrawSprite(graphicsSystem,m_hpFrameTexture,HUD_LAYOUT::ns_HP_FRAME.position,HUD_LAYOUT::ns_HP_FRAME.size,GAME_HUD_STYLE::ns_WHITE,1.0f);
+		m_spriteRenderer.DrawSprite(graphicsSystem,m_hpFrameTexture,
+																HUD_RECT::FromPositionAndSize(HUD_LAYOUT::ns_HP_FRAME.position,HUD_LAYOUT::ns_HP_FRAME.size),white_appearance);
 		const XMFLOAT4& fill_color = health_ratio <= ns_LOW_HP_RATIO ? ns_HP_LOW_COLOR : ns_HP_NORMAL_COLOR;
-		m_spriteRenderer.DrawSprite(graphicsSystem,m_hpFillTexture,HUD_LAYOUT::ns_HP_FILL.position,HUD_LAYOUT::ns_HP_FILL.size,fill_color,health_ratio);
+		const HUD_SPRITE_APPEARANCE fill_appearance{fill_color,health_ratio};
+		m_spriteRenderer.DrawSprite(graphicsSystem,m_hpFillTexture,
+																HUD_RECT::FromPositionAndSize(HUD_LAYOUT::ns_HP_FILL.position,HUD_LAYOUT::ns_HP_FILL.size),fill_appearance);
 	}
 
 	// 弾薬の枠と、通貨のアイコンを描く。数字は、画像の後に文字として描く。
-	m_spriteRenderer.DrawSprite(graphicsSystem,m_ammoFrameTexture,HUD_LAYOUT::ns_AMMO_FRAME.position,HUD_LAYOUT::ns_AMMO_FRAME.size,
-															GAME_HUD_STYLE::ns_WHITE,1.0f);
-	m_spriteRenderer.DrawSprite(graphicsSystem,m_currencyIconTexture,HUD_LAYOUT::ns_CURRENCY_ICON.position,HUD_LAYOUT::ns_CURRENCY_ICON.size,
-															GAME_HUD_STYLE::ns_WHITE,1.0f);
+	m_spriteRenderer.DrawSprite(graphicsSystem,m_ammoFrameTexture,
+															HUD_RECT::FromPositionAndSize(HUD_LAYOUT::ns_AMMO_FRAME.position,HUD_LAYOUT::ns_AMMO_FRAME.size),white_appearance);
+	m_spriteRenderer.DrawSprite(graphicsSystem,m_currencyIconTexture,
+															HUD_RECT::FromPositionAndSize(HUD_LAYOUT::ns_CURRENCY_ICON.position,HUD_LAYOUT::ns_CURRENCY_ICON.size),white_appearance);
 }
 
 // 照準を、配置表の中心を保ったまま、構え中は小さく描く。
@@ -220,17 +227,19 @@ void GameHud::DrawCrosshair(GraphicsSystem& graphicsSystem,bool isAiming)
 	const XMFLOAT2 crosshair_size{HUD_LAYOUT::ns_CROSSHAIR.size.x * crosshair_scale,HUD_LAYOUT::ns_CROSSHAIR.size.y * crosshair_scale};
 	const XMFLOAT2 crosshair_position{HUD_LAYOUT::ns_CROSSHAIR.position.x + (HUD_LAYOUT::ns_CROSSHAIR.size.x - crosshair_size.x) * 0.5f,
 		HUD_LAYOUT::ns_CROSSHAIR.position.y + (HUD_LAYOUT::ns_CROSSHAIR.size.y - crosshair_size.y) * 0.5f};
-	m_spriteRenderer.DrawSprite(graphicsSystem,m_crosshairTexture,crosshair_position,crosshair_size,GAME_HUD_STYLE::ns_WHITE,1.0f);
+	const HUD_SPRITE_APPEARANCE white_appearance{GAME_HUD_STYLE::ns_WHITE,1.0f};
+	m_spriteRenderer.DrawSprite(graphicsSystem,m_crosshairTexture,HUD_RECT::FromPositionAndSize(crosshair_position,crosshair_size),white_appearance);
 }
 
 // 報酬のカードの枠を、カードの数だけ描く。
 void GameHud::DrawRewardCards(GraphicsSystem& graphicsSystem,int hoveredIndex)
 {
 	// 全てのカードを左から順に描く。カーソルが乗っているカードだけ、ホバー用の画像にする。
+	const HUD_SPRITE_APPEARANCE white_appearance{GAME_HUD_STYLE::ns_WHITE,1.0f};
 	for(int card_index = 0; card_index < REWARD_LAYOUT::ns_CARD_COUNT; ++card_index){
 		const HudTextureHandle card_texture = (card_index == hoveredIndex) ? m_rewardCardHoverTexture : m_rewardCardTexture;
-		m_spriteRenderer.DrawSprite(graphicsSystem,card_texture,REWARD_LAYOUT::ns_CARD_POSITIONS[card_index],REWARD_LAYOUT::ns_CARD_SIZE,
-																GAME_HUD_STYLE::ns_WHITE,1.0f);
+		const HUD_RECT card_rect = HUD_RECT::FromPositionAndSize(REWARD_LAYOUT::ns_CARD_POSITIONS[card_index],REWARD_LAYOUT::ns_CARD_SIZE);
+		m_spriteRenderer.DrawSprite(graphicsSystem,card_texture,card_rect,white_appearance);
 	}
 }
 

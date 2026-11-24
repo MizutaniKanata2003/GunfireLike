@@ -60,18 +60,7 @@ public:
 	// appearance: 色と、画像を描く横幅の割合。描く矩形の幅は、rectangleの幅にこの割合を掛けた値になる。
 	// 必須Resourceがない、またはContextがない、または描画先サイズが0なら何もしない。
 	// Bind状態（Topology・Shader・Layout・定数Buffer・画像・Sampler）は描画後も元へ戻さない。
-	// 移行中は、下の旧形式へ渡すだけの入口にする。旧形式を削除する際に、この形式へ本体を移す。
-	void DrawSprite(GraphicsSystem& graphicsSystem,HudTextureHandle texture,const HUD_RECT& rectangle,const HUD_SPRITE_APPEARANCE& appearance)
-	{
-		DrawSprite(graphicsSystem,texture,XMFLOAT2{rectangle.x,rectangle.y},XMFLOAT2{rectangle.width,rectangle.height},appearance.color,appearance.visibleWidthRatio);
-	}
-	// 移行中の旧形式。引数が6個あり、13.5の基準を超える。呼出側を、上の形式へ移行した後に削除する。
-	// position: 矩形の左上のCanvas座標。右向きX・下向きY。
-	// size: 画像全体を描いた場合の、Canvas基準の幅と高さ。どちらかが0以下なら何もしない。
-	// color: 画像の色へ乗算するRGBA色。visibleWidthRatio: 画像の左端から描く横幅の割合。
-	// その他の引数・動作は、上の形式と同じ。
-	void DrawSprite(GraphicsSystem& graphicsSystem,HudTextureHandle texture,const XMFLOAT2& position,const XMFLOAT2& size,
-									const XMFLOAT4& color,float visibleWidthRatio);
+	void DrawSprite(GraphicsSystem& graphicsSystem,HudTextureHandle texture,const HUD_RECT& rectangle,const HUD_SPRITE_APPEARANCE& appearance);
 
 	//========= 終了関数=========
 	// 読み込んだ画像と、所有する全Resourceを解放する。識別値は全て無効になる。未初期化・終了済みでも呼出可能。
