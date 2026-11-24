@@ -8,14 +8,14 @@
 #include <fstream> // std::ifstreamでOBJを行単位に読み込む。
 #include <istream> // std::istreamで、OBJ行の残りの面トークンを受け取る。
 #include <sstream> // std::stringstreamでOBJ行とslash区切りの面トークンを解析する。
-#include <string> // 文字列・getline・stoi・to_stringでパス、Index、共有Keyとログを扱う。
+#include <string> // std::string・getline・stoi・to_stringでパス、Index、共有Keyとログを扱う。
 #include <unordered_map> // 位置・UV・法線Indexの文字列KeyからGPU頂点Indexを検索する。
 #include <vector> // OBJの位置・UV・頂点・Indexを可変長配列に保持する。
 
 //========= Framework インクルード=========
-#include "Framework/DirectX/H/GraphicsErrorLog.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
 #include "Framework/DirectX/H/MeshBuffers.h"
+#include "Framework/DirectX/H/SamplerFactory.h"
 #include "Framework/DirectX/H/TextureLoader.h"
 #include "Framework/Etc/H/Logger.h"
 
@@ -250,8 +250,8 @@ bool ObjModelRenderer::Initialize(GraphicsSystem& graphicsSystem,const std::wstr
 		return false;
 	}
 
-	// 画像なしでもSamplerを作る。失敗なら画像SRVを含め全ての所有Resourceを解放する。
-	if(!CreateSampler(device)){
+	// 画像なしでもSamplerを作る。Linear補間・WRAPで生成する。失敗なら画像SRVを含め全ての所有Resourceを解放する。
+	if(!SamplerFactory::CreateLinear(device,D3D11_TEXTURE_ADDRESS_WRAP,m_textureSampler)){
 		Uninit();
 		return false;
 	}
@@ -355,28 +355,6 @@ bool ObjModelRenderer::CreateMeshBuffers(ID3D11Device* device,const std::vector<
 
 	// Vertex→Indexの順に生成し、最初の失敗で止める。失敗のログは、MeshBuffersが記録する。先に生成したVertex Bufferの解放は、呼出側が行う。
 	return MeshBuffers::Create(device,vertex_source,m_vertexBuffer) && MeshBuffers::Create(device,index_source,m_indexBuffer);
-}
-
-// Linear補間・WRAPのSamplerを生成する。
-bool ObjModelRenderer::CreateSampler(ID3D11Device* device)
-{
-	// 縮小・拡大・Mip間のLinear参照と、U/V/WのWRAPを指定する。Mip画像を自動生成する設定ではない。
-	// 許可LODは0〜FLOAT32_MAX、実際のMip数は画像次第。その他はゼロ設定で既存値を維持する。
-	// 画像なしでもSamplerを作る。2D参照で未使用のWも既存のWRAP設定を維持する。
-	D3D11_SAMPLER_DESC sampler_desc{};
-	sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-	sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-	sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-	sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-	sampler_desc.MinLOD = 0.0f;
-	sampler_desc.MaxLOD = D3D11_FLOAT32_MAX;
-	const HRESULT sampler_state_result = device->CreateSamplerState(&sampler_desc,m_textureSampler.GetAddressOf());
-	// Sampler生成失敗ならAPI名とHRESULTを記録して失敗を返す。生成済みResourceの解放は、呼出側が行う。
-	if(FAILED(sampler_state_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateSamplerState",sampler_state_result);
-		return false;
-	}
-	return true;
 }
 
 // モデル・画像・Samplerを接続して描画する。

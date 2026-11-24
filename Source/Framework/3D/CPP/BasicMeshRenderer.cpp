@@ -4,9 +4,9 @@
 // 原本の頂点・Index・UV・API設定と失敗経路を維持し、描画Stateの復元や新機能は追加しない。BasicColorのShader・定数Bufferは、BasicColorPipelineを使う。
 
 //========= Framework インクルード=========
-#include "Framework/DirectX/H/GraphicsErrorLog.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
 #include "Framework/DirectX/H/MeshBuffers.h"
+#include "Framework/DirectX/H/SamplerFactory.h"
 #include "Framework/DirectX/H/TextureLoader.h"
 
 // Cube形状・Assetパスと、Cubeの頂点・Indexの配列をまとめる。
@@ -102,8 +102,9 @@ bool BasicMeshRenderer::Initialize(GraphicsSystem& graphicsSystem)
 	if(device == nullptr)return false;
 
 	// Cube Buffer→Shader・定数Buffer→画像→Samplerの順に生成する。失敗のログは、各生成関数が記録する。
-	// 最初に失敗した時点で、生成済みのResourceを全て解放してfalseを返す。LoaderのCOM初期化前提は呼出側で守る。
-	if(!CreateCubeBuffers(device) || !m_pipeline.Initialize(device) || !LoadTextures(device) || !CreateSampler(device)){
+	// Samplerは、Linear補間・WRAPで生成する。最初に失敗した時点で、生成済みのResourceを全て解放してfalseを返す。LoaderのCOM初期化前提は呼出側で守る。
+	if(!CreateCubeBuffers(device) || !m_pipeline.Initialize(device) || !LoadTextures(device) ||
+		 !SamplerFactory::CreateLinear(device,D3D11_TEXTURE_ADDRESS_WRAP,m_textureSampler)){
 		Uninit();
 		return false;
 	}
@@ -192,30 +193,6 @@ bool BasicMeshRenderer::LoadTextures(ID3D11Device* device)
 	return TextureLoader::LoadWicTexture(device,ns_FLOOR_TEXTURE_PATH,m_floorTextureView) &&
 		TextureLoader::LoadWicTexture(device,ns_WALL_TEXTURE_PATH,m_wallTextureView) &&
 		TextureLoader::LoadWicTexture(device,ns_OBJECT_TEXTURE_PATH,m_objectTextureView);
-}
-
-// Linear参照・WRAPのSamplerを生成する。
-bool BasicMeshRenderer::CreateSampler(ID3D11Device* device)
-{
-	// Texture参照時のフィルタリングとアドレス指定を行うSamplerを設定する。
-	// 縮小・拡大・Mip間をLinear参照し、U/V/Wは範囲外をWRAPで繰り返す。自動Mip生成の指定ではない。
-	// LODは0〜FLOAT32_MAXを許可するが、実際のMipは画像Resourceに従う。その他はゼロ初期値を維持する。
-	D3D11_SAMPLER_DESC sampler_description{};
-	sampler_description.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-	sampler_description.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-	sampler_description.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-	sampler_description.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-	sampler_description.MinLOD = 0.0f;
-	sampler_description.MaxLOD = D3D11_FLOAT32_MAX;
-
-	// Texture本体とは別に、画像の補間・繰り返し方法を持つSampler Stateを生成する。
-	const HRESULT sampler_state_result = device->CreateSamplerState(&sampler_description,m_textureSampler.GetAddressOf());
-	// Sampler生成失敗ならAPI名・結果を記録して失敗を返す。生成済みResourceの解放は、呼出側が行う。
-	if(FAILED(sampler_state_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateSamplerState",sampler_state_result);
-		return false;
-	}
-	return true;
 }
 
 // 画像の種別から、使うSRVを選ぶ。

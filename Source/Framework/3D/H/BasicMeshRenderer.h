@@ -75,10 +75,6 @@ private:
 	// device: 生成に使うDevice。
 	// 戻り値: 全て成功したらtrue。
 	[[nodiscard]] bool LoadTextures(ID3D11Device* device);
-	// 縮小・拡大・Mip間をLinear参照し、範囲外をWRAPで繰り返すSamplerを生成する。失敗はログへ記録する。
-	// device: 生成に使うDevice。
-	// 戻り値: 成功したらtrue。
-	[[nodiscard]] bool CreateSampler(ID3D11Device* device);
 	// 画像の種別から、使うSRVを選ぶ。Colorと未定義値はnullptr。
 	// textureType: 画像選択。
 	// 戻り値: SRVの借用ポインター。所有権は移さない。
@@ -93,7 +89,7 @@ private:
 	BasicColorPipeline m_pipeline{};
 
 	//========= Texture関連=========
-	// Linear参照・WRAPを指定するSamplerの所有参照。画像Resourceとは別にBindする。
+	// Linear参照・WRAPを指定するSamplerの所有参照。画像Resourceとは別にBindする。SamplerFactoryで生成する。
 	ComPtr<ID3D11SamplerState> m_textureSampler{};
 	// 床画像のSRVを所有する。参照する画像Textureの寿命もViewが保持する。
 	ComPtr<ID3D11ShaderResourceView> m_floorTextureView{};

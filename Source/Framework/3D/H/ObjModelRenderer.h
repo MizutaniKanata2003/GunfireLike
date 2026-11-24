@@ -73,10 +73,6 @@ private:
 	// indices: 初期データにするIndex配列。32bit Indexで、呼出中に有効であること。
 	// 戻り値: 両方成功したらtrue。
 	[[nodiscard]] bool CreateMeshBuffers(ID3D11Device* device,const std::vector<BASIC_COLOR_VERTEX>& vertices,const std::vector<unsigned int>& indices);
-	// Linear補間・WRAPのSamplerを生成する。画像なしの場合も生成する。失敗はログへ記録する。
-	// device: 生成に使うDevice。
-	// 戻り値: 成功したらtrue。
-	[[nodiscard]] bool CreateSampler(ID3D11Device* device);
 	// モデル・画像・Samplerを接続して描画する。IA・Shader・定数・SRV・Samplerを、元へ戻さない。
 	// context: 描画に使う即時Context。画像なしの場合、PS t0へnullptrを設定する。
 	void BindAndDraw(ID3D11DeviceContext* context) const;
@@ -94,7 +90,7 @@ private:
 	//========= Texture関連=========
 	// モデル全体に使う画像のSRVを所有する。空パスの初期化後は未生成のまま。
 	ComPtr<ID3D11ShaderResourceView> m_textureView{};
-	// Linear参照・WRAPのSamplerを所有する。画像なしの場合も生成する。
+	// Linear参照・WRAPのSamplerを所有する。画像なしの場合も生成する。SamplerFactoryで生成する。
 	ComPtr<ID3D11SamplerState> m_textureSampler{};
 
 	//========= 描画情報=========
