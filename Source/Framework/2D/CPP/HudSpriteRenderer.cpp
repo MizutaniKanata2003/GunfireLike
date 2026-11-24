@@ -7,9 +7,9 @@
 #include <array> // 単位Quadの4頂点と6Indexを、固定要素数の連続配列に保持する。
 
 //========= Framework インクルード=========
-#include "Framework/DirectX/H/GraphicsErrorLog.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
 #include "Framework/DirectX/H/MeshBuffers.h"
+#include "Framework/DirectX/H/SamplerFactory.h"
 #include "Framework/DirectX/H/TextureLoader.h"
 
 // 単位Quadの2三角形のIndexを定数としてまとめる。
@@ -33,7 +33,8 @@ bool HudSpriteRenderer::Initialize(GraphicsSystem& graphicsSystem)
 	if(device == nullptr)return false;
 
 	// Buffer・Shader・Samplerを、この順に生成する。失敗のログは、各生成関数が記録する。最初に失敗した時点で、部分Resourceを解放してfalseを返す。
-	if(!CreateQuadBuffers(device) || !m_pipeline.Initialize(device) || !CreateSampler(device)){
+	// Samplerは、画像の端を繰り返さないよう、Linear補間・CLAMPで生成する。
+	if(!CreateQuadBuffers(device) || !m_pipeline.Initialize(device) || !SamplerFactory::CreateLinear(device,D3D11_TEXTURE_ADDRESS_CLAMP,m_sampler)){
 		Uninit();
 		return false;
 	}
@@ -155,26 +156,6 @@ bool HudSpriteRenderer::CreateQuadBuffers(ID3D11Device* device)
 
 	// Vertex→Indexの順に生成し、最初の失敗で止める。失敗のログは、MeshBuffersが記録する。先に生成したVertex Bufferの解放は、呼出側が行う。
 	return MeshBuffers::Create(device,vertex_source,m_vertexBuffer) && MeshBuffers::Create(device,index_source,m_indexBuffer);
-}
-
-// Linear補間・CLAMPのSamplerを生成する。
-bool HudSpriteRenderer::CreateSampler(ID3D11Device* device)
-{
-	// 画像の端を繰り返さないよう、Linear補間・CLAMPのSamplerを生成する。LODは0〜FLOAT32_MAXを許可し、実際のMipは画像Resourceに従う。
-	D3D11_SAMPLER_DESC sampler_desc{};
-	sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-	sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-	sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-	sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-	sampler_desc.MinLOD = 0.0f;
-	sampler_desc.MaxLOD = D3D11_FLOAT32_MAX;
-	const HRESULT sampler_result = device->CreateSamplerState(&sampler_desc,m_sampler.GetAddressOf());
-	// Sampler生成失敗ならAPI名・結果を記録して失敗を返す。生成済みResourceの解放は、呼出側が行う。
-	if(FAILED(sampler_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateSamplerState",sampler_result);
-		return false;
-	}
-	return true;
 }
 
 // 単位Quadと、画像・Samplerを接続して描画する。

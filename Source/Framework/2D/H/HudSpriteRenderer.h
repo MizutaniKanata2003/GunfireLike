@@ -73,10 +73,6 @@ private:
 	// device: 生成に使うDevice。
 	// 戻り値: 両方成功したらtrue。
 	[[nodiscard]] bool CreateQuadBuffers(ID3D11Device* device);
-	// 画像の端を繰り返さない、Linear補間・CLAMPのSamplerを生成する。失敗はログへ記録する。
-	// device: 生成に使うDevice。
-	// 戻り値: 成功したらtrue。
-	[[nodiscard]] bool CreateSampler(ID3D11Device* device);
 	// 単位Quadと、画像・Samplerを接続して描画する。IA・Shader・定数・SRV・Samplerを、元へ戻さない。
 	// context: 描画に使う即時Context。
 	// texture: 描画する画像のSRV。範囲は呼出側が確認済みであること。
@@ -93,7 +89,7 @@ private:
 	ComPtr<ID3D11Buffer> m_indexBuffer{};
 
 	//========= Texture関連=========
-	// Linear補間・CLAMPのSamplerの所有参照。画像の端を繰り返さない。
+	// Linear補間・CLAMPのSamplerの所有参照。画像の端を繰り返さない。SamplerFactoryで生成する。
 	ComPtr<ID3D11SamplerState> m_sampler{};
 	// 読み込んだ画像のSRV。識別値-1の位置に格納する（識別値1が先頭）。
 	std::vector<ComPtr<ID3D11ShaderResourceView>> m_textures{};
