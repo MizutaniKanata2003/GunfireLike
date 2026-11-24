@@ -103,10 +103,10 @@ bool HudRenderer::Initialize(GraphicsSystem& graphicsSystem)
 
 //========= 描画関数=========
 // Canvas矩形を実描画先へ変換し、固定Quadへ適用して描画する。
-void HudRenderer::DrawQuad(GraphicsSystem& graphicsSystem,float positionX,float positionY,float width,float height,const XMFLOAT4& color)
+void HudRenderer::DrawQuad(GraphicsSystem& graphicsSystem,const HUD_RECT& rectangle,const XMFLOAT4& color)
 {
 	// 幅・高さが0以下なら描かない。HP0の現在値バーなどもこの条件で省略する。
-	if(width <= 0.0f || height <= 0.0f)return;
+	if(rectangle.width <= 0.0f || rectangle.height <= 0.0f)return;
 
 	// 借用Contextと現在の描画先pixel寸法を取得する。
 	ID3D11DeviceContext* context = graphicsSystem.GetContext();
@@ -119,8 +119,8 @@ void HudRenderer::DrawQuad(GraphicsSystem& graphicsSystem,float positionX,float 
 
 	// 位置にはCanvas倍率と中央寄せOffset、サイズには倍率だけを適用する。結果は実pixel単位。
 	const HudCanvas HUD_canvas{render_width,render_height};
-	const XMFLOAT2 screen_position = HUD_canvas.ToScreenPosition(XMFLOAT2{positionX,positionY});
-	const XMFLOAT2 screen_size = HUD_canvas.ToScreenSize(XMFLOAT2{width,height});
+	const XMFLOAT2 screen_position = HUD_canvas.ToScreenPosition(XMFLOAT2{rectangle.x,rectangle.y});
+	const XMFLOAT2 screen_size = HUD_canvas.ToScreenSize(XMFLOAT2{rectangle.width,rectangle.height});
 
 	// rectangle.xyは左上、zwは寸法。renderSizeはCanvas領域ではなくRender Target全体のpixel寸法。
 	// HudVSがpixel→正規化→Y反転したClip座標へ変換する。余白は0として48バイトの配置を保つ。
@@ -169,12 +169,12 @@ void HudRenderer::DrawCrosshair(GraphicsSystem& graphicsSystem)
 	const XMFLOAT4 crosshair_color{1.0f,1.0f,1.0f,ns_HUD_FOREGROUND_ALPHA};
 
 	// 中央から寸法の半分を引いて横線の左上を求める。
-	DrawQuad(graphicsSystem,ns_CROSSHAIR_CENTER_X - ns_CROSSHAIR_LINE_LENGTH * 0.5f,ns_CROSSHAIR_CENTER_Y - ns_CROSSHAIR_LINE_THICKNESS * 0.5f,
-					 ns_CROSSHAIR_LINE_LENGTH,ns_CROSSHAIR_LINE_THICKNESS,crosshair_color);
+	DrawQuad(graphicsSystem,HUD_RECT{ns_CROSSHAIR_CENTER_X - ns_CROSSHAIR_LINE_LENGTH * 0.5f,ns_CROSSHAIR_CENTER_Y - ns_CROSSHAIR_LINE_THICKNESS * 0.5f,
+																	 ns_CROSSHAIR_LINE_LENGTH,ns_CROSSHAIR_LINE_THICKNESS},crosshair_color);
 
 	// 長さと太さを入れ替えた縦線を後から描く。中心座標は横線と同じ。
-	DrawQuad(graphicsSystem,ns_CROSSHAIR_CENTER_X - ns_CROSSHAIR_LINE_THICKNESS * 0.5f,ns_CROSSHAIR_CENTER_Y - ns_CROSSHAIR_LINE_LENGTH * 0.5f,
-					 ns_CROSSHAIR_LINE_THICKNESS,ns_CROSSHAIR_LINE_LENGTH,crosshair_color);
+	DrawQuad(graphicsSystem,HUD_RECT{ns_CROSSHAIR_CENTER_X - ns_CROSSHAIR_LINE_THICKNESS * 0.5f,ns_CROSSHAIR_CENTER_Y - ns_CROSSHAIR_LINE_LENGTH * 0.5f,
+																	 ns_CROSSHAIR_LINE_THICKNESS,ns_CROSSHAIR_LINE_LENGTH},crosshair_color);
 }
 
 // 背景と内側の現在値を順に描画する。
@@ -187,7 +187,7 @@ void HudRenderer::DrawPlayerHealthBar(GraphicsSystem& graphicsSystem,float curre
 	const float HP_ratio = std::clamp(currentHP / maxHP,0.0f,ns_FULLY_OPAQUE_ALPHA);
 
 	// 黒い背景を先に描き、内側の現在値を後から重ねる。
-	DrawQuad(graphicsSystem,ns_HP_BAR_POSITION_X,ns_HP_BAR_POSITION_Y,ns_HP_BAR_WIDTH,ns_HP_BAR_HEIGHT,XMFLOAT4{0.0f,0.0f,0.0f,ns_HUD_BACKGROUND_ALPHA});
+	DrawQuad(graphicsSystem,HUD_RECT{ns_HP_BAR_POSITION_X,ns_HP_BAR_POSITION_Y,ns_HP_BAR_WIDTH,ns_HP_BAR_HEIGHT},XMFLOAT4{0.0f,0.0f,0.0f,ns_HUD_BACKGROUND_ALPHA});
 
 	// 両側余白を引いた内幅へ比率を掛ける。25%より大きければ緑、それ以外は赤寄りの既存色。
 	const float health_width = (ns_HP_BAR_WIDTH - ns_HP_BAR_BORDER * 2.0f) * HP_ratio;
@@ -196,8 +196,8 @@ void HudRenderer::DrawPlayerHealthBar(GraphicsSystem& graphicsSystem,float curre
 		XMFLOAT4{ns_FULLY_OPAQUE_ALPHA,0.15f,0.10f,ns_HUD_FOREGROUND_ALPHA};
 
 	// 左上を余白分ずらし、上下余白分を引いた高さで描く。比率0の幅はDrawQuad側で省略される。
-	DrawQuad(graphicsSystem,ns_HP_BAR_POSITION_X + ns_HP_BAR_BORDER,ns_HP_BAR_POSITION_Y + ns_HP_BAR_BORDER,
-					 health_width,ns_HP_BAR_HEIGHT - ns_HP_BAR_BORDER * 2.0f,health_color);
+	DrawQuad(graphicsSystem,HUD_RECT{ns_HP_BAR_POSITION_X + ns_HP_BAR_BORDER,ns_HP_BAR_POSITION_Y + ns_HP_BAR_BORDER,
+																	 health_width,ns_HP_BAR_HEIGHT - ns_HP_BAR_BORDER * 2.0f},health_color);
 }
 
 // 低HP時に基準Canvas四辺へ半透明の赤い枠を描く。
@@ -210,10 +210,10 @@ void HudRenderer::DrawLowHealthWarning(GraphicsSystem& graphicsSystem,float curr
 	const XMFLOAT4 warning_color{ns_FULLY_OPAQUE_ALPHA,0.0f,0.0f,ns_WARNING_ALPHA};
 
 	// 上→下→左→右の順に描く。四隅の重複を維持し、Render Target余白の外周へ広げる変更はしない。
-	DrawQuad(graphicsSystem,0.0f,0.0f,ns_SCREEN_WIDTH,ns_LOW_HP_BORDER_THICKNESS,warning_color);
-	DrawQuad(graphicsSystem,0.0f,ns_SCREEN_HEIGHT - ns_LOW_HP_BORDER_THICKNESS,ns_SCREEN_WIDTH,ns_LOW_HP_BORDER_THICKNESS,warning_color);
-	DrawQuad(graphicsSystem,0.0f,0.0f,ns_LOW_HP_BORDER_THICKNESS,ns_SCREEN_HEIGHT,warning_color);
-	DrawQuad(graphicsSystem,ns_SCREEN_WIDTH - ns_LOW_HP_BORDER_THICKNESS,0.0f,ns_LOW_HP_BORDER_THICKNESS,ns_SCREEN_HEIGHT,warning_color);
+	DrawQuad(graphicsSystem,HUD_RECT{0.0f,0.0f,ns_SCREEN_WIDTH,ns_LOW_HP_BORDER_THICKNESS},warning_color);
+	DrawQuad(graphicsSystem,HUD_RECT{0.0f,ns_SCREEN_HEIGHT - ns_LOW_HP_BORDER_THICKNESS,ns_SCREEN_WIDTH,ns_LOW_HP_BORDER_THICKNESS},warning_color);
+	DrawQuad(graphicsSystem,HUD_RECT{0.0f,0.0f,ns_LOW_HP_BORDER_THICKNESS,ns_SCREEN_HEIGHT},warning_color);
+	DrawQuad(graphicsSystem,HUD_RECT{ns_SCREEN_WIDTH - ns_LOW_HP_BORDER_THICKNESS,0.0f,ns_LOW_HP_BORDER_THICKNESS,ns_SCREEN_HEIGHT},warning_color);
 }
 
 //========= 終了関数=========

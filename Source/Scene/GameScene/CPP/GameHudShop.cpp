@@ -163,8 +163,12 @@ namespace
 // ショップのパネルと、現在のページのボタンの画像を描く。
 void GameHud::DrawShopSprites(GraphicsSystem& graphicsSystem,const HUD_SHOP_STATE& shop)
 {
+	// パネルとボタンの画像は、全て画像本来の色（白）で、全体を描く。見た目の指定を1つにまとめて使い回す。
+	const HUD_SPRITE_APPEARANCE white_appearance{GAME_HUD_STYLE::ns_WHITE,1.0f};
+
 	// パネルを先に描く。
-	m_spriteRenderer.DrawSprite(graphicsSystem,m_shopPanelTexture,SHOP_LAYOUT::ns_PANEL.position,SHOP_LAYOUT::ns_PANEL.size,GAME_HUD_STYLE::ns_WHITE,1.0f);
+	m_spriteRenderer.DrawSprite(graphicsSystem,m_shopPanelTexture,HUD_RECT::FromPositionAndSize(SHOP_LAYOUT::ns_PANEL.position,SHOP_LAYOUT::ns_PANEL.size),
+															white_appearance);
 
 	// 現在のページのボタンだけを、添字の順に描く。押せないボタンは、押せない時の画像にする。押せるボタンは、カーソルが乗っていればホバー用の画像にする。
 	for(int button_index = 0; button_index < SHOP_LAYOUT::ns_BUTTON_COUNT; ++button_index){
@@ -176,8 +180,8 @@ void GameHud::DrawShopSprites(GraphicsSystem& graphicsSystem,const HUD_SHOP_STAT
 		if(IsShopButtonPressable(button_index,shop)){
 			button_texture = (button_index == shop.hoveredIndex) ? m_shopButtonHoverTexture : m_shopButtonTexture;
 		}
-		m_spriteRenderer.DrawSprite(graphicsSystem,button_texture,SHOP_LAYOUT::ns_BUTTON_POSITIONS[button_index],SHOP_LAYOUT::ns_BUTTON_SIZE,
-																GAME_HUD_STYLE::ns_WHITE,1.0f);
+		const HUD_RECT button_rect = HUD_RECT::FromPositionAndSize(SHOP_LAYOUT::ns_BUTTON_POSITIONS[button_index],SHOP_LAYOUT::ns_BUTTON_SIZE);
+		m_spriteRenderer.DrawSprite(graphicsSystem,button_texture,button_rect,white_appearance);
 	}
 }
 
