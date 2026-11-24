@@ -98,6 +98,8 @@ LRESULT CALLBACK WindowProcedure(HWND windowHandle,UINT message,WPARAM wParam,LP
 
 //========= エントリーポイント=========
 // Systemを順に初期化し、メッセージとゲームフレームを処理してから既存順序で終了する。
+// 13.1の例外：COM・Class登録・Window生成・Graphics・Audio・ImGuiの失敗検出を並べた初期化のため、本体が50行を超える。
+// 失敗した段階ごとに、解放するSystemの対象と順序が異なる。この終了順を、1か所で追えるよう、補助関数へ抽出しない。
 // instance: このアプリケーションのインスタンス。Window Class登録とWindow生成に使用する。
 // 第2引数: Win32エントリーポイントの旧インスタンス引数。未使用のため無名を維持する。
 // 第3引数: コマンドライン文字列。未使用のため無名を維持する。

@@ -12,6 +12,7 @@
 #include "Scene/Common/Stage/H/RoomController.h"
 
 // デバッグ表示に必要な、ゲームの状態の値。
+// 13.3の例外：デバッグ表示の値を運ぶだけの構造体で、振る舞いを持たない。メンバーは28個で15個を超えるが、GameDebugController::DrawUiが一括で組み立て、GameDebugUi::Drawが読み取るだけである。
 struct GAME_DEBUG_INFO
 {
 	//========= プレイヤー=========

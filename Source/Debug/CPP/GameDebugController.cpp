@@ -28,6 +28,8 @@
 
 //========= 初期化・終了関数=========
 // 参照先を登録する。
+// 13.8の例外：参照先の検査と登録の並びは、PlayerCombatController::Initializeと、メンバー名と型だけが違う。
+// 参照先の型と個数がクラスごとに異なり、各クラスのメンバーへ直接代入するため、共通の関数にはまとめない。
 bool GameDebugController::Initialize(const GAME_DEBUG_CONTROLLER_LINKS& links)
 {
 	// 参照先が1つでも欠けている場合は、以後の更新で空の参照を使ってしまうため、何も登録せず失敗を返す。
@@ -125,7 +127,7 @@ DODGE_JUDGE_RESULT GameDebugController::UpdateDodgeJudge(float worldDeltaTime)
 {
 	// 予告した攻撃が当たる瞬間だけ、結果が返る。それ以外の更新では、何も返らない。
 	const DODGE_JUDGE_RESULT judge_result = m_dodgeJudge.Update(worldDeltaTime,m_playerController->IsInvincible(),
-																															 m_playerController->GetSecondsSinceDodgeStart());
+																															m_playerController->GetSecondsSinceDodgeStart());
 	// 判定結果が出た場合だけ、表示用に記録する。
 	if(judge_result != DODGE_JUDGE_RESULT::e_NONE){
 		m_lastJudgeResult = judge_result;
