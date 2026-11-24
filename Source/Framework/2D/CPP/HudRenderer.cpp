@@ -11,6 +11,7 @@
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/GraphicsErrorLog.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
+#include "Framework/DirectX/H/MeshBuffers.h"
 #include "Framework/DirectX/H/ShaderBinaryLoader.h"
 
 // Canvas基準の配置と外観・CSOパス、単位Quadの定数をまとめる。
@@ -288,33 +289,14 @@ bool HudRenderer::CreateQuadBuffers(ID3D11Device* device)
 		VERTEX{XMFLOAT2{0.0f,1.0f}}
 	};
 
-	// ByteWidthは総バイト数。IMMUTABLEなので生成時に初期データを渡し、以後は頂点Bufferを更新しない。
-	D3D11_BUFFER_DESC vertex_buffer_description{};
-	vertex_buffer_description.ByteWidth = static_cast<UINT>(sizeof(VERTEX) * vertices.size());
-	vertex_buffer_description.Usage = D3D11_USAGE_IMMUTABLE;
-	vertex_buffer_description.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	// CPU配列の所有権は移さず読取元として渡す。Buffer用途なのでPitch類はゼロのまま。
-	D3D11_SUBRESOURCE_DATA vertex_data{};
-	vertex_data.pSysMem = vertices.data();
-	const HRESULT vertex_buffer_result = device->CreateBuffer(&vertex_buffer_description,&vertex_data,m_vertexBuffer.GetAddressOf());
-	// Vertex Buffer生成失敗ならAPI名と結果を記録して失敗を返す。
-	if(FAILED(vertex_buffer_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateBuffer(VertexBuffer)",vertex_buffer_result);
-		return false;
-	}
+	// Vertex Bufferの指定。ByteWidthは総バイト数。IMMUTABLEなので生成時に初期データを渡し、以後は頂点Bufferを更新しない。
+	const MESH_BUFFER_SOURCE vertex_source{vertices.data(),sizeof(VERTEX) * vertices.size(),D3D11_USAGE_IMMUTABLE,
+		D3D11_BIND_VERTEX_BUFFER,L"ID3D11Device::CreateBuffer(VertexBuffer)"};
 
-	// 16bit Indexを6個持つ不変Bufferを生成する。Draw時のR16_UINTと要素型を対応させる。
-	D3D11_BUFFER_DESC index_buffer_description{};
-	index_buffer_description.ByteWidth = static_cast<UINT>(sizeof(unsigned short) * ns_QUAD_INDICES.size());
-	index_buffer_description.Usage = D3D11_USAGE_IMMUTABLE;
-	index_buffer_description.BindFlags = D3D11_BIND_INDEX_BUFFER;
-	D3D11_SUBRESOURCE_DATA index_data{};
-	index_data.pSysMem = ns_QUAD_INDICES.data();
-	const HRESULT index_buffer_result = device->CreateBuffer(&index_buffer_description,&index_data,m_indexBuffer.GetAddressOf());
-	// Index Buffer生成失敗ならAPI名と結果を記録して失敗を返す。作成済みVertex Bufferの解放は、呼出側が行う。
-	if(FAILED(index_buffer_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateBuffer(IndexBuffer)",index_buffer_result);
-		return false;
-	}
-	return true;
+	// Index Bufferの指定。16bit Indexを6個持つ不変Bufferで、Draw時のR16_UINTと要素型を対応させる。
+	const MESH_BUFFER_SOURCE index_source{ns_QUAD_INDICES.data(),sizeof(unsigned short) * ns_QUAD_INDICES.size(),D3D11_USAGE_IMMUTABLE,
+		D3D11_BIND_INDEX_BUFFER,L"ID3D11Device::CreateBuffer(IndexBuffer)"};
+
+	// Vertex→Indexの順に生成し、最初の失敗で止める。失敗のログは、MeshBuffersが記録する。作成済みVertex Bufferの解放は、呼出側が行う。
+	return MeshBuffers::Create(device,vertex_source,m_vertexBuffer) && MeshBuffers::Create(device,index_source,m_indexBuffer);
 }

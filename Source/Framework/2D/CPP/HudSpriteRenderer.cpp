@@ -9,6 +9,7 @@
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/GraphicsErrorLog.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
+#include "Framework/DirectX/H/MeshBuffers.h"
 #include "Framework/DirectX/H/TextureLoader.h"
 
 // 単位Quadの2三角形のIndexを定数としてまとめる。
@@ -144,36 +145,16 @@ bool HudSpriteRenderer::CreateQuadBuffers(ID3D11Device* device)
 		BASIC_COLOR_VERTEX{XMFLOAT3{0.0f,1.0f,0.0f},XMFLOAT2{0.0f,1.0f}}
 	};
 
-	// ByteWidthは総バイト数。IMMUTABLEなので生成時に初期データを渡し、以後は頂点Bufferを更新しない。
-	D3D11_BUFFER_DESC vertex_buffer_desc{};
-	vertex_buffer_desc.ByteWidth = static_cast<UINT>(sizeof(BASIC_COLOR_VERTEX) * vertices.size());
-	vertex_buffer_desc.Usage = D3D11_USAGE_IMMUTABLE;
-	vertex_buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	// Vertex Bufferの指定。ByteWidthは総バイト数。IMMUTABLEなので生成時に初期データを渡し、以後は頂点Bufferを更新しない。
+	const MESH_BUFFER_SOURCE vertex_source{vertices.data(),sizeof(BASIC_COLOR_VERTEX) * vertices.size(),D3D11_USAGE_IMMUTABLE,
+		D3D11_BIND_VERTEX_BUFFER,L"ID3D11Device::CreateBuffer(HudSpriteVertexBuffer)"};
 
-	// CPU配列を読取元として渡し、所有は移さない。BufferなのでPitch類はゼロのまま。
-	D3D11_SUBRESOURCE_DATA vertex_data{};
-	vertex_data.pSysMem = vertices.data();
-	const HRESULT vertex_buffer_result = device->CreateBuffer(&vertex_buffer_desc,&vertex_data,m_vertexBuffer.GetAddressOf());
-	// Vertex Buffer生成失敗ならAPI名・結果を記録して失敗を返す。
-	if(FAILED(vertex_buffer_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateBuffer(HudSpriteVertexBuffer)",vertex_buffer_result);
-		return false;
-	}
+	// Index Bufferの指定。16bit Indexの不変Bufferで、Draw時のR16_UINTと要素型を対応させる。
+	const MESH_BUFFER_SOURCE index_source{ns_QUAD_INDICES.data(),sizeof(unsigned short) * ns_QUAD_INDICES.size(),D3D11_USAGE_IMMUTABLE,
+		D3D11_BIND_INDEX_BUFFER,L"ID3D11Device::CreateBuffer(HudSpriteIndexBuffer)"};
 
-	// 16bit Indexの不変Bufferを生成する。
-	D3D11_BUFFER_DESC index_buffer_desc{};
-	index_buffer_desc.ByteWidth = static_cast<UINT>(sizeof(unsigned short) * ns_QUAD_INDICES.size());
-	index_buffer_desc.Usage = D3D11_USAGE_IMMUTABLE;
-	index_buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-	D3D11_SUBRESOURCE_DATA index_data{};
-	index_data.pSysMem = ns_QUAD_INDICES.data();
-	const HRESULT index_buffer_result = device->CreateBuffer(&index_buffer_desc,&index_data,m_indexBuffer.GetAddressOf());
-	// Index Buffer生成失敗ならAPI名・結果を記録して失敗を返す。先に生成したVertex Bufferの解放は、呼出側が行う。
-	if(FAILED(index_buffer_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateBuffer(HudSpriteIndexBuffer)",index_buffer_result);
-		return false;
-	}
-	return true;
+	// Vertex→Indexの順に生成し、最初の失敗で止める。失敗のログは、MeshBuffersが記録する。先に生成したVertex Bufferの解放は、呼出側が行う。
+	return MeshBuffers::Create(device,vertex_source,m_vertexBuffer) && MeshBuffers::Create(device,index_source,m_indexBuffer);
 }
 
 // Linear補間・CLAMPのSamplerを生成する。
