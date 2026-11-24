@@ -26,20 +26,21 @@ public:
 	~SceneManager();
 
 	//========= ライフサイクル関数=========
-	// 既存Sceneを終了し、System参照を登録してTitleSceneの初期化を試行する。
+	// 既存Sceneを終了し、System参照を登録して、フェード用の黒い画像を読み込み、TitleSceneの初期化を試行する。
 	// inputSystem: Sceneへ渡す入力基盤。非所有で、Sceneの終了まで有効であること。
 	// graphicsSystem: Sceneへ渡す描画基盤。非所有で、SceneのResource終了まで有効であること。
 	// audioSystem: Sceneへ渡す音声基盤。非所有で、Sceneの終了まで有効であること。
-	// 戻り値による成功通知は行わない。TitleSceneのInit失敗はログへ記録する。
+	// 戻り値による成功通知は行わない。TitleSceneのInit失敗と、フェード用の画像の読込の失敗はログへ記録する。
+	// 画像の読込の失敗では、フェードの進行と切替は動作するが、黒い画像は描画されない。呼出スレッドのCOM初期化は、呼出側で済ませる。
 	void Initialize(InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem);
 	// Scene更新、遷移開始、フェード更新、黒画面での切替を既存順序で行う。
 	// deltaTime: この更新で進める経過時間。単位は秒。Sceneとフェードへそのまま渡す。
 	// フェードイン・アウトのどちらの再生中も、現在SceneのUpdateは呼ばない。
 	void Update(float deltaTime);
 	// 現在Sceneを描画してからフェードを重ねる。Scene切替は行わない。
-	// ImGuiのフレーム開始後、描画データ確定前に呼ぶ。
+	// ImGuiのフレーム開始後、描画データ確定前に呼ぶ。フェードは、Screen UI Passで描くため、ImGuiのウィンドウより下に描かれる。
 	void Draw();
-	// 予約Sceneを破棄し、現在SceneをFinalize後に破棄して、System参照を解除する。
+	// 予約Sceneを破棄し、現在SceneをFinalize後に破棄して、フェードの画像を解放し、System参照を解除する。
 	// System自体の終了処理とフェード状態のリセットは行わない。終了済みでも呼出可能。
 	void Finalize();
 

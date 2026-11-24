@@ -32,7 +32,7 @@ SceneManager::~SceneManager()
 }
 
 //========= ライフサイクル関数=========
-// 既存の管理状態を終了し、登録したSystemを使ってTitleSceneの開始を試行する。
+// 既存の管理状態を終了し、登録したSystemを使ってフェード用の画像を読み込み、TitleSceneの開始を試行する。
 void SceneManager::Initialize(InputSystem& inputSystem,GraphicsSystem& graphicsSystem,AudioSystem& audioSystem)
 {
 	// 再初期化でも以前のSceneを残さず、以前のSystem参照を使って終了を完了させる。
@@ -42,6 +42,11 @@ void SceneManager::Initialize(InputSystem& inputSystem,GraphicsSystem& graphicsS
 	m_inputSystem = &inputSystem;
 	m_graphicsSystem = &graphicsSystem;
 	m_audioSystem = &audioSystem;
+
+	// フェード用の黒い画像を読み込む。失敗しても起動は続け、フェードの進行と切替は動作する。黒い画像は描画されない。
+	if(!m_fadeOverlay.Initialize(graphicsSystem)){
+		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"フェード用の画像の初期化に失敗しました。フェードの画像は描画されません。");
+	}
 
 	// 起動時は黒への待機を挟まずTitleSceneの初期化を試行し、フェードインへ進む。
 	RequestSceneChange<TitleScene>();
@@ -70,8 +75,8 @@ void SceneManager::Draw()
 	// Sceneがない場合もフェードは描けるよう、Sceneの有無はこの描画だけで判定する。
 	if(m_currentScene)m_currentScene->Draw();
 
-	// Sceneの描画命令の後にフェードを登録し、遷移演出を重ねる。
-	m_fadeOverlay.Draw();
+	// Sceneの描画命令の後にフェードを描き、遷移演出を重ねる。描画基盤が登録されていない場合は、描かない。
+	if(m_graphicsSystem != nullptr)m_fadeOverlay.Draw(*m_graphicsSystem);
 }
 
 // 所有Sceneを終了してから、所有していないSystem参照を解除する。
@@ -85,6 +90,9 @@ void SceneManager::Finalize()
 		m_currentScene->Finalize();
 		m_currentScene.reset();
 	}
+
+	// フェードの画像とスプライト描画の基盤を、描画基盤の終了より先に解放する。フェードの進行状態は変更しない。
+	m_fadeOverlay.Uninit();
 
 	// System自体は終了せず、以後のScene生成に使わないよう非所有ポインターを解除する。
 	m_inputSystem = nullptr;

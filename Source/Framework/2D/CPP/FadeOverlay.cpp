@@ -1,15 +1,15 @@
 ﻿#include "../H/FadeOverlay.h"
 
-// 開始時の端点設定、秒数からのAlpha計算、メインViewportを覆うImGui背景の登録を実装する。
-// 既存の数値・計算式・描画Flag・Style操作の順序を維持し、Scene切替や入力制御は追加しない。
+// 画像の読込、開始時の端点設定、秒数からのAlpha計算、黒い画像のCanvas全体への描画を実装する。
+// 既存の数値・計算式を維持し、Scene切替や入力制御は追加しない。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで所要時間の最小値を適用し、std::clampでフェード進行率を0〜1へ制限する。
 
-//========= 外部ライブラリ インクルード=========
-#include "imgui.h" // メインViewportの取得、背景Windowの登録、StyleのPush/Popを使用する。
+//========= Framework インクルード=========
+#include "Framework/DirectX/H/GraphicsSystem.h"
 
-// フェードの時間・進行率・色と、ImGui背景Windowの固定設定をまとめる。
+// フェードの時間・進行率・色と、黒い画像の設定をまとめる。
 namespace
 {
 	//========= フェード時間・進行率定数=========
@@ -26,15 +26,42 @@ namespace
 	// Alpha=1は不透明側の端点。フェードインでは1-進行率を計算する基準にも使う。
 	constexpr float ns_FULLY_OPAQUE_ALPHA = 1.0f;
 
-	//========= フェード色定数=========
-	// RGB各成分を0とする黒の既存設定。変化させるのは別に保持するAlphaで、RGBは固定する。
-	constexpr float ns_FADE_COLOR_RED = 0.0f;
-	constexpr float ns_FADE_COLOR_GREEN = 0.0f;
-	constexpr float ns_FADE_COLOR_BLUE = 0.0f;
+	//========= 黒い画像の定数=========
+	// 黒い画像のパス。作業ディレクトリ基準。画像を差し替えると、フェードの見た目を変えられる。画像のAlphaは不透明（1）であること。
+	constexpr wchar_t ns_FADE_TEXTURE_PATH[] = L"Assets/Textures/FadeBlack.png";
+	// Canvas全体の幅と高さ。HudCanvasの基準領域1280×720と対応する既存値で、実Render Targetのpixelではない。
+	constexpr float ns_CANVAS_WIDTH = 1280.0f;
+	constexpr float ns_CANVAS_HEIGHT = 720.0f;
+	// 画像の全体を描く表示割合。1で左端から右端まで。
+	constexpr float ns_FULL_VISIBLE_WIDTH_RATIO = 1.0f;
+}
 
-	//========= ImGui設定定数=========
-	// ImGui Windowの識別名。同名Windowとの対応に影響するため、既存文字列を維持する。
-	constexpr const char* ns_FADE_OVERLAY_WINDOW_NAME = "Fade Overlay";
+//========= ライフサイクル関数=========
+// スプライト描画の基盤と、黒い画像を生成する。
+bool FadeOverlay::Initialize(GraphicsSystem& graphicsSystem)
+{
+	// 旧所有参照を先に解放する。以後の生成失敗でも旧描画状態へは復帰しない。
+	Uninit();
+
+	// スプライト描画の基盤を生成する。失敗のログは、HudSpriteRendererの下位処理が記録する。
+	if(!m_spriteRenderer.Initialize(graphicsSystem))return false;
+
+	// 黒い画像を読み込む。失敗した場合は、TextureLoaderがログを記録し、識別値は0のままになる。
+	m_fadeTexture = m_spriteRenderer.LoadTexture(graphicsSystem,ns_FADE_TEXTURE_PATH);
+	// 読込失敗なら、先に生成した基盤も解放してfalseを返す。
+	if(m_fadeTexture == 0){
+		m_spriteRenderer.Uninit();
+		return false;
+	}
+	return true;
+}
+
+// 基盤と画像を解放する。
+void FadeOverlay::Uninit()
+{
+	// 画像の識別値は、Rendererの解放で全て無効になる。フェードの進行状態は変更しない。
+	m_spriteRenderer.Uninit();
+	m_fadeTexture = {};
 }
 
 //========= フェード制御関数=========
@@ -91,40 +118,16 @@ void FadeOverlay::Update(float deltaTime)
 	}
 }
 
-// 時間やSceneを変更せず、現在Alphaの黒い背景をImGuiの描画命令として登録する。
-void FadeOverlay::Draw() const
+// 時間やSceneを変更せず、現在Alphaの黒い画像をCanvas全体へ描画する。
+void FadeOverlay::Draw(GraphicsSystem& graphicsSystem)
 {
-	// Alphaが0以下ならWindowもStyle操作も登録せず戻る。停止中でもAlphaが正なら描画を続ける。
-	if(m_alpha <= ns_FULLY_TRANSPARENT_ALPHA)return;
+	// Alphaが0以下、または画像がなければ何も描かない。停止中でもAlphaが正なら描画を続ける。
+	if(m_alpha <= ns_FULLY_TRANSPARENT_ALPHA || m_fadeTexture == 0)return;
 
-	// メインViewportの位置・全体サイズをそのまま使う。Virtual CanvasではなくImGuiの座標系へ合わせる。
-	// Alwaysにより毎回この位置と寸法を適用する。Viewportは借用し、このクラスでは保持しない。
-	const ImGuiViewport* viewport = ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos(viewport->Pos,ImGuiCond_Always);
-	ImGui::SetNextWindowSize(viewport->Size,ImGuiCond_Always);
+	// 直前のSceneのStateを引き継がず、Alpha Blend有効・Depth無効のScreen UI Passへ設定する。
+	graphicsSystem.SetRenderPass(e_RenderPass::e_SCREEN_UI);
 
-	// 装飾なし・移動なし・設定保存なし・入力なし・Navigationなし・Focus時の前面化なしをORで組み合わせる。
-	// 自動の最前面保証やアプリ全体の入力停止を追加する指定ではない。既存のWindow Flag構成を維持する。
-	const ImGuiWindowFlags window_flags =
-		ImGuiWindowFlags_NoDecoration |
-		ImGuiWindowFlags_NoMove |
-		ImGuiWindowFlags_NoSavedSettings |
-		ImGuiWindowFlags_NoInputs |
-		ImGuiWindowFlags_NoNav |
-		ImGuiWindowFlags_NoBringToFrontOnFocus;
-
-	// 背景色に固定RGBと現在Alphaを渡し、丸みと枠幅を0にして矩形の背景にする。
-	// StyleVarは2回、StyleColorは1回Pushするため、後段のPop数と対応を保つ。
-	ImGui::PushStyleColor(ImGuiCol_WindowBg,ImVec4(ns_FADE_COLOR_RED,ns_FADE_COLOR_GREEN,ns_FADE_COLOR_BLUE,m_alpha));
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0.0f);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0.0f);
-
-	// 本文なしのWindow背景を登録する。p_open=nullptrで閉じるためのboolは用意しない。
-	// Beginの戻り値にかかわらず対応Endを呼ぶ。GPU描画はここでは行わず、ImGuiの描画バックエンドへ任せる。
-	ImGui::Begin(ns_FADE_OVERLAY_WINDOW_NAME,nullptr,window_flags);
-	ImGui::End();
-
-	// 上でPushしたStyleだけを戻し、後続UIへ丸み・枠幅・背景色を残さない。例外時の自動復元機構は追加しない。
-	ImGui::PopStyleVar(2);
-	ImGui::PopStyleColor();
+	// 画像の色には白(1,1,1)を掛けて、画像本来の黒を保つ。Alphaだけを、現在のフェードのAlphaにする。
+	const XMFLOAT4 fade_color{1.0f,1.0f,1.0f,m_alpha};
+	m_spriteRenderer.DrawSprite(graphicsSystem,m_fadeTexture,XMFLOAT2{},XMFLOAT2{ns_CANVAS_WIDTH,ns_CANVAS_HEIGHT},fade_color,ns_FULL_VISIBLE_WIDTH_RATIO);
 }
