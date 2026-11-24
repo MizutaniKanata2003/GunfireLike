@@ -1,10 +1,6 @@
 ﻿length,places
-23,Source/Scene/ResultScene/CPP/ResultScene.cpp:18 | Source/Scene/TitleScene/CPP/TitleScene.cpp:18
+20,Source/Scene/ResultScene/CPP/ResultScene.cpp:11 | Source/Scene/TitleScene/CPP/TitleScene.cpp:11
 17,Source/Debug/CPP/GameDebugController.cpp:47 | Source/Scene/Common/Combat/CPP/PlayerCombatController.cpp:40
-15,Source/Framework/2D/CPP/HudSpriteRenderer.cpp:154 | Source/Framework/3D/CPP/ObjModelRenderer.cpp:354
-14,Source/Framework/DirectX/CPP/RenderStateSet.cpp:113 | Source/Framework/DirectX/CPP/RenderStateSet.cpp:146
 14,Source/Scene/GameScene/H/GameScene.h:11 | Source/Scene/ResultScene/H/ResultScene.h:11 | Source/Scene/TitleScene/H/TitleScene.h:11
-13,Source/Scene/ResultScene/H/ResultScene.h:19 | Source/Scene/TitleScene/H/TitleScene.h:19
-11,Source/Framework/3D/CPP/BasicMeshRenderer.cpp:113 | Source/Framework/3D/CPP/ObjModelRenderer.cpp:261
-11,Source/Framework/DirectX/CPP/RenderStateSet.cpp:133 | Source/Framework/DirectX/CPP/RenderStateSet.cpp:165
-10,Source/Debug/CPP/GameDebugUi.cpp:15 | Source/Debug/CPP/GameDebugUi.cpp:55 | Source/Debug/CPP/GameDebugUi.cpp:83
+13,Source/Scene/ResultScene/H/ResultScene.h:22 | Source/Scene/TitleScene/H/TitleScene.h:22
+10,Source/Debug/CPP/GameDebugUi.cpp:18 | Source/Debug/CPP/GameDebugUi.cpp:58 | Source/Debug/CPP/GameDebugUi.cpp:86

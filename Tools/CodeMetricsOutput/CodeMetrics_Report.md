@@ -1,6 +1,6 @@
 # コード指標レポート（I1）
 
-対象: ファイル 156 個、関数 655 個、クラス・構造体 176 個
+対象: ファイル 160 個、関数 660 個、クラス・構造体 180 個
 
 ## 1. 基準を超えた件数
 
@@ -8,10 +8,10 @@
 |---|---|---|
 | 関数の本体の行数 | 50行 | 1 |
 | ネストの深さ | 3段 | 0 |
-| 関数の引数の数 | 4個 | 1 |
+| 関数の引数の数 | 4個 | 0 |
 | クラスの行数・メンバー数 | 400行・15個 | 1 |
 | ファイルの物理行数 | 500行 | 0 |
-| 重複（同じ並び） | 10行以上 | 9 |
+| 重複（同じ並び） | 10行以上 | 5 |
 
 
 ## 2. 関数の本体の行数（上位30）
@@ -28,9 +28,7 @@
 
 ## 4. 引数の数（上位30）
 
-| ファイル | 関数 | 行 | 引数 |
-|---|---|---|---|
-| Source/Scene/Common/Player/CPP/PlayerController.cpp | PlayerController::Update | 70 | 5 |
+（なし）
 
 
 ## 5. クラス・構造体
@@ -49,15 +47,11 @@
 
 | 行数 | 場所（ファイル:開始行） |
 |---|---|
-| 23 | Source/Scene/ResultScene/CPP/ResultScene.cpp:18<br>Source/Scene/TitleScene/CPP/TitleScene.cpp:18 |
+| 20 | Source/Scene/ResultScene/CPP/ResultScene.cpp:11<br>Source/Scene/TitleScene/CPP/TitleScene.cpp:11 |
 | 17 | Source/Debug/CPP/GameDebugController.cpp:47<br>Source/Scene/Common/Combat/CPP/PlayerCombatController.cpp:40 |
-| 15 | Source/Framework/2D/CPP/HudSpriteRenderer.cpp:154<br>Source/Framework/3D/CPP/ObjModelRenderer.cpp:354 |
-| 14 | Source/Framework/DirectX/CPP/RenderStateSet.cpp:113<br>Source/Framework/DirectX/CPP/RenderStateSet.cpp:146 |
 | 14 | Source/Scene/GameScene/H/GameScene.h:11<br>Source/Scene/ResultScene/H/ResultScene.h:11<br>Source/Scene/TitleScene/H/TitleScene.h:11 |
-| 13 | Source/Scene/ResultScene/H/ResultScene.h:19<br>Source/Scene/TitleScene/H/TitleScene.h:19 |
-| 11 | Source/Framework/3D/CPP/BasicMeshRenderer.cpp:113<br>Source/Framework/3D/CPP/ObjModelRenderer.cpp:261 |
-| 11 | Source/Framework/DirectX/CPP/RenderStateSet.cpp:133<br>Source/Framework/DirectX/CPP/RenderStateSet.cpp:165 |
-| 10 | Source/Debug/CPP/GameDebugUi.cpp:15<br>Source/Debug/CPP/GameDebugUi.cpp:55<br>Source/Debug/CPP/GameDebugUi.cpp:83 |
+| 13 | Source/Scene/ResultScene/H/ResultScene.h:22<br>Source/Scene/TitleScene/H/TitleScene.h:22 |
+| 10 | Source/Debug/CPP/GameDebugUi.cpp:18<br>Source/Debug/CPP/GameDebugUi.cpp:58<br>Source/Debug/CPP/GameDebugUi.cpp:86 |
 
 
 ## 8. 数え方の限界

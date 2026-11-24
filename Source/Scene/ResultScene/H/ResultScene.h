@@ -13,6 +13,9 @@ class GraphicsSystem;
 class InputSystem;
 class SceneManager;
 
+// IScene実装の骨組み（4つの前方宣言・同じ4つの参照を受ける生成関数・5つのoverride宣言）は、TitleScene・ResultScene・GameSceneで同じ形になり、重複として検出されるが、例外とする（規約02の13.8）。
+// 理由は、overrideは各クラスが宣言する必要があること（C++の規則）と、生成関数が受ける4つの参照は、各Sceneの依存の契約であること。
+// 共通の基底や部品へまとめる案は、所有を優先する13.4に反し、Sceneの生成・遷移の予約を行う呼出し側の変更も要るため、採用しない。
 // リザルトのSceneとして、ボタン1つのメニュー画面の流れ（ButtonMenuFlow）の呼出しと、タイトルへ戻る入力に応じた遷移の予約を行うクラス。
 class ResultScene final: public IScene
 {
