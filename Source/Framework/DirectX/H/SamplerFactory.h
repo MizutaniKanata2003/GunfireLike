@@ -14,17 +14,17 @@
 class SamplerFactory final
 {
 public:
-	//========= 生成関数=========
-	// 縮小・拡大・Mip間をLinear補間し、U・V・Wを同じアドレス指定にするSamplerを生成して、出力先へ所有参照を受け取る。
-	// LODは0〜FLOAT32_MAXを許可し、実際のMipは画像Resourceに従う。その他の設定は、ゼロ初期値のまま。Mipの自動生成の指定ではない。
-	// device: 生成に使うDevice。nullptr不可。
-	// addressMode: U・V・Wに共通のアドレス指定。画像の端を繰り返すならD3D11_TEXTURE_ADDRESS_WRAP、繰り返さないならD3D11_TEXTURE_ADDRESS_CLAMP。
-	// output: 所有参照の出力先。呼出前に空であること。失敗時は、空のまま、またはCreateSamplerStateが設定した値のまま。
-	// 戻り値: 成功したらtrue。失敗はAPI名（ID3D11Device::CreateSamplerState）とHRESULTをログへ記録してfalse。
-	[[nodiscard]] static bool CreateLinear(ID3D11Device* device,D3D11_TEXTURE_ADDRESS_MODE addressMode,ComPtr<ID3D11SamplerState>& output);
+  //========= 生成関数=========
+  // 縮小・拡大・Mip間をLinear補間し、U・V・Wを同じアドレス指定にするSamplerを生成して、出力先へ所有参照を受け取る。
+  // LODは0〜FLOAT32_MAXを許可し、実際のMipは画像Resourceに従う。その他の設定は、ゼロ初期値のまま。Mipの自動生成の指定ではない。
+  // device: 生成に使うDevice。nullptr不可。
+  // addressMode: U・V・Wに共通のアドレス指定。画像の端を繰り返すならD3D11_TEXTURE_ADDRESS_WRAP、繰り返さないならD3D11_TEXTURE_ADDRESS_CLAMP。
+  // output: 所有参照の出力先。呼出前に空であること。失敗時は、空のまま、またはCreateSamplerStateが設定した値のまま。
+  // 戻り値: 成功したらtrue。失敗はAPI名（ID3D11Device::CreateSamplerState）とHRESULTをログへ記録してfalse。
+  [[nodiscard]] static bool CreateLinear(ID3D11Device* device,D3D11_TEXTURE_ADDRESS_MODE addressMode,ComPtr<ID3D11SamplerState>& output);
 
 private:
-	//========= 生成禁止関数=========
-	// SamplerFactoryのインスタンス生成を禁止する。
-	SamplerFactory() = delete;
+  //========= 生成禁止関数=========
+  // SamplerFactoryのインスタンス生成を禁止する。
+  SamplerFactory() = delete;
 };

@@ -24,76 +24,76 @@ class GraphicsSystem;
 class ObjModelRenderer final
 {
 public:
-	//========= Getter関数=========
-	// 位置float3とUV float2の頂点形式を表す識別値を返す。法線入力は持たない。
-	[[nodiscard]] VERTEX_FORMAT GetVertexFormat() const { return VERTEX_FORMAT::e_POSITION_TEXTURE; }
+  //========= Getter関数=========
+  // 位置float3とUV float2の頂点形式を表す識別値を返す。法線入力は持たない。
+  [[nodiscard]] VERTEX_FORMAT GetVertexFormat() const { return VERTEX_FORMAT::e_POSITION_TEXTURE; }
 
-	//========= ライフサイクル・描画関数=========
-	// 旧Resourceを先にUninitし、OBJからBuffer・BasicColorPipeline・必要な画像・Samplerを生成する。
-	// graphicsSystem: 有効な生成Deviceの取得元。描画に使う基盤と対応するDeviceであること。
-	// OBJFilePath: OBJファイルのパス。相対パスはプロセスの作業ディレクトリ基準。
-	// textureFilePath: モデル全体へ使う画像パス。空なら読込を省く。MTLから取得する処理はない。
-	// 戻り値: 全生成完了ならtrue。検出した読込・GPU生成失敗では部分ResourceをUninitしてfalse。
-	// Device未取得でもfalse。旧状態は復元しない。stoi・メモリ確保・下位処理の例外は捕捉しない。
-	// 例外時はbool経路と同じ解放を保証しない。画像読込時はLoaderが必要とするCOM初期化を利用側で済ませる。
-	bool Initialize(GraphicsSystem& graphicsSystem,const std::wstring& OBJFilePath,const std::wstring& textureFilePath);
-	// モデルを指定変換と色で描く。変更したIA・VS/PS・定数Buffer・SRV・Samplerは元へ戻さない。
-	// graphicsSystem: Context取得元。Render Target・Viewport・Blend・Depth・Rasterizerは利用側が設定する。
-	// worldMatrix: Local→World行列。内部で転置してObject転送型へ保存する。
-	// camera: View行列とProjection行列。view*projectionの順で合成し、転置してCamera転送型へ保存する。
-	// color: RGBA色。既定(1,1,1,1)は不透明な白。単色出力または画像色との積に使い、clampは追加しない。
-	// 必須Resource・Context・Index数がなければ何もしない。UV倍率は(1,1)で、SRVの有無から画像使用値を作る。
-	// Bind先はCamera=VS b0、Object=VS/PS b1、Material=VS/PS b2、画像=PS t0、Sampler=PS s0。
-	void Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const CAMERA_MATRICES& camera,const XMFLOAT4& color = XMFLOAT4{1.0f,1.0f,1.0f,1.0f});
-	// メンバーの所有参照を解放してIndex数を0にする。未初期化・部分初期化・終了済みでも呼出可能。
-	// ContextのBind解除・状態復元・GPU完了待機はしない。Context等の別参照は残り得る。
-	void Uninit();
+  //========= ライフサイクル・描画関数=========
+  // 旧Resourceを先にUninitし、OBJからBuffer・BasicColorPipeline・必要な画像・Samplerを生成する。
+  // graphicsSystem: 有効な生成Deviceの取得元。描画に使う基盤と対応するDeviceであること。
+  // OBJFilePath: OBJファイルのパス。相対パスはプロセスの作業ディレクトリ基準。
+  // textureFilePath: モデル全体へ使う画像パス。空なら読込を省く。MTLから取得する処理はない。
+  // 戻り値: 全生成完了ならtrue。検出した読込・GPU生成失敗では部分ResourceをUninitしてfalse。
+  // Device未取得でもfalse。旧状態は復元しない。stoi・メモリ確保・下位処理の例外は捕捉しない。
+  // 例外時はbool経路と同じ解放を保証しない。画像読込時はLoaderが必要とするCOM初期化を利用側で済ませる。
+  bool Initialize(GraphicsSystem& graphicsSystem,const std::wstring& OBJFilePath,const std::wstring& textureFilePath);
+  // モデルを指定変換と色で描く。変更したIA・VS/PS・定数Buffer・SRV・Samplerは元へ戻さない。
+  // graphicsSystem: Context取得元。Render Target・Viewport・Blend・Depth・Rasterizerは利用側が設定する。
+  // worldMatrix: Local→World行列。内部で転置してObject転送型へ保存する。
+  // camera: View行列とProjection行列。view*projectionの順で合成し、転置してCamera転送型へ保存する。
+  // color: RGBA色。既定(1,1,1,1)は不透明な白。単色出力または画像色との積に使い、clampは追加しない。
+  // 必須Resource・Context・Index数がなければ何もしない。UV倍率は(1,1)で、SRVの有無から画像使用値を作る。
+  // Bind先はCamera=VS b0、Object=VS/PS b1、Material=VS/PS b2、画像=PS t0、Sampler=PS s0。
+  void Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const CAMERA_MATRICES& camera,const XMFLOAT4& color = XMFLOAT4{1.0f,1.0f,1.0f,1.0f});
+  // メンバーの所有参照を解放してIndex数を0にする。未初期化・部分初期化・終了済みでも呼出可能。
+  // ContextのBind解除・状態復元・GPU完了待機はしない。Context等の別参照は残り得る。
+  void Uninit();
 
 private:
-	//========= 読込の補助関数=========
-	// OBJを読み、位置・UV・法線Indexの組で頂点を共有し、面を先頭固定の扇形で三角形化する。
-	// OBJFilePath: 読込先。位置は正の1始まりIndexが前提で、負数相対参照は解決しない。
-	// vertices: 空配列を渡す。内部ではclearせず追加し、途中失敗の追加分も巻き戻さない。
-	// indices: 空のunsigned int配列を渡す。GPUではR32_UINTを使う。途中失敗の追加分は残る。
-	// 戻り値: Open・参照範囲等の検出失敗でfalse、最後に両配列が非空ならtrue。
-	// v・vt・fを扱う。凹多角形の一般的分割、数値抽出の完全検証、ストリーム終了理由の検証は行わない。
-	// 法線値は読み込まず、法線Indexだけを共有Keyへ含める。UVはV=1-V、UV Indexが0以下なら(0,0)。
-	// stoi等の例外と巨大配列の整数変換上限は別途扱う必要があり、ここでは捕捉・上限検証を追加しない。
-	bool LoadOBJFile(const std::wstring& OBJFilePath,std::vector<BASIC_COLOR_VERTEX>& vertices,std::vector<unsigned int>& indices);
-	// 共通TextureLoaderを使い、画像のSRVをメンバーへ受け取る。
-	// device: Initializeで有効性を確認した非所有Device。
-	// textureFilePath: 読込画像パス。参照自体は保持しない。
-	// 戻り値: Loaderの成否。Loaderはm_textureViewをResetしてから読込を行う。
-	bool LoadTextureFromFile(ID3D11Device* device,const std::wstring& textureFilePath);
+  //========= 読込の補助関数=========
+  // OBJを読み、位置・UV・法線Indexの組で頂点を共有し、面を先頭固定の扇形で三角形化する。
+  // OBJFilePath: 読込先。位置は正の1始まりIndexが前提で、負数相対参照は解決しない。
+  // vertices: 空配列を渡す。内部ではclearせず追加し、途中失敗の追加分も巻き戻さない。
+  // indices: 空のunsigned int配列を渡す。GPUではR32_UINTを使う。途中失敗の追加分は残る。
+  // 戻り値: Open・参照範囲等の検出失敗でfalse、最後に両配列が非空ならtrue。
+  // v・vt・fを扱う。凹多角形の一般的分割、数値抽出の完全検証、ストリーム終了理由の検証は行わない。
+  // 法線値は読み込まず、法線Indexだけを共有Keyへ含める。UVはV=1-V、UV Indexが0以下なら(0,0)。
+  // stoi等の例外と巨大配列の整数変換上限は別途扱う必要があり、ここでは捕捉・上限検証を追加しない。
+  bool LoadOBJFile(const std::wstring& OBJFilePath,std::vector<BASIC_COLOR_VERTEX>& vertices,std::vector<unsigned int>& indices);
+  // 共通TextureLoaderを使い、画像のSRVをメンバーへ受け取る。
+  // device: Initializeで有効性を確認した非所有Device。
+  // textureFilePath: 読込画像パス。参照自体は保持しない。
+  // 戻り値: Loaderの成否。Loaderはm_textureViewをResetしてから読込を行う。
+  bool LoadTextureFromFile(ID3D11Device* device,const std::wstring& textureFilePath);
 
-	//========= 生成・描画の補助関数=========
-	// 共有後の頂点配列とIndex配列から、Vertex BufferとIndex Bufferを、この順に生成する。失敗はログへ記録する。
-	// device: 生成に使うDevice。
-	// vertices: 初期データにする頂点配列。呼出中に有効であること。
-	// indices: 初期データにするIndex配列。32bit Indexで、呼出中に有効であること。
-	// 戻り値: 両方成功したらtrue。
-	[[nodiscard]] bool CreateMeshBuffers(ID3D11Device* device,const std::vector<BASIC_COLOR_VERTEX>& vertices,const std::vector<unsigned int>& indices);
-	// モデル・画像・Samplerを接続して描画する。IA・Shader・定数・SRV・Samplerを、元へ戻さない。
-	// context: 描画に使う即時Context。画像なしの場合、PS t0へnullptrを設定する。
-	void BindAndDraw(ID3D11DeviceContext* context) const;
+  //========= 生成・描画の補助関数=========
+  // 共有後の頂点配列とIndex配列から、Vertex BufferとIndex Bufferを、この順に生成する。失敗はログへ記録する。
+  // device: 生成に使うDevice。
+  // vertices: 初期データにする頂点配列。呼出中に有効であること。
+  // indices: 初期データにするIndex配列。32bit Indexで、呼出中に有効であること。
+  // 戻り値: 両方成功したらtrue。
+  [[nodiscard]] bool CreateMeshBuffers(ID3D11Device* device,const std::vector<BASIC_COLOR_VERTEX>& vertices,const std::vector<unsigned int>& indices);
+  // モデル・画像・Samplerを接続して描画する。IA・Shader・定数・SRV・Samplerを、元へ戻さない。
+  // context: 描画に使う即時Context。画像なしの場合、PS t0へnullptrを設定する。
+  void BindAndDraw(ID3D11DeviceContext* context) const;
 
-	//========= Pipeline関連=========
-	// BasicColorのShader・Input Layout・定数Bufferを所有する。
-	BasicColorPipeline m_pipeline{};
+  //========= Pipeline関連=========
+  // BasicColorのShader・Input Layout・定数Bufferを所有する。
+  BasicColorPipeline m_pipeline{};
 
-	//========= Buffer関連=========
-	// OBJの共有後頂点を格納するDEFAULT Bufferを所有する。
-	ComPtr<ID3D11Buffer> m_vertexBuffer{};
-	// unsigned intで三角形の参照順を格納するDEFAULT Bufferを所有する。
-	ComPtr<ID3D11Buffer> m_indexBuffer{};
+  //========= Buffer関連=========
+  // OBJの共有後頂点を格納するDEFAULT Bufferを所有する。
+  ComPtr<ID3D11Buffer> m_vertexBuffer{};
+  // unsigned intで三角形の参照順を格納するDEFAULT Bufferを所有する。
+  ComPtr<ID3D11Buffer> m_indexBuffer{};
 
-	//========= Texture関連=========
-	// モデル全体に使う画像のSRVを所有する。空パスの初期化後は未生成のまま。
-	ComPtr<ID3D11ShaderResourceView> m_textureView{};
-	// Linear参照・WRAPのSamplerを所有する。画像なしの場合も生成する。SamplerFactoryで生成する。
-	ComPtr<ID3D11SamplerState> m_textureSampler{};
+  //========= Texture関連=========
+  // モデル全体に使う画像のSRVを所有する。空パスの初期化後は未生成のまま。
+  ComPtr<ID3D11ShaderResourceView> m_textureView{};
+  // Linear参照・WRAPのSamplerを所有する。画像なしの場合も生成する。SamplerFactoryで生成する。
+  ComPtr<ID3D11SamplerState> m_textureSampler{};
 
-	//========= 描画情報=========
-	// 初期0、生成完了後にIndex配列の要素数、Uninitで0。バイト数ではない。
-	unsigned int m_indexCount{};
+  //========= 描画情報=========
+  // 初期0、生成完了後にIndex配列の要素数、Uninitで0。バイト数ではない。
+  unsigned int m_indexCount{};
 };

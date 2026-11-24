@@ -38,7 +38,7 @@ namespace GAME_INPUT_HELPER
     const POINT cursor_position = inputSystem.GetCursorClientPosition();
     const XMFLOAT2& canvas_offset = hud_canvas.GetOffset();
     return XMFLOAT2{(static_cast<float>(cursor_position.x) - canvas_offset.x) / canvas_scale,
-                    (static_cast<float>(cursor_position.y) - canvas_offset.y) / canvas_scale};
+      (static_cast<float>(cursor_position.y) - canvas_offset.y) / canvas_scale};
   }
 
   // 数字キー（1から順）のうち、この更新で押されたキーに対応する添字を返す。複数が押された場合は、最後のキーを返す。

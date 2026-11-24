@@ -11,87 +11,87 @@
 class InputSystem final
 {
 public:
-	//========= 初期化・更新関数=========
-	// 入力先を登録し、現在キーを前回キーにもコピーして中央位置を計算する。差分やCapture設定はリセットしない。
-	// windowHandle: 入力対象の有効なWindow。所有しない。入力・カーソル操作中は呼出側が有効に保つ。
-	void Initialize(HWND windowHandle);
-	// 前回値を保存して新しいキー状態を取得する。Capture中は中央・制限領域・カーソル位置も更新する。
-	// Sceneがトリガーを判定する前に毎フレーム呼ぶ。蓄積したマウス差分とホイール回転量はここではクリアしない。
-	void Update();
-	// Captureを解除し、Window登録・差分・ホイール回転量・中央・両キー配列をクリアする。Window自体は破棄しない。
-	// Captureが既にfalseならカーソル制御は再実行しない。OS全体の設定を無条件に復元する処理ではない。
-	void Uninit();
-	// Capture中のマウス移動とホイール回転を蓄積し、フォーカス喪失で設定を解除する。解除中は全メッセージを無視する。
-	// message: WindowProcedureから転送するWin32メッセージ番号。
-	// wParam: WM_MOUSEWHEELで上位ワードの符号付きホイール回転量を抽出する値。他のメッセージでは使用しない。
-	// lParam: WM_MOUSEMOVEでクライアント座標のX・Yを抽出する値。ここでは他メッセージの追加情報に使わない。
-	void OnWindowMessage(UINT message,WPARAM wParam,LPARAM lParam);
+  //========= 初期化・更新関数=========
+  // 入力先を登録し、現在キーを前回キーにもコピーして中央位置を計算する。差分やCapture設定はリセットしない。
+  // windowHandle: 入力対象の有効なWindow。所有しない。入力・カーソル操作中は呼出側が有効に保つ。
+  void Initialize(HWND windowHandle);
+  // 前回値を保存して新しいキー状態を取得する。Capture中は中央・制限領域・カーソル位置も更新する。
+  // Sceneがトリガーを判定する前に毎フレーム呼ぶ。蓄積したマウス差分とホイール回転量はここではクリアしない。
+  void Update();
+  // Captureを解除し、Window登録・差分・ホイール回転量・中央・両キー配列をクリアする。Window自体は破棄しない。
+  // Captureが既にfalseならカーソル制御は再実行しない。OS全体の設定を無条件に復元する処理ではない。
+  void Uninit();
+  // Capture中のマウス移動とホイール回転を蓄積し、フォーカス喪失で設定を解除する。解除中は全メッセージを無視する。
+  // message: WindowProcedureから転送するWin32メッセージ番号。
+  // wParam: WM_MOUSEWHEELで上位ワードの符号付きホイール回転量を抽出する値。他のメッセージでは使用しない。
+  // lParam: WM_MOUSEMOVEでクライアント座標のX・Yを抽出する値。ここでは他メッセージの追加情報に使わない。
+  void OnWindowMessage(UINT message,WPARAM wParam,LPARAM lParam);
 
-	//========= キー入力Getter関数=========
-	// 保存済み現在値の上位bit(0x80)が立っていれば押下中。下位のトグル状態は判定しない。
-	// keyCode: 256要素の配列へ対応する0〜255の仮想キーコード。状態を消費しない。
-	[[nodiscard]] bool IsKeyPressed(unsigned char keyCode) const { return (m_currentKeys[keyCode] & 0x80) != 0; }
-	// 現在は押下中かつ前回は非押下ならtrue。繰り返し呼んでも判定結果を消費しない。
-	// keyCode: 比較する0〜255の仮想キーコード。Update前後の保存値を使用する。
-	[[nodiscard]] bool IsKeyTriggered(unsigned char keyCode) const
-	{
-		// 0x80のマスクで上位bitだけを取り出し、現在の押下と前回の非押下を組み合わせる。
-		return (m_currentKeys[keyCode] & 0x80) != 0 && (m_previousKeys[keyCode] & 0x80) == 0;
-	}
+  //========= キー入力Getter関数=========
+  // 保存済み現在値の上位bit(0x80)が立っていれば押下中。下位のトグル状態は判定しない。
+  // keyCode: 256要素の配列へ対応する0〜255の仮想キーコード。状態を消費しない。
+  [[nodiscard]] bool IsKeyPressed(unsigned char keyCode) const { return (m_currentKeys[keyCode] & 0x80) != 0; }
+  // 現在は押下中かつ前回は非押下ならtrue。繰り返し呼んでも判定結果を消費しない。
+  // keyCode: 比較する0〜255の仮想キーコード。Update前後の保存値を使用する。
+  [[nodiscard]] bool IsKeyTriggered(unsigned char keyCode) const
+  {
+    // 0x80のマスクで上位bitだけを取り出し、現在の押下と前回の非押下を組み合わせる。
+    return (m_currentKeys[keyCode] & 0x80) != 0 && (m_previousKeys[keyCode] & 0x80) == 0;
+  }
 
-	//========= マウス入力Getter関数=========
-	// 中央基準で蓄積した差分を値で返し、内部差分を0へ戻す。新規入力がなければ次の取得は(0,0)。
-	// 戻り値: スクリーン座標へ変換したマウス位置と中央との差の累積値。右向きX・下向きY、単位はpixel。
-	[[nodiscard]] POINT ConsumeMouseDelta();
-	// 蓄積したホイール回転量を値で返し、内部の累積を0へ戻す。新規入力がなければ次の取得は0。
-	// 戻り値: ホイール回転量の累積値。正は奥（画面側）への回転、負は手前への回転。標準では1ノッチが120。
-	[[nodiscard]] int ConsumeMouseWheelDelta();
-	// FPS操作用の表示・中央固定・領域制限を要求している設定かを返す。OS操作の成功を保証する値ではない。
-	[[nodiscard]] bool IsMouseCaptureEnabled() const { return m_isMouseCaptureEnabled; }
-	// 現在のマウスカーソルの位置を、登録したWindowのクライアント座標で返す。状態を消費しない。報酬の選択など、カーソルで操作するUIが使う。
-	// 戻り値: クライアント領域の左上を原点にした位置。右向きX・下向きY、単位はpixel。領域の外では負の値や領域より大きい値になる。
-	// Windowが未登録の場合や、Win32 APIが失敗した場合は、変換されていない値を返す。成否は検証しない。
-	[[nodiscard]] POINT GetCursorClientPosition() const
-	{
-		// スクリーン座標のカーソル位置を取得し、登録したWindowのクライアント座標へ変換する。
-		POINT cursor_position{};
-		GetCursorPos(&cursor_position);
-		ScreenToClient(m_windowHandle,&cursor_position);
-		return cursor_position;
-	}
+  //========= マウス入力Getter関数=========
+  // 中央基準で蓄積した差分を値で返し、内部差分を0へ戻す。新規入力がなければ次の取得は(0,0)。
+  // 戻り値: スクリーン座標へ変換したマウス位置と中央との差の累積値。右向きX・下向きY、単位はpixel。
+  [[nodiscard]] POINT ConsumeMouseDelta();
+  // 蓄積したホイール回転量を値で返し、内部の累積を0へ戻す。新規入力がなければ次の取得は0。
+  // 戻り値: ホイール回転量の累積値。正は奥（画面側）への回転、負は手前への回転。標準では1ノッチが120。
+  [[nodiscard]] int ConsumeMouseWheelDelta();
+  // FPS操作用の表示・中央固定・領域制限を要求している設定かを返す。OS操作の成功を保証する値ではない。
+  [[nodiscard]] bool IsMouseCaptureEnabled() const { return m_isMouseCaptureEnabled; }
+  // 現在のマウスカーソルの位置を、登録したWindowのクライアント座標で返す。状態を消費しない。報酬の選択など、カーソルで操作するUIが使う。
+  // 戻り値: クライアント領域の左上を原点にした位置。右向きX・下向きY、単位はpixel。領域の外では負の値や領域より大きい値になる。
+  // Windowが未登録の場合や、Win32 APIが失敗した場合は、変換されていない値を返す。成否は検証しない。
+  [[nodiscard]] POINT GetCursorClientPosition() const
+  {
+    // スクリーン座標のカーソル位置を取得し、登録したWindowのクライアント座標へ変換する。
+    POINT cursor_position{};
+    GetCursorPos(&cursor_position);
+    ScreenToClient(m_windowHandle,&cursor_position);
+    return cursor_position;
+  }
 
-	//========= マウス操作設定関数=========
-	// 設定変更時だけ差分とホイール回転量を破棄し、カーソル表示・中央固定・領域制限を切り替える。
-	// isEnabled: trueで非表示・中央合わせ・領域制限、falseで表示と領域制限解除。同値なら何もしない。
-	// OSのSetCapture・ReleaseCaptureは使用しない。Win32 API失敗時の設定巻き戻しも行わない。
-	void SetMouseCaptureEnabled(bool isEnabled);
+  //========= マウス操作設定関数=========
+  // 設定変更時だけ差分とホイール回転量を破棄し、カーソル表示・中央固定・領域制限を切り替える。
+  // isEnabled: trueで非表示・中央合わせ・領域制限、falseで表示と領域制限解除。同値なら何もしない。
+  // OSのSetCapture・ReleaseCaptureは使用しない。Win32 API失敗時の設定巻き戻しも行わない。
+  void SetMouseCaptureEnabled(bool isEnabled);
 
 private:
-	//========= 補助関数=========
-	// クライアント領域の整数中央を計算し、スクリーン座標に変換して保持する。有効なWindowが前提。
-	void UpdateMouseCenter();
-	// 保持済みスクリーン座標へ移動を要求する。中央の再計算・成否判定・マウス差分のクリアは行わない。
-	void ResetMousePosition() { SetCursorPos(m_screenCenter.x,m_screenCenter.y); }
-	// クライアント矩形の両端をスクリーン座標へ変換し、ClipCursorへ渡す。以前の制限矩形は保存しない。
-	void ClipMouseCursor();
+  //========= 補助関数=========
+  // クライアント領域の整数中央を計算し、スクリーン座標に変換して保持する。有効なWindowが前提。
+  void UpdateMouseCenter();
+  // 保持済みスクリーン座標へ移動を要求する。中央の再計算・成否判定・マウス差分のクリアは行わない。
+  void ResetMousePosition() { SetCursorPos(m_screenCenter.x,m_screenCenter.y); }
+  // クライアント矩形の両端をスクリーン座標へ変換し、ClipCursorへ渡す。以前の制限矩形は保存しない。
+  void ClipMouseCursor();
 
-	//========= ウィンドウ情報=========
-	// Initializeで借用するWindowハンドル。既定は未登録、Uninitでnullptrへ戻す。
-	HWND m_windowHandle{};
+  //========= ウィンドウ情報=========
+  // Initializeで借用するWindowハンドル。既定は未登録、Uninitでnullptrへ戻す。
+  HWND m_windowHandle{};
 
-	//========= キーボード状態=========
-	// 仮想キー0〜255に対応する256バイトの最新状態。既定は全0。押下判定では各要素の上位bitだけを使う。
-	BYTE m_currentKeys[256]{};
-	// 新しい状態を取得する直前のコピー。初期登録時は現在値と同一、Uninitでは全0にする。
-	BYTE m_previousKeys[256]{};
+  //========= キーボード状態=========
+  // 仮想キー0〜255に対応する256バイトの最新状態。既定は全0。押下判定では各要素の上位bitだけを使う。
+  BYTE m_currentKeys[256]{};
+  // 新しい状態を取得する直前のコピー。初期登録時は現在値と同一、Uninitでは全0にする。
+  BYTE m_previousKeys[256]{};
 
-	//========= マウス状態=========
-	// 各WM_MOUSEMOVEの中央基準差分を加算する。既定は(0,0)、消費・設定変更・Uninitでクリアする。
-	POINT m_mouseDelta{};
-	// 各WM_MOUSEWHEELの回転量を加算する。既定は0、消費・設定変更・Uninitでクリアする。正は奥、負は手前への回転。
-	int m_mouseWheelDelta{};
-	// クライアント領域中央をスクリーン座標のpixelで保持する。既定は(0,0)、生成や表示サイズを表す値ではない。
-	POINT m_screenCenter{};
-	// 既定falseは自由カーソル操作。Window Captureの取得状態やOS操作の成否を表すものではない。
-	bool m_isMouseCaptureEnabled{};
+  //========= マウス状態=========
+  // 各WM_MOUSEMOVEの中央基準差分を加算する。既定は(0,0)、消費・設定変更・Uninitでクリアする。
+  POINT m_mouseDelta{};
+  // 各WM_MOUSEWHEELの回転量を加算する。既定は0、消費・設定変更・Uninitでクリアする。正は奥、負は手前への回転。
+  int m_mouseWheelDelta{};
+  // クライアント領域中央をスクリーン座標のpixelで保持する。既定は(0,0)、生成や表示サイズを表す値ではない。
+  POINT m_screenCenter{};
+  // 既定falseは自由カーソル操作。Window Captureの取得状態やOS操作の成否を表すものではない。
+  bool m_isMouseCaptureEnabled{};
 };

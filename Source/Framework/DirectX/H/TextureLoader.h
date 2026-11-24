@@ -16,22 +16,22 @@
 class TextureLoader final
 {
 public:
-	//========= Texture読込関数=========
-	// 先頭フレームをBGRAへ変換し、単一Mip・単一画像・非MSAAのTextureとShader参照用Viewを生成する。
-	// device: 呼出中に有効な生成用Deviceの借用ポインター。nullptrならGraphicsログを出してfalse。
-	// filePath: 画像のワイド文字パス。空ならAssetログを出してfalse。終端付きwstringへコピーし、参照は保持しない。
-	// textureView: 呼出側が所有するSRVの出力先。引数検証より前にResetし、成功したViewの所有参照へ置き換える。
-	// 戻り値: 全処理成功ならtrue。検出した引数不正・WIC処理失敗・GPU生成失敗ではfalseで出力先は空。
-	// 旧SRVへの復帰、別形式の再試行は行わない。画像の失敗はAsset、GPU生成の失敗はGraphicsへ記録する。
-	// 前提: 呼出スレッドのCOM初期化は呼出側が済ませる。この関数はCoInitialize/CoUninitializeを行わない。
-	// 返すViewが参照先Textureの寿命も保持する。返却後の所有・Bind・解放は呼出側が管理する。
-	// メモリ確保・ログ生成等のC++例外は捕捉せず、例外経路をfalse返却時の状態保証には含めない。
-	// UINTによる画像容量の乗算オーバーフロー検証、埋込NULL検査、向き補正、明示的色空間変換は行わない。
-	// アニメーション処理・自動Mip生成は行わない。公開名LoadWicTextureは既存参照との互換性のため維持する。
-	static bool LoadWicTexture(ID3D11Device* device,std::wstring_view filePath,ComPtr<ID3D11ShaderResourceView>& textureView);
+  //========= Texture読込関数=========
+  // 先頭フレームをBGRAへ変換し、単一Mip・単一画像・非MSAAのTextureとShader参照用Viewを生成する。
+  // device: 呼出中に有効な生成用Deviceの借用ポインター。nullptrならGraphicsログを出してfalse。
+  // filePath: 画像のワイド文字パス。空ならAssetログを出してfalse。終端付きwstringへコピーし、参照は保持しない。
+  // textureView: 呼出側が所有するSRVの出力先。引数検証より前にResetし、成功したViewの所有参照へ置き換える。
+  // 戻り値: 全処理成功ならtrue。検出した引数不正・WIC処理失敗・GPU生成失敗ではfalseで出力先は空。
+  // 旧SRVへの復帰、別形式の再試行は行わない。画像の失敗はAsset、GPU生成の失敗はGraphicsへ記録する。
+  // 前提: 呼出スレッドのCOM初期化は呼出側が済ませる。この関数はCoInitialize/CoUninitializeを行わない。
+  // 返すViewが参照先Textureの寿命も保持する。返却後の所有・Bind・解放は呼出側が管理する。
+  // メモリ確保・ログ生成等のC++例外は捕捉せず、例外経路をfalse返却時の状態保証には含めない。
+  // UINTによる画像容量の乗算オーバーフロー検証、埋込NULL検査、向き補正、明示的色空間変換は行わない。
+  // アニメーション処理・自動Mip生成は行わない。公開名LoadWicTextureは既存参照との互換性のため維持する。
+  static bool LoadWicTexture(ID3D11Device* device,std::wstring_view filePath,ComPtr<ID3D11ShaderResourceView>& textureView);
 
 private:
-	//========= 生成禁止関数=========
-	// 静的な読込関数だけを使用するため、インスタンス生成を禁止する。
-	TextureLoader() = delete;
+  //========= 生成禁止関数=========
+  // 静的な読込関数だけを使用するため、インスタンス生成を禁止する。
+  TextureLoader() = delete;
 };

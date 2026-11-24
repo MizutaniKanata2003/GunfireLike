@@ -124,8 +124,8 @@ void CollisionDebugView::Draw(GraphicsSystem& graphicsSystem,const CollisionWorl
     m_drawer.AddCross(m_rayHit.point,ns_HIT_CROSS_HALF_SIZE,ns_HIT_CROSS_COLOR);
     m_drawer.AddLine(m_rayHit.point,
                      XMFLOAT3{m_rayHit.point.x + m_rayHit.normal.x * ns_NORMAL_LENGTH,m_rayHit.point.y + m_rayHit.normal.y * ns_NORMAL_LENGTH,
-                              m_rayHit.point.z + m_rayHit.normal.z * ns_NORMAL_LENGTH},
-                              ns_NORMAL_COLOR);
+                     m_rayHit.point.z + m_rayHit.normal.z * ns_NORMAL_LENGTH},
+                     ns_NORMAL_COLOR);
   }
   // 命中していない場合は、カメラ位置から視線方向へ表示用の長さだけ進んだ点を終点にする。
   else{

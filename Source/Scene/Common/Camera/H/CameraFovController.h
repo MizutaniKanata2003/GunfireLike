@@ -10,23 +10,23 @@
 class CameraFovController final
 {
 public:
-	//========= 初期化関数=========
-	// 現在の視野角を、通常時の値へ戻す。
-	void Reset();
+  //========= 初期化関数=========
+  // 現在の視野角を、通常時の値へ戻す。
+  void Reset();
 
-	//========= 更新関数=========
-	// 動作の状態に応じた目標値へ、現在の視野角を滑らかに近づける。
-	// deltaTime: この更新で進める経過時間。単位は秒。実時間。
-	// actionState: プレイヤーの現在の動作の状態。
-	// isAiming: プレイヤーが構えているか。スライディングとダッシュを除き、しゃがみ中でも構えを優先する。
-	void Update(float deltaTime,PLAYER_ACTION_STATE actionState,bool isAiming);
+  //========= 更新関数=========
+  // 動作の状態に応じた目標値へ、現在の視野角を滑らかに近づける。
+  // deltaTime: この更新で進める経過時間。単位は秒。実時間。
+  // actionState: プレイヤーの現在の動作の状態。
+  // isAiming: プレイヤーが構えているか。スライディングとダッシュを除き、しゃがみ中でも構えを優先する。
+  void Update(float deltaTime,PLAYER_ACTION_STATE actionState,bool isAiming);
 
-	//========= Getter関数=========
-	// 現在の垂直方向の視野角を返す。単位は度。投影行列の生成時にラジアンへ変換する。
-	[[nodiscard]] float GetFovDegrees() const { return m_fovDegrees; }
+  //========= Getter関数=========
+  // 現在の垂直方向の視野角を返す。単位は度。投影行列の生成時にラジアンへ変換する。
+  [[nodiscard]] float GetFovDegrees() const { return m_fovDegrees; }
 
 private:
-	//========= 視野角の状態=========
-	// 現在の視野角。単位は度。動作の状態に応じた目標値へ滑らかに近づく。
-	float m_fovDegrees{};
+  //========= 視野角の状態=========
+  // 現在の視野角。単位は度。動作の状態に応じた目標値へ滑らかに近づく。
+  float m_fovDegrees{};
 };
