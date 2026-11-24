@@ -1,4 +1,4 @@
-#include "../H/HudRenderer.h"
+﻿#include "../H/HudRenderer.h"
 
 // 固定Quadの生成・解放と、Canvas変換→矩形転送→Bind→Blend設定→DrawIndexedを実装する。
 // 配置・色・判定・生成失敗時の終了順は維持し、描画状態の復元や機能追加は行わない。
@@ -6,15 +6,14 @@
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::clampでHPバーの表示比率を0〜1へ制限する。
 #include <array> // 単位Quadの4頂点と6Indexを、固定要素数の連続配列に保持する。
-#include <string> // std::wstringで生成失敗のAPI名とHRESULT表示を組み立てる。
 #include <vector> // std::vector<char>でVS・PSのCSOバイト列を読み込む。
 
 //========= Framework インクルード=========
+#include "Framework/DirectX/H/GraphicsErrorLog.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
 #include "Framework/DirectX/H/ShaderBinaryLoader.h"
-#include "Framework/Etc/H/Logger.h"
 
-// Canvas基準の配置と外観・CSOパス、およびGPU生成失敗のログ補助をまとめる。
+// Canvas基準の配置と外観・CSOパス、単位Quadの定数をまとめる。
 namespace
 {
 	//========= 画面サイズ定数=========
@@ -67,29 +66,9 @@ namespace
 	// コンパイル済みHudPSの相対パス。位置・色の転送仕様は対応Shaderと維持する。
 	constexpr const char* ns_HUD_PIXEL_SHADER_PATH = "Shaders/HudPS.cso";
 
-	//========= 補助関数=========
-	// API名と16進数8桁のHRESULTをGraphics分類で出力する。
-	// functionName: 呼出中に有効な終端付きワイド文字列。nullptr不可。
-	// result: 表示する生成失敗値。Resource解放は呼出元で行う。
-	void WriteHUDGraphicsError(const wchar_t* functionName,HRESULT result)
-	{
-		// API名と16進表記の接頭辞を連結する。ログ用メモリ確保の例外は捕捉しない。
-		std::wstring message{functionName};
-		message += L" に失敗しました。HRESULT: 0x";
-
-		// 4bitの値0〜15を対応する16進数字へ変換する表と、unsigned表現を用意する。
-		constexpr wchar_t HEX_DIGITS[]{L"0123456789ABCDEF"};
-		const unsigned long result_value = static_cast<unsigned long>(result);
-		// 桁番号7から0へ走査し、上位から8桁を先頭0も含めて出力する。
-		for(int digit_index = 7; digit_index >= 0; --digit_index){
-			// 対象の4bitを最下位へ移し、マスクでその桁だけを抽出する。
-			const unsigned long digit = (result_value >> digit_index * 4) & 0x0f;
-			message += HEX_DIGITS[digit]; // 抽出値に対応する数字をログ末尾へ加える。
-		}
-
-		// 生成対象を示す完成ログを出力する。解放・復旧処理をログ関数へ移さない。
-		Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_GRAPHICS,message);
-	}
+	//========= 単位Quadの定数=========
+	// 4頂点を(0,1,2)と(0,2,3)の2三角形へ分割する、16bit Index。Index順と面の向きは維持する。
+	constexpr std::array<unsigned short,6> ns_QUAD_INDICES{0,1,2,0,2,3};
 }
 
 //========= 初期化関数=========
@@ -101,92 +80,8 @@ bool HudRenderer::Initialize(GraphicsSystem& graphicsSystem)
 	// Device未取得ではそのままfalseを返す。この分岐では既存Resourceを解放しない。
 	if(device == nullptr)return false;
 
-	// CSOの先頭とバイト長を生成APIへ渡せる連続領域に保持する。
-	std::vector<char> vertex_shader_data{};
-	std::vector<char> pixel_shader_data{};
-	// VSバイナリの読込失敗なら、所有Resourceを部分解放して戻る。例外の捕捉は追加しない。
-	if(!ShaderBinaryLoader::Load(ns_HUD_VERTEX_SHADER_PATH,vertex_shader_data)){
-		Uninit();
-		return false;
-	}
-	// PSバイナリの読込失敗でもUninitする。読込済みCPU配列はローカルの寿命で解放する。
-	if(!ShaderBinaryLoader::Load(ns_HUD_PIXEL_SHADER_PATH,pixel_shader_data)){
-		Uninit();
-		return false;
-	}
-
-	// CSOからVSを生成する。ClassLinkageは指定せず、所有先はメンバーComPtr。
-	const HRESULT vertex_shader_result = device->CreateVertexShader(vertex_shader_data.data(),vertex_shader_data.size(),nullptr,m_vertexShader.GetAddressOf());
-	// VS生成失敗ならAPI名と結果を記録し、部分Resourceを解放してfalseを返す。
-	if(FAILED(vertex_shader_result)){
-		WriteHUDGraphicsError(L"ID3D11Device::CreateVertexShader",vertex_shader_result);
-		Uninit();
-		return false;
-	}
-
-	// CSOからPSを生成する。ShaderのBindと定数接続は描画時に別途行う。
-	const HRESULT pixel_shader_result = device->CreatePixelShader(pixel_shader_data.data(),pixel_shader_data.size(),nullptr,m_pixelShader.GetAddressOf());
-	// PS生成失敗では、先に生成したVSも含めてUninitする。
-	if(FAILED(pixel_shader_result)){
-		WriteHUDGraphicsError(L"ID3D11Device::CreatePixelShader",pixel_shader_result);
-		Uninit();
-		return false;
-	}
-
-	// POSITION0=float2をSlot0・Offset0から頂点単位で読む。StepRate0でInstance単位の属性にはしない。
-	const D3D11_INPUT_ELEMENT_DESC input_elements[]
-	{
-		{"POSITION",0,DXGI_FORMAT_R32G32_FLOAT,0,0,D3D11_INPUT_PER_VERTEX_DATA,0}
-	};
-	// VSの入力signatureとLayout記述を対応付ける。Strideは描画時に別途指定する。
-	const HRESULT input_layout_result = device->CreateInputLayout(input_elements,ARRAYSIZE(input_elements),
-																															 vertex_shader_data.data(),vertex_shader_data.size(),m_inputLayout.GetAddressOf());
-	// Layout生成失敗なら、成功済みShaderを含む所有Resourceを解放して戻る。
-	if(FAILED(input_layout_result)){
-		WriteHUDGraphicsError(L"ID3D11Device::CreateInputLayout",input_layout_result);
-		Uninit();
-		return false;
-	}
-
-	// 左上から順に固定4頂点を作る。実pixel位置ではなく0〜1のQuadで、矩形の拡縮・移動はVSが行う。
-	const std::array<VERTEX,4> vertices
-	{
-		VERTEX{XMFLOAT2{0.0f,0.0f}},
-		VERTEX{XMFLOAT2{1.0f,0.0f}},
-		VERTEX{XMFLOAT2{1.0f,1.0f}},
-		VERTEX{XMFLOAT2{0.0f,1.0f}}
-	};
-
-	// ByteWidthは総バイト数。IMMUTABLEなので生成時に初期データを渡し、以後は頂点Bufferを更新しない。
-	D3D11_BUFFER_DESC vertex_buffer_description{};
-	vertex_buffer_description.ByteWidth = static_cast<UINT>(sizeof(VERTEX) * vertices.size());
-	vertex_buffer_description.Usage = D3D11_USAGE_IMMUTABLE;
-	vertex_buffer_description.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	// CPU配列の所有権は移さず読取元として渡す。Buffer用途なのでPitch類はゼロのまま。
-	D3D11_SUBRESOURCE_DATA vertex_data{};
-	vertex_data.pSysMem = vertices.data();
-	const HRESULT vertex_buffer_result = device->CreateBuffer(&vertex_buffer_description,&vertex_data,m_vertexBuffer.GetAddressOf());
-	// Vertex Buffer生成失敗なら、先行Shader等も含めて部分解放する。
-	if(FAILED(vertex_buffer_result)){
-		WriteHUDGraphicsError(L"ID3D11Device::CreateBuffer(VertexBuffer)",vertex_buffer_result);
-		Uninit();
-		return false;
-	}
-
-	// 4頂点を(0,1,2)と(0,2,3)の2三角形へ分割する。Index順と面の向きは維持する。
-	const std::array<unsigned short,6> indices{0,1,2,0,2,3};
-
-	// 16bit Indexを6個持つ不変Bufferを生成する。Draw時のR16_UINTと要素型を対応させる。
-	D3D11_BUFFER_DESC index_buffer_description{};
-	index_buffer_description.ByteWidth = static_cast<UINT>(sizeof(unsigned short) * indices.size());
-	index_buffer_description.Usage = D3D11_USAGE_IMMUTABLE;
-	index_buffer_description.BindFlags = D3D11_BIND_INDEX_BUFFER;
-	D3D11_SUBRESOURCE_DATA index_data{};
-	index_data.pSysMem = indices.data();
-	const HRESULT index_buffer_result = device->CreateBuffer(&index_buffer_description,&index_data,m_indexBuffer.GetAddressOf());
-	// Index Buffer生成失敗なら、作成済みVertex BufferやShaderも解放する。
-	if(FAILED(index_buffer_result)){
-		WriteHUDGraphicsError(L"ID3D11Device::CreateBuffer(IndexBuffer)",index_buffer_result);
+	// Shader・Layout→Quad Bufferの順に生成する。失敗のログは、各生成関数が記録する。最初に失敗した時点で、部分Resourceを解放してfalseを返す。
+	if(!CreateShaders(device) || !CreateQuadBuffers(device)){
 		Uninit();
 		return false;
 	}
@@ -195,13 +90,13 @@ bool HudRenderer::Initialize(GraphicsSystem& graphicsSystem)
 	HRESULT HUD_buffer_result{};
 	// 定数Buffer生成失敗ならHRESULTを記録し、QuadとShaderもUninitして戻る。
 	if(!m_HUDBuffer.Init(device,HUD_buffer_result)){
-		WriteHUDGraphicsError(L"ID3D11Device::CreateBuffer(HudBuffer)",HUD_buffer_result);
+		GraphicsErrorLog::Write(L"ID3D11Device::CreateBuffer(HudBuffer)",HUD_buffer_result);
 		Uninit();
 		return false;
 	}
 
 	// 全生成後だけIndex数を6へ確定する。失敗経路ではUninitにより0へ戻る。
-	m_indexCount = static_cast<unsigned int>(indices.size());
+	m_indexCount = static_cast<unsigned int>(ns_QUAD_INDICES.size());
 	return true;
 }
 
@@ -237,11 +132,10 @@ void HudRenderer::DrawQuad(GraphicsSystem& graphicsSystem,float positionX,float 
 	};
 
 	// Strideは頂点1個のバイト間隔、Offset0は先頭読取。借用ポインター配列で、所有はメンバーに残る。
+	// 各Shader Stageのb0へ渡す同じ定数Bufferも準備する。配列の要素数は1。
 	const UINT stride = sizeof(VERTEX);
 	const UINT offset{};
 	ID3D11Buffer* vertex_buffers[]{m_vertexBuffer.Get()};
-
-	// 各Shader Stageのb0へ渡す同じ定数Bufferを準備する。配列の要素数は1。
 	ID3D11Buffer* constant_buffers[]{m_HUDBuffer.Get()};
 
 	// 今回の矩形・色で全体更新する。UpdateだけではslotへBindされず、戻り値による成否通知もない。
@@ -337,4 +231,90 @@ void HudRenderer::Uninit()
 
 	// 全生成成功後のIndex数を残さず、0へ戻す。
 	m_indexCount = {};
+}
+
+//========= 生成の補助関数=========
+// VS・PSのCSOを読み、VS・PS・Input Layoutを、この順に生成する。
+bool HudRenderer::CreateShaders(ID3D11Device* device)
+{
+	// CSOの先頭とバイト長を生成APIへ渡せる連続領域に保持する。
+	std::vector<char> vertex_shader_data{};
+	std::vector<char> pixel_shader_data{};
+	// VS・PSバイナリの読込失敗なら、falseを返す。読込済みCPU配列はローカルの寿命で解放する。例外の捕捉は追加しない。
+	if(!ShaderBinaryLoader::Load(ns_HUD_VERTEX_SHADER_PATH,vertex_shader_data))return false;
+	if(!ShaderBinaryLoader::Load(ns_HUD_PIXEL_SHADER_PATH,pixel_shader_data))return false;
+
+	// CSOからVSを生成する。ClassLinkageは指定せず、所有先はメンバーComPtr。
+	const HRESULT vertex_shader_result = device->CreateVertexShader(vertex_shader_data.data(),vertex_shader_data.size(),nullptr,m_vertexShader.GetAddressOf());
+	// VS生成失敗ならAPI名と結果を記録して失敗を返す。
+	if(FAILED(vertex_shader_result)){
+		GraphicsErrorLog::Write(L"ID3D11Device::CreateVertexShader",vertex_shader_result);
+		return false;
+	}
+
+	// CSOからPSを生成する。ShaderのBindと定数接続は描画時に別途行う。
+	const HRESULT pixel_shader_result = device->CreatePixelShader(pixel_shader_data.data(),pixel_shader_data.size(),nullptr,m_pixelShader.GetAddressOf());
+	// PS生成失敗ならAPI名と結果を記録して失敗を返す。先に生成したVSの解放は、呼出側が行う。
+	if(FAILED(pixel_shader_result)){
+		GraphicsErrorLog::Write(L"ID3D11Device::CreatePixelShader",pixel_shader_result);
+		return false;
+	}
+
+	// POSITION0=float2をSlot0・Offset0から頂点単位で読む。StepRate0でInstance単位の属性にはしない。
+	const D3D11_INPUT_ELEMENT_DESC input_elements[]
+	{
+		{"POSITION",0,DXGI_FORMAT_R32G32_FLOAT,0,0,D3D11_INPUT_PER_VERTEX_DATA,0}
+	};
+	// VSの入力signatureとLayout記述を対応付ける。Strideは描画時に別途指定する。
+	const HRESULT input_layout_result = device->CreateInputLayout(input_elements,ARRAYSIZE(input_elements),
+																																vertex_shader_data.data(),vertex_shader_data.size(),m_inputLayout.GetAddressOf());
+	// Layout生成失敗ならAPI名と結果を記録して失敗を返す。
+	if(FAILED(input_layout_result)){
+		GraphicsErrorLog::Write(L"ID3D11Device::CreateInputLayout",input_layout_result);
+		return false;
+	}
+	return true;
+}
+
+// 固定4頂点のVertex Bufferと、6要素のIndex Bufferを、この順に生成する。
+bool HudRenderer::CreateQuadBuffers(ID3D11Device* device)
+{
+	// 左上から順に固定4頂点を作る。実pixel位置ではなく0〜1のQuadで、矩形の拡縮・移動はVSが行う。
+	const std::array<VERTEX,4> vertices
+	{
+		VERTEX{XMFLOAT2{0.0f,0.0f}},
+		VERTEX{XMFLOAT2{1.0f,0.0f}},
+		VERTEX{XMFLOAT2{1.0f,1.0f}},
+		VERTEX{XMFLOAT2{0.0f,1.0f}}
+	};
+
+	// ByteWidthは総バイト数。IMMUTABLEなので生成時に初期データを渡し、以後は頂点Bufferを更新しない。
+	D3D11_BUFFER_DESC vertex_buffer_description{};
+	vertex_buffer_description.ByteWidth = static_cast<UINT>(sizeof(VERTEX) * vertices.size());
+	vertex_buffer_description.Usage = D3D11_USAGE_IMMUTABLE;
+	vertex_buffer_description.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	// CPU配列の所有権は移さず読取元として渡す。Buffer用途なのでPitch類はゼロのまま。
+	D3D11_SUBRESOURCE_DATA vertex_data{};
+	vertex_data.pSysMem = vertices.data();
+	const HRESULT vertex_buffer_result = device->CreateBuffer(&vertex_buffer_description,&vertex_data,m_vertexBuffer.GetAddressOf());
+	// Vertex Buffer生成失敗ならAPI名と結果を記録して失敗を返す。
+	if(FAILED(vertex_buffer_result)){
+		GraphicsErrorLog::Write(L"ID3D11Device::CreateBuffer(VertexBuffer)",vertex_buffer_result);
+		return false;
+	}
+
+	// 16bit Indexを6個持つ不変Bufferを生成する。Draw時のR16_UINTと要素型を対応させる。
+	D3D11_BUFFER_DESC index_buffer_description{};
+	index_buffer_description.ByteWidth = static_cast<UINT>(sizeof(unsigned short) * ns_QUAD_INDICES.size());
+	index_buffer_description.Usage = D3D11_USAGE_IMMUTABLE;
+	index_buffer_description.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	D3D11_SUBRESOURCE_DATA index_data{};
+	index_data.pSysMem = ns_QUAD_INDICES.data();
+	const HRESULT index_buffer_result = device->CreateBuffer(&index_buffer_description,&index_data,m_indexBuffer.GetAddressOf());
+	// Index Buffer生成失敗ならAPI名と結果を記録して失敗を返す。作成済みVertex Bufferの解放は、呼出側が行う。
+	if(FAILED(index_buffer_result)){
+		GraphicsErrorLog::Write(L"ID3D11Device::CreateBuffer(IndexBuffer)",index_buffer_result);
+		return false;
+	}
+	return true;
 }

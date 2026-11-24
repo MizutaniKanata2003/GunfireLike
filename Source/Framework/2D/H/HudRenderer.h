@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // 単色Quad・照準・HPバー・低HP警告用のGPU Resourceを所有し、Canvas座標から実描画先へ変換して描画する。
 // HP更新・Scene進行は担当しない。GraphicsSystemは各呼出中だけ借用し、参照を保持しない。
@@ -84,6 +84,16 @@ private:
 
 	// 総サイズだけをコンパイル時検証する。各Offset・Shader配置・Bind先の正しさをすべて保証するものではない。
 	static_assert(sizeof(HUD_BUFFER) == 48,"HUD_BUFFERは48バイトである必要があります。");
+
+	//========= 生成の補助関数=========
+	// VS・PSのCSOを読み、VS・PS・Input Layoutを、この順に生成する。失敗はログへ記録する。
+	// device: 生成に使うDevice。
+	// 戻り値: 全て成功したらtrue。
+	[[nodiscard]] bool CreateShaders(ID3D11Device* device);
+	// 固定4頂点のVertex Bufferと、6要素のIndex Bufferを、この順に生成する。失敗はログへ記録する。
+	// device: 生成に使うDevice。
+	// 戻り値: 両方成功したらtrue。
+	[[nodiscard]] bool CreateQuadBuffers(ID3D11Device* device);
 
 	//========= Shader関連=========
 	// 単位Quadへ矩形を適用し、Clip位置と色を出力するHudVSの所有参照。
