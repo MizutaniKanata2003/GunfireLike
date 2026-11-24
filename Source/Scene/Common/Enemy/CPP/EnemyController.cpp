@@ -303,12 +303,12 @@ void EnemyController::UpdateRangedSlot(std::size_t slotIndex,float worldDeltaTim
 
 	// 遠すぎる間は近づき、近すぎる間は離れる。移動した更新では、予告を始めない。
 	if(distance > ENEMY_RANGED::ns_FAR_DISTANCE){
-		ENEMY_RANGED::Move(enemy,player_position,1.0f,worldDeltaTime,*m_collisionWorld);
+		ENEMY_RANGED::Move(enemy,ENEMY_RANGED::MOVE_REQUEST{player_position,1.0f,worldDeltaTime},*m_collisionWorld);
 		return;
 	}
 	// 近すぎる場合は、プレイヤーから離れる。
 	if(distance < ENEMY_RANGED::ns_NEAR_DISTANCE){
-		ENEMY_RANGED::Move(enemy,player_position,-1.0f,worldDeltaTime,*m_collisionWorld);
+		ENEMY_RANGED::Move(enemy,ENEMY_RANGED::MOVE_REQUEST{player_position,-1.0f,worldDeltaTime},*m_collisionWorld);
 		return;
 	}
 

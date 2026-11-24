@@ -53,9 +53,10 @@ public:
 		Clear(collisionWorld);
 		// 編成の先頭から順に、敵の数だけ登録し、枠番号に1を足した値をウェーブ内で一意のIDにする。
 		for(std::size_t slot_index = 0; slot_index < wave.enemyCount; ++slot_index){
-			const auto enemy_ID = static_cast<std::uint32_t>(slot_index + 1);
+			// 種類・位置・IDを、1つの構造体にまとめて、敵を初期化する。
+			const ENEMY_INIT_PARAMS init_params{wave.spawns[slot_index].kind,wave.spawns[slot_index].position,static_cast<std::uint32_t>(slot_index + 1)};
 			// 敵の初期化がfalseなら、先に成功した枠も解除し、空の状態を返す。例外は捕捉しない。
-			if(!m_enemies[slot_index].Initialize(registry,collisionWorld,wave.spawns[slot_index].kind,wave.spawns[slot_index].position,enemy_ID)){
+			if(!m_enemies[slot_index].Initialize(registry,collisionWorld,init_params)){
 				Clear(collisionWorld);
 				return false;
 			}

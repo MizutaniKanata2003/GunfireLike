@@ -39,7 +39,7 @@ namespace
 
 //========= 初期化・終了関数=========
 // Cube Rendererを借用し、種類の表からHPと大きさを設定して、球のColliderを登録する。
-bool Enemy::Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,ENEMY_KIND kind,const XMFLOAT3& position,std::uint32_t enemyId)
+bool Enemy::Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,const ENEMY_INIT_PARAMS& initParams)
 {
 	// 共有のCube Rendererを借用する。
 	m_cubeRenderer = registry.GetCubeRenderer();
@@ -47,11 +47,11 @@ bool Enemy::Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,EN
 	if(m_cubeRenderer == nullptr)return false;
 
 	// 種類・位置・識別値・大きさを設定する。Cubeは1辺1のため、倍率がそのまま1辺の長さになる。
-	const ENEMY_PARAMS& params = ENEMY_TABLE::GetParams(kind);
-	m_kind = kind;
-	m_position = position;
-	m_enemyId = enemyId;
-	m_transform.SetPosition(position);
+	const ENEMY_PARAMS& params = ENEMY_TABLE::GetParams(initParams.kind);
+	m_kind = initParams.kind;
+	m_position = initParams.position;
+	m_enemyId = initParams.enemyId;
+	m_transform.SetPosition(initParams.position);
 	m_transform.SetRotation(XMFLOAT3{});
 	m_transform.SetScale(XMFLOAT3{params.cubeSize,params.cubeSize,params.cubeSize});
 
@@ -63,7 +63,7 @@ bool Enemy::Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,EN
 	m_shotDamageScale = 1.0f;
 	m_isTelegraphing = false;
 	m_isAlive = true;
-	m_colliderHandle = collisionWorld.AddSphere(COLLISION_SPHERE{position,params.colliderRadius},COLLISION_LAYER::ns_ENEMY,enemyId);
+	m_colliderHandle = collisionWorld.AddSphere(COLLISION_SPHERE{initParams.position,params.colliderRadius},COLLISION_LAYER::ns_ENEMY,initParams.enemyId);
 	return true;
 }
 

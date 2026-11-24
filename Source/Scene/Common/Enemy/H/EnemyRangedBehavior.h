@@ -35,34 +35,44 @@ namespace ENEMY_RANGED
 	// ジャスト回避の判定を使わない予告で、回避の開始からの経過時間として渡す値。単位は秒。判定の閾値より十分に大きい。
 	inline constexpr float ns_UNUSED_DODGE_AGE_SECONDS = 1000.0f;
 
+	//========= 移動の入力=========
+	// 移動の指示。Moveの引数の数を減らすための値の束で、移動は変更しない。
+	struct MOVE_REQUEST
+	{
+		// プレイヤーのワールド座標。Yは使わない。
+		XMFLOAT3 targetPosition{};
+		// 1なら目標へ近づき、-1なら目標から離れる。
+		float directionSign{};
+		// 敵側の経過時間。単位は秒。0以下または非有限値なら移動しない。
+		float deltaTime{};
+	};
+
 	//========= 移動関数=========
 	// プレイヤーへ近づく、または離れる向きに、水平に移動する。
 	// enemy: 移動する敵。死亡中などの移動条件は、呼出側が確認すること。
-	// targetPosition: プレイヤーのワールド座標。Yは使わない。
-	// directionSign: 1なら目標へ近づき、-1なら目標から離れる。
-	// deltaTime: 敵側の経過時間。単位は秒。0以下または非有限値なら移動しない。
+	// request: 目標の座標・近づくか離れるかの向き・経過時間。
 	// collisionWorld: この敵のColliderを登録したCollisionWorld。
-	inline void Move(Enemy& enemy,const XMFLOAT3& targetPosition,float directionSign,float deltaTime,CollisionWorld& collisionWorld)
+	inline void Move(Enemy& enemy,const MOVE_REQUEST& request,CollisionWorld& collisionWorld)
 	{
 		// 時間が進まない、または時間が不正な場合は、描画位置もColliderも変更しない。
-		if(!std::isfinite(deltaTime) || deltaTime <= 0.0f)return;
+		if(!std::isfinite(request.deltaTime) || request.deltaTime <= 0.0f)return;
 
 		// 速度と上限付きの経過時間から、この更新で使える移動距離を求める。
-		float remaining_distance = ns_SPEED * std::min(deltaTime,ns_MAX_UPDATE_SECONDS);
+		float remaining_distance = ns_SPEED * std::min(request.deltaTime,ns_MAX_UPDATE_SECONDS);
 
 		// 移動距離を小分けに使い、押し戻された後の実位置から毎回向きを求め直す。
 		while(remaining_distance > 0.0f){
 			// XZ平面での目標までの差と距離を求める。敵の高さは移動候補にそのまま使う。
 			const XMFLOAT3 position = enemy.GetBodySphere().center;
-			const float offset_x = targetPosition.x - position.x;
-			const float offset_z = targetPosition.z - position.z;
+			const float offset_x = request.targetPosition.x - position.x;
+			const float offset_z = request.targetPosition.z - position.z;
 			const float distance = std::sqrt(offset_x * offset_x + offset_z * offset_z);
 			// 中心が一致している場合は向きを決められない（0で割れない）ため、移動を終える。
 			if(distance <= 0.0f)return;
 
 			// 残り距離と1ステップの上限のうち小さい方だけ進める。離れる場合は、向きの符号を反転して目標と逆へ進む。
 			const float step_distance = std::min(remaining_distance,ns_MAX_STEP_DISTANCE);
-			const float step_scale = directionSign * step_distance / distance;
+			const float step_scale = request.directionSign * step_distance / distance;
 			const XMFLOAT3 next_position{position.x + offset_x * step_scale,position.y,position.z + offset_z * step_scale};
 			// Colliderを更新できなければ、登録状態が変わるまでこのフレームの移動を打ち切る。
 			if(!enemy.TryMoveTo(next_position,collisionWorld))return;

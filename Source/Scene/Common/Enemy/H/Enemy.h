@@ -20,6 +20,17 @@ class CollisionWorld;
 class GraphicsSystem;
 class ModelRegistry;
 
+// 敵1体の初期化に使う、種類・位置・識別値。Enemy::Initializeの引数の数を減らすための値の束で、初期化は変更しない。
+struct ENEMY_INIT_PARAMS
+{
+	// 敵の種類。HP・当たりの大きさ・表示の大きさと色を決める。
+	ENEMY_KIND kind{ENEMY_KIND::e_MELEE};
+	// 球の中心のワールド座標。
+	XMFLOAT3 position{};
+	// Colliderへ付ける識別値。命中結果のuserDataとして返る。
+	std::uint32_t enemyId{};
+};
+
 // 種類・HP・怯み・転倒を持ち、球のColliderで被弾を受ける敵1体。
 class Enemy final
 {
@@ -28,11 +39,9 @@ public:
 	// 種類・位置・識別値を設定し、HPを満タンにして、球のColliderを登録する。表示用のCube Rendererを借用する。
 	// registry: Cube Rendererの借用元。Initialize済みであること。このEnemyより長く生存させる。
 	// collisionWorld: Colliderの登録先。このEnemyより長く生存させ、Uninitまで同じ実体を渡す。
-	// kind: 敵の種類。HP・当たりの大きさ・表示の大きさと色を決める。
-	// position: 球の中心のワールド座標。
-	// enemyId: Colliderへ付ける識別値。命中結果のuserDataとして返る。
+	// initParams: 敵の種類・位置・Colliderへ付ける識別値。
 	// 戻り値: Cube Rendererを借用できて登録できればtrue。Registryが未初期化ならfalse。
-	[[nodiscard]] bool Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,ENEMY_KIND kind,const XMFLOAT3& position,std::uint32_t enemyId);
+	[[nodiscard]] bool Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,const ENEMY_INIT_PARAMS& initParams);
 	// 登録したColliderを解除し、借用した参照を手放す。未初期化・解除済みでも呼出可能。
 	// collisionWorld: Initializeで渡したのと同じCollisionWorld。
 	void Uninit(CollisionWorld& collisionWorld);
