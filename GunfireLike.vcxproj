@@ -263,6 +263,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\2D\H\HudSpriteRenderer.h" />
     <ClInclude Include="Source\Framework\3D\H\BasicColorPipeline.h" />
     <ClInclude Include="Source\Debug\H\DebugLineRenderer.h" />
+    <ClInclude Include="Source\Framework\3D\H\CameraMatrices.h" />
     <ClInclude Include="Source\Framework\Audio\H\AudioSystem.h" />
     <ClInclude Include="Source\Framework\2D\H\FadeOverlay.h" />
     <ClInclude Include="Source\Framework\Collision\H\CollisionDebugDrawer.h" />

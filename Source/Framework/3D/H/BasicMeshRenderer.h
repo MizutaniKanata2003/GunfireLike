@@ -9,6 +9,7 @@
 
 //========= Framework インクルード=========
 #include "Framework/3D/H/BasicColorPipeline.h"
+#include "Framework/3D/H/CameraMatrices.h"
 #include "Framework/DirectX/H/VertexFormat.h"
 #include "Framework/Etc/H/MathTypes.h"
 
@@ -29,6 +30,18 @@ public:
 		Color // SRVなし・画像使用値0でObject色の単色経路を選ぶ。
 	};
 
+	//========= 構造体=========
+	// Cubeの見た目の指定。DrawCubeの引数の数を減らすため、色・UV倍率・画像選択を1つにまとめる。
+	struct CUBE_APPEARANCE
+	{
+		// RGBA色。単色またはTexture色との積に使う。値のclampやAlpha加工はしない。
+		XMFLOAT4 color{1.0f,1.0f,1.0f,1.0f};
+		// U・Vへ掛ける単位なし倍率。画像の繰り返しはSampler設定と組み合わせる。
+		XMFLOAT2 UVTiling{1.0f,1.0f};
+		// 画像選択。Colorと未定義値は単色扱い。選んだ個別SRVのnull検証は行わない。
+		TextureType textureType{TextureType::Color};
+	};
+
 	//========= Getter関数=========
 	// 位置とUVを持つ形式の識別値。実際のfloat3/float2とOffset・Strideは専用Layoutで定義する。
 	[[nodiscard]] VERTEX_FORMAT GetVertexFormat() const { return VERTEX_FORMAT::e_POSITION_TEXTURE; }
@@ -43,13 +56,13 @@ public:
 	// Cubeを指定変換と外観で描く。各Bind状態は描画後も残り、呼出前の設定へ復元しない。
 	// graphicsSystem: Context取得元。描画先・Viewport・Blend・Depth・Rasterizerは呼出側が設定する。
 	// worldMatrix: Local→World行列。内部で転置してObject転送型へ保存する。
-	// viewMatrix: World→View行列。viewMatrix*projectionMatrixの順で合成する。
-	// projectionMatrix: View→Clip行列。合成後に転置してCamera転送型へ保存する。
-	// color: RGBA色。単色またはTexture色との積に使う。値のclampやAlpha加工はしない。
-	// UVTiling: U・Vへ掛ける単位なし倍率。画像の繰り返しはSampler設定と組み合わせる。
-	// textureType: 画像選択。Colorと未定義値は単色扱い。選んだ個別SRVのnull検証は行わない。
+	// camera: View行列とProjection行列。view*projectionの順で合成し、転置してCamera転送型へ保存する。
+	// appearance: 色・UV倍率・画像選択。
 	// 必須Resource・Context・Index数がなければ何もしない。追加の行列や有限値検証は行わない。
 	// Bind先はCamera=VS b0、Object=VS/PS b1、Material=VS/PS b2、画像=PS t0、Sampler=PS s0。
+	void DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const CAMERA_MATRICES& camera,const CUBE_APPEARANCE& appearance);
+	// 移行中の旧形式。引数7個のため、13.5の基準を超える。呼出側を、上の形式へ移行した後に削除する。
+	// viewMatrix: camera.viewと同じ。projectionMatrix: camera.projectionと同じ。color・UVTiling・textureType: appearanceの各項目と同じ。
 	void DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const XMMATRIX& viewMatrix,
 								const XMMATRIX& projectionMatrix,const XMFLOAT4& color,const XMFLOAT2& UVTiling,TextureType textureType);
 	// メンバーの所有参照とIndex数を解除する。未初期化・部分初期化・終了済みでも呼出可能。

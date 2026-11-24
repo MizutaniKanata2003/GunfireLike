@@ -113,9 +113,8 @@ bool BasicMeshRenderer::Initialize(GraphicsSystem& graphicsSystem)
 	return true;
 }
 
-// 指定した行列、色、UVタイリング、テクスチャ種別でCubeを描画する。
-void BasicMeshRenderer::DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const XMMATRIX& viewMatrix,
-																 const XMMATRIX& projectionMatrix,const XMFLOAT4& color,const XMFLOAT2& UVTiling,TextureType textureType)
+// 指定した行列と外観でCubeを描画する。
+void BasicMeshRenderer::DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const CAMERA_MATRICES& camera,const CUBE_APPEARANCE& appearance)
 {
 	// 必須のBuffer・Shader・Layout・SamplerとIndex数が揃わなければ転送・Bind・描画を省く。
 	if(!m_vertexBuffer || !m_indexBuffer || !m_pipeline.IsValid() || !m_textureSampler || m_indexCount == 0)return;
@@ -127,7 +126,7 @@ void BasicMeshRenderer::DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& 
 
 	// Shaderへ渡すCamera、Object、Material定数を作成する。
 	// View*Projectionの順で合成して転置し、Worldも転置する。HLSLの行列格納契約へ合わせ、座標系変更はしない。
-	const XMMATRIX view_projection_matrix = XMMatrixTranspose(viewMatrix * projectionMatrix);
+	const XMMATRIX view_projection_matrix = XMMatrixTranspose(camera.view * camera.projection);
 	const XMMATRIX transposed_world_matrix = XMMatrixTranspose(worldMatrix);
 
 	// 転置済みのWorld→Clip行列をVS b0の配置へ保存する。
@@ -137,18 +136,29 @@ void BasicMeshRenderer::DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& 
 	// Local→World行列とRGBA色をb1の配置へ保存する。色のclampやAlpha操作は追加しない。
 	OBJECT_CONSTANTS object_constants{};
 	XMStoreFloat4x4(&object_constants.worldMatrix,transposed_world_matrix);
-	object_constants.color = color;
+	object_constants.color = appearance.color;
 
 	// Floor・Wall・Objectは使用値1で画像参照を選ぶ。Colorと未定義値は使用値0のまま単色経路とする。個別SRVのnull判定は追加しない。
 	// baseColor・uvTiling・useTexture・paddingの配置を保つ。未参照baseColorと余白も既定値で残す。
-	const bool uses_texture = textureType == TextureType::Floor || textureType == TextureType::Wall || textureType == TextureType::Object;
+	const TextureType texture_type = appearance.textureType;
+	const bool uses_texture = texture_type == TextureType::Floor || texture_type == TextureType::Wall || texture_type == TextureType::Object;
 	MATERIAL_CONSTANTS material_constants{};
-	material_constants.uvTiling = UVTiling;
+	material_constants.uvTiling = appearance.UVTiling;
 	material_constants.useTexture = uses_texture ? 1.0f : 0.0f;
 
 	// 3つの定数Bufferへ転送し、Cubeと画像を接続して描画する。更新だけではBindされず、成否の戻り値もない。
 	m_pipeline.UpdateConstants(context,camera_constants,object_constants,material_constants);
-	BindAndDraw(context,SelectTextureView(textureType));
+	BindAndDraw(context,SelectTextureView(texture_type));
+}
+
+// 移行中の旧形式。引数を構造体へまとめ、新しい形式へ渡す。呼出側の移行後に削除する。
+void BasicMeshRenderer::DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const XMMATRIX& viewMatrix,
+																 const XMMATRIX& projectionMatrix,const XMFLOAT4& color,const XMFLOAT2& UVTiling,TextureType textureType)
+{
+	// View・Projectionの2行列と、色・UV倍率・画像選択を、それぞれ1つの構造体へまとめる。値は変更しない。
+	const CAMERA_MATRICES camera{viewMatrix,projectionMatrix};
+	const CUBE_APPEARANCE appearance{color,UVTiling,textureType};
+	DrawCube(graphicsSystem,worldMatrix,camera,appearance);
 }
 
 // 描画に使用したDirect3Dリソースを解放する。

@@ -512,6 +512,9 @@
     <ClInclude Include="Source\Framework\DirectX\H\MeshBuffers.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Framework\3D\H\CameraMatrices.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Source\Framework\Shaders\BasicColorVS.hlsl" />
