@@ -34,10 +34,11 @@ namespace
 
 //========= 生成関数=========
 // 設定表を順にObjectへ変換し、全件成功した場合だけ出力配列へ追加する。
-bool SceneObjectFactory::Build(const OBJECT_CONFIG* configs,std::size_t configCount,ModelRegistry& registry,CollisionWorld* collisionWorld,
-															 std::vector<SceneObject>& objects)
+bool SceneObjectFactory::Build(const OBJECT_CONFIG_LIST& configList,ModelRegistry& registry,CollisionWorld* collisionWorld,std::vector<SceneObject>& objects)
 {
 	// 配列の先頭がなければ要素を読めないため、要素数に関係なく失敗として戻す。
+	const OBJECT_CONFIG* const configs = configList.configs;
+	const std::size_t configCount = configList.configCount;
 	if(configs == nullptr)return false;
 
 	// 全件成功するまでobjectsを変更しないため、いったんローカル配列へ生成する。登録したColliderの識別値も、失敗時の解除用に記録する。
