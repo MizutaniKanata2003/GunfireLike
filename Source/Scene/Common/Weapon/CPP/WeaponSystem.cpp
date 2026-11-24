@@ -45,23 +45,22 @@ void WeaponSystem::Initialize(const WEAPON_DATA& weaponData)
 }
 
 // リロード中なら時間を進め、そうでなければリロード開始と射撃を判定する。
-WEAPON_UPDATE_RESULT WeaponSystem::Update(float deltaTime,const InputSystem& input,bool isAiming,bool isShootingAllowed,FpsCamera& camera,
-																					const CollisionWorld& collisionWorld)
+WEAPON_UPDATE_RESULT WeaponSystem::Update(const WEAPON_UPDATE_REQUEST& request,const InputSystem& input,FpsCamera& camera,const CollisionWorld& collisionWorld)
 {
 	// 戻す結果。発射しなければ全て初期値のまま。
 	WEAPON_UPDATE_RESULT result{};
 
 	// 射撃を続けている最中かを、カメラの反動の制御へ伝える。射撃が許可され、左クリックを押し続け、リロード中でなく、撃てる弾がある間だけtrue。
 	// 連射方式の反動は、trueの間は戻らず、falseになった更新から戻り始める。弾が尽きた時や、リロード、射撃の禁止でも、falseになる。
-	const bool is_firing = isShootingAllowed && input.IsKeyPressed(VK_LBUTTON) && !m_isReloading && (m_magazineAmmo > 0 || m_isInfiniteAmmo);
+	const bool is_firing = request.isShootingAllowed && input.IsKeyPressed(VK_LBUTTON) && !m_isReloading && (m_magazineAmmo > 0 || m_isInfiniteAmmo);
 	camera.SetRecoilHold(is_firing);
 
 	// 連射間隔の残り時間を進める。0未満にはせず、発射可能の状態を0で表す。
-	m_fireCooldownSeconds = std::max(0.0f,m_fireCooldownSeconds - deltaTime);
+	m_fireCooldownSeconds = std::max(0.0f,m_fireCooldownSeconds - request.deltaTime);
 
 	// リロード中は発射せず、経過時間を進めて、完了していれば弾を補充する。
 	if(m_isReloading){
-		m_reloadElapsedSeconds += deltaTime;
+		m_reloadElapsedSeconds += request.deltaTime;
 
 		// 経過時間がリロード時間に達したら、不足分と予備弾薬の少ない方だけ補充してリロードを終える。
 		if(m_reloadElapsedSeconds >= m_weaponData.reloadSeconds){
@@ -85,7 +84,7 @@ WEAPON_UPDATE_RESULT WeaponSystem::Update(float deltaTime,const InputSystem& inp
 
 	// 射撃が許可されていない、左クリックを押し続けていない、連射間隔が残っている場合は発射しない。
 	// 装填弾がない場合も発射しないが、弾薬を消費しないデバッグ設定が有効なら、装填弾数に関係なく発射できる。
-	if(!isShootingAllowed || !input.IsKeyPressed(VK_LBUTTON) || m_fireCooldownSeconds > 0.0f)return result;
+	if(!request.isShootingAllowed || !input.IsKeyPressed(VK_LBUTTON) || m_fireCooldownSeconds > 0.0f)return result;
 	if(m_magazineAmmo <= 0 && !m_isInfiniteAmmo)return result;
 
 	// 弾薬を1つ消費し、次の発射までの連射間隔を設定する。弾薬を消費しないデバッグ設定が有効なら、弾は減らさない。
@@ -96,7 +95,7 @@ WEAPON_UPDATE_RESULT WeaponSystem::Update(float deltaTime,const InputSystem& inp
 	m_fireCooldownSeconds = m_weaponData.fireIntervalSeconds;
 
 	// 構えているかに応じた散布で、弾ごとの方向と命中を決める。反動は方向を決めた後に、1回の発射につき1回だけ加える。
-	const float spread_degrees = isAiming ? m_weaponData.aimSpreadDegrees : m_weaponData.hipSpreadDegrees;
+	const float spread_degrees = request.isAiming ? m_weaponData.aimSpreadDegrees : m_weaponData.hipSpreadDegrees;
 	result.didFire = true;
 	CastPellets(camera,spread_degrees,collisionWorld,result);
 

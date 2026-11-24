@@ -52,6 +52,17 @@ struct WEAPON_UPDATE_RESULT
 	std::array<SHOT_PELLET_RESULT,WEAPON_TABLE::ns_MAX_PELLET_COUNT> pellets{};
 };
 
+// 1回の更新で、呼出側が渡す、時間と射撃の条件。WeaponSystem::Updateの引数の数を減らすための値の束で、更新は変更しない。
+struct WEAPON_UPDATE_REQUEST
+{
+	// この更新で進める経過時間。単位は秒。
+	float deltaTime{};
+	// 構えているか。trueなら構え射撃の散布、falseなら通常射撃の散布を使う。
+	bool isAiming{};
+	// 射撃してよい状態か。falseの間は、左クリックを押していても発射しない。リロードの開始と進行には影響しない。
+	bool isShootingAllowed{};
+};
+
 // 弾薬・連射間隔・リロードの状態を管理し、射撃の判定を行う。
 class WeaponSystem final
 {
@@ -62,15 +73,12 @@ public:
 	void Initialize(const WEAPON_DATA& weaponData);
 	// 連射間隔とリロードの時間を進め、リロード開始と射撃の入力を処理する。射撃を続けている最中かを、カメラの反動の制御へ伝える。
 	// 発射した場合は、1回の発射で、弾薬を1つだけ減らし、反動を1回だけ加え、性能値の数の弾（ペレット）を、それぞれ別の方向へ判定する。
-	// deltaTime: この更新で進める経過時間。単位は秒。
+	// request: この更新で進める経過時間と、構えているか、射撃してよいか。
 	// input: 左クリック（射撃）とRキー（リロード）の取得先。参照は保持しない。
-	// isAiming: 構えているか。trueなら構え射撃の散布、falseなら通常射撃の散布を使う。
-	// isShootingAllowed: 射撃してよい状態か。falseの間は、左クリックを押していても発射しない。リロードの開始と進行には影響しない。
 	// camera: 発射の始点と方向の取得元で、発射時に反動を加える先。呼出側が先に視線と位置を更新しておくこと。
 	// collisionWorld: 命中判定を行うCollisionWorld。読み取りだけを行う。
 	// 戻り値: この更新で起きた射撃の結果。リロード中は発射しない。
-	[[nodiscard]] WEAPON_UPDATE_RESULT Update(float deltaTime,const InputSystem& input,bool isAiming,bool isShootingAllowed,FpsCamera& camera,
-																						const CollisionWorld& collisionWorld);
+	[[nodiscard]] WEAPON_UPDATE_RESULT Update(const WEAPON_UPDATE_REQUEST& request,const InputSystem& input,FpsCamera& camera,const CollisionWorld& collisionWorld);
 	// リロードを途中でやめる。弾は補充せず、装填弾数と予備弾薬は変わらない。殴打など、リロードをキャンセルする動作から呼ぶ。
 	// リロード中でなければ何もしない。
 	void CancelReload()
