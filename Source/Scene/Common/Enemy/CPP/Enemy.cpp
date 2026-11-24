@@ -5,6 +5,7 @@
 
 //========= Framework インクルード=========
 #include "Framework/3D/H/BasicMeshRenderer.h"
+#include "Framework/3D/H/CameraMatrices.h"
 #include "Framework/Collision/H/CollisionResolver.h"
 #include "Framework/Collision/H/CollisionWorld.h"
 
@@ -165,8 +166,10 @@ void Enemy::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const
 		color = ns_TELEGRAPH_COLOR;
 	}
 
-	m_cubeRenderer->DrawCube(graphicsSystem,draw_transform.GetWorldMatrix(),viewMatrix,projectionMatrix,color,XMFLOAT2{1.0f,1.0f},
-													 BasicMeshRenderer::TextureType::Object);
+	// View行列とProjection行列、および、決めた色・UV倍率1・Object画像を、それぞれ1つの構造体にまとめて、Cubeを描く。
+	const CAMERA_MATRICES camera{viewMatrix,projectionMatrix};
+	const BasicMeshRenderer::CUBE_APPEARANCE appearance{color,XMFLOAT2{1.0f,1.0f},BasicMeshRenderer::TextureType::Object};
+	m_cubeRenderer->DrawCube(graphicsSystem,draw_transform.GetWorldMatrix(),camera,appearance);
 }
 
 //========= 戦闘関数=========
