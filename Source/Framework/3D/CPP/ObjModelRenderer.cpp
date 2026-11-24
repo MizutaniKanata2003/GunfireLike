@@ -15,6 +15,7 @@
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/GraphicsErrorLog.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
+#include "Framework/DirectX/H/MeshBuffers.h"
 #include "Framework/DirectX/H/TextureLoader.h"
 #include "Framework/Etc/H/Logger.h"
 
@@ -345,39 +346,16 @@ bool ObjModelRenderer::LoadTextureFromFile(ID3D11Device* device,const std::wstri
 // 共有後の頂点配列とIndex配列から、Vertex BufferとIndex Bufferを、この順に生成する。
 bool ObjModelRenderer::CreateMeshBuffers(ID3D11Device* device,const std::vector<BASIC_COLOR_VERTEX>& vertices,const std::vector<unsigned int>& indices)
 {
-	// DEFAULT・頂点用途で生成する。ByteWidthは頂点数×1頂点のバイト数をUINTへ変換する。
-	// 巨大配列での積・UINT変換の上限検証は追加しない。CPUAccess等の残りはゼロ設定を維持する。
-	D3D11_BUFFER_DESC vertex_buffer_desc{};
-	vertex_buffer_desc.ByteWidth = static_cast<UINT>(sizeof(BASIC_COLOR_VERTEX) * vertices.size());
-	vertex_buffer_desc.Usage = D3D11_USAGE_DEFAULT;
-	vertex_buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	// Vertex Bufferの指定。DEFAULT・頂点用途。ByteWidthは頂点数×1頂点のバイト数で、巨大配列での積・UINT変換の上限検証は追加しない。
+	const MESH_BUFFER_SOURCE vertex_source{vertices.data(),sizeof(BASIC_COLOR_VERTEX) * vertices.size(),D3D11_USAGE_DEFAULT,
+		D3D11_BIND_VERTEX_BUFFER,L"ID3D11Device::CreateBuffer(VertexBuffer)"};
 
-	// 初期データは連続するCPU頂点配列。所有権は渡さず、CreateBuffer中に有効に保持する。Bufferなので画像用Pitch類はゼロのまま。
-	D3D11_SUBRESOURCE_DATA vertex_data{};
-	vertex_data.pSysMem = vertices.data();
-	const HRESULT vertex_buffer_result = device->CreateBuffer(&vertex_buffer_desc,&vertex_data,m_vertexBuffer.GetAddressOf());
-	// Vertex Buffer生成失敗ならAPI名とHRESULTを記録して失敗を返す。
-	if(FAILED(vertex_buffer_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateBuffer(VertexBuffer)",vertex_buffer_result);
-		return false;
-	}
+	// Index Bufferの指定。unsigned intの要素幅とR32_UINTを対応させる。総バイト数のUINT変換は既存式を維持し、上限検証はしない。
+	const MESH_BUFFER_SOURCE index_source{indices.data(),sizeof(unsigned int) * indices.size(),D3D11_USAGE_DEFAULT,
+		D3D11_BIND_INDEX_BUFFER,L"ID3D11Device::CreateBuffer(IndexBuffer)"};
 
-	// unsigned intの要素幅とR32_UINTを対応させる。総バイト数のUINT変換は既存式を維持し、上限検証はしない。
-	D3D11_BUFFER_DESC index_buffer_desc{};
-	index_buffer_desc.ByteWidth = static_cast<UINT>(sizeof(unsigned int) * indices.size());
-	index_buffer_desc.Usage = D3D11_USAGE_DEFAULT;
-	index_buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-
-	// 三角形の頂点参照順を初期データに渡す。配列の所有は移さず、Index Bufferの参照をメンバーで受け取る。
-	D3D11_SUBRESOURCE_DATA index_data{};
-	index_data.pSysMem = indices.data();
-	const HRESULT index_buffer_result = device->CreateBuffer(&index_buffer_desc,&index_data,m_indexBuffer.GetAddressOf());
-	// Index Buffer生成失敗ならAPI名とHRESULTを記録して失敗を返す。先に生成したVertex Bufferの解放は、呼出側が行う。
-	if(FAILED(index_buffer_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateBuffer(IndexBuffer)",index_buffer_result);
-		return false;
-	}
-	return true;
+	// Vertex→Indexの順に生成し、最初の失敗で止める。失敗のログは、MeshBuffersが記録する。先に生成したVertex Bufferの解放は、呼出側が行う。
+	return MeshBuffers::Create(device,vertex_source,m_vertexBuffer) && MeshBuffers::Create(device,index_source,m_indexBuffer);
 }
 
 // Linear補間・WRAPのSamplerを生成する。

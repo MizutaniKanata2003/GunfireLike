@@ -6,6 +6,7 @@
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/GraphicsErrorLog.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
+#include "Framework/DirectX/H/MeshBuffers.h"
 #include "Framework/DirectX/H/TextureLoader.h"
 
 // Cube形状・Assetパスと、Cubeの頂点・Indexの配列をまとめる。
@@ -172,39 +173,16 @@ void BasicMeshRenderer::Uninit()
 // CubeのVertex BufferとIndex Bufferを、この順に生成する。
 bool BasicMeshRenderer::CreateCubeBuffers(ID3D11Device* device)
 {
-	// CubeのVertex Bufferを生成する。
-	// ByteWidthは配列の総バイト数。DEFAULT・頂点用途、CPUAccessFlags等0の既存設定を維持する。CPU配列を読取元として渡し所有は移さない。
-	D3D11_BUFFER_DESC vertex_buffer_desc{};
-	vertex_buffer_desc.ByteWidth = static_cast<UINT>(sizeof(ns_CUBE_VERTICES));
-	vertex_buffer_desc.Usage = D3D11_USAGE_DEFAULT;
-	vertex_buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	D3D11_SUBRESOURCE_DATA vertex_data{};
-	vertex_data.pSysMem = ns_CUBE_VERTICES;
+	// Vertex Bufferの指定。ByteWidthは配列の総バイト数。DEFAULT・頂点用途、CPUAccessFlags等0の既存設定を維持する。
+	const MESH_BUFFER_SOURCE vertex_source{ns_CUBE_VERTICES,sizeof(ns_CUBE_VERTICES),D3D11_USAGE_DEFAULT,D3D11_BIND_VERTEX_BUFFER,
+		L"ID3D11Device::CreateBuffer(VertexBuffer)"};
 
-	// 生成出力を空のメンバーComPtrで受け取る。
-	const HRESULT vertex_buffer_result = device->CreateBuffer(&vertex_buffer_desc,&vertex_data,m_vertexBuffer.GetAddressOf());
-	// Vertex Buffer生成失敗ならAPI名・結果を記録して失敗を返す。
-	if(FAILED(vertex_buffer_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateBuffer(VertexBuffer)",vertex_buffer_result);
-		return false;
-	}
+	// Index Bufferの指定。unsigned shortの総バイト数を指定する。描画時のR16_UINTと要素幅を対応させる。
+	const MESH_BUFFER_SOURCE index_source{ns_CUBE_INDICES,sizeof(ns_CUBE_INDICES),D3D11_USAGE_DEFAULT,D3D11_BIND_INDEX_BUFFER,
+		L"ID3D11Device::CreateBuffer(IndexBuffer)"};
 
-	// CubeのIndex Bufferを生成する。unsigned shortの総バイト数を指定する。描画時のR16_UINTと要素幅を対応させる。
-	D3D11_BUFFER_DESC index_buffer_desc{};
-	index_buffer_desc.ByteWidth = static_cast<UINT>(sizeof(ns_CUBE_INDICES));
-	index_buffer_desc.Usage = D3D11_USAGE_DEFAULT;
-	index_buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-	D3D11_SUBRESOURCE_DATA index_data{};
-	index_data.pSysMem = ns_CUBE_INDICES;
-
-	// DEFAULT・Index用途のBufferを生成し、メンバーへ所有参照を受け取る。
-	const HRESULT index_buffer_result = device->CreateBuffer(&index_buffer_desc,&index_data,m_indexBuffer.GetAddressOf());
-	// Index Buffer生成失敗ならAPI名・結果を記録して失敗を返す。先に生成したVertex Bufferの解放は、呼出側が行う。
-	if(FAILED(index_buffer_result)){
-		GraphicsErrorLog::Write(L"ID3D11Device::CreateBuffer(IndexBuffer)",index_buffer_result);
-		return false;
-	}
-	return true;
+	// Vertex→Indexの順に生成し、最初の失敗で止める。失敗のログは、MeshBuffersが記録する。先に生成したVertex Bufferの解放は、呼出側が行う。
+	return MeshBuffers::Create(device,vertex_source,m_vertexBuffer) && MeshBuffers::Create(device,index_source,m_indexBuffer);
 }
 
 // 床・壁・Objectの画像を、この順に読み込む。
