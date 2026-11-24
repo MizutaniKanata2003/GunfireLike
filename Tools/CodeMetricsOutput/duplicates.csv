@@ -1,27 +1,10 @@
 ﻿length,places
-49,Source/Scene/ResultScene/CPP/ResultScene.cpp:27 | Source/Scene/TitleScene/CPP/TitleScene.cpp:27
-43,Source/Framework/3D/CPP/BasicMeshRenderer.cpp:186 | Source/Framework/3D/CPP/DebugLineRenderer.cpp:93
-24,Source/Framework/2D/CPP/HudSpriteRenderer.cpp:149 | Source/Framework/3D/CPP/ObjModelRenderer.cpp:210
-24,Source/Framework/2D/CPP/HudSpriteRenderer.cpp:300 | Source/Framework/3D/CPP/ObjModelRenderer.cpp:336
-22,Source/Debug/CPP/DebugPlayer.cpp:33 | Source/Scene/Common/Player/CPP/PlayerController.cpp:51
-22,Source/Framework/2D/CPP/HudSpriteRenderer.cpp:99 | Source/Framework/3D/CPP/ObjModelRenderer.cpp:157
-21,Source/Framework/2D/CPP/HudRenderer.cpp:163 | Source/Framework/2D/CPP/HudSpriteRenderer.cpp:81
-19,Source/Framework/3D/CPP/BasicMeshRenderer.cpp:370 | Source/Framework/3D/CPP/ObjModelRenderer.cpp:322
-19,Source/Scene/ResultScene/H/ResultScene.h:23 | Source/Scene/TitleScene/H/TitleScene.h:23
-17,Source/Debug/CPP/GameDebugController.cpp:45 | Source/Scene/Common/Combat/CPP/PlayerCombatController.cpp:38
-17,Source/Framework/2D/CPP/HudSpriteRenderer.cpp:186 | Source/Framework/3D/CPP/ObjModelRenderer.cpp:255
-15,Source/Framework/2D/CPP/HudSpriteRenderer.cpp:28 | Source/Framework/3D/CPP/BasicMeshRenderer.cpp:44
-14,Source/Framework/2D/CPP/HudSpriteRenderer.cpp:140 | Source/Framework/3D/CPP/BasicMeshRenderer.cpp:177 | Source/Framework/3D/CPP/BasicMeshRenderer.cpp:215 | Source/Framework/3D/CPP/DebugLineRenderer.cpp:84 | Source/Framework/3D/CPP/DebugLineRenderer.cpp:119 | Source/Framework/3D/CPP/ObjModelRenderer.cpp:201
-14,Source/Scene/Common/Enemy/CPP/EnemyController.cpp:177 | Source/Scene/Common/Enemy/CPP/EnemyController.cpp:246
-14,Source/Scene/GameScene/H/GameScene.h:11 | Source/Scene/ResultScene/H/ResultScene.h:15 | Source/Scene/TitleScene/H/TitleScene.h:15
-12,Source/Framework/2D/H/HudSpriteRenderer.h:61 | Source/Framework/3D/H/BasicMeshRenderer.h:58 | Source/Framework/3D/H/DebugLineRenderer.h:43
-11,Source/Framework/2D/CPP/HudRenderer.cpp:161 | Source/Framework/2D/CPP/HudSpriteRenderer.cpp:79 | Source/Framework/3D/CPP/ObjModelRenderer.cpp:137
-11,Source/Framework/3D/CPP/BasicMeshRenderer.cpp:282 | Source/Framework/DirectX/CPP/GraphicsSystem.cpp:153
-11,Source/Framework/2D/CPP/HudSpriteRenderer.cpp:298 | Source/Framework/3D/CPP/BasicMeshRenderer.cpp:385 | Source/Framework/3D/CPP/ObjModelRenderer.cpp:334
-11,Source/Framework/3D/CPP/BasicMeshRenderer.cpp:145 | Source/Framework/3D/CPP/BasicMeshRenderer.cpp:165
-11,Source/Scene/Common/Enemy/CPP/EnemyController.cpp:236 | Source/Scene/Common/Enemy/CPP/EnemyController.cpp:297
+23,Source/Scene/ResultScene/CPP/ResultScene.cpp:18 | Source/Scene/TitleScene/CPP/TitleScene.cpp:18
+17,Source/Debug/CPP/GameDebugController.cpp:47 | Source/Scene/Common/Combat/CPP/PlayerCombatController.cpp:40
+15,Source/Framework/2D/CPP/HudSpriteRenderer.cpp:154 | Source/Framework/3D/CPP/ObjModelRenderer.cpp:354
+14,Source/Framework/DirectX/CPP/RenderStateSet.cpp:113 | Source/Framework/DirectX/CPP/RenderStateSet.cpp:146
+14,Source/Scene/GameScene/H/GameScene.h:11 | Source/Scene/ResultScene/H/ResultScene.h:11 | Source/Scene/TitleScene/H/TitleScene.h:11
+13,Source/Scene/ResultScene/H/ResultScene.h:19 | Source/Scene/TitleScene/H/TitleScene.h:19
+11,Source/Framework/3D/CPP/BasicMeshRenderer.cpp:113 | Source/Framework/3D/CPP/ObjModelRenderer.cpp:261
+11,Source/Framework/DirectX/CPP/RenderStateSet.cpp:133 | Source/Framework/DirectX/CPP/RenderStateSet.cpp:165
 10,Source/Debug/CPP/GameDebugUi.cpp:15 | Source/Debug/CPP/GameDebugUi.cpp:55 | Source/Debug/CPP/GameDebugUi.cpp:83
-10,Source/Framework/2D/CPP/HudRenderer.cpp:74 | Source/Framework/2D/CPP/HudSpriteRenderer.cpp:35 | Source/Framework/3D/CPP/BasicMeshRenderer.cpp:51 | Source/Framework/3D/CPP/DebugLineRenderer.cpp:39
-10,Source/Framework/2D/CPP/HudRenderer.cpp:182 | Source/Framework/3D/CPP/ObjModelRenderer.cpp:139
-10,Source/Framework/2D/CPP/HudSpriteRenderer.cpp:280 | Source/Framework/3D/CPP/DebugLineRenderer.cpp:201
-10,Source/Framework/3D/CPP/BasicMeshRenderer.cpp:387 | Source/Framework/3D/CPP/DebugLineRenderer.cpp:221

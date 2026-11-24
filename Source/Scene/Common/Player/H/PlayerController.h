@@ -60,6 +60,15 @@ struct PLAYER_MOTION
 	float targetEyeHeight{};
 };
 
+// 1回の更新で、呼出側が渡す、時間と蹴りの条件。PlayerController::Updateの引数の数を減らすための値の束で、更新は変更しない。
+struct PLAYER_UPDATE_REQUEST
+{
+	// この更新で進める経過時間。単位は秒。0なら状態の時間も進まない。
+	float deltaTime{};
+	// 蹴れる相手（射程内で、怯んでいて、転倒していない敵）がいるか。falseの間は、Fを押しても蹴りを始めない。
+	bool canKick{};
+};
+
 // WASD移動・ダッシュ・しゃがみ・スライディング・回避・蹴り・殴打・構えを扱い、地形のAABBを通り抜けないように位置を補正するクラス。
 class PlayerController final
 {
@@ -69,11 +78,17 @@ public:
 	// startPosition: 開始位置のワールド座標。Yは立っている時の視点の高さに合わせる。壁の内側を指定すること。
 	void Initialize(const XMFLOAT3& startPosition);
 	// 入力から動作の状態を切り替え、移動・視点の高さ・構えを更新し、地形のAABBから押し戻す。入力がなくても、押し戻しは行う。
-	// deltaTime: この更新で進める経過時間。単位は秒。0なら状態の時間も進まない。
+	// request: この更新で進める経過時間と、蹴れる相手がいるか。
 	// input: W・A・S・D・Space・E・F・C・左Shift・左右クリックの取得先。参照は保持しない。
 	// camera: 移動方向の基準にする視線の取得元。上下の向きは移動に使わない。参照は保持しない。
 	// collisionWorld: 押し戻しの基準にするCollisionWorld。STATICレイヤーのAABBを読み取る。参照は保持しない。
-	// canKick: 蹴れる相手（射程内で、怯んでいて、転倒していない敵）がいるか。falseの間は、Fを押しても蹴りを始めない。
+	// 移行中は、下の旧形式へ渡すだけの入口にする。旧形式を削除する際に、この形式へ本体を移す。
+	void Update(const PLAYER_UPDATE_REQUEST& request,const InputSystem& input,const FpsCamera& camera,const CollisionWorld& collisionWorld)
+	{
+		Update(request.deltaTime,input,camera,collisionWorld,request.canKick);
+	}
+	// 移行中の旧形式。引数が5個あり、13.5の基準を超える。呼出側を、上の形式へ移行した後に削除する。
+	// 引数と動作は、上の形式と同じ。deltaTime・canKickは、requestの同名のメンバーに対応する。
 	void Update(float deltaTime,const InputSystem& input,const FpsCamera& camera,const CollisionWorld& collisionWorld,bool canKick);
 	// 被弾などで、プレイヤーを短く怯ませる。怯み中は、通常・ダッシュ・しゃがみの移動速度が下がる。
 	// seconds: 怯む時間。単位は秒。すでに怯み中の場合は、長い方の残り時間にする。
