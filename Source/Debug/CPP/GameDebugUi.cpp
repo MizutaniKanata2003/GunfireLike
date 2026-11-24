@@ -124,9 +124,7 @@ void GameDebugUi::Draw(const GAME_DEBUG_INFO& info)
 	ImGui::Text("Room: %d / 3  Wave: %d / 2  Phase: %s",info.roomNumber,info.waveNumber,GetRoomPhaseName(info.roomPhase));
 	ImGui::Text("One-hit kill: %s",info.isOneHitKillEnabled ? "ON" : "OFF");
 	// 生成失敗で再試行を止めている場合だけ、F4で再開できることを表示する。
-	if(info.hasWaveSpawnFailed){
-		ImGui::TextUnformatted("Wave spawn failed (F4: restart rooms)");
-	}
+	if(info.hasWaveSpawnFailed) ImGui::TextUnformatted("Wave spawn failed (F4: restart rooms)");
 
 	// プレイヤーの位置・HP・動作・無敵・怯み・回復アイテム数を表示する。
 	ImGui::Text("Position: %.2f, %.2f, %.2f",info.playerPosition.x,info.playerPosition.y,info.playerPosition.z);
@@ -136,9 +134,8 @@ void GameDebugUi::Draw(const GAME_DEBUG_INFO& info)
 							info.isCollisionDebugVisible ? "ON" : "OFF",info.isHitStopActive ? "ON" : "OFF",info.isSlowMotionActive ? "ON" : "OFF");
 
 	// 確認用の攻撃を予告中の場合だけ、当たるまでの残り時間を表示する。判定結果は常に表示する。
-	if(info.hasIncomingAttack){
-		ImGui::Text("Incoming attack in: %.2f s",info.secondsUntilHit);
-	}
+	if(info.hasIncomingAttack) ImGui::Text("Incoming attack in: %.2f s",info.secondsUntilHit);
+
 	ImGui::Text("Last attack result: %s",GetJudgeResultName(info.lastJudgeResult));
 
 	// 敵の状態を表示する。
@@ -154,14 +151,10 @@ void GameDebugUi::Draw(const GAME_DEBUG_INFO& info)
 	}
 
 	// 直近の命中の表示時間が残っている間だけ、命中した旨を表示する。
-	if(info.isHitMarkerActive){
-		ImGui::TextUnformatted("HIT!");
-	}
+	if(info.isHitMarkerActive) ImGui::TextUnformatted("HIT!");
 
 	// 可視化の表示中でRayが命中している場合だけ、命中したColliderのレイヤーのbitと距離を表示する。
-	if(info.isCollisionDebugVisible && info.hasRayHit){
-		ImGui::Text("Ray hit: layer bit=%u distance=%.2f",info.rayHitLayer,info.rayHitDistance);
-	}
+	if(info.isCollisionDebugVisible && info.hasRayHit) ImGui::Text("Ray hit: layer bit=%u distance=%.2f",info.rayHitLayer,info.rayHitDistance);
 
 	ImGui::End();
 }

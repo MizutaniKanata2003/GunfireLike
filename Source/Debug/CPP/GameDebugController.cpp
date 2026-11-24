@@ -81,34 +81,23 @@ void GameDebugController::Reset()
 bool GameDebugController::UpdateCommands()
 {
 	// F3が押された瞬間は、Collision可視化の表示を反転する。Capture解除中も切り替えられるよう、呼出側はCaptureの判定より前に呼ぶ。
-	if(m_inputSystem->IsKeyTriggered(VK_F3)){
-		m_collisionDebugView->ToggleVisible();
-	}
+	if(m_inputSystem->IsKeyTriggered(VK_F3)) m_collisionDebugView->ToggleVisible();
 
 	// F5が押された瞬間は、HPバーと低HP警告の確認のため、プレイヤーへ確認用のダメージを与える。ヒットストップや怯みは与えない。
-	if(m_inputSystem->IsKeyTriggered(VK_F5)){
-		m_playerHealth->ApplyDamage(COMBAT_TABLE::ns_DEBUG_DAMAGE);
-	}
+	if(m_inputSystem->IsKeyTriggered(VK_F5)) m_playerHealth->ApplyDamage(COMBAT_TABLE::ns_DEBUG_DAMAGE);
 
 	// F6が押された瞬間は、プレイヤーのHPを満タンへ戻す。
-	if(m_inputSystem->IsKeyTriggered(VK_F6)){
-		m_playerHealth->HealFull();
-	}
+	if(m_inputSystem->IsKeyTriggered(VK_F6)) m_playerHealth->HealFull();
 
 	// F7が押された瞬間は、回避とジャスト回避の確認のため、一定時間後に当たる攻撃を予告する。敵の攻撃の実装までの暫定の操作。
-	if(m_inputSystem->IsKeyTriggered(VK_F7)){
-		m_dodgeJudge.StartIncomingAttack(COMBAT_TABLE::ns_SIMULATED_ATTACK_DELAY_SECONDS);
-	}
+	if(m_inputSystem->IsKeyTriggered(VK_F7)) m_dodgeJudge.StartIncomingAttack(COMBAT_TABLE::ns_SIMULATED_ATTACK_DELAY_SECONDS);
 
 	// F8が押された瞬間は、回復アイテムを1個増やす。入手の実装までの暫定の操作。上限を超えない。
-	if(m_inputSystem->IsKeyTriggered(VK_F8)){
-		m_healItems->Add(1);
-	}
+	if(m_inputSystem->IsKeyTriggered(VK_F8)) m_healItems->Add(1);
 
 	// F9が押された瞬間は、デバッグ用に、一撃で敵を倒す設定を切り替える。Capture解除中も切り替えられるよう、呼出側はCaptureの判定より前に呼ぶ。
-	if(m_inputSystem->IsKeyTriggered(VK_F9)){
-		m_playerCombat->ToggleOneHitKill();
-	}
+	if(m_inputSystem->IsKeyTriggered(VK_F9)) m_playerCombat->ToggleOneHitKill();
+
 
 	// Insertが押された瞬間は、デバッグ用に、弾薬を消費せずに撃ち続けられる設定を切り替え、切替後の状態をログへ記録する。
 	// F10はWindowsのメニュー操作、F12はデバッガーの中断に使われるため、割り当てない。
@@ -129,9 +118,8 @@ DODGE_JUDGE_RESULT GameDebugController::UpdateDodgeJudge(float worldDeltaTime)
 	const DODGE_JUDGE_RESULT judge_result = m_dodgeJudge.Update(worldDeltaTime,m_playerController->IsInvincible(),
 																															m_playerController->GetSecondsSinceDodgeStart());
 	// 判定結果が出た場合だけ、表示用に記録する。
-	if(judge_result != DODGE_JUDGE_RESULT::e_NONE){
-		m_lastJudgeResult = judge_result;
-	}
+	if(judge_result != DODGE_JUDGE_RESULT::e_NONE) m_lastJudgeResult = judge_result;
+
 	return judge_result;
 }
 
