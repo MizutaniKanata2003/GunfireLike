@@ -64,15 +64,7 @@ public:
 	// rayHit: 命中した場合の出力先。命中しない場合は変更しない。
 	// hitInfo: 命中したColliderの情報の出力先。命中しない場合は変更しない。
 	// 戻り値: いずれかのColliderに命中すればtrue。同じ距離なら先に登録したColliderを採用する。
-	// 移行中は、下の旧形式へ渡すだけの入口にする。旧形式を削除する際に、この形式へ本体を移す。
-	[[nodiscard]] bool Raycast(const COLLISION_RAY_QUERY& query,COLLISION_RAY_HIT& rayHit,COLLISION_HIT_INFO& hitInfo) const
-	{
-		return Raycast(query.ray,query.maxDistance,query.layerMask,rayHit,hitInfo);
-	}
-	// 移行中の旧形式。引数が5個あり、13.5の基準を超える。呼出側を、上の形式へ移行した後に削除する。
-	// 引数と動作は、上の形式と同じ。ray・maxDistance・layerMaskは、queryの同名のメンバーに対応する。
-	[[nodiscard]] bool Raycast(const COLLISION_RAY& ray,float maxDistance,std::uint32_t layerMask,COLLISION_RAY_HIT& rayHit,
-														 COLLISION_HIT_INFO& hitInfo) const;
+	[[nodiscard]] bool Raycast(const COLLISION_RAY_QUERY& query,COLLISION_RAY_HIT& rayHit,COLLISION_HIT_INFO& hitInfo) const;
 	// 球と重なる全Colliderを調べる。
 	// sphere: 調べる範囲を表す球。
 	// layerMask: 対象にするレイヤーのbitの組合せ。
