@@ -9,6 +9,7 @@
 
 //========= Framework インクルード=========
 #include "Framework/3D/H/BasicMeshRenderer.h"
+#include "Framework/3D/H/CameraMatrices.h"
 #include "Framework/Collision/H/CollisionMath.h"
 #include "Framework/Collision/H/CollisionWorld.h"
 
@@ -96,11 +97,15 @@ void EnemyProjectileManager::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX&
 	Transform transform;
 	transform.SetRotation(XMFLOAT3{});
 	transform.SetScale(XMFLOAT3{ENEMY_PROJECTILE::ns_DRAW_SIZE,ENEMY_PROJECTILE::ns_DRAW_SIZE,ENEMY_PROJECTILE::ns_DRAW_SIZE});
+
+	// 全ての弾に共通の、視点の行列と、色・UV倍率・Texture種別を、1つずつの構造体にまとめる。
+	const CAMERA_MATRICES camera{viewMatrix,projectionMatrix};
+	const BasicMeshRenderer::CUBE_APPEARANCE appearance{ENEMY_PROJECTILE::ns_COLOR,XMFLOAT2{1.0f,1.0f},BasicMeshRenderer::TextureType::Object};
+
 	// 全ての弾を、位置だけ変えて、同じ大きさと色で描く。
 	for(const PROJECTILE_STATE& projectile : m_projectiles){
 		transform.SetPosition(projectile.position);
-		m_cubeRenderer->DrawCube(graphicsSystem,transform.GetWorldMatrix(),viewMatrix,projectionMatrix,ENEMY_PROJECTILE::ns_COLOR,XMFLOAT2{1.0f,1.0f},
-														 BasicMeshRenderer::TextureType::Object);
+		m_cubeRenderer->DrawCube(graphicsSystem,transform.GetWorldMatrix(),camera,appearance);
 	}
 }
 

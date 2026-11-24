@@ -4,6 +4,7 @@
 
 //========= Framework インクルード=========
 #include "Framework/3D/H/BasicMeshRenderer.h"
+#include "Framework/3D/H/CameraMatrices.h"
 
 //========= Scene インクルード=========
 #include "Scene/Common/Object/H/ModelRegistry.h"
@@ -72,14 +73,17 @@ void AreaTelegraph::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatr
 	transform.SetRotation(XMFLOAT3{});
 	transform.SetScale(XMFLOAT3{side_length,AREA_TELEGRAPH::ns_THICKNESS,side_length});
 
+	// 全ての板に共通の、視点の行列と、色・UV倍率・Texture種別を、1つずつの構造体にまとめる。
+	const CAMERA_MATRICES camera{viewMatrix,projectionMatrix};
+	const BasicMeshRenderer::CUBE_APPEARANCE appearance{AREA_TELEGRAPH::ns_COLOR,XMFLOAT2{1.0f,1.0f},BasicMeshRenderer::TextureType::Object};
+
 	// 全枠を先頭から調べ、予告中の枠だけ、範囲の中心へ板を置いて描く。
 	for(const SLOT_STATE& slot : m_slots){
 		// 予告中でない枠は、描かずに次の枠へ進む。
 		if(!slot.isActive)continue;
 
 		transform.SetPosition(XMFLOAT3{slot.center.x,AREA_TELEGRAPH::ns_CENTER_Y,slot.center.z});
-		m_cubeRenderer->DrawCube(graphicsSystem,transform.GetWorldMatrix(),viewMatrix,projectionMatrix,AREA_TELEGRAPH::ns_COLOR,XMFLOAT2{1.0f,1.0f},
-														 BasicMeshRenderer::TextureType::Object);
+		m_cubeRenderer->DrawCube(graphicsSystem,transform.GetWorldMatrix(),camera,appearance);
 	}
 }
 

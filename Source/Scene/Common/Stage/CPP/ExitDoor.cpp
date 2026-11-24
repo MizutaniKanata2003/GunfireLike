@@ -8,6 +8,7 @@
 
 //========= Framework インクルード=========
 #include "Framework/3D/H/BasicMeshRenderer.h"
+#include "Framework/3D/H/CameraMatrices.h"
 #include "Framework/Collision/H/CollisionWorld.h"
 
 //========= Scene インクルード=========
@@ -90,15 +91,18 @@ void ExitDoor::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,co
 	// Rendererを借用していない場合は、描画しない。
 	if(m_cubeRenderer == nullptr)return;
 
+	// 視点の行列を、1つの構造体にまとめる。開いている場合も閉じている場合も、同じ値を使う。
+	const CAMERA_MATRICES camera{viewMatrix,projectionMatrix};
+
 	// 開いている間は床の緑の目印を、閉じている間は赤い扉を描く。扉の色は画像の色へ乗算して、通行可否を示す。
 	if(m_isOpen){
-		m_cubeRenderer->DrawCube(graphicsSystem,m_padTransform.GetWorldMatrix(),viewMatrix,projectionMatrix,EXIT_DOOR::ns_OPEN_COLOR,XMFLOAT2{1.0f,1.0f},
-														 BasicMeshRenderer::TextureType::Object);
+		const BasicMeshRenderer::CUBE_APPEARANCE open_appearance{EXIT_DOOR::ns_OPEN_COLOR,XMFLOAT2{1.0f,1.0f},BasicMeshRenderer::TextureType::Object};
+		m_cubeRenderer->DrawCube(graphicsSystem,m_padTransform.GetWorldMatrix(),camera,open_appearance);
 	}
 	// 閉じている間は、赤い扉を描く。
 	else{
-		m_cubeRenderer->DrawCube(graphicsSystem,m_doorTransform.GetWorldMatrix(),viewMatrix,projectionMatrix,EXIT_DOOR::ns_CLOSED_COLOR,XMFLOAT2{1.0f,1.0f},
-														 BasicMeshRenderer::TextureType::Object);
+		const BasicMeshRenderer::CUBE_APPEARANCE closed_appearance{EXIT_DOOR::ns_CLOSED_COLOR,XMFLOAT2{1.0f,1.0f},BasicMeshRenderer::TextureType::Object};
+		m_cubeRenderer->DrawCube(graphicsSystem,m_doorTransform.GetWorldMatrix(),camera,closed_appearance);
 	}
 }
 

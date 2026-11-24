@@ -3,6 +3,7 @@
 // 床と4面の壁の固定配置を設定し、既存の色・UV倍率・Texture種別と順序で描画する。
 
 //========= Framework インクルード=========
+#include "Framework/3D/H/CameraMatrices.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
 
 // 床と壁の配置・拡大縮小に使う固定値を、この実装ファイル内にまとめる。
@@ -81,26 +82,19 @@ void StageField::Initialize()
 // 床と各壁をCubeとして描画する。GPU側の更新とBindはRendererへ委譲する。
 void StageField::Draw(BasicMeshRenderer& basicMeshRenderer,GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix) const
 {
-	// 壁Textureへ掛ける共通色を不透明な白とし、Texture本来の色を維持する。
-	const XMFLOAT4 wall_color{1.0f,1.0f,1.0f,1.0f};
+	// 床と全ての壁に共通の、視点の行列を、1つの構造体にまとめる。
+	const CAMERA_MATRICES camera{viewMatrix,projectionMatrix};
 
-	// 床を白色・UV10倍のFloor Textureで描く。
-	basicMeshRenderer.DrawCube(graphicsSystem,m_floorTransform.GetWorldMatrix(),viewMatrix,projectionMatrix,
-														 XMFLOAT4{1.0f,1.0f,1.0f,1.0f},XMFLOAT2{10.0f,10.0f},BasicMeshRenderer::TextureType::Floor);
+	// 床は、白色・UV10倍のFloor Textureで描く。壁は、不透明な白（Texture本来の色を維持する）・UV1倍のWall Textureで描く。
+	const BasicMeshRenderer::CUBE_APPEARANCE floor_appearance{XMFLOAT4{1.0f,1.0f,1.0f,1.0f},XMFLOAT2{10.0f,10.0f},BasicMeshRenderer::TextureType::Floor};
+	const BasicMeshRenderer::CUBE_APPEARANCE wall_appearance{XMFLOAT4{1.0f,1.0f,1.0f,1.0f},XMFLOAT2{1.0f,1.0f},BasicMeshRenderer::TextureType::Wall};
 
-	// 左壁を白色・UV1倍のWall Textureで描く。
-	basicMeshRenderer.DrawCube(graphicsSystem,m_leftWallTransform.GetWorldMatrix(),viewMatrix,projectionMatrix,
-														 wall_color,XMFLOAT2{1.0f,1.0f},BasicMeshRenderer::TextureType::Wall);
+	// 床を最初に描く。
+	basicMeshRenderer.DrawCube(graphicsSystem,m_floorTransform.GetWorldMatrix(),camera,floor_appearance);
 
-	// 右壁を左壁の後に同じ色・UV倍率・Texture種別で描く。
-	basicMeshRenderer.DrawCube(graphicsSystem,m_rightWallTransform.GetWorldMatrix(),viewMatrix,projectionMatrix,
-														 wall_color,XMFLOAT2{1.0f,1.0f},BasicMeshRenderer::TextureType::Wall);
-
-	// 手前壁を左右壁の後に描く。
-	basicMeshRenderer.DrawCube(graphicsSystem,m_nearWallTransform.GetWorldMatrix(),viewMatrix,projectionMatrix,
-														 wall_color,XMFLOAT2{1.0f,1.0f},BasicMeshRenderer::TextureType::Wall);
-
-	// 奥壁を最後に描く。
-	basicMeshRenderer.DrawCube(graphicsSystem,m_farWallTransform.GetWorldMatrix(),viewMatrix,projectionMatrix,
-														 wall_color,XMFLOAT2{1.0f,1.0f},BasicMeshRenderer::TextureType::Wall);
+	// 左壁・右壁・手前壁・奥壁を、この順に、同じ外観で描く。
+	basicMeshRenderer.DrawCube(graphicsSystem,m_leftWallTransform.GetWorldMatrix(),camera,wall_appearance);
+	basicMeshRenderer.DrawCube(graphicsSystem,m_rightWallTransform.GetWorldMatrix(),camera,wall_appearance);
+	basicMeshRenderer.DrawCube(graphicsSystem,m_nearWallTransform.GetWorldMatrix(),camera,wall_appearance);
+	basicMeshRenderer.DrawCube(graphicsSystem,m_farWallTransform.GetWorldMatrix(),camera,wall_appearance);
 }
