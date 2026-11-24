@@ -1,17 +1,16 @@
 ﻿#pragma once
 
-// 各面に独立したUVを持つ固定Cubeと、描画用Shader・Buffer・画像SRV・Samplerを所有する。
-// CPU配列からGPU Resourceを作り、描画ごとに行列・色・UV倍率・画像使用値を転送する。
+// 各面に独立したUVを持つ固定Cubeと、描画用のBuffer・画像SRV・Samplerを所有する。
+// BasicColorのShader・定数Bufferは、BasicColorPipelineが所有する。描画ごとに行列・色・UV倍率・画像使用値を転送する。
 // Scene進行、Render Pass選択、描画先やBlend・Depth・Cull設定は担当しない。GraphicsSystemは借用し保持しない。
 
 //========= 外部ライブラリ インクルード=========
-#include <d3d11.h> // Shader・Layout・Buffer・Texture View・SamplerのCOM型を使用する。
+#include <d3d11.h> // Buffer・Texture View・SamplerのCOM型を使用する。
 
 //========= Framework インクルード=========
-#include "Framework/Etc/H/MathTypes.h"
-#include "Framework/DirectX/H/ConstantBuffer.h"
-#include "Framework/DirectX/H/GraphicsConstants.h"
+#include "Framework/3D/H/BasicColorPipeline.h"
 #include "Framework/DirectX/H/VertexFormat.h"
+#include "Framework/Etc/H/MathTypes.h"
 
 //========= 前方宣言=========
 class GraphicsSystem;
@@ -35,7 +34,7 @@ public:
 	[[nodiscard]] VERTEX_FORMAT GetVertexFormat() const { return VERTEX_FORMAT::e_POSITION_TEXTURE; }
 
 	//========= ライフサイクル・描画関数=========
-	// 旧ResourceをUninit後、Cube・Shader・定数Buffer・画像・Samplerを生成する。
+	// 旧ResourceをUninit後、Cube・BasicColorPipeline・画像・Samplerを生成する。
 	// graphicsSystem: 有効な生成Deviceの取得元。生成Resourceと対応する描画基盤を渡す。
 	// 戻り値: 全生成成功ならtrue。検出したDevice未取得・読込・生成失敗はfalse。
 	// 検出した失敗では部分Resourceを解放する。旧状態へ復帰せず、下位処理・メモリ確保等の例外も捕捉しない。
@@ -58,23 +57,31 @@ public:
 	void Uninit();
 
 private:
-	//========= 構造体=========
-	// 各面4頂点のLocal位置とUV。法線や頂点Colorは含まない。
-	struct VERTEX
-	{
-		// Local座標のfloat3。POSITION0をR32G32B32_FLOATで読み、バイト位置はoffsetofで求める。
-		XMFLOAT3 position{};
-		// float2のUV。TEXCOORD0をR32G32_FLOATで読む。外部略語UVを維持する。
-		XMFLOAT2 UV{};
-	};
+	//========= 生成・描画の補助関数=========
+	// CubeのVertex BufferとIndex Bufferを、この順に生成する。失敗はログへ記録する。
+	// device: 生成に使うDevice。
+	// 戻り値: 両方成功したらtrue。
+	[[nodiscard]] bool CreateCubeBuffers(ID3D11Device* device);
+	// 床・壁・Objectの画像を、この順に読み込む。最初の失敗で、後続の読込を省く。失敗はTextureLoaderがログへ記録する。
+	// device: 生成に使うDevice。
+	// 戻り値: 全て成功したらtrue。
+	[[nodiscard]] bool LoadTextures(ID3D11Device* device);
+	// 縮小・拡大・Mip間をLinear参照し、範囲外をWRAPで繰り返すSamplerを生成する。失敗はログへ記録する。
+	// device: 生成に使うDevice。
+	// 戻り値: 成功したらtrue。
+	[[nodiscard]] bool CreateSampler(ID3D11Device* device);
+	// 画像の種別から、使うSRVを選ぶ。Colorと未定義値はnullptr。
+	// textureType: 画像選択。
+	// 戻り値: SRVの借用ポインター。所有権は移さない。
+	[[nodiscard]] ID3D11ShaderResourceView* SelectTextureView(TextureType textureType) const;
+	// Cube・画像・Samplerを接続して描画する。IA・Shader・定数・SRV・Samplerを、元へ戻さない。
+	// context: 描画に使う即時Context。
+	// textureView: PS t0へ設定するSRV。単色の場合はnullptrで、直前の画像参照を残さない。
+	void BindAndDraw(ID3D11DeviceContext* context,ID3D11ShaderResourceView* textureView) const;
 
-	//========= Shader関連=========
-	// BasicColorVS.csoから生成するVSの所有参照。位置とUVを入力に使う。
-	ComPtr<ID3D11VertexShader> m_vertexShader{};
-	// BasicColorPS.csoから生成するPSの所有参照。b2の画像使用値に従い出力色を選ぶ。
-	ComPtr<ID3D11PixelShader> m_pixelShader{};
-	// CPUのVERTEXとVS signatureを対応付けるInput Layoutの所有参照。
-	ComPtr<ID3D11InputLayout> m_inputLayout{};
+	//========= Pipeline関連=========
+	// BasicColorのShader・Input Layout・定数Bufferを所有する。
+	BasicColorPipeline m_pipeline{};
 
 	//========= Texture関連=========
 	// Linear参照・WRAPを指定するSamplerの所有参照。画像Resourceとは別にBindする。
@@ -91,12 +98,6 @@ private:
 	ComPtr<ID3D11Buffer> m_vertexBuffer{};
 	// 12三角形・36要素の16bit Index Bufferを所有する。
 	ComPtr<ID3D11Buffer> m_indexBuffer{};
-	// 64バイトのCamera転送型。転置済みViewProjectionをVS b0へ設定する。
-	ConstantBuffer<CAMERA_CONSTANTS> m_cameraBuffer{};
-	// 80バイトのObject転送型。転置済みWorldと色をVS/PS b1へ設定する。
-	ConstantBuffer<OBJECT_CONSTANTS> m_objectBuffer{};
-	// 32バイトのMaterial転送型。UV倍率と画像使用値をVS/PS b2へ設定する。未参照フィールドも配置のため維持する。
-	ConstantBuffer<MATERIAL_CONSTANTS> m_materialBuffer{};
 
 	//========= 描画情報=========
 	// 初期0、全生成成功後36、Uninitで0。DrawIndexedの要素数でありバイト数ではない。
