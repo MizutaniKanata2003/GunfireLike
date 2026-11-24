@@ -2,13 +2,6 @@
 
 // タイトルのメニュー画面の初期化、開始ボタンのクリックまたはEnterによるGameSceneへの遷移予約、描画の呼出し、終了を実装する。
 
-//========= Windows インクルード=========
-#include <windows.h> // VK_RETURNで開始の入力を判定する。
-
-//========= Framework インクルード=========
-#include "Framework/Audio/H/AudioSystem.h"
-#include "Framework/Input/H/InputSystem.h"
-
 //========= Scene インクルード=========
 #include "Scene/Common/Core/H/SceneManager.h"
 #include "Scene/Common/UI/H/UiLayout.h"
@@ -40,14 +33,11 @@ void TitleScene::Initialize()
 bool TitleScene::Init()
 {
 	// メニュー画面の初期化がfalseを返した場合は、部分Resourceを解放して管理側へ失敗を返す。失敗した対象のメッセージは、メニュー画面が記録する。
-	if(!m_menu.Initialize(m_graphicsSystem,ns_MENU_CONFIG)){
+	// 成功した場合だけ、ButtonMenuFlowが、マウスキャプチャの解除とタイトルBGMの再生を行う。
+	if(!m_menuFlow.Init(m_graphicsSystem,m_inputSystem,m_audioSystem,ns_MENU_CONFIG)){
 		Finalize();
 		return false;
 	}
-
-	// Resource生成の成功後にだけCaptureとBGMを変更し、false返却時にはこの副作用を発生させない。
-	m_inputSystem.SetMouseCaptureEnabled(false);
-	m_audioSystem.PlayTitleBgm();
 	return true;
 }
 
@@ -57,11 +47,8 @@ void TitleScene::Update(float deltaTime)
 	// タイトルに時間依存の更新はないため、共通インターフェースの引数を意図的に未使用とする。
 	static_cast<void>(deltaTime);
 
-	// 開始ボタンのホバーとクリックを判定する。
-	const bool is_button_clicked = m_menu.UpdateButton(m_inputSystem,m_graphicsSystem);
-
 	// 開始ボタンのクリック、またはEnterが押されたフレームで遷移を予約し、フェードと実際の切替はSceneManagerへ任せる。
-	if(is_button_clicked || m_inputSystem.IsKeyTriggered(VK_RETURN)){
+	if(m_menuFlow.Update(m_inputSystem,m_graphicsSystem)){
 		m_sceneManager.RequestSceneChange<GameScene>();
 	}
 }
@@ -69,12 +56,12 @@ void TitleScene::Update(float deltaTime)
 // メニュー画面の描画を呼び出す。
 void TitleScene::Draw()
 {
-	m_menu.Draw(m_graphicsSystem);
+	m_menuFlow.Draw(m_graphicsSystem);
 }
 
 // Sceneが所有するメニュー画面の描画Resourceだけを終了する。
 void TitleScene::Finalize()
 {
 	// 遷移先が設定したCaptureやBGMを上書きしないよう、共有Systemの設定は変更しない。
-	m_menu.Uninit();
+	m_menuFlow.Uninit();
 }
