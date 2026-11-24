@@ -57,8 +57,7 @@ bool DebugLineRenderer::Initialize(GraphicsSystem& graphicsSystem)
 }
 
 // 端点を2点ずつの線分として、Bufferの容量ごとに分けて描画する。
-void DebugLineRenderer::DrawLines(GraphicsSystem& graphicsSystem,const std::vector<XMFLOAT3>& points,const XMFLOAT4& color,
-																	const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix)
+void DebugLineRenderer::DrawLines(GraphicsSystem& graphicsSystem,const std::vector<XMFLOAT3>& points,const XMFLOAT4& color,const CAMERA_MATRICES& camera)
 {
 	// 必須のBuffer・Shader・Layoutが揃わない、または線分が1本もできない端点数なら、転送・Bind・描画を省く。
 	if(!m_vertexBuffer || !m_pipeline.IsValid() || points.size() < 2)return;
@@ -69,7 +68,7 @@ void DebugLineRenderer::DrawLines(GraphicsSystem& graphicsSystem,const std::vect
 	if(context == nullptr)return;
 
 	// View*Projectionの順で合成して転置する。HLSLの行列格納契約へ合わせ、BasicMeshRendererと同じ手順にする。
-	const XMMATRIX view_projection_matrix = XMMatrixTranspose(viewMatrix * projectionMatrix);
+	const XMMATRIX view_projection_matrix = XMMatrixTranspose(camera.view * camera.projection);
 	CAMERA_CONSTANTS camera_constants{};
 	XMStoreFloat4x4(&camera_constants.viewProjectionMatrix,view_projection_matrix);
 

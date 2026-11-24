@@ -36,17 +36,7 @@ public:
 	// camera: View行列とProjection行列。view*projectionの順で合成する。
 	// 必須Resourceがない、またはContextがない、または端点が2点未満なら何もしない。端点が多い場合は、Bufferの容量ごとに分けて描画する。
 	// Bind状態（Topology・Shader・Layout・定数Buffer）は描画後も元へ戻さない。
-	// 移行中は、下の旧形式へ渡すだけの入口にする。旧形式を削除する際に、この形式へ本体を移す。
-	void DrawLines(GraphicsSystem& graphicsSystem,const std::vector<XMFLOAT3>& points,const XMFLOAT4& color,const CAMERA_MATRICES& camera)
-	{
-		DrawLines(graphicsSystem,points,color,camera.view,camera.projection);
-	}
-	// 移行中の旧形式。引数が5個あり、13.5の基準を超える。呼出側を、上の形式へ移行した後に削除する。
-	// viewMatrix: World空間からView空間への変換行列。viewMatrix*projectionMatrixの順で合成する。
-	// projectionMatrix: View空間からClip空間への変換行列。
-	// その他の引数・動作は、上の形式と同じ。
-	void DrawLines(GraphicsSystem& graphicsSystem,const std::vector<XMFLOAT3>& points,const XMFLOAT4& color,const XMMATRIX& viewMatrix,
-								 const XMMATRIX& projectionMatrix);
+	void DrawLines(GraphicsSystem& graphicsSystem,const std::vector<XMFLOAT3>& points,const XMFLOAT4& color,const CAMERA_MATRICES& camera);
 	// メンバーの所有参照を解放する。未初期化・部分初期化・終了済みでも呼出可能。
 	// ContextのBind解除・状態復元・GPU完了待機は行わない。
 	void Uninit();
