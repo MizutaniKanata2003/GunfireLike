@@ -66,16 +66,16 @@ void PlayerController::Initialize(const XMFLOAT3& startPosition)
 }
 
 // 動作の状態の切替・移動・視点の高さ・構えを更新し、分割した移動ごとに押し戻す。
-void PlayerController::Update(float deltaTime,const InputSystem& input,const FpsCamera& camera,const CollisionWorld& collisionWorld,bool canKick)
+void PlayerController::Update(const PLAYER_UPDATE_REQUEST& request,const InputSystem& input,const FpsCamera& camera,const CollisionWorld& collisionWorld)
 {
 	// 入力を読み取り、経過時間を進める。回避からの経過時間は、回避中も、回避後も増え続ける。怯みの残り時間は0未満にしない。
 	const PLAYER_MOVE_INPUT move_input = ReadMoveInput(input,camera);
-	m_stateElapsedSeconds += deltaTime;
-	m_secondsSinceDodgeStart += deltaTime;
-	m_flinchRemainingSeconds = std::max(0.0f,m_flinchRemainingSeconds - deltaTime);
+	m_stateElapsedSeconds += request.deltaTime;
+	m_secondsSinceDodgeStart += request.deltaTime;
+	m_flinchRemainingSeconds = std::max(0.0f,m_flinchRemainingSeconds - request.deltaTime);
 
 	// 入力から動作の状態を切り替え、蹴り・殴打の当たる時刻を迎えていれば、当たりを通知できる状態にする。
-	UpdateActionState(input,move_input,canKick);
+	UpdateActionState(input,move_input,request.canKick);
 	UpdateMeleeImpact();
 
 	// 右クリックを押している間は構える。ただし、ダッシュ・回避・蹴り・殴打の間は構えられず、構え入力があっても解除される。
@@ -92,7 +92,7 @@ void PlayerController::Update(float deltaTime,const InputSystem& input,const Fps
 	}
 
 	// 視点の高さを近づけ、分割した移動ごとに、地形のAABBから押し戻す。
-	MoveAndResolve(motion,deltaTime,collisionWorld);
+	MoveAndResolve(motion,request.deltaTime,collisionWorld);
 }
 
 // 怯みの残り時間を、長い方へ更新する。

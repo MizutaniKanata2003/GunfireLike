@@ -82,14 +82,7 @@ public:
 	// input: W・A・S・D・Space・E・F・C・左Shift・左右クリックの取得先。参照は保持しない。
 	// camera: 移動方向の基準にする視線の取得元。上下の向きは移動に使わない。参照は保持しない。
 	// collisionWorld: 押し戻しの基準にするCollisionWorld。STATICレイヤーのAABBを読み取る。参照は保持しない。
-	// 移行中は、下の旧形式へ渡すだけの入口にする。旧形式を削除する際に、この形式へ本体を移す。
-	void Update(const PLAYER_UPDATE_REQUEST& request,const InputSystem& input,const FpsCamera& camera,const CollisionWorld& collisionWorld)
-	{
-		Update(request.deltaTime,input,camera,collisionWorld,request.canKick);
-	}
-	// 移行中の旧形式。引数が5個あり、13.5の基準を超える。呼出側を、上の形式へ移行した後に削除する。
-	// 引数と動作は、上の形式と同じ。deltaTime・canKickは、requestの同名のメンバーに対応する。
-	void Update(float deltaTime,const InputSystem& input,const FpsCamera& camera,const CollisionWorld& collisionWorld,bool canKick);
+	void Update(const PLAYER_UPDATE_REQUEST& request,const InputSystem& input,const FpsCamera& camera,const CollisionWorld& collisionWorld);
 	// 被弾などで、プレイヤーを短く怯ませる。怯み中は、通常・ダッシュ・しゃがみの移動速度が下がる。
 	// seconds: 怯む時間。単位は秒。すでに怯み中の場合は、長い方の残り時間にする。
 	void ApplyFlinch(float seconds);
