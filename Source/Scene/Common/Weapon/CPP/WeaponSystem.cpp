@@ -129,7 +129,10 @@ void WeaponSystem::CastPellets(const FpsCamera& camera,float spreadDegrees,const
 		SHOT_PELLET_RESULT& pellet = result.pellets[pellet_index];
 		pellet.ray.origin = camera.GetPosition();
 		pellet.ray.direction = BuildShotDirection(camera,spreadDegrees);
-		pellet.didHit = collisionWorld.Raycast(pellet.ray,m_weaponData.maxRange,ns_SHOT_LAYER_MASK,pellet.rayHit,pellet.hitInfo);
+
+		// Ray・最大距離・対象のレイヤーを、1つの問い合わせにまとめて、命中を調べる。
+		const COLLISION_RAY_QUERY query{pellet.ray,m_weaponData.maxRange,ns_SHOT_LAYER_MASK};
+		pellet.didHit = collisionWorld.Raycast(query,pellet.rayHit,pellet.hitInfo);
 	}
 }
 

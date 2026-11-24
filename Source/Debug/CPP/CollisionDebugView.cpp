@@ -83,10 +83,11 @@ void CollisionDebugView::UpdateRay(const FpsCamera& camera,const CollisionWorld&
 		return;
 	}
 
-	// カメラ位置から視線方向へRayを飛ばし、最も近い命中を調べる。
+	// カメラ位置から視線方向へRayを飛ばし、最も近い命中を調べる。Ray・最大距離・対象のレイヤーは、1つの問い合わせにまとめる。
 	m_ray.origin = camera.GetPosition();
 	m_ray.direction = camera.GetForward();
-	m_hasRayHit = collisionWorld.Raycast(m_ray,ns_RAY_MAX_DISTANCE,COLLISION_LAYER::ns_ALL,m_rayHit,m_rayHitInfo);
+	const COLLISION_RAY_QUERY query{m_ray,ns_RAY_MAX_DISTANCE,COLLISION_LAYER::ns_ALL};
+	m_hasRayHit = collisionWorld.Raycast(query,m_rayHit,m_rayHitInfo);
 }
 
 // 弾道の終点と、表示時間を記録する。
@@ -124,7 +125,7 @@ void CollisionDebugView::Draw(GraphicsSystem& graphicsSystem,const CollisionWorl
 		m_drawer.AddLine(m_rayHit.point,
 										 XMFLOAT3{m_rayHit.point.x + m_rayHit.normal.x * ns_NORMAL_LENGTH,m_rayHit.point.y + m_rayHit.normal.y * ns_NORMAL_LENGTH,
 															m_rayHit.point.z + m_rayHit.normal.z * ns_NORMAL_LENGTH},
-										 ns_NORMAL_COLOR);
+															ns_NORMAL_COLOR);
 	}
 	// 命中していない場合は、カメラ位置から視線方向へ表示用の長さだけ進んだ点を終点にする。
 	else{

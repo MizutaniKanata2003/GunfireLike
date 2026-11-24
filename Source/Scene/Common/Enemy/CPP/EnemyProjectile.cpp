@@ -125,10 +125,11 @@ bool EnemyProjectileManager::AdvanceProjectile(PROJECTILE_STATE& projectile,cons
 		// 残りの距離と1ステップの上限の小さい方だけ進める。壁の判定は、現在位置から進む向きへの線分で行い、薄い壁をすり抜けない。
 		const float step_distance = std::min(remaining_distance,ENEMY_PROJECTILE::ns_MAX_STEP_DISTANCE);
 		const COLLISION_RAY ray{projectile.position,projectile.direction};
+		const COLLISION_RAY_QUERY wall_query{ray,step_distance,COLLISION_LAYER::ns_STATIC};
 		COLLISION_RAY_HIT ray_hit{};
 		COLLISION_HIT_INFO hit_info{};
 		// 進む線分の途中に壁・出口があれば、弾を消す。プレイヤーへの判定は行わない。
-		if(collisionWorld.Raycast(ray,step_distance,COLLISION_LAYER::ns_STATIC,ray_hit,hit_info))return false;
+		if(collisionWorld.Raycast(wall_query,ray_hit,hit_info))return false;
 
 		// 壁がなければ進め、弾の球がプレイヤーの球と重なったかを調べる。
 		projectile.position.x += projectile.direction.x * step_distance;
