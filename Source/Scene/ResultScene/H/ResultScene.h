@@ -1,11 +1,11 @@
 ﻿#pragma once
 
 // クリア後のリザルトの画像（背景・見出し・タイトルへ戻るボタン）と操作の案内の描画、ボタンのクリックまたはEnterによるタイトルへの遷移予約、開始時の入力・BGM設定を担当する。
-// 画像・文字の描画Resourceと、ボタンの判定は、ButtonMenuViewが担当する。Scene切替とフェード進行はSceneManagerへ任せ、共有Systemは所有しない。プレイの結果の数値は、表示しない。
+// 画像・文字の描画Resource・ボタンの判定・開始時の入力とBGMの設定・決定の判定は、ButtonMenuFlowが担当する。Scene切替とフェード進行はSceneManagerへ任せ、共有Systemは所有しない。プレイの結果の数値は、表示しない。
 
 //========= Scene インクルード=========
 #include "Scene/Common/Core/H/IScene.h"
-#include "Scene/Common/UI/H/ButtonMenuView.h"
+#include "Scene/Common/UI/H/ButtonMenuFlow.h"
 
 //========= 前方宣言=========
 class AudioSystem;
@@ -13,7 +13,7 @@ class GraphicsSystem;
 class InputSystem;
 class SceneManager;
 
-// リザルトのSceneとして、ボタン1つのメニュー画面（ButtonMenuView）の呼出しと、タイトルへ戻る入力に応じた遷移の予約を行うクラス。
+// リザルトのSceneとして、ボタン1つのメニュー画面の流れ（ButtonMenuFlow）の呼出しと、タイトルへ戻る入力に応じた遷移の予約を行うクラス。
 class ResultScene final: public IScene
 {
 public:
@@ -53,6 +53,6 @@ private:
 	AudioSystem& m_audioSystem;
 
 	//========= Scene所有状態=========
-	// 背景・見出し・タイトルへ戻るボタンの画像と、操作の案内の文字を描く、メニュー画面。Finalizeで明示的に解放する。
-	ButtonMenuView m_menu{};
+	// 背景・見出し・タイトルへ戻るボタンの画像と、操作の案内の文字を描く、メニュー画面の流れ。Finalizeで明示的に解放する。
+	ButtonMenuFlow m_menuFlow{};
 };
