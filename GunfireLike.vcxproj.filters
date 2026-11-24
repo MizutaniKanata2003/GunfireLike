@@ -90,7 +90,7 @@
     <ClCompile Include="Source\Debug\CPP\DebugLineRenderer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\Collision\CPP\CollisionDebugDrawer.cpp">
+    <ClCompile Include="Source\Debug\CPP\CollisionDebugDrawer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\Collision\CPP\CollisionMath.cpp">
@@ -302,7 +302,7 @@
     <ClInclude Include="Source\Debug\H\DebugLineRenderer.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\Collision\H\CollisionDebugDrawer.h">
+    <ClInclude Include="Source\Debug\H\CollisionDebugDrawer.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\Collision\H\CollisionMath.h">

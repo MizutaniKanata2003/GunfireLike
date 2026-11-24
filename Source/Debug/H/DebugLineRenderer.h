@@ -13,6 +13,7 @@
 
 //========= Framework インクルード=========
 #include "Framework/3D/H/BasicColorPipeline.h"
+#include "Framework/3D/H/CameraMatrices.h"
 #include "Framework/Etc/H/MathTypes.h"
 
 //========= 前方宣言=========
@@ -32,10 +33,18 @@ public:
 	// graphicsSystem: Contextの取得元。描画先・Viewport・Blend・Depth・Rasterizerは呼出側が設定する。
 	// points: 線分の端点の列。[0]と[1]が1本目、[2]と[3]が2本目となる。ワールド座標。奇数個なら最後の1点は無視する。
 	// color: 全線分に共通のRGBA色。値のclampはしない。
-	// viewMatrix: World空間からView空間への変換行列。viewMatrix*projectionMatrixの順で合成する。
-	// projectionMatrix: View空間からClip空間への変換行列。
+	// camera: View行列とProjection行列。view*projectionの順で合成する。
 	// 必須Resourceがない、またはContextがない、または端点が2点未満なら何もしない。端点が多い場合は、Bufferの容量ごとに分けて描画する。
 	// Bind状態（Topology・Shader・Layout・定数Buffer）は描画後も元へ戻さない。
+	// 移行中は、下の旧形式へ渡すだけの入口にする。旧形式を削除する際に、この形式へ本体を移す。
+	void DrawLines(GraphicsSystem& graphicsSystem,const std::vector<XMFLOAT3>& points,const XMFLOAT4& color,const CAMERA_MATRICES& camera)
+	{
+		DrawLines(graphicsSystem,points,color,camera.view,camera.projection);
+	}
+	// 移行中の旧形式。引数が5個あり、13.5の基準を超える。呼出側を、上の形式へ移行した後に削除する。
+	// viewMatrix: World空間からView空間への変換行列。viewMatrix*projectionMatrixの順で合成する。
+	// projectionMatrix: View空間からClip空間への変換行列。
+	// その他の引数・動作は、上の形式と同じ。
 	void DrawLines(GraphicsSystem& graphicsSystem,const std::vector<XMFLOAT3>& points,const XMFLOAT4& color,const XMMATRIX& viewMatrix,
 								 const XMMATRIX& projectionMatrix);
 	// メンバーの所有参照を解放する。未初期化・部分初期化・終了済みでも呼出可能。

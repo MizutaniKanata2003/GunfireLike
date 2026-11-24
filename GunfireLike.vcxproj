@@ -197,7 +197,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Framework\3D\CPP\BasicColorPipeline.cpp" />
     <ClCompile Include="Source\Debug\CPP\DebugLineRenderer.cpp" />
     <ClCompile Include="Source\Framework\Audio\CPP\AudioSystem.cpp" />
-    <ClCompile Include="Source\Framework\Collision\CPP\CollisionDebugDrawer.cpp" />
+    <ClCompile Include="Source\Debug\CPP\CollisionDebugDrawer.cpp" />
     <ClCompile Include="Source\Framework\Collision\CPP\CollisionMath.cpp" />
     <ClCompile Include="Source\Framework\Collision\CPP\CollisionResolver.cpp" />
     <ClCompile Include="Source\Framework\Collision\CPP\CollisionWorld.cpp" />
@@ -266,7 +266,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\3D\H\CameraMatrices.h" />
     <ClInclude Include="Source\Framework\Audio\H\AudioSystem.h" />
     <ClInclude Include="Source\Framework\2D\H\FadeOverlay.h" />
-    <ClInclude Include="Source\Framework\Collision\H\CollisionDebugDrawer.h" />
+    <ClInclude Include="Source\Debug\H\CollisionDebugDrawer.h" />
     <ClInclude Include="Source\Framework\Collision\H\CollisionMath.h" />
     <ClInclude Include="Source\Framework\Collision\H\CollisionResolver.h" />
     <ClInclude Include="Source\Framework\Collision\H\CollisionShapes.h" />

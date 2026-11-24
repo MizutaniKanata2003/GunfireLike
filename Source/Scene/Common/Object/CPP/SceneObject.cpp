@@ -4,6 +4,8 @@
 // GPU Resourceの生成・所有は担当しない。例外の捕捉や、借用先の寿命管理は行わない。
 
 //========= Framework インクルード=========
+#include "Framework/3D/H/BasicMeshRenderer.h"
+#include "Framework/3D/H/CameraMatrices.h"
 #include "Framework/3D/H/ObjModelRenderer.h"
 
 //========= Scene インクルード=========
@@ -54,22 +56,28 @@ void SceneObject::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix
 	// Scale・Rotation・Translationの順に合成したLocal→World行列を、描画ごとに求める。GPU用の転置は各Rendererが行う。
 	const XMMATRIX world_matrix = m_transform.GetWorldMatrix();
 
+	// View行列とProjection行列を、1つの構造体にまとめる。CubeとOBJのどちらの描画にも、同じ値を渡す。
+	const CAMERA_MATRICES camera{viewMatrix,projectionMatrix};
+
 	// 形状の種別ごとに、借用しているRendererの描画関数を切り替える。
 	switch(m_meshKind){
-		// Cubeは画像選択とUV倍率を渡して描画する。
+		// Cubeは色・UV倍率・画像選択を、1つの構造体にまとめて描画する。
 	case OBJECT_MESH_KIND::e_CUBE:
-	// Rendererを借用できていなければ、Initialize失敗または未実行のため描画しない。
-	if(m_cubeRenderer == nullptr)return;
+	{
+		// Rendererを借用できていなければ、Initialize失敗または未実行のため描画しない。
+		if(m_cubeRenderer == nullptr)return;
 
-	m_cubeRenderer->DrawCube(graphicsSystem,world_matrix,viewMatrix,projectionMatrix,m_color,m_uvTiling,m_cubeTexture);
-	break;
+		const BasicMeshRenderer::CUBE_APPEARANCE appearance{m_color,m_uvTiling,m_cubeTexture};
+		m_cubeRenderer->DrawCube(graphicsSystem,world_matrix,camera,appearance);
+		break;
+	}
 
 	// OBJは色だけを渡して描画する。UV倍率は現行ObjModelRendererが固定値(1,1)を使うため渡さない。
 	case OBJECT_MESH_KIND::e_OBJ:
 	// Rendererを借用できていなければ、Initialize失敗または未実行のため描画しない。
 	if(m_objRenderer == nullptr)return;
 
-	m_objRenderer->Draw(graphicsSystem,world_matrix,viewMatrix,projectionMatrix,m_color);
+	m_objRenderer->Draw(graphicsSystem,world_matrix,camera,m_color);
 	break;
 	}
 }
