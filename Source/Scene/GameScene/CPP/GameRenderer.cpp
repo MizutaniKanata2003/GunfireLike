@@ -3,6 +3,7 @@
 // ゲーム中の3Dのワールド、画像のHUD、Collision可視化の初期化・描画・解放を実装する。
 
 //========= Framework インクルード=========
+#include "Framework/3D/H/CameraMatrices.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
 #include "Framework/Etc/H/InitCheck.h"
 #include "Framework/Etc/H/Logger.h"
@@ -65,8 +66,10 @@ void GameRenderer::DrawWorld(GraphicsSystem& graphicsSystem,const XMMATRIX& view
 	m_stage->DrawExit(graphicsSystem,viewMatrix,projectionMatrix);
 	// 続けて全枠の敵を出現順に描画し、その後に飛行中の敵の弾を描画する。死亡枠はEnemy::Drawが描画を省略する。
 	m_enemyController->DrawEnemies(graphicsSystem,viewMatrix,projectionMatrix);
-	// 敵と弾の後に、表示中ならCollisionの線を重ねる。
-	m_collisionDebugView.Draw(graphicsSystem,m_stage->GetCollisionWorld(),*m_camera,viewMatrix,projectionMatrix);
+
+	// 敵と弾の後に、表示中ならCollisionの線を重ねる。View行列とProjection行列は、1つの構造体にまとめて渡す。
+	const CAMERA_MATRICES camera_matrices{viewMatrix,projectionMatrix};
+	m_collisionDebugView.Draw(graphicsSystem,m_stage->GetCollisionWorld(),*m_camera,camera_matrices);
 }
 
 // 3Dの上に、画像のHUDを描画する。

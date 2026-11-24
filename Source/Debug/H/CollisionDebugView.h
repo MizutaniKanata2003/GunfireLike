@@ -8,6 +8,7 @@
 #include "Debug/H/DebugLineRenderer.h"
 
 //========= Framework インクルード=========
+#include "Framework/3D/H/CameraMatrices.h"
 #include "Framework/Collision/H/CollisionShapes.h"
 #include "Framework/Etc/H/MathTypes.h"
 
@@ -47,10 +48,8 @@ public:
 	// graphicsSystem: 描画基盤。Render Passは呼出側が設定しておくこと。
 	// collisionWorld: 表示するColliderを持つCollisionWorld。読み取りだけを行う。
 	// camera: 線の始点を求めるための位置と向きの取得元。
-	// viewMatrix: World空間からView空間への変換行列。
-	// projectionMatrix: View空間からClip空間への変換行列。
-	void Draw(GraphicsSystem& graphicsSystem,const CollisionWorld& collisionWorld,const FpsCamera& camera,const XMMATRIX& viewMatrix,
-						const XMMATRIX& projectionMatrix);
+	// cameraMatrices: 描画に使う、View行列とProjection行列。
+	void Draw(GraphicsSystem& graphicsSystem,const CollisionWorld& collisionWorld,const FpsCamera& camera,const CAMERA_MATRICES& cameraMatrices);
 
 	//========= Getter関数=========
 	// 表示中かを返す。
