@@ -9,6 +9,7 @@
 //========= Framework インクルード=========
 #include "Framework/Etc/H/MathTypes.h"
 #include "Framework/2D/H/HudCanvas.h"
+#include "Framework/2D/H/HudRect.h"
 #include "Framework/DirectX/H/ConstantBuffer.h"
 #include "Framework/DirectX/H/VertexFormat.h"
 
@@ -33,13 +34,21 @@ public:
 	//========= 描画関数=========
 	// Canvasの矩形を実pixelへ変換し、単色Quadを描画する。初期化済みResourceを同じ描画基盤で使うこと。
 	// graphicsSystem: Context・描画先サイズの取得先とBlend設定先。非所有で借用する。
+	// rectangle: Canvas基準の矩形。左上のX・Yは範囲制限を行わず、幅・高さのどちらかが0以下なら何もしない。
+	// color: RGBA色。Alpha<1ならBlend有効、それ以外は無効。色のclamp・有限性検証は行わない。
+	// Context・正の描画先サイズ・必要Resourceが揃わなければ何もしない。
+	// IA・VS/PS・VS/PS b0・Blendを変更して元に戻さない。Render Target・Viewport・Depth・Cull等は呼出側で準備する。
+	// 移行中は、下の旧形式へ渡すだけの入口にする。旧形式を削除する際に、この形式へ本体を移す。
+	void DrawQuad(GraphicsSystem& graphicsSystem,const HUD_RECT& rectangle,const XMFLOAT4& color)
+	{
+		DrawQuad(graphicsSystem,rectangle.x,rectangle.y,rectangle.width,rectangle.height,color);
+	}
+	// 移行中の旧形式。引数が6個あり、13.5の基準を超える。呼出側を、上の形式へ移行した後に削除する。
 	// positionX: Canvas基準の矩形左上X。右向きを正とする。範囲制限は行わない。
 	// positionY: Canvas基準の矩形左上Y。下向きを正とする。範囲制限は行わない。
 	// width: Canvas基準の幅。0以下なら何もしない。
 	// height: Canvas基準の高さ。0以下なら何もしない。
-	// color: RGBA色。Alpha<1ならBlend有効、それ以外は無効。色のclamp・有限性検証は行わない。
-	// Context・正の描画先サイズ・必要Resourceが揃わなければ何もしない。
-	// IA・VS/PS・VS/PS b0・Blendを変更して元に戻さない。Render Target・Viewport・Depth・Cull等は呼出側で準備する。
+	// その他の引数・動作は、上の形式と同じ。
 	void DrawQuad(GraphicsSystem& graphicsSystem,float positionX,float positionY,float width,float height,const XMFLOAT4& color);
 	// 基準画面中央へ横線・縦線の順に照準を描く。交点の重複描画も維持する。
 	// graphicsSystem: 各DrawQuadで借用する描画基盤。Bind/Blendの副作用を引き継ぐ。

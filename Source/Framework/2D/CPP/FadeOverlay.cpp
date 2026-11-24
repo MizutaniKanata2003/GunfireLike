@@ -29,9 +29,8 @@ namespace
 	//========= 黒い画像の定数=========
 	// 黒い画像のパス。作業ディレクトリ基準。画像を差し替えると、フェードの見た目を変えられる。画像のAlphaは不透明（1）であること。
 	constexpr wchar_t ns_FADE_TEXTURE_PATH[] = L"Assets/Textures/FadeBlack.png";
-	// Canvas全体の幅と高さ。HudCanvasの基準領域1280×720と対応する既存値で、実Render Targetのpixelではない。
-	constexpr float ns_CANVAS_WIDTH = 1280.0f;
-	constexpr float ns_CANVAS_HEIGHT = 720.0f;
+	// 黒い画像を貼る矩形。Canvas全体（左上(0,0)・幅1280・高さ720）。HudCanvasの基準領域1280×720と対応する既存値で、実Render Targetのpixelではない。
+	constexpr HUD_RECT ns_FADE_RECT{0.0f,0.0f,1280.0f,720.0f};
 	// 画像の全体を描く表示割合。1で左端から右端まで。
 	constexpr float ns_FULL_VISIBLE_WIDTH_RATIO = 1.0f;
 }
@@ -127,7 +126,7 @@ void FadeOverlay::Draw(GraphicsSystem& graphicsSystem)
 	// 直前のSceneのStateを引き継がず、Alpha Blend有効・Depth無効のScreen UI Passへ設定する。
 	graphicsSystem.SetRenderPass(e_RenderPass::e_SCREEN_UI);
 
-	// 画像の色には白(1,1,1)を掛けて、画像本来の黒を保つ。Alphaだけを、現在のフェードのAlphaにする。
-	const XMFLOAT4 fade_color{1.0f,1.0f,1.0f,m_alpha};
-	m_spriteRenderer.DrawSprite(graphicsSystem,m_fadeTexture,XMFLOAT2{},XMFLOAT2{ns_CANVAS_WIDTH,ns_CANVAS_HEIGHT},fade_color,ns_FULL_VISIBLE_WIDTH_RATIO);
+	// 画像の色には白(1,1,1)を掛けて、画像本来の黒を保つ。Alphaだけを、現在のフェードのAlphaにする。画像の全体を描く。
+	const HUD_SPRITE_APPEARANCE appearance{XMFLOAT4{1.0f,1.0f,1.0f,m_alpha},ns_FULL_VISIBLE_WIDTH_RATIO};
+	m_spriteRenderer.DrawSprite(graphicsSystem,m_fadeTexture,ns_FADE_RECT,appearance);
 }

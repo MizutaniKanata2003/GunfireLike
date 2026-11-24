@@ -14,6 +14,7 @@
 
 //========= Framework インクルード=========
 #include "Framework/2D/H/HudCanvas.h"
+#include "Framework/2D/H/HudRect.h"
 #include "Framework/3D/H/BasicColorPipeline.h"
 #include "Framework/Etc/H/MathTypes.h"
 
@@ -23,6 +24,16 @@ class GraphicsSystem;
 //========= 画像の識別値=========
 // 読み込んだ画像を指す識別値。1から順に割り当て、0は無効値。Uninitで全て無効になる。
 using HudTextureHandle = std::uint32_t;
+
+//========= スプライトの見た目=========
+// スプライトの見た目の指定。DrawSpriteの引数の数を減らすため、色と、画像を描く横幅の割合を1つにまとめる。
+struct HUD_SPRITE_APPEARANCE
+{
+	// 画像の色へ乗算するRGBA色。既定(1,1,1,1)で画像本来の色。Alphaは画像のAlphaと掛け合わせる。
+	XMFLOAT4 color{1.0f,1.0f,1.0f,1.0f};
+	// 画像の左端から、横方向に何割を描くか。0〜1。既定1で全体。0以下なら何も描かない。バーの表示割合を表すために使う。
+	float visibleWidthRatio{1.0f};
+};
 
 // 画像を貼った矩形を、Canvas座標で描画するRenderer。
 class HudSpriteRenderer final
@@ -45,12 +56,20 @@ public:
 	// 画像を、Canvas座標の位置と大きさで描画する。画像の左側の一部分だけを描くことで、バーの表示割合も表せる。
 	// graphicsSystem: Contextと描画先サイズの取得元。Render Target・Viewport・Blendは呼出側が設定する。
 	// texture: LoadTextureが返した識別値。無効値や範囲外なら何もしない。
-	// position: 矩形の左上のCanvas座標。右向きX・下向きY。
-	// size: 画像全体を描いた場合の、Canvas基準の幅と高さ。どちらかが0以下なら何もしない。
-	// color: 画像の色へ乗算するRGBA色。(1,1,1,1)で画像本来の色。Alphaは画像のAlphaと掛け合わせる。
-	// visibleWidthRatio: 画像の左端から、横方向に何割を描くか。0〜1。1で全体。0以下なら何もしない。描く矩形の幅は、sizeの幅にこの割合を掛けた値になる。
+	// rectangle: 画像全体を描いた場合の、Canvas基準の左上の位置と、幅・高さ。幅・高さのどちらかが0以下なら何もしない。
+	// appearance: 色と、画像を描く横幅の割合。描く矩形の幅は、rectangleの幅にこの割合を掛けた値になる。
 	// 必須Resourceがない、またはContextがない、または描画先サイズが0なら何もしない。
 	// Bind状態（Topology・Shader・Layout・定数Buffer・画像・Sampler）は描画後も元へ戻さない。
+	// 移行中は、下の旧形式へ渡すだけの入口にする。旧形式を削除する際に、この形式へ本体を移す。
+	void DrawSprite(GraphicsSystem& graphicsSystem,HudTextureHandle texture,const HUD_RECT& rectangle,const HUD_SPRITE_APPEARANCE& appearance)
+	{
+		DrawSprite(graphicsSystem,texture,XMFLOAT2{rectangle.x,rectangle.y},XMFLOAT2{rectangle.width,rectangle.height},appearance.color,appearance.visibleWidthRatio);
+	}
+	// 移行中の旧形式。引数が6個あり、13.5の基準を超える。呼出側を、上の形式へ移行した後に削除する。
+	// position: 矩形の左上のCanvas座標。右向きX・下向きY。
+	// size: 画像全体を描いた場合の、Canvas基準の幅と高さ。どちらかが0以下なら何もしない。
+	// color: 画像の色へ乗算するRGBA色。visibleWidthRatio: 画像の左端から描く横幅の割合。
+	// その他の引数・動作は、上の形式と同じ。
 	void DrawSprite(GraphicsSystem& graphicsSystem,HudTextureHandle texture,const XMFLOAT2& position,const XMFLOAT2& size,
 									const XMFLOAT4& color,float visibleWidthRatio);
 
