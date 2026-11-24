@@ -151,16 +151,6 @@ void BasicMeshRenderer::DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& 
 	BindAndDraw(context,SelectTextureView(texture_type));
 }
 
-// 移行中の旧形式。引数を構造体へまとめ、新しい形式へ渡す。呼出側の移行後に削除する。
-void BasicMeshRenderer::DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const XMMATRIX& viewMatrix,
-																 const XMMATRIX& projectionMatrix,const XMFLOAT4& color,const XMFLOAT2& UVTiling,TextureType textureType)
-{
-	// View・Projectionの2行列と、色・UV倍率・画像選択を、それぞれ1つの構造体へまとめる。値は変更しない。
-	const CAMERA_MATRICES camera{viewMatrix,projectionMatrix};
-	const CUBE_APPEARANCE appearance{color,UVTiling,textureType};
-	DrawCube(graphicsSystem,worldMatrix,camera,appearance);
-}
-
 // 描画に使用したDirect3Dリソースを解放する。
 void BasicMeshRenderer::Uninit()
 {

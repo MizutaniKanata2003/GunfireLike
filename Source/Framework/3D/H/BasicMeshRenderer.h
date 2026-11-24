@@ -61,10 +61,6 @@ public:
 	// 必須Resource・Context・Index数がなければ何もしない。追加の行列や有限値検証は行わない。
 	// Bind先はCamera=VS b0、Object=VS/PS b1、Material=VS/PS b2、画像=PS t0、Sampler=PS s0。
 	void DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const CAMERA_MATRICES& camera,const CUBE_APPEARANCE& appearance);
-	// 移行中の旧形式。引数7個のため、13.5の基準を超える。呼出側を、上の形式へ移行した後に削除する。
-	// viewMatrix: camera.viewと同じ。projectionMatrix: camera.projectionと同じ。color・UVTiling・textureType: appearanceの各項目と同じ。
-	void DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& worldMatrix,const XMMATRIX& viewMatrix,
-								const XMMATRIX& projectionMatrix,const XMFLOAT4& color,const XMFLOAT2& UVTiling,TextureType textureType);
 	// メンバーの所有参照とIndex数を解除する。未初期化・部分初期化・終了済みでも呼出可能。
 	// ContextのUnbind・State復元・GPU完了待機は行わず、Context等の別参照は残り得る。
 	void Uninit();
