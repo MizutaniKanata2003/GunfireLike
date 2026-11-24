@@ -271,27 +271,12 @@ void ObjModelRenderer::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& world
 	ID3D11DeviceContext* context = graphicsSystem.GetContext();
 	if(context == nullptr)return;
 
-	// View*Projectionの順で合成し、Worldと共に転置する。HLSLへの格納契約を合わせる処理で、座標系変更ではない。
-	const XMMATRIX view_projection_matrix = XMMatrixTranspose(camera.view * camera.projection);
-	const XMMATRIX transposed_world_matrix = XMMatrixTranspose(worldMatrix);
+	// UVはU/Vとも1倍を維持する。SRVを所有すれば画像を使い、なければ画像参照を省いて単色にする。
+	// 色・UV倍率・画像の使用をまとめ、定数の組立てと転送を、BasicColorPipelineへ任せる。更新はBindとは別で、このAPIから成否の戻り値は得ない。
+	const BASIC_COLOR_APPEARANCE color_appearance{color,XMFLOAT2{1.0f,1.0f},m_textureView != nullptr};
+	m_pipeline.UpdateModelConstants(context,worldMatrix,camera,color_appearance);
 
-	// World→Clipの転置済み行列をCamera転送型のXMFLOAT4X4へ保存する。
-	CAMERA_CONSTANTS camera_constants{};
-	XMStoreFloat4x4(&camera_constants.viewProjectionMatrix,view_projection_matrix);
-
-	// Local→Worldの転置済み行列とRGBA色をObject転送型へ保存する。色の合成はPS側へ任せる。
-	OBJECT_CONSTANTS object_constants{};
-	XMStoreFloat4x4(&object_constants.worldMatrix,transposed_world_matrix);
-	object_constants.color = color;
-
-	// UVはU/Vとも1倍を維持する。SRVを所有すれば使用値1、なければ0で画像参照を省く。
-	// baseColorは現行BasicColorで未参照でも既定値を残し、paddingと共にCPU/HLSL間の配置を維持する。
-	MATERIAL_CONSTANTS material_constants{};
-	material_constants.uvTiling = XMFLOAT2{1.0f,1.0f};
-	material_constants.useTexture = m_textureView ? 1.0f : 0.0f;
-
-	// 3つの定数Bufferへ転送し、モデルと画像を接続して描画する。更新はBindとは別で、このAPIから成否の戻り値は得ない。
-	m_pipeline.UpdateConstants(context,camera_constants,object_constants,material_constants);
+	// モデルと画像を接続して描画する。
 	BindAndDraw(context);
 }
 

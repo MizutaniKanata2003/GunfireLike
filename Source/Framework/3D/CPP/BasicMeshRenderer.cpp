@@ -125,30 +125,15 @@ void BasicMeshRenderer::DrawCube(GraphicsSystem& graphicsSystem,const XMMATRIX& 
 	// Contextがなければ描画しない。GraphicsSystemは借用し、このRendererに参照を登録しない。
 	if(context == nullptr)return;
 
-	// Shaderへ渡すCamera、Object、Material定数を作成する。
-	// View*Projectionの順で合成して転置し、Worldも転置する。HLSLの行列格納契約へ合わせ、座標系変更はしない。
-	const XMMATRIX view_projection_matrix = XMMatrixTranspose(camera.view * camera.projection);
-	const XMMATRIX transposed_world_matrix = XMMatrixTranspose(worldMatrix);
-
-	// 転置済みのWorld→Clip行列をVS b0の配置へ保存する。
-	CAMERA_CONSTANTS camera_constants{};
-	XMStoreFloat4x4(&camera_constants.viewProjectionMatrix,view_projection_matrix);
-
-	// Local→World行列とRGBA色をb1の配置へ保存する。色のclampやAlpha操作は追加しない。
-	OBJECT_CONSTANTS object_constants{};
-	XMStoreFloat4x4(&object_constants.worldMatrix,transposed_world_matrix);
-	object_constants.color = appearance.color;
-
-	// Floor・Wall・Objectは使用値1で画像参照を選ぶ。Colorと未定義値は使用値0のまま単色経路とする。個別SRVのnull判定は追加しない。
-	// baseColor・uvTiling・useTexture・paddingの配置を保つ。未参照baseColorと余白も既定値で残す。
+	// Floor・Wall・Objectは画像を使い、Colorと未定義値は画像を使わない単色経路とする。個別SRVのnull判定は追加しない。
 	const TextureType texture_type = appearance.textureType;
 	const bool uses_texture = texture_type == TextureType::Floor || texture_type == TextureType::Wall || texture_type == TextureType::Object;
-	MATERIAL_CONSTANTS material_constants{};
-	material_constants.uvTiling = appearance.UVTiling;
-	material_constants.useTexture = uses_texture ? 1.0f : 0.0f;
 
-	// 3つの定数Bufferへ転送し、Cubeと画像を接続して描画する。更新だけではBindされず、成否の戻り値もない。
-	m_pipeline.UpdateConstants(context,camera_constants,object_constants,material_constants);
+	// 色・UV倍率・画像の使用をまとめ、Camera・Object・Material定数の組立てと転送を、BasicColorPipelineへ任せる。更新だけではBindされず、成否の戻り値もない。
+	const BASIC_COLOR_APPEARANCE color_appearance{appearance.color,appearance.UVTiling,uses_texture};
+	m_pipeline.UpdateModelConstants(context,worldMatrix,camera,color_appearance);
+
+	// Cubeと画像を接続して描画する。
 	BindAndDraw(context,SelectTextureView(texture_type));
 }
 
