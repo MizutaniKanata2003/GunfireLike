@@ -88,6 +88,10 @@ public:
   // fallbackSpeed: 速度の表がない（モデルがない・足のノードが見つからなかった）時に返す、既定の速度。単位はワールド距離単位/秒。
   // 戻り値: 移動速度。単位はワールド距離単位/秒。
   [[nodiscard]] float GetMoveSpeed(const ENEMY_PLAYBACK_STATE& state,float fallbackSpeed) const;
+  // 死体が、完全に消えたか（または、モデルで描けず、預かる必要がないか）を返す。死亡後の保持と、フェードの時間が過ぎると、trueになる。
+  // state: 敵の現在の状態。種類と識別値から、見た目を決める。
+  // 戻り値: 生きている場合はfalse。死亡後で、完全に透明になったか、モデルで描けない場合はtrue。
+  [[nodiscard]] bool IsCorpseGone(const ENEMY_PLAYBACK_STATE& state) const;
 private:
   //========= 更新の補助関数=========
   // 前回の更新からの水平の移動の速さで、移動中かを更新する。開始と終了の閾値を変え、判定が、毎フレーム入れ替わらないようにする。

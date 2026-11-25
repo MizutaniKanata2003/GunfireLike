@@ -235,6 +235,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Framework\3D\CPP\ObjModelRenderer.cpp" />
     <ClCompile Include="Source\Scene\Common\Enemy\CPP\AreaTelegraph.cpp" />
     <ClCompile Include="Source\Scene\Common\Enemy\CPP\BossController.cpp" />
+    <ClCompile Include="Source\Scene\Common\Enemy\CPP\EnemyCorpseFader.cpp" />
     <ClCompile Include="Source\Scene\Common\Enemy\CPP\EnemyModelLibrary.cpp" />
     <ClCompile Include="Source\Scene\Common\Player\CPP\PlayerSuite.cpp" />
     <ClCompile Include="Source\Scene\Common\Stage\CPP\ExitDoor.cpp" />
@@ -328,6 +329,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\Common\Enemy\H\AreaTelegraph.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\BossController.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\EnemyAnimationTable.h" />
+    <ClInclude Include="Source\Scene\Common\Enemy\H\EnemyCorpseFader.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\EnemyModelLibrary.h" />
     <ClInclude Include="Source\Scene\Common\Player\H\PlayerSuite.h" />
     <ClInclude Include="Source\Scene\Common\Player\H\Wallet.h" />

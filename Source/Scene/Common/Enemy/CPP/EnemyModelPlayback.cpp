@@ -204,6 +204,22 @@ bool EnemyModelPlayback::Draw(GraphicsSystem& graphicsSystem,const CAMERA_MATRIC
   return true;
 }
 
+// 死体が、完全に消えたかを返す。
+bool EnemyModelPlayback::IsCorpseGone(const ENEMY_PLAYBACK_STATE& state) const
+{
+  // 生きている敵は、死体ではない。
+  if(state.isAlive)return false;
+
+  // モデルで描けない場合（読込がない・見た目がない・動きがない）は、預かっても描けないため、消えたものとして扱う。
+  ENEMY_APPEARANCE appearance{};
+  if(m_library == nullptr || !EnemyModelLibrary::TryGetAppearance(state.kind,state.enemyId,appearance) || !m_library->IsLoaded(appearance))return true;
+  const SkinnedAnimationPlayer* player = m_library->FindPlayer(appearance,m_clip);
+  if(player == nullptr)return true;
+
+  // 透明度が0以下になったら、消えた。
+  return CalculateCorpseAlpha(m_clipTimeSeconds,player->GetDurationSeconds()) <= 0.0f;
+}
+
 // 足が地面を滑らない、追従の移動速度を返す。
 float EnemyModelPlayback::GetMoveSpeed(const ENEMY_PLAYBACK_STATE& state,float fallbackSpeed) const
 {
