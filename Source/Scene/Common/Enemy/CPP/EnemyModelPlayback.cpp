@@ -3,12 +3,12 @@
 // 敵1体のモデルの動きの選択・時刻の進行・動きの切替の補間・移動速度・描画を実装する。数値は、EnemyAnimationTableと、このファイルの定数にまとめた仮値。
 
 //========= C++標準ライブラリ インクルード=========
-#include <algorithm> // std::clampで、死亡の動きの進行の割合と、補間の割合を0〜1へ制限し、std::maxで、移動速度の下限を守る。
+#include <algorithm> // std::clampで、死亡の動きの進行の割合と、補間の割合と、死体の透明度を0〜1へ制限し、std::maxで、移動速度の下限を守る。
 
 //========= Scene インクルード=========
 #include "Scene/Common/Enemy/H/EnemyAnimationTable.h"
 
-// 動きの切替と、移動速度、死亡時の高さの補正の数値をまとめる。見た目を確認して、調整する仮値。
+// 動きの切替と、移動速度、死亡時の高さの補正と、死体のフェードの数値をまとめる。見た目を確認して、調整する仮値。
 namespace
 {
   //========= 動きの切替=========
@@ -34,6 +34,10 @@ namespace
   //========= 死亡時の高さの補正=========
   // 倒れた体が床に埋まらないよう、死亡の動きの最後に、描画だけを持ち上げる量。単位はワールド距離単位。動きの進行に比例して、0から、この量まで上げる。
   constexpr float ns_DEATH_LIFT_Y = 0.12f;
+
+  //========= 死体のフェード=========
+  // 死亡後の保持の時間が過ぎてから、死体が消えるまでの時間。単位は秒。この間に、画素を市松状に徐々に抜いて、透明にする。仮値。
+  constexpr float ns_CORPSE_FADE_SECONDS = 2.0f;
 }
 
 // 動きの再生に使う、補助関数をまとめる。数値はEnemyAnimationTableから読む。
@@ -106,6 +110,16 @@ namespace
 
     return std::clamp(clipTimeSeconds / durationSeconds,0.0f,1.0f) * ns_DEATH_LIFT_Y;
   }
+
+  // 死体の透明度を返す。死亡の動きが終わり、保持の時間が過ぎるまでは1で、その後、フェードの時間をかけて、0へ下がる。
+  // clipTimeSeconds: 死亡の動きの時刻。単位は秒。
+  // durationSeconds: 死亡の動きの長さ。単位は秒。
+  // 戻り値: 透明度。1で不透明、0で完全に透明。
+  float CalculateCorpseAlpha(float clipTimeSeconds,float durationSeconds)
+  {
+    const float fade_elapsed_seconds = clipTimeSeconds - (durationSeconds + ENEMY_ANIMATION::ns_MODEL_DEATH_HOLD_SECONDS);
+    return 1.0f - std::clamp(fade_elapsed_seconds / ns_CORPSE_FADE_SECONDS,0.0f,1.0f);
+  }
 }
 
 //========= 設定・初期化関数=========
@@ -169,21 +183,23 @@ bool EnemyModelPlayback::Draw(GraphicsSystem& graphicsSystem,const CAMERA_MATRIC
   SkinnedModelRenderer* renderer = m_library->FindRenderer(appearance);
   if(player == nullptr || renderer == nullptr)return false;
 
-  // 死亡後は、動きが終わり、最後のポーズの保持の時間が過ぎたら、何も描かない。Cubeへは戻さない。
+  // 死亡後は、保持の時間が過ぎてから、画素を市松状に抜いて、徐々に消す。完全に透明になったら、何も描かない。Cubeへは戻さない。
   const float duration_seconds = player->GetDurationSeconds();
-  if(!state.isAlive && m_clipTimeSeconds > duration_seconds + ENEMY_ANIMATION::ns_MODEL_DEATH_HOLD_SECONDS)return true;
+  const float corpse_alpha = state.isAlive ? 1.0f : CalculateCorpseAlpha(m_clipTimeSeconds,duration_seconds);
+  if(corpse_alpha <= 0.0f)return true;
 
   // 死亡の動きの間は、倒れた体が床に埋まらないよう、描画の位置だけを持ち上げる。
   XMFLOAT3 draw_position = state.position;
   draw_position.y += CalculateDeathLift(m_clip,m_clipTimeSeconds,duration_seconds);
 
-  // 全ボーンの行列を求め（補間中は直前の動きと混ぜ）、位置・向き・倍率から作ったワールド行列で描く。
+  // 全ボーンの行列を求め（補間中は直前の動きと混ぜ）、位置・向き・倍率から作ったワールド行列で描く。色のAlphaが、Pixel Shaderの、市松状に抜く濃さになる。
   BoneMatrixArray bone_matrices{};
   EvaluateBoneMatrices(appearance,*player,bone_matrices);
   SKINNED_DRAW_PARAMS draw_params{};
   draw_params.worldMatrix = EnemyModelLibrary::BuildWorldMatrix(appearance,draw_position,state.yawRadians);
   draw_params.boneMatrices = &bone_matrices;
   draw_params.color = state.color;
+  draw_params.color.w *= corpse_alpha;
   renderer->Draw(graphicsSystem,camera,draw_params);
   return true;
 }
