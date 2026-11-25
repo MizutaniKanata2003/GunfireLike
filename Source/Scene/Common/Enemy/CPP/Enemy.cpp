@@ -1,7 +1,7 @@
 ﻿#include "../H/Enemy.h"
 
-// 敵1体のHP・怯み・転倒・射撃のダメージの印・向き・Collider登録・Cube表示（待機の揺れ・怯みの傾き・予告の前傾・攻撃の突進を含む）を実装する。
-// 種類ごとのHP・当たり・大きさ・色はEnemyTableから、アニメーションの数値はEnemyAnimationTableから読み、怯みと転倒の時間と状態の色は、このファイルの定数にまとめた仮値。
+// 敵1体のHP・怯み・転倒・射撃のダメージの印・向き・Collider登録・表示（モデルの動きの切替と描画、読み込めない時のCube表示）を実装する。
+// 種類ごとのHP・当たり・大きさ・色はEnemyTableから、Cubeの簡易アニメーションとモデルの再生の数値はEnemyAnimationTableから読み、怯みと転倒の時間と状態の色は、このファイルの定数にまとめた仮値。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::minで、怯みの傾きと予告の前傾の強さを1以下に制限する。
@@ -38,6 +38,8 @@ namespace
   //========= 状態の色=========
   // 射撃のダメージの印が付いている間の色。紫で、Object画像の色へ乗算して色味を変える。種類の色の代わりに使い、予告・怯み・転倒の色より後にする。
   constexpr XMFLOAT4 ns_MARK_COLOR{0.9f,0.4f,1.0f,1.0f};
+  // モデルの画像に乗算する、通常の色。白で、画像の色をそのまま出す。射撃のダメージの印・予告・怯み・転倒の色は、これを置き換える。
+  constexpr XMFLOAT4 ns_MODEL_BASE_COLOR{1.0f,1.0f,1.0f,1.0f};
   // 攻撃の予告中の色。黄で、Object画像の色へ乗算して色味を変える。種類の色と印の色より優先し、怯みの色より後にする。
   constexpr XMFLOAT4 ns_TELEGRAPH_COLOR{1.0f,1.0f,0.3f,1.0f};
   // 怯み中の色。橙で、Object画像の色へ乗算して色味を変える。予告の色より優先する。
@@ -92,6 +94,38 @@ namespace
   }
 }
 
+// モデルの動きの再生に使う、補助関数をまとめる。数値はEnemyAnimationTableから読む。
+namespace
+{
+  // 動きを繰り返すかを返す。待機と移動だけが繰り返し、ほかは、最後のポーズで止まる。
+  // clip: 動き。
+  bool IsLoopingClip(ENEMY_CLIP clip)
+  {
+    return clip == ENEMY_CLIP::e_IDLE || clip == ENEMY_CLIP::e_WALK;
+  }
+
+  // 動きの再生の速さの倍率を返す。
+  // clip: 動き。
+  // 戻り値: 時刻を進める倍率。1.0が等倍。
+  float GetClipSpeed(ENEMY_CLIP clip)
+  {
+    switch(clip){
+    case ENEMY_CLIP::e_HIT:
+    return ENEMY_ANIMATION::ns_MODEL_SPEED_HIT;
+
+    case ENEMY_CLIP::e_DOWN:
+    return ENEMY_ANIMATION::ns_MODEL_SPEED_DOWN;
+
+    case ENEMY_CLIP::e_GET_UP:
+    return ENEMY_ANIMATION::ns_MODEL_SPEED_GET_UP;
+
+    // 待機・移動・予告・攻撃・死亡は、等倍。
+    default:
+    return ENEMY_ANIMATION::ns_MODEL_SPEED_NORMAL;
+    }
+  }
+}
+
 //========= 初期化・終了関数=========
 // Cube Rendererを借用し、種類の表からHPと大きさを設定して、球のColliderを登録する。
 bool Enemy::Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,const ENEMY_INIT_PARAMS& initParams)
@@ -124,6 +158,8 @@ bool Enemy::Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,co
   m_animation = ENEMY_ANIMATION_STATE{};
   const std::uint32_t phase_step = initParams.enemyId % ENEMY_ANIMATION::ns_IDLE_PHASE_STEP_COUNT;
   m_animation.idleBobPhase = static_cast<float>(phase_step) / static_cast<float>(ENEMY_ANIMATION::ns_IDLE_PHASE_STEP_COUNT);
+  // モデルの動きを、待機の最初へ戻す。待機の動きの開始位置は、揺れの位相と同じ段数で、敵ごとにずらし、同時に生成した敵が揃って動かないようにする。
+  ResetModelState(static_cast<float>(phase_step) * ENEMY_ANIMATION::ns_MODEL_IDLE_STEP_SECONDS);
   return true;
 }
 
@@ -198,6 +234,8 @@ void Enemy::Update(float deltaTime)
       m_shotDamageMarkRemainingSeconds = 0.0f;
     }
   }
+  // 状態から、モデルの動きを選び、時刻を進める。
+  UpdateModelClip(deltaTime);
 }
 
 // 移動先の球を地形から押し戻し、Colliderの更新に成功した座標を描画にも使う。
@@ -258,40 +296,27 @@ bool Enemy::TakeDefeatEffectNotice()
   return true;
 }
 
-// 生きている間だけ、Cubeを描く。
+// 生きている間は、モデルで描き、描けない時はCubeで描く。死亡後は、モデルの死亡の動きだけを描く。
 void Enemy::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix) const
 {
-  // 死亡している、またはRendererを借用していない場合は、描画しない。
-  if(!m_isAlive || m_cubeRenderer == nullptr)return;
+  // Rendererを借用していない（未初期化・Uninit済み）場合は、描画しない。
+  if(m_cubeRenderer == nullptr)return;
 
-  // 描画用のTransformと色を決める。通常は保持しているTransformと、種類の色。射撃のダメージの印が付いている間は、印の色にする。
-  const ENEMY_PARAMS& params = ENEMY_TABLE::GetParams(m_kind);
-  Transform draw_transform = m_transform;
-  XMFLOAT4 color = IsShotDamageMarked() ? ns_MARK_COLOR : params.normalColor;
-
-  // 転倒中は、高さを低く潰し、足元の位置が変わらないよう中心を下げて、色を変える。中心を下げる量は、潰した高さの分の半分。
-  if(IsKnockedDown()){
-    const float squashed_height = params.cubeSize * ns_KNOCKDOWN_HEIGHT_SCALE;
-    draw_transform.SetScale(XMFLOAT3{params.cubeSize,squashed_height,params.cubeSize});
-    draw_transform.SetPosition(XMFLOAT3{m_position.x,m_position.y - (params.cubeSize - squashed_height) * 0.5f,m_position.z});
-    color = ns_KNOCKDOWN_COLOR;
-  }
-  // 怯み中は、橙色にする。転倒中の表示を優先する。
-  else if(IsFlinching()){
-    color = ns_FLINCH_COLOR;
-  }
-  // 攻撃の予告中は、黄色にする。転倒・怯みの表示を優先する。
-  else if(m_isTelegraphing){
-    color = ns_TELEGRAPH_COLOR;
-  }
-
-  // 簡易アニメーション（揺れ・突進・傾き・前傾）を、描画用のTransformへ反映する。転倒中は、反映の中で何もしない。
-  ApplyAnimation(draw_transform);
-
-  // View行列とProjection行列、および、決めた色・UV倍率1・Object画像を、それぞれ1つの構造体にまとめて、Cubeを描く。
+  // View行列とProjection行列を、1つの構造体にまとめる。
   const CAMERA_MATRICES camera{viewMatrix,projectionMatrix};
-  const BasicMeshRenderer::CUBE_APPEARANCE appearance{color,XMFLOAT2{1.0f,1.0f},BasicMeshRenderer::TextureType::Object};
-  m_cubeRenderer->DrawCube(graphicsSystem,draw_transform.GetWorldMatrix(),camera,appearance);
+
+  // 死亡後は、モデルの死亡の動きだけを描く。モデルを使えない場合は、何も描かない。
+  if(!m_isAlive){
+    static_cast<void>(DrawModel(graphicsSystem,camera,ns_MODEL_BASE_COLOR));
+    return;
+  }
+
+  // 生きている間は、モデルで描く。射撃のダメージの印は、基準の色を置き換え、予告・怯み・転倒の色が、それより優先する。
+  const XMFLOAT4 base_color = IsShotDamageMarked() ? ns_MARK_COLOR : ns_MODEL_BASE_COLOR;
+  if(DrawModel(graphicsSystem,camera,DecideStateColor(base_color)))return;
+
+  // モデルを使えない場合は、Cubeで描く。
+  DrawCube(graphicsSystem,camera);
 }
 
 //========= 戦闘関数=========
@@ -317,6 +342,9 @@ bool Enemy::ApplyDamage(float damage,CollisionWorld& collisionWorld,float flinch
   m_currentHP = 0.0f;
   m_isAlive = false;
   m_animation.hasPendingDefeatEffect = true;
+  // 死亡の動きを、最初から始める。次のUpdateを待たず、倒された最初の描画から、死亡の動きになる。
+  m_modelState.clip = ENEMY_CLIP::e_DEATH;
+  m_modelState.clipTimeSeconds = 0.0f;
   collisionWorld.Remove(m_colliderHandle);
   m_colliderHandle = COLLIDER_HANDLE::ns_INVALID;
   return true;
@@ -362,6 +390,7 @@ void Enemy::Respawn(CollisionWorld& collisionWorld)
   m_animation.telegraphSeconds = 0.0f;
   m_animation.lungeRemainingSeconds = 0.0f;
   m_animation.hasPendingDefeatEffect = false;
+  ResetModelState(0.0f);
 
   // 死亡中だった場合だけ、Colliderを同じ位置へ登録し直して生きている状態にする。生きている場合は二重登録しない。
   if(!m_isAlive){
@@ -381,6 +410,131 @@ float Enemy::GetMaxHP() const
 COLLISION_SPHERE Enemy::GetBodySphere() const
 {
   return COLLISION_SPHERE{m_position,ENEMY_TABLE::GetParams(m_kind).colliderRadius};
+}
+
+// Cubeで描く。
+void Enemy::DrawCube(GraphicsSystem& graphicsSystem,const CAMERA_MATRICES& camera) const
+{
+  // 描画用のTransformと色を決める。通常は保持しているTransformと、種類の色。射撃のダメージの印が付いている間は、印の色にする。予告・怯み・転倒の色が、それより優先する。
+  const ENEMY_PARAMS& params = ENEMY_TABLE::GetParams(m_kind);
+  Transform draw_transform = m_transform;
+  const XMFLOAT4 color = DecideStateColor(IsShotDamageMarked() ? ns_MARK_COLOR : params.normalColor);
+
+  // 転倒中は、高さを低く潰し、足元の位置が変わらないよう中心を下げる。中心を下げる量は、潰した高さの分の半分。
+  if(IsKnockedDown()){
+    const float squashed_height = params.cubeSize * ns_KNOCKDOWN_HEIGHT_SCALE;
+    draw_transform.SetScale(XMFLOAT3{params.cubeSize,squashed_height,params.cubeSize});
+    draw_transform.SetPosition(XMFLOAT3{m_position.x,m_position.y - (params.cubeSize - squashed_height) * 0.5f,m_position.z});
+  }
+
+  // 簡易アニメーション（揺れ・突進・傾き・前傾）を、描画用のTransformへ反映する。転倒中は、反映の中で何もしない。
+  ApplyAnimation(draw_transform);
+
+  // 決めた色・UV倍率1・Object画像を、1つの構造体にまとめて、Cubeを描く。
+  const BasicMeshRenderer::CUBE_APPEARANCE appearance{color,XMFLOAT2{1.0f,1.0f},BasicMeshRenderer::TextureType::Object};
+  m_cubeRenderer->DrawCube(graphicsSystem,draw_transform.GetWorldMatrix(),camera,appearance);
+}
+
+// モデルで描く。
+bool Enemy::DrawModel(GraphicsSystem& graphicsSystem,const CAMERA_MATRICES& camera,const XMFLOAT4& color) const
+{
+  // 共有の読込がない、この種類にモデルの見た目がない、または読込済みでない場合は、Cubeで描く必要がある。
+  EnemyModelLibrary* library = m_modelState.library;
+  ENEMY_APPEARANCE appearance{};
+  if(library == nullptr || !EnemyModelLibrary::TryGetAppearance(m_kind,m_enemyId,appearance) || !library->IsLoaded(appearance))return false;
+
+  // 再生中の動きの再生部と、描画部を取り出す。どちらかがなければ、Cubeで描く必要がある。
+  SkinnedAnimationPlayer* player = library->FindPlayer(appearance,m_modelState.clip);
+  SkinnedModelRenderer* renderer = library->FindRenderer(appearance);
+  if(player == nullptr || renderer == nullptr)return false;
+
+  // 死亡後は、動きが終わり、最後のポーズの保持の時間が過ぎたら、何も描かない。Cubeへは戻さない。
+  if(!m_isAlive && m_modelState.clipTimeSeconds > player->GetDurationSeconds() + ENEMY_ANIMATION::ns_MODEL_DEATH_HOLD_SECONDS)return true;
+
+  // 時刻を整えて、全ボーンの行列を求め、位置・向き・倍率から作ったワールド行列で描く。
+  BoneMatrixArray bone_matrices{};
+  player->Evaluate(player->NormalizeTime(m_modelState.clipTimeSeconds,IsLoopingClip(m_modelState.clip)),bone_matrices);
+  SKINNED_DRAW_PARAMS draw_params{};
+  draw_params.worldMatrix = EnemyModelLibrary::BuildWorldMatrix(appearance,m_position,m_transform.GetRotation().y);
+  draw_params.boneMatrices = &bone_matrices;
+  draw_params.color = color;
+  renderer->Draw(graphicsSystem,camera,draw_params);
+  return true;
+}
+
+// 状態に応じた色を返す。
+XMFLOAT4 Enemy::DecideStateColor(const XMFLOAT4& baseColor) const
+{
+  // 転倒の表示を最優先にし、次に怯み、次に攻撃の予告とする。
+  if(IsKnockedDown())return ns_KNOCKDOWN_COLOR;
+  if(IsFlinching())return ns_FLINCH_COLOR;
+  if(m_isTelegraphing)return ns_TELEGRAPH_COLOR;
+  return baseColor;
+}
+
+//========= モデルの動きの補助関数=========
+// 状態から動きを選び、時刻を進める。
+void Enemy::UpdateModelClip(float deltaTime)
+{
+  // 共有の読込がない場合と、時間が進まない（ヒットストップ中）場合は、動きも時刻も変えない。
+  if(m_modelState.library == nullptr || deltaTime <= 0.0f)return;
+
+  // この敵がモデルで描かれる場合だけ、動きを選ぶ。
+  ENEMY_APPEARANCE appearance{};
+  if(!EnemyModelLibrary::TryGetAppearance(m_kind,m_enemyId,appearance) || !m_modelState.library->IsLoaded(appearance))return;
+
+  // 前回の更新からの水平の移動の距離を、移動中と判定する下限の距離と比べる。比較は二乗のまま行い、平方根を取らない。
+  const float move_x = m_position.x - m_modelState.lastPosition.x;
+  const float move_z = m_position.z - m_modelState.lastPosition.z;
+  const float min_distance = ENEMY_ANIMATION::ns_MODEL_WALK_MIN_SPEED * deltaTime;
+  const bool is_moving = move_x * move_x + move_z * move_z > min_distance * min_distance;
+  m_modelState.lastPosition = m_position;
+
+  // 予告が始まった更新を検出する。
+  const bool is_telegraph_start = m_isTelegraphing && !m_modelState.wasTelegraphing;
+  m_modelState.wasTelegraphing = m_isTelegraphing;
+
+  // 現在の動きを最後まで再生したかを調べ、次の動きを選ぶ。
+  const SkinnedAnimationPlayer* current_player = m_modelState.library->FindPlayer(appearance,m_modelState.clip);
+  const bool is_finished = current_player == nullptr || m_modelState.clipTimeSeconds >= current_player->GetDurationSeconds();
+  const ENEMY_CLIP next_clip = ChooseClip(is_moving,is_finished);
+
+  // 動きが変わった時と、攻撃の予告が始まった時は、最初から数え直す。連続した攻撃で、前の攻撃の動きが残らないようにする。
+  if(next_clip != m_modelState.clip || (is_telegraph_start && next_clip == ENEMY_CLIP::e_ATTACK)){
+    m_modelState.clip = next_clip;
+    m_modelState.clipTimeSeconds = 0.0f;
+  }
+  m_modelState.clipTimeSeconds += deltaTime * GetClipSpeed(m_modelState.clip);
+}
+
+// 状態から、再生する動きを選ぶ。
+ENEMY_CLIP Enemy::ChooseClip(bool isMoving,bool isClipFinished) const
+{
+  const ENEMY_CLIP current_clip = m_modelState.clip;
+
+  // 死亡・転倒・怯みは、状態そのものを表すため、ほかの動きより優先する。
+  if(!m_isAlive)return ENEMY_CLIP::e_DEATH;
+  if(IsKnockedDown())return ENEMY_CLIP::e_DOWN;
+  if(IsFlinching())return ENEMY_CLIP::e_HIT;
+
+  // 転倒が終わった直後は、起き上がりを再生し、最後まで続ける。
+  if(current_clip == ENEMY_CLIP::e_DOWN)return ENEMY_CLIP::e_GET_UP;
+  if(current_clip == ENEMY_CLIP::e_GET_UP && !isClipFinished)return ENEMY_CLIP::e_GET_UP;
+
+  // 攻撃の予告中は、攻撃の動きを再生する。予告が終わっても、動きが終わるまで、続ける。
+  if(m_isTelegraphing)return ENEMY_CLIP::e_ATTACK;
+  if(current_clip == ENEMY_CLIP::e_ATTACK && !isClipFinished)return ENEMY_CLIP::e_ATTACK;
+
+  return isMoving ? ENEMY_CLIP::e_WALK : ENEMY_CLIP::e_IDLE;
+}
+
+// モデルの動きの状態を、待機の最初へ戻す。
+void Enemy::ResetModelState(float idleStartSeconds)
+{
+  m_modelState.clip = ENEMY_CLIP::e_IDLE;
+  m_modelState.clipTimeSeconds = idleStartSeconds;
+  m_modelState.lastPosition = m_position;
+  m_modelState.wasTelegraphing = false;
 }
 
 //========= 描画の補助関数=========

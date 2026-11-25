@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-// 敵の簡易アニメーション（待機の揺れ・怯みの傾き・予告の前傾・攻撃の突進）の数値を、表としてまとめる。
-// 数値の定義だけを持ち、アニメーションの計算や描画は担当しない。骨格のアニメーションは使わず、位置と回転だけを動かす。企画書で未確定の数値は、プレイ確認後に調整する仮値。
+// 敵のCube描画の簡易アニメーション（待機の揺れ・怯みの傾き・予告の前傾・攻撃の突進）と、モデルの動きの再生の数値を、表としてまとめる。
+// 数値の定義だけを持ち、アニメーションの計算や描画は担当しない。Cubeの描画では、骨格のアニメーションは使わず、位置と回転だけを動かす。企画書で未確定の数値は、プレイ確認後に調整する仮値。
 
 //========= C++標準ライブラリ インクルード=========
 #include <cstdint> // std::uint32_tで、待機の揺れの位相をずらす段数を表す。
@@ -38,4 +38,20 @@ namespace ENEMY_ANIMATION
   inline constexpr float ns_ATTACK_LUNGE_DISTANCE = 0.3f;
   // 攻撃の突進で、出て戻るまでの時間。単位は秒。仮値。
   inline constexpr float ns_ATTACK_LUNGE_SECONDS = 0.1f;
+
+  //========= モデルの動き=========
+  // 待機の動きの開始位置を、敵の識別値ごとにずらす幅。単位は秒。待機の揺れの位相の段数（ns_IDLE_PHASE_STEP_COUNT）を掛けて、待機の動き（4秒）を、ほぼ1周分ずらす。仮値。
+  inline constexpr float ns_MODEL_IDLE_STEP_SECONDS = 0.5f;
+  // 移動中と判定する、水平の移動の速さの下限。単位はワールド距離単位/秒。敵どうしの押し離しなどの小さな動きで、歩く動きにならないようにする。仮値。
+  inline constexpr float ns_MODEL_WALK_MIN_SPEED = 0.3f;
+  // 死亡の動きが終わった後に、倒れたままの最後のポーズを見せ続ける時間。単位は秒。過ぎたら、描画をやめる（H8e-3cで、徐々に消える形へ変える）。仮値。
+  inline constexpr float ns_MODEL_DEATH_HOLD_SECONDS = 3.0f;
+  // 動きの再生の速さの倍率。1.0が等倍。待機・移動・攻撃・死亡は、等倍。
+  inline constexpr float ns_MODEL_SPEED_NORMAL = 1.0f;
+  // 怯み（Hit、2.17秒）の再生の倍率。ゲーム側の怯みの時間（0.3秒）に対して長いため、速くする。仮値。
+  inline constexpr float ns_MODEL_SPEED_HIT = 3.0f;
+  // 転倒（Down、2.2秒）の再生の倍率。ゲーム側の転倒の時間（1.5秒）に、ほぼ合わせる。仮値。
+  inline constexpr float ns_MODEL_SPEED_DOWN = 1.5f;
+  // 起き上がり（GetUp、6.0秒）の再生の倍率。長いため、約2秒にする。仮値。
+  inline constexpr float ns_MODEL_SPEED_GET_UP = 3.0f;
 }

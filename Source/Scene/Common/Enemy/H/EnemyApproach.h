@@ -14,8 +14,8 @@
 namespace ENEMY_APPROACH
 {
   //========= 接近型の移動設定=========
-  // 追従速度。単位はワールド距離単位/秒。試遊用の仮値。
-  inline constexpr float ns_SPEED = 2.4f;
+  // 追従速度。単位はワールド距離単位/秒。Walkの動き（足の運び）に合わせて、遅くした試遊用の仮値。足が滑って見える場合は、さらに調整する。
+  inline constexpr float ns_SPEED = 0.6f;
   // 追従を止める水平中心間距離。単位はワールド距離単位。攻撃範囲ではない。
   inline constexpr float ns_STOP_DISTANCE = 1.5f;
 

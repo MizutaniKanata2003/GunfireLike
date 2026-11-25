@@ -195,6 +195,7 @@ bool GameSession::InitEnemyController()
   ENEMY_CONTROLLER_LINKS enemy_links{};
   enemy_links.modelRegistry = &m_stage.GetModelRegistry();
   enemy_links.collisionWorld = &m_stage.GetCollisionWorld();
+  enemy_links.graphicsSystem = &m_graphicsSystem;
   enemy_links.playerController = &m_player.GetPlayerController();
   enemy_links.playerHealth = &m_player.GetPlayerHealth();
   enemy_links.onAttackEvent = [this](const ENEMY_ATTACK_EVENT& attackEvent){ApplyEnemyAttackEvent(attackEvent); };

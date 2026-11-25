@@ -23,10 +23,10 @@ namespace COMBAT_TABLE
   //========= 接近型の攻撃=========
   // 予告開始と命中に使う水平中心間距離。追従の停止距離1.5より広くする試遊用の仮値。
   inline constexpr float ns_ENEMY_MELEE_REACH = 1.65f;
-  // 予告開始から命中判定までの時間。敵側の時間で0.55秒。仮値。
-  inline constexpr float ns_ENEMY_MELEE_WINDUP_SECONDS = 0.55f;
-  // 命中判定・空振り・予告中断の後、次の予告を始められるまでの時間。敵側の時間で1.0秒。仮値。
-  inline constexpr float ns_ENEMY_MELEE_RECOVERY_SECONDS = 1.0f;
+  // 予告開始から命中判定までの時間。敵側の時間で1.0秒。攻撃の動き（Attack、2.63秒）の、腕を振る瞬間に合わせる仮値。
+  inline constexpr float ns_ENEMY_MELEE_WINDUP_SECONDS = 1.0f;
+  // 命中判定・空振り・予告中断の後、次の予告を始められるまでの時間。敵側の時間で2.0秒。攻撃の動きが終わってから、次の予告に入る長さの仮値。
+  inline constexpr float ns_ENEMY_MELEE_RECOVERY_SECONDS = 2.0f;
   // 接近型の攻撃が命中したときに減らすプレイヤーHP。仮値。
   inline constexpr float ns_ENEMY_MELEE_DAMAGE = 10.0f;
 

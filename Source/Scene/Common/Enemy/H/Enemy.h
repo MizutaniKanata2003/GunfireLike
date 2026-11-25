@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// 敵1体の状態（種類・HP・怯み・転倒・射撃のダメージの印・攻撃予告の表示・生死・向き）と、球のColliderの登録、Cubeでの仮表示（待機の揺れ・怯みの傾き・予告の前傾・攻撃の突進を含む）を担当する。
+// 敵1体の状態（種類・HP・怯み・転倒・射撃のダメージの印・攻撃予告の表示・生死・向き・モデルの動き）と、球のColliderの登録、モデル（読み込めない時はCube）での表示を担当する。
 // 種類ごとの数値はEnemyTableから読む。敵の行動（移動・攻撃）は持たない。複数体の管理は、EnemyManagerが担当する。
 
 //========= C++標準ライブラリ インクルード=========
@@ -8,9 +8,11 @@
 
 //========= Framework インクルード=========
 #include "Framework/Collision/H/CollisionShapes.h"
+#include "Framework/3D/H/CameraMatrices.h"
 #include "Framework/Etc/H/MathTypes.h"
 
 //========= Scene インクルード=========
+#include "Scene/Common/Enemy/H/EnemyModelLibrary.h"
 #include "Scene/Common/Enemy/H/EnemyWaveTable.h"
 #include "Scene/Common/Object/H/Transform.h"
 
@@ -46,6 +48,22 @@ struct ENEMY_ANIMATION_STATE
   bool hasPendingDefeatEffect{};
 };
 
+
+// 敵1体のモデルの動きの状態。Enemyのメンバー変数の数を抑えるため、1つにまとめる。
+struct ENEMY_MODEL_STATE
+{
+  // 全ての敵が共有する、モデルと動きの読込。非所有で、EnemyControllerが所有する。SetModelLibraryで設定し、Uninit・Respawnでは変えない。未設定の間は、Cubeで描く。
+  EnemyModelLibrary* library{};
+  // 再生中の動き。
+  ENEMY_CLIP clip{ENEMY_CLIP::e_IDLE};
+  // 再生中の動きの時刻。単位は秒。動きごとの速さの倍率を掛けて進める。
+  float clipTimeSeconds{};
+  // 前回のUpdateでの位置。移動中かの判定に使う。
+  XMFLOAT3 lastPosition{};
+  // 前回のUpdateで、攻撃の予告中だったか。予告の開始を検出するために使う。
+  bool wasTelegraphing{};
+};
+
 // 種類・HP・怯み・転倒を持ち、球のColliderで被弾を受ける敵1体。
 class Enemy final
 {
@@ -65,6 +83,9 @@ public:
   // 怯み・転倒・射撃のダメージの印の残り時間と、待機の揺れの位相・予告の経過時間・攻撃の突進の残り時間を進める。
   // deltaTime: この更新で進める経過時間。単位は秒。
   void Update(float deltaTime);
+  // 全ての敵が共有する、モデルと動きの読込を設定する。EnemyControllerが、Initialize時に、全ての枠へ渡し、Uninit時にnullptrを渡す。Enemy::Uninit・Respawnでは変えない。
+  // modelLibrary: 共有の読込。非所有で、このEnemyが使い終わるまで生存させる。nullptrなら、Cubeで描く。
+  void SetModelLibrary(EnemyModelLibrary* modelLibrary) { m_modelState.library = modelLibrary; }
   // 地形との重なりを補正し、登録済みの球Colliderと描画位置を更新する。
   // targetPosition: 移動先候補のワールド座標。呼出側で1回の移動距離を制限する。
   // collisionWorld: この敵のColliderを登録したCollisionWorld。
@@ -79,8 +100,8 @@ public:
   void StartAttackLunge();
   // 倒された時の演出を、まだ出していない場合だけ、trueを返し、出す旨を記録する。同じ敵について、二度目以降はfalseを返す。生きている敵は、常にfalse。
   [[nodiscard]] bool TakeDefeatEffectNotice();
-  // 生きている場合だけ、Cubeで描画する。通常は種類の色、射撃のダメージの印が付いている間は紫、攻撃の予告中は黄、怯み中・転倒中は色を変え、転倒中は低く潰して描く。
-  // 転倒中以外は、待機の揺れで高さを上下させ、攻撃の予告中は前へ傾け、怯み中は向きに対して横へ傾ける。突進中は、前へ出して戻す。
+  // 生きている場合は、モデルで描く（待機・移動・攻撃・怯み・転倒・起き上がりの動き）。モデルがない種類や、読み込めなかった場合は、Cubeで描く。死亡後は、死亡の動きが終わり、保持の時間が過ぎるまで、モデルだけを描く。
+  // 色は、通常は白（モデルの画像の色）、射撃のダメージの印が付いている間は紫、攻撃の予告中は黄、怯み中は橙、転倒中は青みがかった灰色で、画像の色へ乗算する。Cubeの描画では、転倒中に低く潰し、待機の揺れ・前傾・怯みの傾き・突進を加える。
   // graphicsSystem: Rendererが使う描画基盤。
   // viewMatrix: World空間からView空間への変換行列。
   // projectionMatrix: View空間からClip空間への変換行列。
@@ -133,6 +154,33 @@ public:
 
 private:
   //========= 描画の補助関数=========
+  // Cubeで描く。モデルを描けない時の代わり。生きている時だけ呼ぶ。
+  // graphicsSystem: Rendererが使う描画基盤。
+  // camera: View行列とProjection行列。
+  void DrawCube(GraphicsSystem& graphicsSystem,const CAMERA_MATRICES& camera) const;
+  // モデルで描く。読込済みの見た目と動きがある場合だけ描く。死亡後は、保持の時間が過ぎたら、描かずに、trueを返す。
+  // graphicsSystem: Rendererが使う描画基盤。
+  // camera: View行列とProjection行列。
+  // color: モデルの画像に乗算する色。
+  // 戻り値: モデルで処理した（描いた、または、死亡後に描かないと決めた）場合はtrue。モデルを使えず、Cubeで描く必要がある場合はfalse。
+  [[nodiscard]] bool DrawModel(GraphicsSystem& graphicsSystem,const CAMERA_MATRICES& camera,const XMFLOAT4& color) const;
+  // 転倒・怯み・予告の状態に応じた色を返す。優先順は、転倒、怯み、予告、基準の色。
+  // baseColor: どの状態でもない時の色。
+  // 戻り値: 乗算する色。
+  [[nodiscard]] XMFLOAT4 DecideStateColor(const XMFLOAT4& baseColor) const;
+
+  //========= モデルの動きの補助関数=========
+  // 状態から動きを選び、変わった時は時刻を0へ戻し、変わらない時は進める。共有の読込がない場合や、時間が進まない場合は、何もしない。
+  // deltaTime: この更新で進める経過時間。単位は秒。
+  void UpdateModelClip(float deltaTime);
+  // 状態から、再生する動きを選ぶ。優先順は、死亡、転倒、怯み、起き上がり、攻撃、移動、待機。
+  // isMoving: 移動中か。
+  // isClipFinished: 現在の動きを、最後まで再生したか。
+  // 戻り値: 再生する動き。
+  [[nodiscard]] ENEMY_CLIP ChooseClip(bool isMoving,bool isClipFinished) const;
+  // モデルの動きの状態を、待機の最初へ戻す。共有の読込への参照は、変えない。
+  // idleStartSeconds: 待機の動きの開始位置。単位は秒。
+  void ResetModelState(float idleStartSeconds);
   // 簡易アニメーション（待機の揺れ・突進・怯みの傾き・予告の前傾）を、描画用のTransformへ反映する。転倒中は何もしない。
   // drawTransform: 反映先の描画用Transform。位置は保持座標から作り直し、回転は保持している向きに、傾きを足す。Colliderと保持座標は変えない。
   void ApplyAnimation(Transform& drawTransform) const;
@@ -148,6 +196,8 @@ private:
   //========= アニメーション=========
   // 待機の揺れの位相・怯みの傾きの向き・予告の経過時間・突進の残り時間。簡易アニメーションの状態をまとめて保持する。
   ENEMY_ANIMATION_STATE m_animation{};
+  // モデルの動きの状態。共有の読込への参照・再生中の動き・時刻・前回の位置・前回の予告の状態をまとめて保持する。
+  ENEMY_MODEL_STATE m_modelState{};
 
   //========= 種類=========
   // 敵の種類。Initializeで設定する。未初期化の間は接近型として扱う。
