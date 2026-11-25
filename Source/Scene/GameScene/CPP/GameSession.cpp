@@ -293,12 +293,15 @@ void GameSession::UpdateWorldAndRoom(float worldDeltaTime)
   m_stage.UpdateProgress(m_enemyController.GetEnemyManager().HasLivingEnemies());
 }
 
-// 回復アイテムの間隔・Collision可視化の表示時間・命中表示・反動のずれを、Captureに関係なく更新する。
+// 回復アイテムの間隔・Collision可視化の表示時間・命中表示・反動のずれ・演出の粒を、Captureに関係なく更新する。
 void GameSession::UpdateTimers(float deltaTime,float gameplayDeltaTime)
 {
   // プレイヤー側の回復アイテムの間隔・命中表示・反動のずれを進める。Collision可視化の表示用の残り時間は、実時間で進め、0未満にしない。
   m_player.UpdateTimers(deltaTime,gameplayDeltaTime);
   m_renderer.GetCollisionDebugView().Update(deltaTime);
+
+  // 演出の粒の位置と残り時間を、実時間で進める。報酬選択中とショップが開いている間は、deltaTimeが0のため、止まる。
+  m_renderer.GetEffectController().Update(deltaTime);
 }
 
 // ジャスト回避が成立した時の効果を反映する。
@@ -325,11 +328,16 @@ void GameSession::UpdatePlayer(float deltaTime,float gameplayDeltaTime)
   m_player.UpdateView(deltaTime);
 }
 
-// プレイヤーの戦闘・射撃・敵の行動と弾を更新し、Collision可視化の視線のRayを更新する。
+// プレイヤーの戦闘・射撃・敵の行動と弾を更新し、発射の演出を出し、Collision可視化の視線のRayを更新する。
 void GameSession::UpdateCombat(float gameplayDeltaTime,float worldDeltaTime)
 {
   // 近接攻撃・接触・回復・射撃を、この順に更新する。
   m_player.UpdateCombat(gameplayDeltaTime);
+
+  // 発射があった場合だけ、その結果から、マズルフラッシュと命中の火花を出す。結果は、取り出すと捨てられ、同じ発射の演出を二度出さない。
+  WEAPON_UPDATE_RESULT shot_result{};
+  if(m_player.GetShotController().TryTakeShotResult(shot_result))m_renderer.GetEffectController().SpawnShotEffects(shot_result);
+
   // 当フレームの回避・移動・敵への怯みを反映してから、敵の行動と、敵の弾の命中を判定する。
   m_enemyController.Update(worldDeltaTime);
 

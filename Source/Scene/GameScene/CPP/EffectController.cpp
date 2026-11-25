@@ -12,6 +12,7 @@
 //========= Scene インクルード=========
 #include "Scene/Common/Object/H/ModelRegistry.h"
 #include "Scene/Common/Object/H/Transform.h"
+#include "Scene/Common/Weapon/H/WeaponSystem.h"
 
 // 場面ごとの演出の数値をまとめる。企画書で未確定の数値は、プレイ確認後に調整する仮値。
 namespace
@@ -189,5 +190,24 @@ void EffectController::SpawnHitSparks(const XMFLOAT3& hitPoint)
   for(const XMFLOAT3& direction : ns_SPARK_DIRECTIONS){
     params.velocity = XMFLOAT3{direction.x * ns_SPARK_SPEED,direction.y * ns_SPARK_SPEED,direction.z * ns_SPARK_SPEED};
     Spawn(params);
+  }
+}
+
+// 発射の結果から、マズルフラッシュと、命中した弾ごとの火花を出す。
+void EffectController::SpawnShotEffects(const WEAPON_UPDATE_RESULT& shotResult)
+{
+  // 発射していない結果と、弾が0個の結果は、出す対象がないため、何も出さない。
+  if(!shotResult.didFire || shotResult.pelletCount <= 0)return;
+
+  // マズルフラッシュは、1回の発射につき1個だけ、先頭の弾の始点（視点）と方向で出す。
+  const SHOT_PELLET_RESULT& first_pellet = shotResult.pellets[0];
+  SpawnMuzzleFlash(first_pellet.ray.origin,first_pellet.ray.direction);
+
+  // 弾ごとに、命中した弾だけ、命中点へ火花を出す。命中しなかった弾は、次の弾へ進む。
+  for(int pellet_index = 0; pellet_index < shotResult.pelletCount; ++pellet_index){
+    const SHOT_PELLET_RESULT& pellet = shotResult.pellets[pellet_index];
+    if(!pellet.didHit)continue;
+
+    SpawnHitSparks(pellet.rayHit.point);
   }
 }

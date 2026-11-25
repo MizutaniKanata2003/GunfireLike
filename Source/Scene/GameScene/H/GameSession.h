@@ -82,7 +82,7 @@ private:
   // 確認用の攻撃の判定と、敵の怯み・転倒・敵どうしの押し離し・部屋の進行・出口の開閉を、Captureに関係なく更新する。
   // worldDeltaTime: スローを反映した経過時間。単位は秒。ヒットストップ中と、報酬選択中・ショップが開いている間は0。
   void UpdateWorldAndRoom(float worldDeltaTime);
-  // 回復アイテムの間隔・Collision可視化の表示時間・命中表示・反動のずれを、Captureに関係なく更新する。
+  // 回復アイテムの間隔・Collision可視化の表示時間・命中表示・反動のずれ・演出の粒を、Captureに関係なく更新する。
   // deltaTime: 実時間の経過時間。単位は秒。表示用と反動の時間に使う。報酬選択中とショップが開いている間は0。
   // gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。回復アイテムの間隔に使う。
   void UpdateTimers(float deltaTime,float gameplayDeltaTime);
@@ -92,7 +92,7 @@ private:
   // deltaTime: 実時間の経過時間。単位は秒。視野角の補間に使う。
   // gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。プレイヤーの動作に使う。
   void UpdatePlayer(float deltaTime,float gameplayDeltaTime);
-  // プレイヤーの戦闘・射撃・敵の行動と弾を更新し、Collision可視化の視線のRayを更新する。Capture中だけ呼ぶ。
+  // プレイヤーの戦闘・射撃・敵の行動と弾を更新し、発射の演出を出し、Collision可視化の視線のRayを更新する。Capture中だけ呼ぶ。
   // gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。プレイヤーの戦闘と射撃に使う。
   // worldDeltaTime: スローを反映した経過時間。単位は秒。敵の行動と弾に使う。
   void UpdateCombat(float gameplayDeltaTime,float worldDeltaTime);

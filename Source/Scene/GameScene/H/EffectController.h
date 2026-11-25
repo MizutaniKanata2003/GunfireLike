@@ -2,7 +2,7 @@
 
 // 演出（小さなCubeの粒）を、固定長の配列で保持し、生成・更新・描画を担当する。
 // 粒は、位置・速度・色・大きさ・残り時間を持ち、時間とともに小さくなって消える。画像は使わず、単色のCubeで描く。配列が満杯の場合は、最も古い粒を置き換える。
-// 発砲のマズルフラッシュと、命中の火花は、場面の位置と方向を受け取って、粒の組合せとして生成する。どの場面で出すか（発砲・命中の検出）は担当せず、呼出側が、生成を求める。Cube Rendererは、共有Registryから借用し、所有しない。
+// 発砲のマズルフラッシュと、命中の火花は、場面の位置と方向、または射撃の結果を受け取って、粒の組合せとして生成する。どの場面で出すか（発砲・命中の検出）は担当せず、呼出側が、生成を求める。Cube Rendererは、共有Registryから借用し、所有しない。
 
 //========= C++標準ライブラリ インクルード=========
 #include <array> // std::arrayで、演出の粒を、固定長で保持する。
@@ -15,6 +15,7 @@
 class BasicMeshRenderer;
 class GraphicsSystem;
 class ModelRegistry;
+struct WEAPON_UPDATE_RESULT;
 
 // 演出の数値をまとめる。
 namespace EFFECT_CONTROLLER
@@ -74,6 +75,9 @@ public:
   // 命中の火花を、命中点から、斜め上へ散る橙色の粒として、複数個出す。命中した相手が敵か地形かは問わない。
   // hitPoint: 命中点のワールド座標。
   void SpawnHitSparks(const XMFLOAT3& hitPoint);
+  // 1回の発射の結果から、マズルフラッシュ1個と、命中した弾ごとの火花を出す。マズルフラッシュは、先頭の弾の始点と方向を使う。
+  // shotResult: 発射の結果。発射していない結果や、弾が0個の結果の場合は、何も出さない。
+  void SpawnShotEffects(const WEAPON_UPDATE_RESULT& shotResult);
 
 private:
   //========= 粒の状態=========
