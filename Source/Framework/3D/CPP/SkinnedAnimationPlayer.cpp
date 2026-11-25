@@ -1,6 +1,6 @@
 ﻿#include "../H/SkinnedAnimationPlayer.h"
 
-// ボーン行列の計算を実装する。ノードとチャンネルの対応づけ、キーの補間（位置・拡大は直線、回転は球面）、2つの動きの混ぜ合わせ、階層の変換の合成、逆バインド行列との合成を行う。
+// ボーン行列の計算を実装する。ノードとチャンネルの対応づけ、キーの補間（位置・拡大は直線、回転は球面）、2つの動きの混ぜ合わせ、階層の変換の合成、逆バインド行列との合成、ノードの位置の計算を行う。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::upper_boundでキーを探し、std::clampで補間の割合を0〜1へ制限する。
@@ -175,10 +175,43 @@ void SkinnedAnimationPlayer::EvaluateBlended(float timeSeconds,const ANIMATION_B
   ComposeBoneMatrices(outBoneMatrices);
 }
 
+// 指定した時刻の、ノードの位置を、モデル空間で求める。
+void SkinnedAnimationPlayer::EvaluateNodePositions(float timeSeconds,const std::vector<int>& nodeIndices,std::vector<XMFLOAT3>& outPositions)
+{
+  // 先に、全て原点にする。借用していない場合や、範囲外の番号は、原点のまま。
+  outPositions.assign(nodeIndices.size(),XMFLOAT3{});
+  if(m_model == nullptr)return;
+
+  // 全体の変換を求め、ボーン行列と同じように、根の逆行列を掛けて、スキニング後の頂点と同じ空間にする。位置は、行列の4行目。
+  ComputeGlobalTransforms(timeSeconds,nullptr);
+  const XMMATRIX global_inverse = XMLoadFloat4x4(&m_model->globalInverseTransform);
+  for(std::size_t position_index = 0; position_index < nodeIndices.size(); ++position_index){
+    const int node_index = nodeIndices[position_index];
+    if(node_index < 0 || static_cast<std::size_t>(node_index) >= m_globalTransforms.size())continue;
+
+    const XMMATRIX node_in_model = XMMatrixMultiply(XMLoadFloat4x4(&m_globalTransforms[static_cast<std::size_t>(node_index)]),global_inverse);
+    XMStoreFloat3(&outPositions[position_index],node_in_model.r[3]);
+  }
+}
+
 // アニメーションの長さを返す。
 float SkinnedAnimationPlayer::GetDurationSeconds() const
 {
   return m_clip != nullptr ? m_clip->durationSeconds : 0.0f;
+}
+
+// 名前の末尾が一致する、最初のノードの番号を返す。
+int SkinnedAnimationPlayer::FindNodeIndexBySuffix(const std::string& suffix) const
+{
+  if(m_model == nullptr || suffix.empty())return -1;
+
+  for(std::size_t node_index = 0; node_index < m_model->nodes.size(); ++node_index){
+    const std::string& name = m_model->nodes[node_index].name;
+    if(name.size() >= suffix.size() && name.compare(name.size() - suffix.size(),suffix.size(),suffix) == 0){
+      return static_cast<int>(node_index);
+    }
+  }
+  return -1;
 }
 
 //========= 計算の補助関数=========

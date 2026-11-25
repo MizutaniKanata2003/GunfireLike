@@ -3,11 +3,13 @@
 // スキニング付きモデル1つと、アニメーション1本の組合せについて、指定した時刻の、全ボーンの最終の行列を計算するクラス。
 // 時刻から、ノードごとの位置・回転・拡大のキーを補間し、階層の親から順に変換を掛けて、逆バインド行列と合成する。
 // 同じモデルの別の動きと、ノードごとの位置・回転・拡大の段階で混ぜる（クロスフェード）計算も行う。ボーン行列そのものを混ぜると、体が潰れるため、行わない。
+// ノードの名前（末尾の一致）から番号を探す関数と、指定した時刻のノードの位置（モデル空間）を求める関数も持つ。歩きの速度の測定などに使う。
 // 再生の進行（時刻を進める・切り替える・混ぜる割合を決める）、GPUへの転送、描画は担当しない。時刻は、呼出側が持つ。
 // モデルとアニメーションは借用し、所有しない。呼出側が、このクラスより長く生存させる。
 
 //========= C++標準ライブラリ インクルード=========
 #include <array> // std::arrayで、ボーン行列を固定長で出力する。
+#include <string> // std::stringで、ノードの名前の末尾の一致を調べる。
 #include <vector> // ノードごとの、チャンネルの番号と、全体の変換の作業領域を保持する。
 
 //========= Framework インクルード=========
@@ -72,8 +74,17 @@ public:
   // blendInput: 直前の動きと、その時刻、今の動きの割合。
   // outBoneMatrices: 出力先。全てを書き換える。
   void EvaluateBlended(float timeSeconds,const ANIMATION_BLEND_INPUT& blendInput,BoneMatrixArray& outBoneMatrices);
+  // 指定した時刻の、ノードの位置を、スキニング後の頂点と同じ空間（モデル空間）で求める。ボーン行列と同じ計算の途中の値を使うため、頂点の位置と合う。
+  // timeSeconds: 計算する時刻。単位は秒。
+  // nodeIndices: 位置を求めるノードの番号の並び。範囲外の番号の位置は、原点にする。
+  // outPositions: 出力先。nodeIndicesと同じ長さに、作り直す。借用していない場合は、全て原点。
+  void EvaluateNodePositions(float timeSeconds,const std::vector<int>& nodeIndices,std::vector<XMFLOAT3>& outPositions);
   // アニメーションの長さを返す。単位は秒。借用していない場合は0。
   [[nodiscard]] float GetDurationSeconds() const;
+  // 名前の末尾が、指定した文字列と一致する、最初のノードの番号を返す。Mixamoの「mixamorig:LeftFoot」などを、接頭辞に関係なく探すために使う。
+  // suffix: 探す名前の末尾。
+  // 戻り値: ノードの番号。見つからない場合と、借用していない場合は、-1。
+  [[nodiscard]] int FindNodeIndexBySuffix(const std::string& suffix) const;
 
 private:
   //========= 計算の補助関数=========

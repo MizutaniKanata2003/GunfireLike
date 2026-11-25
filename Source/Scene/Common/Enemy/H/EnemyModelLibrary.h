@@ -2,6 +2,7 @@
 
 // 敵の見た目（スキニング付きのFBXモデルと、動きのFBX）を、見た目ごとに1組だけ読み込み、全ての敵で共有するクラス。
 // 見た目ごとに、モデルのデータ・アニメーションのデータ・動きごとの再生部（SkinnedAnimationPlayer）・描画部（SkinnedModelRenderer）を所有する。
+// 歩きの動きの、足のボーンの動きから測った、地面に対する速度の表（位相ごとの速度と、平均）も、見た目ごとに持つ。足が滑らない移動速度を決めるために使う。
 // 敵の状態から動きを選ぶこと、再生の時刻の管理、描画の呼出しは担当しない（Enemy側が行う）。読込は、Scene初期化中にだけ行い、プレイ中には行わない。
 // SkinnedAnimationPlayerは、モデルとアニメーションの参照を保持するため、このクラスは、コピー・移動を禁止し、生成後にアドレスを変えない。
 
@@ -50,6 +51,8 @@ namespace ENEMY_MODEL
   inline constexpr std::size_t ns_APPEARANCE_COUNT = 2;
   // 動きの数。ENEMY_CLIPの要素数と同じにする。
   inline constexpr std::size_t ns_CLIP_COUNT = 8;
+  // 歩きの速度の表の、サンプル数。歩きの動きの1周を、この数に等分して、速度を測る。
+  inline constexpr std::size_t ns_WALK_SPEED_SAMPLE_COUNT = 64;
 }
 
 // 見た目1つ分の、読込元と、描画の補正値。
@@ -80,6 +83,12 @@ struct ENEMY_APPEARANCE_ASSETS
   std::array<bool,ENEMY_MODEL::ns_CLIP_COUNT> hasClip{};
   // スキニング付きモデルの描画部。
   SkinnedModelRenderer renderer{};
+  // 歩きの動きの1周を等分した位相ごとの、地面に対する速度。単位はワールド距離単位/秒。hasWalkSpeedsがfalseの間は使わない。
+  std::array<float,ENEMY_MODEL::ns_WALK_SPEED_SAMPLE_COUNT> walkSpeeds{};
+  // 歩きの速度の平均。単位はワールド距離単位/秒。hasWalkSpeedsがfalseの間は使わない。
+  float walkSpeedAverage{};
+  // 歩きの速度の表を作れたか。足のボーンが見つからない場合は、false。
+  bool hasWalkSpeeds{};
   // モデルと必須の動きを全て読み込み、描画部まで初期化できたか。
   bool isLoaded{};
 };
@@ -97,9 +106,9 @@ public:
   EnemyModelLibrary& operator=(const EnemyModelLibrary&) = delete;
 
   //========= 初期化・終了関数=========
-  // 旧Resourceを先にUninitし、全ての見た目のモデルと動きを読み込み、描画部を初期化する。Scene初期化中にだけ呼ぶ。
+  // 旧Resourceを先にUninitし、全ての見た目のモデルと動きを読み込み、描画部を初期化し、歩きの速度の表を作る。Scene初期化中にだけ呼ぶ。
   // graphicsSystem: 描画部の生成に使うDeviceの取得元。参照は保持しない。
-  // 戻り値: 全ての見た目を読み込めたらtrue。1つでも失敗したら、全て解放してfalse。失敗の理由は、各Loaderがログへ記録する。
+  // 戻り値: 全ての見た目を読み込めたらtrue。1つでも失敗したら、全て解放してfalse。失敗の理由は、各Loaderがログへ記録する。歩きの速度の表を作れなくても、失敗にしない。
   [[nodiscard]] bool Initialize(GraphicsSystem& graphicsSystem);
   // 全ての所有物を解放する。未初期化・終了済みでも呼出可能。ContextのBind解除・GPU完了待機は行わない。
   void Uninit();
@@ -134,13 +143,24 @@ public:
   // appearance: 見た目。
   // 戻り値: 描画部への借用ポインター。未読込・範囲外はnullptr。所有権は移さない。
   [[nodiscard]] SkinnedModelRenderer* FindRenderer(ENEMY_APPEARANCE appearance);
+  // 歩きの動きの位相から、地面に対する速度を返す。位相は、動きの1周を0〜1で表し、範囲外の値は、1周ごとに繰り返す。表の隣り合うサンプルの間は、直線で補間する。
+  // appearance: 見た目。
+  // phase: 歩きの動きの位相。単位は周期の数。
+  // outSpeed: 速度の出力先。単位はワールド距離単位/秒。戻り値がtrueの時だけ書き換える。
+  // 戻り値: 速度の表があればtrue。未読込・範囲外・表がない場合はfalse。
+  [[nodiscard]] bool TryGetWalkSpeed(ENEMY_APPEARANCE appearance,float phase,float& outSpeed) const;
+  // 歩きの速度の平均を返す。
+  // appearance: 見た目。
+  // outSpeed: 平均の出力先。単位はワールド距離単位/秒。戻り値がtrueの時だけ書き換える。
+  // 戻り値: 速度の表があればtrue。未読込・範囲外・表がない場合はfalse。
+  [[nodiscard]] bool TryGetWalkSpeedAverage(ENEMY_APPEARANCE appearance,float& outSpeed) const;
 
 private:
   //========= 読込の補助関数=========
-  // 見た目1つ分の、モデル・動き・描画部を読み込む。
+  // 見た目1つ分の、モデル・動き・描画部を読み込み、歩きの速度の表を作る。
   // graphicsSystem: 描画部の生成に使う描画基盤。
   // appearanceIndex: 見た目の添字。範囲内であること。
-  // 戻り値: 全て成功したらtrue。
+  // 戻り値: 全て成功したらtrue。歩きの速度の表を作れなくても、失敗にしない。
   [[nodiscard]] bool LoadAppearance(GraphicsSystem& graphicsSystem,std::size_t appearanceIndex);
 
   //========= 所有物=========
