@@ -1,6 +1,6 @@
 ﻿#include "../H/EffectController.h"
 
-// 演出の粒の生成・更新・描画と、マズルフラッシュ・命中の火花の生成を実装する。
+// 演出の粒の生成・更新・描画と、マズルフラッシュ・命中の火花・撃破の破片・ジャスト回避の広がりの生成を実装する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <cmath> // std::sqrtで、正面方向から、右方向の向きを求めるために、水平方向の長さを求める。
@@ -10,6 +10,8 @@
 #include "Framework/3D/H/CameraMatrices.h"
 
 //========= Scene インクルード=========
+#include "Scene/Common/Enemy/H/Enemy.h"
+#include "Scene/Common/Enemy/H/EnemyManager.h"
 #include "Scene/Common/Object/H/ModelRegistry.h"
 #include "Scene/Common/Object/H/Transform.h"
 #include "Scene/Common/Weapon/H/WeaponSystem.h"
@@ -44,6 +46,39 @@ namespace
   constexpr float ns_SPARK_SECONDS = 0.15f;
   // 火花の色。橙。
   constexpr XMFLOAT4 ns_SPARK_COLOR{1.0f,0.6f,0.1f,1.0f};
+
+  //========= 撃破の破片=========
+  // 撃破の破片の粒の数。
+  constexpr std::size_t ns_DEFEAT_COUNT = 8;
+  // 撃破の破片の飛ぶ方向。上へ向かって、水平に8方向へ散らす。長さは正規化せず、速さの係数を掛けて、速度にする。
+  constexpr XMFLOAT3 ns_DEFEAT_DIRECTIONS[ns_DEFEAT_COUNT]{{1.0f,2.0f,0.0f},{-1.0f,2.0f,0.0f},{0.0f,2.0f,1.0f},{0.0f,2.0f,-1.0f},
+                                                           {0.7f,3.0f,0.7f},{-0.7f,3.0f,0.7f},{0.7f,3.0f,-0.7f},{-0.7f,3.0f,-0.7f}};
+  // 撃破の破片の速さの係数。方向に掛けて、速度（ワールド距離単位毎秒）にする。
+  constexpr float ns_DEFEAT_SPEED = 1.0f;
+  // 撃破の破片の粒の1辺の長さ。単位はワールド距離単位。
+  constexpr float ns_DEFEAT_SIZE = 0.15f;
+  // 撃破の破片が残る時間。単位は秒。
+  constexpr float ns_DEFEAT_SECONDS = 0.4f;
+  // 撃破の破片の色。赤み。
+  constexpr XMFLOAT4 ns_DEFEAT_COLOR{0.9f,0.2f,0.2f,1.0f};
+
+  //========= ジャスト回避の広がり=========
+  // ジャスト回避の粒の数。
+  constexpr std::size_t ns_DODGE_COUNT = 4;
+  // ジャスト回避の粒の飛ぶ方向。水平に、前後左右の4方向。長さは1。
+  constexpr XMFLOAT3 ns_DODGE_DIRECTIONS[ns_DODGE_COUNT]{{1.0f,0.0f,0.0f},{-1.0f,0.0f,0.0f},{0.0f,0.0f,1.0f},{0.0f,0.0f,-1.0f}};
+  // ジャスト回避の粒の速さ。単位は、ワールド距離単位毎秒。
+  constexpr float ns_DODGE_SPEED = 3.0f;
+  // ジャスト回避の粒を出す位置の、プレイヤーの位置からの水平のずれ。視点に重なって、近いClip面で切れないための距離。単位はワールド距離単位。
+  constexpr float ns_DODGE_START_DISTANCE = 0.5f;
+  // ジャスト回避の粒を出す位置の、プレイヤーの位置からの高さのずれ。負の値で、視点より下へずらす。単位はワールド距離単位。
+  constexpr float ns_DODGE_OFFSET_Y = -0.6f;
+  // ジャスト回避の粒の1辺の長さ。単位はワールド距離単位。
+  constexpr float ns_DODGE_SIZE = 0.2f;
+  // ジャスト回避の粒が残る時間。単位は秒。
+  constexpr float ns_DODGE_SECONDS = 0.3f;
+  // ジャスト回避の粒の色。水色。
+  constexpr XMFLOAT4 ns_DODGE_COLOR{0.4f,0.8f,1.0f,1.0f};
 }
 
 //========= 初期化・終了関数=========
@@ -209,5 +244,45 @@ void EffectController::SpawnShotEffects(const WEAPON_UPDATE_RESULT& shotResult)
     if(!pellet.didHit)continue;
 
     SpawnHitSparks(pellet.rayHit.point);
+  }
+}
+
+// 倒された敵の演出を、まだ出していない敵ごとに、敵の位置から上へ散らして出す。
+void EffectController::SpawnDefeatEffects(EnemyManager& enemyManager)
+{
+  // 全ての粒に共通の、色・大きさ・残り時間を設定する。
+  EFFECT_SPAWN_PARAMS params{};
+  params.color = ns_DEFEAT_COLOR;
+  params.size = ns_DEFEAT_SIZE;
+  params.lifetimeSeconds = ns_DEFEAT_SECONDS;
+
+  // 全ての敵を先頭から調べ、倒された演出をまだ出していない敵だけ、敵の位置から、8方向へ破片を出す。
+  for(Enemy& enemy : enemyManager.GetEnemies()){
+    // 演出を出す対象でない敵は、次へ進む。出す対象の場合は、出した旨を、この呼出しの中で敵へ記録する。
+    if(!enemy.TakeDefeatEffectNotice())continue;
+
+    params.position = enemy.GetBodySphere().center;
+    for(const XMFLOAT3& direction : ns_DEFEAT_DIRECTIONS){
+      params.velocity = XMFLOAT3{direction.x * ns_DEFEAT_SPEED,direction.y * ns_DEFEAT_SPEED,direction.z * ns_DEFEAT_SPEED};
+      Spawn(params);
+    }
+  }
+}
+
+// ジャスト回避の演出を、プレイヤーの付近から、水平に4方向へ広げて出す。
+void EffectController::SpawnJustDodgeEffect(const XMFLOAT3& playerPosition)
+{
+  // 全ての粒に共通の、色・大きさ・残り時間を設定する。
+  EFFECT_SPAWN_PARAMS params{};
+  params.color = ns_DODGE_COLOR;
+  params.size = ns_DODGE_SIZE;
+  params.lifetimeSeconds = ns_DODGE_SECONDS;
+
+  // 前後左右の4方向へ、プレイヤーから少し離れた位置から、方向ごとの速度で、1個ずつ出す。
+  for(const XMFLOAT3& direction : ns_DODGE_DIRECTIONS){
+    params.position = XMFLOAT3{playerPosition.x + direction.x * ns_DODGE_START_DISTANCE,playerPosition.y + ns_DODGE_OFFSET_Y,
+      playerPosition.z + direction.z * ns_DODGE_START_DISTANCE};
+    params.velocity = XMFLOAT3{direction.x * ns_DODGE_SPEED,0.0f,direction.z * ns_DODGE_SPEED};
+    Spawn(params);
   }
 }

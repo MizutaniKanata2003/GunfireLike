@@ -42,6 +42,8 @@ struct ENEMY_ANIMATION_STATE
   float telegraphSeconds{};
   // 攻撃の突進の残り時間。単位は秒。0より大きい間は、突進中。StartAttackLungeで設定し、Updateで減らす。
   float lungeRemainingSeconds{};
+  // 倒された時の演出を、まだ出していないか。ApplyDamageで死亡した時にtrueになり、TakeDefeatEffectNoticeで取り出すとfalseへ戻る。Respawnでも、falseへ戻る。
+  bool hasPendingDefeatEffect{};
 };
 
 // 種類・HP・怯み・転倒を持ち、球のColliderで被弾を受ける敵1体。
@@ -75,6 +77,8 @@ public:
   // 攻撃の瞬間の突進を始める。向いている方向へ、一定時間、描画だけを前へ出して戻す。Colliderと攻撃の判定は変えない。
   // 死亡している場合は何もしない。すでに突進中の場合は、最初から数え直す。
   void StartAttackLunge();
+  // 倒された時の演出を、まだ出していない場合だけ、trueを返し、出す旨を記録する。同じ敵について、二度目以降はfalseを返す。生きている敵は、常にfalse。
+  [[nodiscard]] bool TakeDefeatEffectNotice();
   // 生きている場合だけ、Cubeで描画する。通常は種類の色、射撃のダメージの印が付いている間は紫、攻撃の予告中は黄、怯み中・転倒中は色を変え、転倒中は低く潰して描く。
   // 転倒中以外は、待機の揺れで高さを上下させ、攻撃の予告中は前へ傾け、怯み中は向きに対して横へ傾ける。突進中は、前へ出して戻す。
   // graphicsSystem: Rendererが使う描画基盤。

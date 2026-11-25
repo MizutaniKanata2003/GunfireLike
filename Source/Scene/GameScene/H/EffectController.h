@@ -2,7 +2,8 @@
 
 // 演出（小さなCubeの粒）を、固定長の配列で保持し、生成・更新・描画を担当する。
 // 粒は、位置・速度・色・大きさ・残り時間を持ち、時間とともに小さくなって消える。画像は使わず、単色のCubeで描く。配列が満杯の場合は、最も古い粒を置き換える。
-// 発砲のマズルフラッシュと、命中の火花は、場面の位置と方向、または射撃の結果を受け取って、粒の組合せとして生成する。どの場面で出すか（発砲・命中の検出）は担当せず、呼出側が、生成を求める。Cube Rendererは、共有Registryから借用し、所有しない。
+// 発砲のマズルフラッシュ・命中の火花・敵を倒した時の破片・ジャスト回避の広がりは、場面の位置と方向、または射撃・敵の状態を受け取って、粒の組合せとして生成する。
+// どの場面で出すか（発砲・命中・撃破・ジャスト回避の検出）は担当せず、呼出側が、生成を求める。Cube Rendererは、共有Registryから借用し、所有しない。
 
 //========= C++標準ライブラリ インクルード=========
 #include <array> // std::arrayで、演出の粒を、固定長で保持する。
@@ -13,6 +14,7 @@
 
 //========= 前方宣言=========
 class BasicMeshRenderer;
+class EnemyManager;
 class GraphicsSystem;
 class ModelRegistry;
 struct WEAPON_UPDATE_RESULT;
@@ -78,6 +80,12 @@ public:
   // 1回の発射の結果から、マズルフラッシュ1個と、命中した弾ごとの火花を出す。マズルフラッシュは、先頭の弾の始点と方向を使う。
   // shotResult: 発射の結果。発射していない結果や、弾が0個の結果の場合は、何も出さない。
   void SpawnShotEffects(const WEAPON_UPDATE_RESULT& shotResult);
+  // 倒された敵の演出を、まだ出していない敵ごとに、敵の位置から上へ散る赤みの粒として、複数個出す。出した敵は、出した旨を敵へ記録し、同じ敵の演出を二度出さない。
+  // enemyManager: 敵の枠の取得元。参照は保持しない。
+  void SpawnDefeatEffects(EnemyManager& enemyManager);
+  // ジャスト回避の演出を、プレイヤーの付近から、水平に4方向へ広がる水色の粒として出す。
+  // playerPosition: プレイヤーのワールド座標。
+  void SpawnJustDodgeEffect(const XMFLOAT3& playerPosition);
 
 private:
   //========= 粒の状態=========

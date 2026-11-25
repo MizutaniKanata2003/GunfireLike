@@ -247,6 +247,17 @@ void Enemy::StartAttackLunge()
   m_animation.lungeRemainingSeconds = ENEMY_ANIMATION::ns_ATTACK_LUNGE_SECONDS;
 }
 
+// 倒された時の演出を、まだ出していない場合だけ、trueを返し、出す旨を記録する。
+bool Enemy::TakeDefeatEffectNotice()
+{
+  // 生きている敵と、演出をすでに出した敵は、出す対象ではない。
+  if(m_isAlive || !m_animation.hasPendingDefeatEffect)return false;
+
+  // 出す旨を記録して、同じ敵の演出を二度出さない。
+  m_animation.hasPendingDefeatEffect = false;
+  return true;
+}
+
 // 生きている間だけ、Cubeを描く。
 void Enemy::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix) const
 {
@@ -302,9 +313,10 @@ bool Enemy::ApplyDamage(float damage,CollisionWorld& collisionWorld,float flinch
   // HPが残っていれば、死亡せずに戻る。
   if(m_currentHP > 0.0f)return false;
 
-  // HPが0以下になったため、Colliderを解除して死亡にする。以後の弾は、この敵を通り抜ける。
+  // HPが0以下になったため、Colliderを解除して死亡にする。以後の弾は、この敵を通り抜ける。倒された時の演出を、出す対象として記録する。
   m_currentHP = 0.0f;
   m_isAlive = false;
+  m_animation.hasPendingDefeatEffect = true;
   collisionWorld.Remove(m_colliderHandle);
   m_colliderHandle = COLLIDER_HANDLE::ns_INVALID;
   return true;
@@ -349,6 +361,7 @@ void Enemy::Respawn(CollisionWorld& collisionWorld)
   m_isTelegraphing = false;
   m_animation.telegraphSeconds = 0.0f;
   m_animation.lungeRemainingSeconds = 0.0f;
+  m_animation.hasPendingDefeatEffect = false;
 
   // 死亡中だった場合だけ、Colliderを同じ位置へ登録し直して生きている状態にする。生きている場合は二重登録しない。
   if(!m_isAlive){
