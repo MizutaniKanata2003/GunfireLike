@@ -233,6 +233,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Framework\2D\CPP\HudRenderer.cpp" />
     <ClCompile Include="Source\Framework\2D\CPP\HudTextRenderer.cpp" />
     <ClCompile Include="Source\Framework\3D\CPP\ObjModelRenderer.cpp" />
+    <ClCompile Include="Source\Framework\SceneParts\CPP\LoadingScreen.cpp" />
     <ClCompile Include="Source\Scene\Common\Enemy\CPP\AreaTelegraph.cpp" />
     <ClCompile Include="Source\Scene\Common\Enemy\CPP\BossController.cpp" />
     <ClCompile Include="Source\Scene\Common\Enemy\CPP\EnemyCorpseFader.cpp" />
@@ -326,6 +327,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\2D\H\HudRenderer.h" />
     <ClInclude Include="Source\Framework\2D\H\HudTextRenderer.h" />
     <ClInclude Include="Source\Framework\3D\H\ObjModelRenderer.h" />
+    <ClInclude Include="Source\Framework\SceneParts\H\LoadingScreen.h" />
     <ClInclude Include="Source\Scene\Common\Combat\H\FlinchJudge.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\AreaTelegraph.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\BossController.h" />
