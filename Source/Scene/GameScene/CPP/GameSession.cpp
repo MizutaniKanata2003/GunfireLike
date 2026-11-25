@@ -62,20 +62,37 @@ void GameSession::Initialize()
   m_runController.Initialize();
 }
 
-// 描画Resourceと生成Objectの準備に成功した後にだけ、ゲーム操作とBGMへ切り替える。
-bool GameSession::Init()
+// 初期化の工程を、番号の順に1つ実行する。
+bool GameSession::RunInitStep(int stepIndex)
 {
-  // 描画Resource・各Controllerの参照・第1部屋の敵を、この順に準備する。順序は、後の対象が前の対象の参照を借用するため変えない。
-  // どれかが失敗したら、生成済みのResourceを含めてFinalizeで終了して、呼出側へ失敗を返す。Captureと再生は変更しない。
-  if(!InitRenderResources() || !InitEnemyController() || !InitPlayerAndDebug() || !TrySpawnCurrentWave()){
-    Finalize();
-    return false;
-  }
+  // 工程ごとに、対応する初期化を呼ぶ。順序は、後の対象が前の対象の参照を借用するため変えない。範囲外の番号は、失敗として扱う。
+  switch(stepIndex){
+    // 描画Resourceと、ステージの生成Objectを用意する。
+  case 0:
+  return InitRenderResources();
 
-  // Resource生成とObject生成が成功してからCaptureとBGMを変更し、false返却時には変更しない。
+  // 敵の更新へ参照を渡し、敵のモデルとアニメーションを読み込む。最も時間がかかる。
+  case 1:
+  return InitEnemyController();
+
+  // プレイヤー側・ショップ・報酬とショップの入力の受渡し・デバッグ操作へ、参照を渡す。
+  case 2:
+  return InitPlayerAndDebug();
+
+  // 第1部屋の敵を生成する。
+  case 3:
+  return TrySpawnCurrentWave();
+
+  default:
+  return false;
+  }
+}
+
+// 全ての工程が成功した後にだけ、ゲーム操作とBGMへ切り替える。
+void GameSession::StartPlay()
+{
   m_inputSystem.SetMouseCaptureEnabled(true);
   m_audioSystem.PlayGameBgm();
-  return true;
 }
 
 // F2・F1・F4の入力を先に処理し、操作可能な場合だけ視点・移動・戦闘を更新する。
