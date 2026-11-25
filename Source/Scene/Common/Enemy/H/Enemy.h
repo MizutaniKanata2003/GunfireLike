@@ -34,7 +34,7 @@ struct ENEMY_INIT_PARAMS
   std::uint32_t enemyId{};
 };
 
-// 敵1体の簡易アニメーション（待機の揺れ・怯みの傾き・予告の前傾・攻撃の突進）と、向きの追従の状態。Enemyのメンバー変数の数を抑えるため、1つにまとめる。
+// 敵1体の簡易アニメーション（待機の揺れ・怯みの傾き・予告の前傾・攻撃の突進）と、向きの追従と、怯みの耐性の状態。Enemyのメンバー変数の数を抑えるため、1つにまとめる。
 struct ENEMY_ANIMATION_STATE
 {
   // 待機の揺れの位相。単位は周期の数で、0以上1未満。Updateで進める。同時に生成した敵が揃って揺れないよう、Initializeで敵の識別値から初期値を決める。
@@ -47,6 +47,10 @@ struct ENEMY_ANIMATION_STATE
   float lungeRemainingSeconds{};
   // 向きの目標。単位はラジアン。0が+Z、πが-Z。SetFacingが設定し、Updateが、旋回の速さの上限で、この向きへ近づける。
   float targetYaw{};
+  // プレイヤーとの水平距離。単位はワールド距離単位。SetFacingが毎回記録し、敵がプレイヤーに発覚しているかの判定に使う。向きの目標が設定されるまでは0（発覚している）。
+  float playerDistance{};
+  // 怯みの耐性の残り時間。単位は秒。怯みが終わった時に設定し、Updateで減らす。0より大きい間は、射撃で、続けて怯まない。
+  float flinchImmuneRemainingSeconds{};
   // 向きの目標を、すでに設定したか。最初の1回は、旋回の途中の姿を見せず、そのまま向ける。
   bool hasFacingTarget{};
   // 倒された時の演出を、まだ出していないか。ApplyDamageで死亡した時にtrueになり、TakeDefeatEffectNoticeで取り出すとfalseへ戻る。Respawnでも、falseへ戻る。
@@ -89,7 +93,7 @@ public:
   void StartAttackLunge();
   // 倒された時の演出を、まだ出していない場合だけ、trueを返し、出す旨を記録する。同じ敵について、二度目以降はfalseを返す。生きている敵は、常にfalse。
   [[nodiscard]] bool TakeDefeatEffectNotice();
-  // 生きている場合は、モデルで描く（待機・移動・攻撃・怯み・転倒・起き上がりの動き）。モデルがない種類や、読み込めなかった場合は、Cubeで描く。死亡後は、死亡の動きが終わり、保持の時間が過ぎるまで、モデルだけを描く。
+  // 生きている場合は、モデルで描く（待機・移動・攻撃・怯み・転倒・起き上がりの動き）。モデルがない種類や、読み込めなかった場合は、Cubeで描く。死亡後は、死亡の動きが終わり、保持の時間が過ぎてから、徐々に消えるまで、モデルだけを描く。
   // 色は、通常は白（モデルの画像の色）、射撃のダメージの印が付いている間は紫、攻撃の予告中は黄、怯み中は橙、転倒中は青みがかった灰色で、画像の色へ乗算する。Cubeの描画では、転倒中に低く潰し、待機の揺れ・前傾・怯みの傾き・突進を加える。
   // graphicsSystem: Rendererが使う描画基盤。
   // viewMatrix: World空間からView空間への変換行列。
@@ -97,12 +101,13 @@ public:
   void Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix) const;
 
   //========= 戦闘関数=========
-  // ダメージを受け、HPを減らして怯ませる。HPが0以下になったらColliderを解除して死亡にする。
+  // ダメージを受け、HPを減らし、怯ませる場合は怯ませる。HPが0以下になったらColliderを解除して死亡にする。
   // damage: 受けるダメージ。正の値。
   // collisionWorld: Initializeで渡したのと同じCollisionWorld。死亡時にColliderを解除する。
   // flinchScale: 怯みの時間に掛ける倍率。1.0で通常。特殊強化（制圧射撃）で、射撃の怯みを伸ばす時に1.0より大きい値を渡す。正の値であること。省略すると1.0。
+  // shouldFlinch: 怯ませるか。射撃は、確率で決めた結果を渡す。省略するとtrueで、蹴り・殴打などの近接攻撃は、これまでどおり、必ず怯ませる。
   // 戻り値: このダメージで死亡したらtrue。すでに死亡している場合はダメージを受けずfalse。
-  bool ApplyDamage(float damage,CollisionWorld& collisionWorld,float flinchScale = 1.0f);
+  bool ApplyDamage(float damage,CollisionWorld& collisionWorld,float flinchScale = 1.0f,bool shouldFlinch = true);
   // 転倒させる。転倒中は怯みも解除され、蹴りの対象にならない。すでに転倒中、死亡している、または範囲攻撃型（転倒しない種類）の場合は何もしない。
   // 戻り値: 新しく転倒させたらtrue。何もしなかった場合はfalse。
   bool ApplyKnockdown();
@@ -122,6 +127,8 @@ public:
   [[nodiscard]] bool IsAlive() const { return m_isAlive; }
   // 怯み中かを返す。怯みは被弾から一定時間続く。
   [[nodiscard]] bool IsFlinching() const { return m_flinchRemainingSeconds > 0.0f; }
+  // 怯みの耐性中かを返す。怯みが終わった後の短い間は、射撃で、続けて怯まない。
+  [[nodiscard]] bool IsFlinchImmune() const { return m_animation.flinchImmuneRemainingSeconds > 0.0f; }
   // 転倒中かを返す。転倒は一定時間続き、その間は蹴れない。
   [[nodiscard]] bool IsKnockedDown() const { return m_knockdownRemainingSeconds > 0.0f; }
   // 攻撃の予告中の表示になっているかを返す。
@@ -140,18 +147,19 @@ public:
   [[nodiscard]] std::uint32_t GetEnemyId() const { return m_enemyId; }
   // 敵の体の当たりを表す球を返す。中心は敵の位置、半径は種類の表の値でColliderと同じ。
   [[nodiscard]] COLLISION_SPHERE GetBodySphere() const;
+  // 追従の移動速度を返す。モデルの歩きの動きから測った、足が地面を滑らない速度で、動きの位相によって変わる。モデルを使えない時は、既定の速度を返す。
+  // fallbackSpeed: モデルがない時に返す、既定の速度。単位はワールド距離単位/秒。
+  [[nodiscard]] float GetModelMoveSpeed(float fallbackSpeed) const { return m_playback.GetMoveSpeed(BuildPlaybackState(XMFLOAT4{1.0f,1.0f,1.0f,1.0f}),fallbackSpeed); }
   // 倒された敵（初期化済みで、死亡している枠）かを返す。未使用の枠（Uninit済み）は、false。ウェーブの切替で、死体を預ける対象を選ぶために使う。
   [[nodiscard]] bool IsCorpse() const { return !m_isAlive && m_cubeRenderer != nullptr; }
   // モデルの動きの状態を返す。倒された敵の死体を、預けるために使う。
   [[nodiscard]] const EnemyModelPlayback& GetPlayback() const { return m_playback; }
   // モデルの動きの選択と描画に使う、敵の現在の状態を返す。色は白。
   [[nodiscard]] ENEMY_PLAYBACK_STATE GetPlaybackState() const { return BuildPlaybackState(XMFLOAT4{1.0f,1.0f,1.0f,1.0f}); }
-  // 追従の移動速度を返す。モデルの歩きの動きから測った、足が地面を滑らない速度で、動きの位相によって変わる。モデルを使えない時は、既定の速度を返す。
-  // fallbackSpeed: モデルがない時に返す、既定の速度。単位はワールド距離単位/秒。
-  [[nodiscard]] float GetModelMoveSpeed(float fallbackSpeed) const { return m_playback.GetMoveSpeed(BuildPlaybackState(XMFLOAT4{1.0f,1.0f,1.0f,1.0f}),fallbackSpeed); }
+
 private:
   //========= 更新の補助関数=========
-  // 怯み・転倒・射撃のダメージの印の残り時間を減らし、0未満にならないようにする。
+  // 怯み・転倒・射撃のダメージの印の残り時間を減らし、怯みが終わった時に、怯みの耐性を始める。
   // deltaTime: この更新で進める経過時間。単位は秒。
   void UpdateStatusTimers(float deltaTime);
   // 向きを、目標へ、旋回の速さの上限で近づける。目標が未設定、死亡中、転倒中は、何もしない。
@@ -184,7 +192,7 @@ private:
   bool m_isTelegraphing{};
 
   //========= アニメーション=========
-  // 待機の揺れの位相・怯みの傾きの向き・予告の経過時間・突進の残り時間・向きの目標。簡易アニメーションと向きの状態をまとめて保持する。
+  // 待機の揺れの位相・怯みの傾きの向き・予告の経過時間・突進の残り時間・向きの目標・怯みの耐性。簡易アニメーションと、向きと、怯みの耐性の状態をまとめて保持する。
   ENEMY_ANIMATION_STATE m_animation{};
   // モデルの動きの選択・時刻の進行・描画を担当する。共有の読込への参照は、SetModelLibraryで設定し、Uninit・Respawnでは変えない。
   EnemyModelPlayback m_playback{};

@@ -49,7 +49,7 @@ namespace ENEMY_ANIMATION
   // 動きの再生の速さの倍率。1.0が等倍。待機・移動・攻撃・死亡は、等倍。
   inline constexpr float ns_MODEL_SPEED_NORMAL = 1.0f;
   // 怯み（Hit、2.17秒）の再生の倍率。ゲーム側の怯みの時間（0.3秒）に対して長いため、速くする。仮値。
-  inline constexpr float ns_MODEL_SPEED_HIT = 3.0f;
+  inline constexpr float ns_MODEL_SPEED_HIT = 1.25f;
   // 転倒（Down、2.2秒）の再生の倍率。ゲーム側の転倒の時間（1.5秒）に、ほぼ合わせる。仮値。
   inline constexpr float ns_MODEL_SPEED_DOWN = 1.5f;
   // 起き上がり（GetUp、6.0秒）の再生の倍率。長いため、約2秒にする。仮値。

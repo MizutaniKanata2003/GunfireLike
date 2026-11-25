@@ -1,6 +1,6 @@
 ﻿#include "../H/ShotController.h"
 
-// 射撃の更新、武器の装備、弾道の終点の通知、命中した敵へのダメージと怯み（弾ごと。特殊強化の効果を含む）、命中表示の時間管理、発射の結果の保持と取り出しを実装する。
+// 射撃の更新、武器の装備、弾道の終点の通知、命中した敵へのダメージと怯み（弾ごと。怯みは確率で決め、特殊強化の効果を含む）、命中表示の時間管理、発射の結果の保持と取り出しを実装する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで、命中表示とダメージの増加の残り時間を0未満にしない。
@@ -17,13 +17,14 @@
 #include "Framework/Input/H/InputSystem.h"
 
 //========= Scene インクルード=========
+#include "Scene/Common/Combat/H/FlinchJudge.h"
 #include "Scene/Common/Combat/H/PlayerCombatController.h"
 #include "Scene/Common/Enemy/H/Enemy.h"
 #include "Scene/Common/Enemy/H/EnemyManager.h"
 #include "Scene/Common/Player/H/PlayerController.h"
 #include "Scene/Common/Weapon/H/WeaponTable.h"
 
-// 射撃の表示に使用する固定設定と、弾道の終点を求める補助関数をまとめる。
+// 射撃の表示に使用する固定設定と、弾道の終点・怯みの判定を求める補助関数をまとめる。
 namespace
 {
   //========= 射撃の表示設定=========
@@ -31,6 +32,10 @@ namespace
   constexpr float ns_SHOT_TRACE_DISPLAY_LENGTH = 30.0f;
   // 命中を示す表示を続ける時間。単位は秒。
   constexpr float ns_HIT_MARKER_SECONDS = 0.3f;
+
+  //========= 頭の判定=========
+  // 命中点が、敵の球の中心より、この高さ以上に高い場合を、頭に当たったとみなす。単位はワールド距離単位。専用のColliderを作らず、高さだけで決める仮値。
+  constexpr float ns_HEADSHOT_HEIGHT_OFFSET = 0.2f;
 
   //========= 弾道の補助関数=========
   // 弾1つの弾道の終点を求める。命中していれば命中点、していなければ弾の方向へ表示用の長さだけ進んだ点。
@@ -46,6 +51,20 @@ namespace
     const XMFLOAT3& direction = pellet.ray.direction;
     return XMFLOAT3{origin.x + direction.x * ns_SHOT_TRACE_DISPLAY_LENGTH,origin.y + direction.y * ns_SHOT_TRACE_DISPLAY_LENGTH,
       origin.z + direction.z * ns_SHOT_TRACE_DISPLAY_LENGTH};
+  }
+
+  //========= 怯みの補助関数=========
+  // 命中した弾で、敵が怯むかを、確率で決める。すでに怯んでいる敵と、怯みの耐性中の敵は、怯まない（怯みを延ばさず、続けて怯み続けないようにする）。
+  // enemy: 命中した敵。
+  // pellet: 命中した弾の結果。命中点の高さから、頭に当たったかを決める。
+  // damage: この弾が敵へ与えるダメージ。
+  // 戻り値: 怯むならtrue。
+  bool DecideShotFlinch(const Enemy& enemy,const SHOT_PELLET_RESULT& pellet,float damage)
+  {
+    if(enemy.IsFlinching() || enemy.IsFlinchImmune())return false;
+
+    const bool is_headshot = pellet.rayHit.point.y >= enemy.GetBodySphere().center.y + ns_HEADSHOT_HEIGHT_OFFSET;
+    return FLINCH_JUDGE::Roll(FLINCH_JUDGE::CalculateChance(damage,enemy.GetMaxHP(),is_headshot));
   }
 }
 
@@ -98,7 +117,7 @@ void ShotController::Reset()
 }
 
 //========= 更新関数=========
-// 射撃・リロードを更新し、敵へ命中していればダメージと怯みを与える。
+// 射撃・リロードを更新し、敵へ命中していればダメージを与え、確率で怯ませる。
 void ShotController::Update(float gameplayDeltaTime)
 {
   // ジャスト回避の後のダメージの増加の残り時間を進め、0未満にしない。このフレームの射撃にも、残りがあれば反映する。
@@ -119,7 +138,7 @@ void ShotController::Update(float gameplayDeltaTime)
   m_collisionDebugView->NotifyShot(GetShotTraceEnd(weapon_result.pellets[0]));
 
   // 弾ごとに、敵レイヤーへ命中した場合だけ、ダメージを与える。ダメージは、使用中の武器の弾1つあたりの値（強化を含む）に、
-  // ジャスト回避の後の増加（回避反撃）と、敵に付いた印（殴打追撃）の倍率を掛ける。怯み時間は、制圧射撃の倍率を掛ける。
+  // ジャスト回避の後の増加（回避反撃）と、敵に付いた印（殴打追撃）の倍率を掛ける。怯みは、ダメージの割合と、頭に当たったかから決めた確率で起こし、怯み時間は、制圧射撃の倍率を掛ける。
   // 全ての弾は、ダメージを与える前に判定済みで、先に倒した敵への弾は、生存中の敵として見つからず、何もしない。
   const float boost_scale = IsDamageBoostActive() ? m_damageBoostScale : 1.0f;
   for(int pellet_index = 0; pellet_index < weapon_result.pelletCount; ++pellet_index){
@@ -131,8 +150,11 @@ void ShotController::Update(float gameplayDeltaTime)
     Enemy* const hit_enemy = m_enemyManager->FindLivingEnemy(pellet.hitInfo.userData);
     if(hit_enemy == nullptr)continue;
 
+    // ダメージを決め、怯むかを確率で判定してから、敵へ反映する。
     const float weapon_damage = m_weaponSystem.GetWeaponData().damage * boost_scale * hit_enemy->GetShotDamageScale();
-    hit_enemy->ApplyDamage(m_playerCombat->GetAttackDamage(weapon_damage,*hit_enemy),*m_collisionWorld,m_flinchScale);
+    const float damage = m_playerCombat->GetAttackDamage(weapon_damage,*hit_enemy);
+    const bool should_flinch = DecideShotFlinch(*hit_enemy,pellet,damage);
+    hit_enemy->ApplyDamage(damage,*m_collisionWorld,m_flinchScale,should_flinch);
     m_hitMarkerRemainingSeconds = ns_HIT_MARKER_SECONDS;
   }
 }

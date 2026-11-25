@@ -1,12 +1,12 @@
 ﻿#include "../H/Enemy.h"
 
-// 敵1体のHP・怯み・転倒・射撃のダメージの印・向き・Collider登録・表示（モデルでの描画、読み込めない時のCube表示）を実装する。
+// 敵1体のHP・怯み（確率で起こした怯みと、怯みの耐性）・転倒・射撃のダメージの印・向き・プレイヤーとの距離・Collider登録・表示（モデルでの描画、読み込めない時のCube表示）を実装する。
 // 種類ごとのHP・当たり・大きさ・色はEnemyTableから、Cubeの簡易アニメーションの数値はEnemyAnimationTableから読み、怯みと転倒の時間・旋回の速さ・状態の色は、このファイルの定数にまとめた仮値。
 // モデルの動きの選択と描画は、EnemyModelPlaybackへ任せる。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::minで、怯みの傾きと予告の前傾の強さを1以下に制限し、std::clampで、1回の更新の旋回の角度を制限する。
-#include <cmath> // std::atan2で敵から目標への水平方向をY軸まわりの回転角へ変換し、std::sin・std::cosで待機の揺れ・突進の動き・正面方向を求め、std::floorで揺れの位相を0以上1未満へ戻し、std::remainderで角度の差を-π〜πへ整える。
+#include <cmath> // std::atan2で敵から目標への水平方向をY軸まわりの回転角へ変換し、std::sqrtでプレイヤーとの水平距離を求め、std::sin・std::cosで待機の揺れ・突進の動き・正面方向を求め、std::floorで揺れの位相を0以上1未満へ戻し、std::remainderで角度の差を-π〜πへ整える。
 
 //========= Framework インクルード=========
 #include "Framework/3D/H/BasicMeshRenderer.h"
@@ -23,8 +23,10 @@
 namespace
 {
   //========= 戦闘の仮値=========
-  // 被弾後に怯む時間。単位は秒。企画書では「命中時に敵によって怯む」とだけ定められており、具体値は未確定の仮値。
-  constexpr float ns_FLINCH_SECONDS = 0.3f;
+  // 被弾後に怯む時間。単位は秒。企画書では「命中時に敵によって怯む」とだけ定められており、具体値は未確定の仮値。射撃の怯みは確率で起こすため、短くした。
+  constexpr float ns_FLINCH_SECONDS = 0.6f;
+  // 怯みが終わってから、射撃で続けて怯まない時間。単位は秒。怯み続けて、動けなくならないようにする仮値。
+  constexpr float ns_FLINCH_IMMUNE_SECONDS = 0.5f;
   // 転倒している時間。単位は秒。企画書で未確定の仮値。
   constexpr float ns_KNOCKDOWN_SECONDS = 1.5f;
 
@@ -134,13 +136,13 @@ bool Enemy::Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,co
   m_isAlive = true;
   m_colliderHandle = collisionWorld.AddSphere(COLLISION_SPHERE{initParams.position,params.colliderRadius},COLLISION_LAYER::ns_ENEMY,initParams.enemyId);
 
-  // 簡易アニメーションと向きの状態を初期値へ戻す。待機の揺れの位相の初期値は、敵の識別値から決め、同時に生成した敵が揃って揺れないよう、1周を等分した位置へずらす。
+  // 簡易アニメーションと向きと怯みの耐性の状態を初期値へ戻す。待機の揺れの位相の初期値は、敵の識別値から決め、同時に生成した敵が揃って揺れないよう、1周を等分した位置へずらす。
   m_animation = ENEMY_ANIMATION_STATE{};
   const std::uint32_t phase_step = initParams.enemyId % ENEMY_ANIMATION::ns_IDLE_PHASE_STEP_COUNT;
   m_animation.idleBobPhase = static_cast<float>(phase_step) / static_cast<float>(ENEMY_ANIMATION::ns_IDLE_PHASE_STEP_COUNT);
 
-  // モデルの動きを、待機の最初へ戻す。待機の動きの開始位置は、揺れの位相と同じ段数で、敵ごとにずらし、同時に生成した敵が揃って動かないようにする。
-  m_playback.Reset(m_position,static_cast<float>(phase_step) * ENEMY_ANIMATION::ns_MODEL_IDLE_STEP_SECONDS);
+  // モデルの動きを、移動の最初へ戻す。出現した敵は、待機せず、すぐに歩く。動きの開始位置は、揺れの位相と同じ段数で、敵ごとにずらし、同時に生成した敵が揃って動かないようにする。
+  m_playback.Reset(static_cast<float>(phase_step) * ENEMY_ANIMATION::ns_MODEL_IDLE_STEP_SECONDS);
   return true;
 }
 
@@ -204,17 +206,20 @@ bool Enemy::TryMoveTo(const XMFLOAT3& targetPosition,CollisionWorld& collisionWo
   return true;
 }
 
-// 目標の方へ向ける、向きの目標を設定する。
+// 目標の方へ向ける、向きの目標を設定し、目標との水平距離を記録する。
 void Enemy::SetFacing(const XMFLOAT3& targetPosition)
 {
   // 死亡中は描画されず、転倒中は倒れたまま向きを変えないため、更新しない。
   if(!m_isAlive || IsKnockedDown())return;
 
-  // 敵の位置から目標までの水平方向の差を求める。高さは使わない。
+  // 敵の位置から目標までの水平方向の差を求める。高さは使わない。距離は、プレイヤーに発覚しているかの判定のために、記録する。
   const float offset_x = targetPosition.x - m_position.x;
   const float offset_z = targetPosition.z - m_position.z;
+  const float distance_squared = offset_x * offset_x + offset_z * offset_z;
+  m_animation.playerDistance = std::sqrt(distance_squared);
+
   // 水平距離がほぼ0の場合は、向きが定まらず、わずかな位置の違いで向きが急に変わってしまうため、直前の目標を保つ。
-  if(offset_x * offset_x + offset_z * offset_z <= ns_FACING_MIN_DISTANCE_SQUARED)return;
+  if(distance_squared <= ns_FACING_MIN_DISTANCE_SQUARED)return;
 
   // +Z方向を基準に、Y軸まわりの回転角を求める。atan2(X成分,Z成分)は、回転後の+Z方向が目標の方を向く角度（ラジアン）になる。
   m_animation.targetYaw = std::atan2(offset_x,offset_z);
@@ -271,20 +276,22 @@ void Enemy::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const
 }
 
 //========= 戦闘関数=========
-// ダメージを受けてHPを減らし、怯ませ、0以下なら死亡させる。
-bool Enemy::ApplyDamage(float damage,CollisionWorld& collisionWorld,float flinchScale)
+// ダメージを受けてHPを減らし、怯ませる場合は怯ませ、0以下なら死亡させる。
+bool Enemy::ApplyDamage(float damage,CollisionWorld& collisionWorld,float flinchScale,bool shouldFlinch)
 {
   // すでに死亡している場合は、ダメージも怯みも与えずfalseを返す。
   if(!m_isAlive)return false;
 
-  // 怯みが始まる被弾の時だけ、傾きの向きを反転する。連射で怯みが続く間は向きを変えず、傾きが左右に細かく振れるのを避ける。
-  if(m_flinchRemainingSeconds <= 0.0f){
-    m_animation.flinchTiltSign = -m_animation.flinchTiltSign;
-  }
-
-  // HPを減らし、怯みの時間を、倍率を掛けた長さで最初から数え直す。
+  // HPを減らす。
   m_currentHP -= damage;
-  m_flinchRemainingSeconds = ns_FLINCH_SECONDS * flinchScale;
+
+  // 怯ませる場合だけ、怯みの時間を、倍率を掛けた長さで最初から数え直す。怯みが始まる被弾の時だけ、傾きの向きを反転し、続けて怯む間は向きを変えず、傾きが左右に細かく振れるのを避ける。
+  if(shouldFlinch){
+    if(m_flinchRemainingSeconds <= 0.0f){
+      m_animation.flinchTiltSign = -m_animation.flinchTiltSign;
+    }
+    m_flinchRemainingSeconds = ns_FLINCH_SECONDS * flinchScale;
+  }
 
   // HPが残っていれば、死亡せずに戻る。
   if(m_currentHP > 0.0f)return false;
@@ -330,7 +337,7 @@ void Enemy::Respawn(CollisionWorld& collisionWorld)
   // 未初期化（Rendererを借用していない）の場合は、生き返らせる対象がないため戻る。
   if(m_cubeRenderer == nullptr)return;
 
-  // HPを満タンにして、怯みと転倒と射撃のダメージの印と、攻撃の予告の表示と、予告の前傾・攻撃の突進を解除する。
+  // HPを満タンにして、怯みと怯みの耐性と転倒と射撃のダメージの印と、攻撃の予告の表示と、予告の前傾・攻撃の突進を解除する。
   const ENEMY_PARAMS& params = ENEMY_TABLE::GetParams(m_kind);
   m_currentHP = params.maxHP;
   m_flinchRemainingSeconds = 0.0f;
@@ -340,8 +347,9 @@ void Enemy::Respawn(CollisionWorld& collisionWorld)
   m_isTelegraphing = false;
   m_animation.telegraphSeconds = 0.0f;
   m_animation.lungeRemainingSeconds = 0.0f;
+  m_animation.flinchImmuneRemainingSeconds = 0.0f;
   m_animation.hasPendingDefeatEffect = false;
-  m_playback.Reset(m_position,0.0f);
+  m_playback.Reset(0.0f);
 
   // 死亡中だった場合だけ、Colliderを同じ位置へ登録し直して生きている状態にする。生きている場合は二重登録しない。
   if(!m_isAlive){
@@ -364,11 +372,20 @@ COLLISION_SPHERE Enemy::GetBodySphere() const
 }
 
 //========= 更新の補助関数=========
-// 怯み・転倒・射撃のダメージの印の残り時間を減らす。
+// 怯み・転倒・射撃のダメージの印の残り時間を減らし、怯みが終わった時に、怯みの耐性を始める。
 void Enemy::UpdateStatusTimers(float deltaTime)
 {
-  // それぞれ、残り時間がある間だけ減らし、0未満にならないようにする。
+  // 怯みの残り時間を減らす。怯みが、この更新で終わった時だけ、怯みの耐性を始め、それ以外では、耐性の残り時間を減らす。
+  const bool was_flinching = IsFlinching();
   m_flinchRemainingSeconds = CountDown(m_flinchRemainingSeconds,deltaTime);
+  if(was_flinching && !IsFlinching()){
+    m_animation.flinchImmuneRemainingSeconds = ns_FLINCH_IMMUNE_SECONDS;
+  }
+  else{
+    m_animation.flinchImmuneRemainingSeconds = CountDown(m_animation.flinchImmuneRemainingSeconds,deltaTime);
+  }
+
+  // 転倒と、射撃のダメージの印の残り時間を、残り時間がある間だけ減らし、0未満にならないようにする。
   m_knockdownRemainingSeconds = CountDown(m_knockdownRemainingSeconds,deltaTime);
   m_shotDamageMarkRemainingSeconds = CountDown(m_shotDamageMarkRemainingSeconds,deltaTime);
 }
@@ -418,6 +435,7 @@ ENEMY_PLAYBACK_STATE Enemy::BuildPlaybackState(const XMFLOAT4& color) const
   state.enemyId = m_enemyId;
   state.position = m_position;
   state.yawRadians = m_transform.GetRotation().y;
+  state.playerDistance = m_animation.playerDistance;
   state.isAlive = m_isAlive;
   state.isFlinching = IsFlinching();
   state.isKnockedDown = IsKnockedDown();

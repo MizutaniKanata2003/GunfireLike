@@ -1,6 +1,6 @@
 ﻿#include "../H/EnemyModelPlayback.h"
 
-// 敵1体のモデルの動きの選択・時刻の進行・動きの切替の補間・移動速度・描画を実装する。数値は、EnemyAnimationTableと、このファイルの定数にまとめた仮値。
+// 敵1体のモデルの動きの選択（発覚しているかによる、待機と移動の切替を含む）・時刻の進行・動きの切替の補間・移動速度・描画を実装する。数値は、EnemyAnimationTableと、このファイルの定数にまとめた仮値。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::clampで、死亡の動きの進行の割合と、補間の割合と、死体の透明度を0〜1へ制限し、std::maxで、移動速度の下限を守る。
@@ -8,16 +8,18 @@
 //========= Scene インクルード=========
 #include "Scene/Common/Enemy/H/EnemyAnimationTable.h"
 
-// 動きの切替と、移動速度、死亡時の高さの補正と、死体のフェードの数値をまとめる。見た目を確認して、調整する仮値。
+// 動きの切替と、発覚、移動速度、死亡時の高さの補正と、死体のフェードの数値をまとめる。見た目を確認して、調整する仮値。
 namespace
 {
+  //========= 発覚=========
+  // プレイヤーに発覚する距離。単位はワールド距離単位。この距離の内にいる間は、移動の動きを再生する。現在のフィールドは狭いため、常に発覚する大きさにした。将来、広いフィールドで、遠くの敵を待機にする時に、小さくする。仮値。
+  constexpr float ns_ALERT_DISTANCE = 40.0f;
+  // 発覚が解除される距離。単位はワールド距離単位。発覚する距離より大きくし、境目で、待機と移動が入れ替わり続けないようにする。仮値。
+  constexpr float ns_LOSE_ALERT_DISTANCE = 50.0f;
+
   //========= 動きの切替=========
   // 待機と移動の切替を行わない、最短の時間。単位は秒。この時間より前に、待機と移動が入れ替わっても、現在の動きを保つ。
   constexpr float ns_LOCOMOTION_MIN_HOLD_SECONDS = 0.25f;
-  // 移動中と判定する、水平の速さの閾値（止まっている状態から）。単位はワールド距離単位/秒。
-  constexpr float ns_MOVE_START_SPEED = 0.5f;
-  // 止まったと判定する、水平の速さの閾値（移動中の状態から）。開始の閾値より小さくし、境目で判定が入れ替わらないようにする。単位はワールド距離単位/秒。
-  constexpr float ns_MOVE_STOP_SPEED = 0.2f;
 
   //========= 歩きと移動速度=========
   // 歩きの動きの、再生の速さの倍率。足の運びが速くなり、足の速度の表から求めた移動速度も、同じ倍率で速くなるため、足は滑らない。1.0で、動きの本来の速さ（平均0.35程度で、遅い）。仮値。
@@ -123,15 +125,14 @@ namespace
 }
 
 //========= 設定・初期化関数=========
-// 動きの状態を、待機の最初へ戻し、補間を止める。
-void EnemyModelPlayback::Reset(const XMFLOAT3& position,float idleStartSeconds)
+// 動きの状態を、発覚している状態の、移動の動きの最初へ戻し、補間を止める。
+void EnemyModelPlayback::Reset(float startSeconds)
 {
-  m_clip = ENEMY_CLIP::e_IDLE;
-  m_clipTimeSeconds = idleStartSeconds;
+  m_clip = ENEMY_CLIP::e_WALK;
+  m_clipTimeSeconds = startSeconds;
   m_clipHoldSeconds = 0.0f;
   m_blend = ENEMY_CLIP_BLEND{};
-  m_lastPosition = position;
-  m_isMoving = false;
+  m_isAlert = true;
   m_wasTelegraphing = false;
 }
 
@@ -152,8 +153,8 @@ void EnemyModelPlayback::Update(const ENEMY_PLAYBACK_STATE& state,float deltaTim
   ENEMY_APPEARANCE appearance{};
   if(!EnemyModelLibrary::TryGetAppearance(state.kind,state.enemyId,appearance) || !m_library->IsLoaded(appearance))return;
 
-  // 移動中かを更新し、予告が始まった更新を検出する。
-  UpdateMovingState(state.position,deltaTime);
+  // 発覚しているかを更新し、予告が始まった更新を検出する。
+  UpdateAlertState(state.playerDistance);
   const bool is_telegraph_start = state.isTelegraphing && !m_wasTelegraphing;
   m_wasTelegraphing = state.isTelegraphing;
 
@@ -204,6 +205,27 @@ bool EnemyModelPlayback::Draw(GraphicsSystem& graphicsSystem,const CAMERA_MATRIC
   return true;
 }
 
+// 足が地面を滑らない、追従の移動速度を返す。
+float EnemyModelPlayback::GetMoveSpeed(const ENEMY_PLAYBACK_STATE& state,float fallbackSpeed) const
+{
+  // 歩きの速度の表がない（共有の読込がない・見た目がない・読込済みでない・足のノードが見つからなかった）場合は、既定の速度を使う。
+  ENEMY_APPEARANCE appearance{};
+  float average_speed = 0.0f;
+  if(m_library == nullptr || !EnemyModelLibrary::TryGetAppearance(state.kind,state.enemyId,appearance) || !m_library->IsLoaded(appearance)
+     || !m_library->TryGetWalkSpeedAverage(appearance,average_speed))return fallbackSpeed;
+
+  // 歩きの動きの再生中は、動きの位相に対応する速度、それ以外（怯みの後など）は、平均の速度を使う。
+  float ground_speed = average_speed;
+  const SkinnedAnimationPlayer* walk_player = m_clip == ENEMY_CLIP::e_WALK ? m_library->FindPlayer(appearance,ENEMY_CLIP::e_WALK) : nullptr;
+  if(walk_player != nullptr && walk_player->GetDurationSeconds() > 0.0f){
+    const float phase = walk_player->NormalizeTime(m_clipTimeSeconds,true) / walk_player->GetDurationSeconds();
+    static_cast<void>(m_library->TryGetWalkSpeed(appearance,phase,ground_speed));
+  }
+
+  // 位相によって速度が0に近づいても止まったままにならないよう、平均に対する下限を守り、歩きの再生の倍率を掛ける。
+  return std::max(ground_speed,average_speed * ns_MIN_SPEED_RATIO) * GetClipSpeed(ENEMY_CLIP::e_WALK);
+}
+
 // 死体が、完全に消えたかを返す。
 bool EnemyModelPlayback::IsCorpseGone(const ENEMY_PLAYBACK_STATE& state) const
 {
@@ -220,40 +242,13 @@ bool EnemyModelPlayback::IsCorpseGone(const ENEMY_PLAYBACK_STATE& state) const
   return CalculateCorpseAlpha(m_clipTimeSeconds,player->GetDurationSeconds()) <= 0.0f;
 }
 
-// 足が地面を滑らない、追従の移動速度を返す。
-float EnemyModelPlayback::GetMoveSpeed(const ENEMY_PLAYBACK_STATE& state,float fallbackSpeed) const
-{
-  // 歩きの速度の表がない（共有の読込がない・見た目がない・読込済みでない・足のノードが見つからなかった）場合は、既定の速度を使う。
-  ENEMY_APPEARANCE appearance{};
-  float average_speed = 0.0f;
-  if(m_library == nullptr || !EnemyModelLibrary::TryGetAppearance(state.kind,state.enemyId,appearance) || !m_library->IsLoaded(appearance)
-     || !m_library->TryGetWalkSpeedAverage(appearance,average_speed))return fallbackSpeed;
-
-  // 歩きの動きの再生中は、動きの位相に対応する速度、それ以外（動き出す前など）は、平均の速度を使う。
-  float ground_speed = average_speed;
-  const SkinnedAnimationPlayer* walk_player = m_clip == ENEMY_CLIP::e_WALK ? m_library->FindPlayer(appearance,ENEMY_CLIP::e_WALK) : nullptr;
-  if(walk_player != nullptr && walk_player->GetDurationSeconds() > 0.0f){
-    const float phase = walk_player->NormalizeTime(m_clipTimeSeconds,true) / walk_player->GetDurationSeconds();
-    static_cast<void>(m_library->TryGetWalkSpeed(appearance,phase,ground_speed));
-  }
-
-  // 位相によって速度が0に近づいても止まったままにならないよう、平均に対する下限を守り、歩きの再生の倍率を掛ける。
-  return std::max(ground_speed,average_speed * ns_MIN_SPEED_RATIO) * GetClipSpeed(ENEMY_CLIP::e_WALK);
-}
-
 //========= 更新の補助関数=========
-// 移動中かを、開始と終了で別の閾値を使って更新する。
-void EnemyModelPlayback::UpdateMovingState(const XMFLOAT3& position,float deltaTime)
+// プレイヤーとの距離から、発覚しているかを、発覚する距離と解除される距離で別の閾値を使って更新する。
+void EnemyModelPlayback::UpdateAlertState(float playerDistance)
 {
-  // 前回の更新からの水平の移動の距離を、速さ（距離/時間）の二乗として求める。比較は二乗のまま行い、平方根を取らない。
-  const float move_x = position.x - m_lastPosition.x;
-  const float move_z = position.z - m_lastPosition.z;
-  const float speed_squared = (move_x * move_x + move_z * move_z) / (deltaTime * deltaTime);
-  m_lastPosition = position;
-
-  // 移動中の間は、低い閾値（止まったか）、止まっている間は、高い閾値（動き出したか）と比べる。境目の速さで、判定が毎フレーム入れ替わるのを防ぐ。
-  const float threshold_speed = m_isMoving ? ns_MOVE_STOP_SPEED : ns_MOVE_START_SPEED;
-  m_isMoving = speed_squared > threshold_speed * threshold_speed;
+  // 発覚している間は、遠い閾値（見失ったか）、していない間は、近い閾値（気づいたか）と比べる。境目の距離で、判定が毎フレーム入れ替わるのを防ぐ。
+  const float threshold_distance = m_isAlert ? ns_LOSE_ALERT_DISTANCE : ns_ALERT_DISTANCE;
+  m_isAlert = playerDistance <= threshold_distance;
 }
 
 // 状態から、再生する動きを選ぶ。
@@ -272,7 +267,8 @@ ENEMY_CLIP EnemyModelPlayback::ChooseClip(const ENEMY_PLAYBACK_STATE& state,bool
   if(state.isTelegraphing)return ENEMY_CLIP::e_ATTACK;
   if(m_clip == ENEMY_CLIP::e_ATTACK && !isClipFinished)return ENEMY_CLIP::e_ATTACK;
 
-  return m_isMoving ? ENEMY_CLIP::e_WALK : ENEMY_CLIP::e_IDLE;
+  // 発覚している間は、立ち止まっている間も含めて、移動の動きを再生する。発覚していない間だけ、待機を再生する。
+  return m_isAlert ? ENEMY_CLIP::e_WALK : ENEMY_CLIP::e_IDLE;
 }
 
 // 待機と移動の切替を、最短の保持の時間まで、見送る。

@@ -326,6 +326,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\2D\H\HudRenderer.h" />
     <ClInclude Include="Source\Framework\2D\H\HudTextRenderer.h" />
     <ClInclude Include="Source\Framework\3D\H\ObjModelRenderer.h" />
+    <ClInclude Include="Source\Scene\Common\Combat\H\FlinchJudge.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\AreaTelegraph.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\BossController.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\EnemyAnimationTable.h" />
