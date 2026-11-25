@@ -268,3 +268,4 @@ int WINAPI WinMain(HINSTANCE instance,HINSTANCE,LPSTR,int showCommand)
   CoUninitialize();
   return 0;
 }
+

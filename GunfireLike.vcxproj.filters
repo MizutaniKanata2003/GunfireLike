@@ -234,6 +234,9 @@
     <ClCompile Include="Source\Scene\GameScene\CPP\GameHudScreenEffect.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Framework\3D\CPP\SkinnedModelLoader.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Framework\Imgui\H\ImGuiManager.h">
@@ -549,6 +552,12 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Source\Scene\GameScene\H\GameHudScreenEffect.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\3D\H\SkinnedModelLoader.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\3D\H\SkinnedModelData.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>
