@@ -18,6 +18,7 @@
 #include "Scene/Common/Enemy/H/BossController.h"
 #include "Scene/Common/Enemy/H/EnemyManager.h"
 #include "Scene/Common/Enemy/H/EnemyProjectile.h"
+#include "Scene/Common/Enemy/H/EnemyModelLibrary.h"
 #include "Scene/Common/Enemy/H/EnemyWaveTable.h"
 
 //========= 前方宣言=========
@@ -47,6 +48,8 @@ struct ENEMY_CONTROLLER_LINKS
   ModelRegistry* modelRegistry{};
   // 敵のColliderの登録先と、移動の押し戻しに使うCollisionWorld。
   CollisionWorld* collisionWorld{};
+  // 敵のモデルとアニメーションの読込に使う描画基盤。Initialize済みであること。Initialize中だけ使い、保持しない。
+  GraphicsSystem* graphicsSystem{};
   // 位置・動作の状態・無敵・回避の経過時間の読み取り元となるプレイヤー。読み取りだけを行う。
   const PlayerController* playerController{};
   // 死亡の確認に使うプレイヤーのHP。読み取りだけを行う。
@@ -97,8 +100,15 @@ public:
   [[nodiscard]] EnemyManager& GetEnemyManager() { return m_enemyManager; }
   // 敵の所有者を、読み取り専用で返す。
   [[nodiscard]] const EnemyManager& GetEnemyManager() const { return m_enemyManager; }
+  // 敵のモデルとアニメーションの共有の読込を返す。描画で、再生部と描画部を取り出すために使う。戻り値の参照は、このControllerの寿命を超えて保持しない。
+  [[nodiscard]] EnemyModelLibrary& GetModelLibrary() { return m_modelLibrary; }
 
 private:
+  //========= 初期化の補助関数=========
+  // 敵のモデルとアニメーションを、全て読み込み、読込の時間をログへ出す。読み込めない場合は、警告を出し、Cubeで描画するよう、続ける。
+  // graphicsSystem: 描画部の生成に使うDeviceの取得元。参照は保持しない。
+  void InitModelLibrary(GraphicsSystem& graphicsSystem);
+
   //========= 更新の補助関数=========
   // 全枠の敵を出現順に、種類に応じて更新し、予告中の敵の表示を切り替える。
   // worldDeltaTime: 敵側の経過時間。単位は秒。
@@ -147,6 +157,8 @@ private:
   //========= 所有状態=========
   // 現在のウェーブの敵を所有する。Uninitで、登録先のCollisionWorldより先に解除する。
   EnemyManager m_enemyManager{};
+  // 敵の見た目ごとのモデルとアニメーションを、共有して所有する。GPU Resourceを持つため、Uninitで、共有Registryより先に解放する。
+  EnemyModelLibrary m_modelLibrary{};
   // 射撃型の敵が撃った、飛行中の弾。Cube Rendererを借用するため、Uninitで共有Registryより先に解除する。
   EnemyProjectileManager m_enemyProjectiles{};
   // 範囲攻撃型の敵とボスが予告中の、床の上の範囲。Cube Rendererを借用するため、Uninitで共有Registryより先に解除する。

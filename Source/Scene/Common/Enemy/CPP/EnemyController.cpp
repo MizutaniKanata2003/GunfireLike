@@ -3,6 +3,7 @@
 // 敵の種類別の更新（接近型の追従と近接、射撃型の距離維持と発射、範囲攻撃型の接近と範囲の予告・判定、ボスの攻撃結果の通知）、全ての敵の向き、敵の弾の更新、ウェーブの生成、敵側の描画を実装する。
 
 //========= C++標準ライブラリ インクルード=========
+#include <chrono> // std::chronoで、敵のモデルの読込にかかった時間を測る。
 #include <algorithm> // std::maxで、再攻撃待ちの残り時間を0未満にしない。
 #include <cmath> // std::sqrtで射撃型・範囲攻撃型とプレイヤーの水平距離を求め、std::fabsで範囲の中心からのずれの大きさを求める。
 #include <vector> // 敵の弾の判定結果を、std::vectorで受け取る。
@@ -42,7 +43,7 @@ bool EnemyController::Initialize(const ENEMY_CONTROLLER_LINKS& links)
 {
   // 参照先または通知先が1つでも欠けている場合は、以後の更新で空の参照を使ってしまうため、何も登録せず失敗を返す。
   if(links.modelRegistry == nullptr || links.collisionWorld == nullptr || links.playerController == nullptr ||
-     links.playerHealth == nullptr || !links.onAttackEvent){
+     links.playerHealth == nullptr || links.graphicsSystem == nullptr || !links.onAttackEvent){
     Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"EnemyControllerの参照先の登録に失敗しました。");
     return false;
   }
@@ -53,6 +54,9 @@ bool EnemyController::Initialize(const ENEMY_CONTROLLER_LINKS& links)
   m_playerController = links.playerController;
   m_playerHealth = links.playerHealth;
   m_onAttackEvent = links.onAttackEvent;
+
+  // 敵のモデルとアニメーションを読み込む。読み込めなくても、ゲームは続ける。
+  InitModelLibrary(*links.graphicsSystem);
 
   // 敵の弾の描画に使うCube Rendererを借用する。借用できなければ、失敗を返す。生成済みの部分は、呼出側のUninitで解放する。
   if(!m_enemyProjectiles.Initialize(*m_modelRegistry)){
@@ -88,6 +92,7 @@ void EnemyController::Uninit()
   m_bossController.Uninit();
   m_enemyProjectiles.Uninit();
   m_areaTelegraph.Uninit();
+  m_modelLibrary.Uninit();
   m_modelRegistry = nullptr;
   m_collisionWorld = nullptr;
   m_playerController = nullptr;
@@ -150,6 +155,23 @@ void EnemyController::DrawEnemies(GraphicsSystem& graphicsSystem,const XMMATRIX&
 
   // 敵の後に、飛行中の敵の弾を描画する。
   m_enemyProjectiles.Draw(graphicsSystem,viewMatrix,projectionMatrix);
+}
+
+//========= 初期化の補助関数=========
+// 敵のモデルとアニメーションを、全て読み込み、読込の時間をログへ出す。
+void EnemyController::InitModelLibrary(GraphicsSystem& graphicsSystem)
+{
+  // 読込にかかった時間を測る。
+  const auto start_time = std::chrono::steady_clock::now();
+  const bool is_loaded = m_modelLibrary.Initialize(graphicsSystem);
+  const long long elapsed_milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time).count();
+
+  // 読み込めなかった場合は、警告だけを出し、Cubeで描画する。失敗の理由は、各Loaderが記録している。
+  if(!is_loaded){
+    Logger::Write(e_LogLevel::e_WARNING,e_LogCategory::e_SCENE,L"EnemyControllerの敵のモデルの読込に失敗しました。Cubeで描画します。");
+    return;
+  }
+  Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,L"敵のモデルの読込時間: " + std::to_wstring(elapsed_milliseconds) + L" ms");
 }
 
 //========= 更新の補助関数=========

@@ -12,7 +12,8 @@
 //========= Scene インクルード=========
 #include "Scene/Common/Enemy/H/EnemyController.h"
 #include "Scene/Common/Stage/H/StageController.h"
-
+#include <windows.h>
+#include "Scene/Common/Enemy/H/EnemyModelLibrary.h"
 //========= 初期化・終了関数=========
 // 参照先を登録し、Collision可視化とHUDと演出を初期化する。
 bool GameRenderer::Initialize(GraphicsSystem& graphicsSystem,const GAME_RENDERER_LINKS& links)
@@ -72,6 +73,34 @@ void GameRenderer::DrawWorld(GraphicsSystem& graphicsSystem,const XMMATRIX& view
 
   // 敵と弾の後に、演出の粒を描画する。残っている粒がなければ、何も描かない。
   m_effectController.Draw(graphicsSystem,viewMatrix,projectionMatrix);
+
+  // 一時確認用。確認後に削除する。
+  {
+    static EnemyModelLibrary test_library;
+    static bool is_tried = false;
+    static bool is_ready = false;
+    if(!is_tried){
+      is_tried = true;
+      is_ready = test_library.Initialize(graphicsSystem);
+    }
+    if(is_ready){
+      const float test_time = static_cast<float>((GetTickCount64() % 1000000) / 1000.0);
+      const ENEMY_APPEARANCE test_appearances[]{ENEMY_APPEARANCE::e_MELEE_A,ENEMY_APPEARANCE::e_MELEE_B};
+      for(std::size_t test_index = 0; test_index < 2; ++test_index){
+        SkinnedAnimationPlayer* player = test_library.FindPlayer(test_appearances[test_index],ENEMY_CLIP::e_WALK);
+        SkinnedModelRenderer* renderer = test_library.FindRenderer(test_appearances[test_index]);
+        if(player == nullptr || renderer == nullptr)continue;
+
+        BoneMatrixArray bone_matrices;
+        player->Evaluate(player->NormalizeTime(test_time,true),bone_matrices);
+        SKINNED_DRAW_PARAMS draw_params{};
+        draw_params.worldMatrix = EnemyModelLibrary::BuildWorldMatrix(test_appearances[test_index],
+                                                                      XMFLOAT3{-1.5f + 3.0f * static_cast<float>(test_index),1.0f,5.0f},DirectX::XM_PI);
+        draw_params.boneMatrices = &bone_matrices;
+        renderer->Draw(graphicsSystem,CAMERA_MATRICES{viewMatrix,projectionMatrix},draw_params);
+      }
+    }
+  }
 
   // 演出の後に、表示中ならCollisionの線を重ねる。View行列とProjection行列は、1つの構造体にまとめて渡す。
   const CAMERA_MATRICES camera_matrices{viewMatrix,projectionMatrix};
