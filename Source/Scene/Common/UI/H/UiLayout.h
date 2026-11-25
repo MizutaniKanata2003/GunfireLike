@@ -45,6 +45,10 @@ namespace HUD_LAYOUT
   //========= 速度線=========
   // スライディング中に、画面全体へ重ねる、画面の縁へ向かう白い線。中央は透明。1280×720。
   inline constexpr UI_IMAGE_LAYOUT ns_SLIDE_LINES{L"Assets/Textures/UI/SlideLines.png",{0.0f,0.0f},{1280.0f,720.0f}};
+
+  //========= 被弾のフラッシュ=========
+  // 被弾した瞬間に、画面全体へ重ねる、縁が赤い画像。中央は透明。1280×720。
+  inline constexpr UI_IMAGE_LAYOUT ns_HIT_FLASH{L"Assets/Textures/UI/HitFlash.png",{0.0f,0.0f},{1280.0f,720.0f}};
 }
 
 // 報酬選択の画像の配置をまとめる。画像は、Assets/Textures/UI/へ置く。

@@ -190,8 +190,8 @@ void GameHud::DrawStatusSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_ST
   // 画像本来の色（白）で、全体を描く見た目の指定。低HP警告・HPバーの枠・弾薬の枠・通貨のアイコンで使い回す。
   const HUD_SPRITE_APPEARANCE white_appearance{GAME_HUD_STYLE::ns_WHITE,1.0f};
 
-  // 画面全体へ重ねる演出を描く。スライディング中は速度線、HPの割合が低HPの閾値以下なら低HP警告を、この順に描き、他のHUDがその上に重なるようにする。
-  m_screenEffect.DrawOverlays(graphicsSystem,state.isSliding,has_health && health_ratio <= ns_LOW_HP_RATIO);
+  // 画面全体へ重ねる演出を描く。スライディング中は速度線、HPが減った直後は被弾のフラッシュ、HPの割合が低HPの閾値以下なら低HP警告を、この順に描き、他のHUDがその上に重なるようにする。
+  m_screenEffect.DrawOverlays(graphicsSystem,state.isSliding,has_health && health_ratio <= ns_LOW_HP_RATIO,state.vitals.currentHP);
 
   DrawCrosshair(graphicsSystem,state.isAiming);
 
