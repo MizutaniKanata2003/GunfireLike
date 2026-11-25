@@ -86,13 +86,13 @@ private:
   // deltaTime: 実時間の経過時間。単位は秒。表示用と反動の時間に使う。報酬選択中とショップが開いている間は0。
   // gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。回復アイテムの間隔に使う。
   void UpdateTimers(float deltaTime,float gameplayDeltaTime);
-  // ジャスト回避が成立した時の効果を反映する。スローを開始し、回避反撃を取得していれば、一定時間、射撃のダメージを増やす。
+  // ジャスト回避が成立した時の効果を反映する。スローを開始し、演出を出し、回避反撃を取得していれば、一定時間、射撃のダメージを増やす。
   void StartJustDodgeEffects();
   // 視点・プレイヤーの動作・出口の通過・殴打でのリロードのキャンセル・視野角を更新する。Capture中だけ呼ぶ。
   // deltaTime: 実時間の経過時間。単位は秒。視野角の補間に使う。
   // gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。プレイヤーの動作に使う。
   void UpdatePlayer(float deltaTime,float gameplayDeltaTime);
-  // プレイヤーの戦闘・射撃・敵の行動と弾を更新し、発射の演出を出し、Collision可視化の視線のRayを更新する。Capture中だけ呼ぶ。
+  // プレイヤーの戦闘・射撃・敵の行動と弾を更新し、発射と撃破の演出を出し、Collision可視化の視線のRayを更新する。Capture中だけ呼ぶ。
   // gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。プレイヤーの戦闘と射撃に使う。
   // worldDeltaTime: スローを反映した経過時間。単位は秒。敵の行動と弾に使う。
   void UpdateCombat(float gameplayDeltaTime,float worldDeltaTime);

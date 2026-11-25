@@ -310,9 +310,14 @@ void GameSession::StartJustDodgeEffects()
   // ジャスト回避のスローを開始する。連続した場合は、時間を数え直す。
   m_timeScale.StartSlowMotion();
 
+  // ジャスト回避の演出を、プレイヤーの付近から広げて出す。連続した場合も、そのたびに出す。
+  m_renderer.GetEffectController().SpawnJustDodgeEffect(m_player.GetPlayerController().GetPosition());
+
   // 回避反撃を取得している（倍率が1.0より大きい）場合だけ、一定時間、射撃のダメージを増やす。未取得なら、何も増やさない。
   const float damage_scale = m_economy.GetReward().GetCounterDodgeDamageScale();
-  if(damage_scale > 1.0f)m_player.GetShotController().ActivateDamageBoost(damage_scale,REWARD_TABLE::ns_COUNTER_DODGE_SECONDS);
+  if(damage_scale > 1.0f){
+    m_player.GetShotController().ActivateDamageBoost(damage_scale,REWARD_TABLE::ns_COUNTER_DODGE_SECONDS);
+  }
 }
 
 // 視点・プレイヤーの動作・出口の通過・殴打でのリロードのキャンセル・視野角を更新する。
@@ -328,7 +333,7 @@ void GameSession::UpdatePlayer(float deltaTime,float gameplayDeltaTime)
   m_player.UpdateView(deltaTime);
 }
 
-// プレイヤーの戦闘・射撃・敵の行動と弾を更新し、発射の演出を出し、Collision可視化の視線のRayを更新する。
+// プレイヤーの戦闘・射撃・敵の行動と弾を更新し、発射と撃破の演出を出し、Collision可視化の視線のRayを更新する。
 void GameSession::UpdateCombat(float gameplayDeltaTime,float worldDeltaTime)
 {
   // 近接攻撃・接触・回復・射撃を、この順に更新する。
@@ -338,6 +343,8 @@ void GameSession::UpdateCombat(float gameplayDeltaTime,float worldDeltaTime)
   WEAPON_UPDATE_RESULT shot_result{};
   if(m_player.GetShotController().TryTakeShotResult(shot_result))m_renderer.GetEffectController().SpawnShotEffects(shot_result);
 
+  // 射撃・近接攻撃で倒された敵の破片を出す。倒された敵が、次のウェーブの生成で入れ替わる前に出すため、ここで呼ぶ。
+  m_renderer.GetEffectController().SpawnDefeatEffects(m_enemyController.GetEnemyManager());
   // 当フレームの回避・移動・敵への怯みを反映してから、敵の行動と、敵の弾の命中を判定する。
   m_enemyController.Update(worldDeltaTime);
 
