@@ -1,6 +1,6 @@
 ﻿#include "../H/EffectController.h"
 
-// 演出の粒の生成・更新・描画と、マズルフラッシュ・命中の火花・撃破の破片・ジャスト回避の広がりの生成を実装する。
+// 演出の粒の生成・更新・描画と、マズルフラッシュ・命中の火花・撃破の破片・ジャスト回避の広がり・スライディングの砂煙の生成を実装する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <cmath> // std::sqrtで、正面方向から、右方向の向きを求めるために、水平方向の長さを求める。
@@ -79,6 +79,22 @@ namespace
   constexpr float ns_DODGE_SECONDS = 0.3f;
   // ジャスト回避の粒の色。水色。
   constexpr XMFLOAT4 ns_DODGE_COLOR{0.4f,0.8f,1.0f,1.0f};
+
+  //========= スライディングの砂煙=========
+  // 砂煙を出す間隔。単位は秒。
+  constexpr float ns_SLIDE_DUST_INTERVAL_SECONDS = 0.05f;
+  // 砂煙を出す位置の、プレイヤーの位置（視点の高さ）からの高さのずれ。足元へ下げる量。単位はワールド距離単位。仮値。
+  constexpr float ns_SLIDE_DUST_OFFSET_Y = 0.8f;
+  // 砂煙が、滑る向きの後ろへ流れる速さ。単位は、ワールド距離単位毎秒。
+  constexpr float ns_SLIDE_DUST_BACK_SPEED = 1.5f;
+  // 砂煙が、上へ上がる速さ。単位は、ワールド距離単位毎秒。
+  constexpr float ns_SLIDE_DUST_RISE_SPEED = 0.5f;
+  // 砂煙の粒の1辺の長さ。単位はワールド距離単位。
+  constexpr float ns_SLIDE_DUST_SIZE = 0.2f;
+  // 砂煙が残る時間。単位は秒。
+  constexpr float ns_SLIDE_DUST_SECONDS = 0.4f;
+  // 砂煙の色。茶。
+  constexpr XMFLOAT4 ns_SLIDE_DUST_COLOR{0.5f,0.35f,0.2f,1.0f};
 }
 
 //========= 初期化・終了関数=========
@@ -102,7 +118,7 @@ void EffectController::Uninit()
   m_cubeRenderer = nullptr;
 }
 
-// 全ての粒を消し、生成の位置を先頭へ戻す。
+// 全ての粒と、砂煙の間隔の計測を消し、生成の位置を先頭へ戻す。
 void EffectController::Clear()
 {
   // 全ての粒を先頭から、使われていない枠へ戻す。
@@ -110,6 +126,7 @@ void EffectController::Clear()
     effect = EFFECT_STATE{};
   }
   m_nextIndex = 0;
+  m_slideDustElapsedSeconds = 0.0f;
 }
 
 //========= 更新・描画関数=========
@@ -285,4 +302,30 @@ void EffectController::SpawnJustDodgeEffect(const XMFLOAT3& playerPosition)
     params.velocity = XMFLOAT3{direction.x * ns_DODGE_SPEED,0.0f,direction.z * ns_DODGE_SPEED};
     Spawn(params);
   }
+}
+
+// スライディング中だけ、一定の間隔で、足元から砂煙を1個ずつ出す。
+void EffectController::UpdateSlideDust(bool isSliding,const XMFLOAT3& playerPosition,const XMFLOAT2& slideDirectionXZ,float deltaTime)
+{
+  // スライディングでなければ、間隔の計測を0へ戻して、次のスライディングを、最初から数える。
+  if(!isSliding){
+    m_slideDustElapsedSeconds = 0.0f;
+    return;
+  }
+
+  // 経過時間を進め、間隔に達するまでは、何も出さない。
+  m_slideDustElapsedSeconds += deltaTime;
+  if(m_slideDustElapsedSeconds < ns_SLIDE_DUST_INTERVAL_SECONDS)return;
+
+  // 間隔の分を引いて、次の間隔を数える。1回の呼出しで出すのは、1個だけ。
+  m_slideDustElapsedSeconds -= ns_SLIDE_DUST_INTERVAL_SECONDS;
+
+  // 足元（視点の高さから、表の分だけ下）へ、滑る向きの後ろへ流れて、少し上がる粒を1個出す。
+  EFFECT_SPAWN_PARAMS params{};
+  params.position = XMFLOAT3{playerPosition.x,playerPosition.y - ns_SLIDE_DUST_OFFSET_Y,playerPosition.z};
+  params.velocity = XMFLOAT3{-slideDirectionXZ.x * ns_SLIDE_DUST_BACK_SPEED,ns_SLIDE_DUST_RISE_SPEED,-slideDirectionXZ.y * ns_SLIDE_DUST_BACK_SPEED};
+  params.color = ns_SLIDE_DUST_COLOR;
+  params.size = ns_SLIDE_DUST_SIZE;
+  params.lifetimeSeconds = ns_SLIDE_DUST_SECONDS;
+  Spawn(params);
 }

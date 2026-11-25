@@ -293,7 +293,7 @@ void GameSession::UpdateWorldAndRoom(float worldDeltaTime)
   m_stage.UpdateProgress(m_enemyController.GetEnemyManager().HasLivingEnemies());
 }
 
-// 回復アイテムの間隔・Collision可視化の表示時間・命中表示・反動のずれ・演出の粒を、Captureに関係なく更新する。
+// 回復アイテムの間隔・Collision可視化の表示時間・命中表示・反動のずれ・演出の粒と砂煙を、Captureに関係なく更新する。
 void GameSession::UpdateTimers(float deltaTime,float gameplayDeltaTime)
 {
   // プレイヤー側の回復アイテムの間隔・命中表示・反動のずれを進める。Collision可視化の表示用の残り時間は、実時間で進め、0未満にしない。
@@ -302,6 +302,11 @@ void GameSession::UpdateTimers(float deltaTime,float gameplayDeltaTime)
 
   // 演出の粒の位置と残り時間を、実時間で進める。報酬選択中とショップが開いている間は、deltaTimeが0のため、止まる。
   m_renderer.GetEffectController().Update(deltaTime);
+
+  // スライディング中だけ、砂煙を一定の間隔で出す。向きは、スライディングで固定した方向。deltaTimeが0の間は、間隔が進まない。
+  const PlayerController& player_controller = m_player.GetPlayerController();
+  const bool is_sliding = player_controller.GetActionState() == PLAYER_ACTION_STATE::e_SLIDE;
+  m_renderer.GetEffectController().UpdateSlideDust(is_sliding,player_controller.GetPosition(),player_controller.GetFixedDirection(),deltaTime);
 }
 
 // ジャスト回避が成立した時の効果を反映する。

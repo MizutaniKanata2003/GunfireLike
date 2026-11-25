@@ -108,6 +108,8 @@ public:
   [[nodiscard]] bool IsFlinching() const { return m_flinchRemainingSeconds > 0.0f; }
   // 最後に回避を始めてからの経過時間を返す。単位は秒。回避をしていない間も増え続け、一度も回避していない場合は十分に大きい値。
   [[nodiscard]] float GetSecondsSinceDodgeStart() const { return m_secondsSinceDodgeStart; }
+  // スライディング・回避・殴打の踏み込みで固定している、水平の移動方向を返す。X・Zの順。単位ベクトル。スライディング中の向きを、演出が使う。それ以外の動作では、直前に固定した値のまま。
+  [[nodiscard]] XMFLOAT2 GetFixedDirection() const { return XMFLOAT2{m_fixedDirectionX,m_fixedDirectionZ}; }
 
 private:
   //========= 入力の読取関数=========
