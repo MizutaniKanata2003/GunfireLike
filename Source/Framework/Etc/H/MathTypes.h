@@ -103,3 +103,25 @@ using DirectX::XMVector3Cross;
 //========= 既存の重複using宣言=========
 // 原本末尾にある同じ関数の再宣言を維持する。重複整理は今回混ぜず、新しい別名や関数実装も追加しない。
 using DirectX::XMMatrixPerspectiveFovLH;
+
+using DirectX::XMMatrixMultiply;
+
+using DirectX::XMMatrixIdentity;
+
+using DirectX::XMVectorLerp;
+
+using DirectX::XMQuaternionNormalize;
+
+using DirectX::XMQuaternionSlerp;
+
+using DirectX::XMLoadFloat4;
+
+using DirectX::XMLoadFloat4x4;
+
+using DirectX::XMMatrixDecompose;
+
+using DirectX::XMMatrixScalingFromVector;
+
+using DirectX::XMMatrixTranslationFromVector;
+
+using DirectX::XMMatrixRotationQuaternion;
