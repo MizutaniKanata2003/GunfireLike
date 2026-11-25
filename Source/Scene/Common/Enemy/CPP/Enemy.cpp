@@ -209,8 +209,8 @@ bool Enemy::TryMoveTo(const XMFLOAT3& targetPosition,CollisionWorld& collisionWo
 // 目標の方へ向ける、向きの目標を設定し、目標との水平距離を記録する。
 void Enemy::SetFacing(const XMFLOAT3& targetPosition)
 {
-  // 死亡中は描画されず、転倒中は倒れたまま向きを変えないため、更新しない。
-  if(!m_isAlive || IsKnockedDown())return;
+  // 死亡中は描画されないため、更新しない。転倒中は、向きは変えないが、向きの目標と距離は更新し、起き上がる時に、すぐ合わせる。
+  if(!m_isAlive)return;
 
   // 敵の位置から目標までの水平方向の差を求める。高さは使わない。距離は、プレイヤーに発覚しているかの判定のために、記録する。
   const float offset_x = targetPosition.x - m_position.x;
@@ -225,7 +225,7 @@ void Enemy::SetFacing(const XMFLOAT3& targetPosition)
   m_animation.targetYaw = std::atan2(offset_x,offset_z);
 
   // 最初の1回だけは、旋回の途中の姿を見せず、そのまま向ける。X（Pitch）とZ（Roll）の回転は0のままにし、Colliderと位置は変えない。
-  if(!m_animation.hasFacingTarget){
+  if(!m_animation.hasFacingTarget && !IsKnockedDown()){
     m_animation.hasFacingTarget = true;
     m_transform.SetRotation(XMFLOAT3{0.0f,m_animation.targetYaw,0.0f});
   }
@@ -385,8 +385,12 @@ void Enemy::UpdateStatusTimers(float deltaTime)
     m_animation.flinchImmuneRemainingSeconds = CountDown(m_animation.flinchImmuneRemainingSeconds,deltaTime);
   }
 
-  // 転倒と、射撃のダメージの印の残り時間を、残り時間がある間だけ減らし、0未満にならないようにする。
+  // 転倒の残り時間を減らす。転倒が、この更新で終わった時は、最新の向きの目標へ、すぐ向け、起き上がりの間に、大きく旋回しないようにする。
+  const bool was_knocked_down = IsKnockedDown();
   m_knockdownRemainingSeconds = CountDown(m_knockdownRemainingSeconds,deltaTime);
+  if(was_knocked_down && !IsKnockedDown() && m_animation.hasFacingTarget)m_transform.SetRotation(XMFLOAT3{0.0f,m_animation.targetYaw,0.0f});
+
+  // 射撃のダメージの印の残り時間を、残り時間がある間だけ減らし、0未満にならないようにする。
   m_shotDamageMarkRemainingSeconds = CountDown(m_shotDamageMarkRemainingSeconds,deltaTime);
 }
 

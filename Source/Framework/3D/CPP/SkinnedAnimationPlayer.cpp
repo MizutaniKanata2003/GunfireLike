@@ -1,6 +1,6 @@
 ﻿#include "../H/SkinnedAnimationPlayer.h"
 
-// ボーン行列の計算を実装する。ノードとチャンネルの対応づけ、キーの補間（位置・拡大は直線、回転は球面）、2つの動きの混ぜ合わせ、階層の変換の合成、逆バインド行列との合成、ノードの位置の計算を行う。
+// ボーン行列の計算を実装する。ノードとチャンネルの対応づけ、キーの補間（位置・拡大は直線、回転は球面）、2つの動きの混ぜ合わせ、階層の変換の合成、水平の位置の固定、逆バインド行列との合成、ノードの位置の計算を行う。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::upper_boundでキーを探し、std::clampで補間の割合を0〜1へ制限する。
@@ -131,6 +131,7 @@ void SkinnedAnimationPlayer::Uninit()
   m_clip = nullptr;
   m_channelIndexByNode.clear();
   m_globalTransforms.clear();
+  m_horizontalLockNodeIndex = -1;
 }
 
 //========= 計算関数=========
@@ -218,6 +219,9 @@ int SkinnedAnimationPlayer::FindNodeIndexBySuffix(const std::string& suffix) con
 // 全てのノードの、親を含めた全体の変換を計算する。ノードは親が先に並ぶため、先頭から順に、親の結果を使える。
 void SkinnedAnimationPlayer::ComputeGlobalTransforms(float timeSeconds,const ANIMATION_BLEND_INPUT* blend)
 {
+  // 水平の位置を固定するノードを決める。固定がなければ、-1で、どのノードにも一致しない。
+  const int lock_node_index = DecideHorizontalLockNode(blend);
+
   for(std::size_t node_index = 0; node_index < m_model->nodes.size(); ++node_index){
     const XMMATRIX local_transform = BuildLocalTransform(static_cast<int>(node_index),timeSeconds,blend);
     const int parent_index = m_model->nodes[node_index].parentIndex;
@@ -225,11 +229,42 @@ void SkinnedAnimationPlayer::ComputeGlobalTransforms(float timeSeconds,const ANI
     // 根は、親から見た変換が、そのまま全体の変換。それ以外は、行ベクトルの向きで、「自分 × 親」。
     if(parent_index < 0){
       XMStoreFloat4x4(&m_globalTransforms[node_index],local_transform);
-      continue;
     }
-    const XMMATRIX parent_global = XMLoadFloat4x4(&m_globalTransforms[static_cast<std::size_t>(parent_index)]);
-    XMStoreFloat4x4(&m_globalTransforms[node_index],XMMatrixMultiply(local_transform,parent_global));
+    else{
+      const XMMATRIX parent_global = XMLoadFloat4x4(&m_globalTransforms[static_cast<std::size_t>(parent_index)]);
+      XMStoreFloat4x4(&m_globalTransforms[node_index],XMMatrixMultiply(local_transform,parent_global));
+    }
+
+    // 固定するノードは、子の計算より先に、水平の位置を戻す。子は、戻した後の位置を、親として使う。
+    if(static_cast<int>(node_index) == lock_node_index){
+      ApplyHorizontalLock(node_index);
+    }
   }
+}
+
+// 水平の位置を固定するノードの番号を決める。
+int SkinnedAnimationPlayer::DecideHorizontalLockNode(const ANIMATION_BLEND_INPUT* blend) const
+{
+  // この動きに固定があれば、それを使う。
+  if(m_horizontalLockNodeIndex >= 0)return m_horizontalLockNodeIndex;
+
+  // この動きになければ、混ぜている間だけ、直前の動きの固定を使う。直前の動きのずれが、混ぜている間に残らないようにする。
+  return blend != nullptr ? blend->previousPlayer->m_horizontalLockNodeIndex : -1;
+}
+
+// ノード1つの、全体の変換の位置を、モデル空間で水平が原点になるよう、ずらす。
+void SkinnedAnimationPlayer::ApplyHorizontalLock(std::size_t nodeIndex)
+{
+  // ノードの位置を、スキニング後の頂点と同じ空間（モデル空間）で求める。位置は、行列の4行目。
+  const XMMATRIX global_inverse = XMLoadFloat4x4(&m_model->globalInverseTransform);
+  XMMATRIX node_global = XMLoadFloat4x4(&m_globalTransforms[nodeIndex]);
+  const XMVECTOR model_position = XMMatrixMultiply(node_global,global_inverse).r[3];
+
+  // モデル空間で、水平（XとZ）を原点へ戻すずれを、全体の変換の空間へ直し、ノードの位置へ足す。高さと向きは、変えない。
+  const XMVECTOR model_offset = XMVectorSet(-XMVectorGetX(model_position),0.0f,-XMVectorGetZ(model_position),0.0f);
+  const XMVECTOR global_offset = XMVector3TransformNormal(model_offset,XMMatrixInverse(nullptr,global_inverse));
+  node_global.r[3] = XMVectorAdd(node_global.r[3],global_offset);
+  XMStoreFloat4x4(&m_globalTransforms[nodeIndex],node_global);
 }
 
 // ボーンごとに「逆バインド行列 × ノードの全体の変換 × 根の逆行列」を合成して出力する。

@@ -127,3 +127,6 @@ using DirectX::XMQuaternionSlerp;
 //========= 既存の重複using宣言=========
 // 原本末尾にある同じ関数の再宣言を維持する。重複整理は今回混ぜず、新しい別名や関数実装も追加しない。
 using DirectX::XMMatrixPerspectiveFovLH;
+
+using DirectX::XMVectorGetZ;
+using DirectX::XMVectorAdd;

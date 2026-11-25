@@ -32,6 +32,8 @@ namespace
   constexpr float ns_BLEND_SECONDS = 0.2f;
   // 怯み・転倒・死亡へ切り替える時の、補間の時間。単位は秒。被弾への反応が遅れないよう、短くする。仮値。
   constexpr float ns_QUICK_BLEND_SECONDS = 0.08f;
+  // 怯み・起き上がりから、別の動きへ戻る時の、補間の時間。単位は秒。反応の姿から、歩きへ、ゆっくり戻す。仮値。
+  constexpr float ns_RECOVER_BLEND_SECONDS = 0.4f;
 
   //========= 死亡時の高さの補正=========
   // 倒れた体が床に埋まらないよう、死亡の動きの最後に、描画だけを持ち上げる量。単位はワールド距離単位。動きの進行に比例して、0から、この量まで上げる。
@@ -83,13 +85,17 @@ namespace
     }
   }
 
-  // 切り替える先の動きに応じた、補間の時間を返す。怯み・転倒・死亡は、短い。
+  // 動きの切替の、補間の時間を返す。怯み・転倒・死亡へ切り替える時は短く、怯み・起き上がりから戻る時は長い。
+  // previousClip: 切り替える前の動き。
   // nextClip: 切り替える先の動き。
   // 戻り値: 補間の時間。単位は秒。
-  float GetBlendSeconds(ENEMY_CLIP nextClip)
+  float GetBlendSeconds(ENEMY_CLIP previousClip,ENEMY_CLIP nextClip)
   {
     const bool is_quick = nextClip == ENEMY_CLIP::e_HIT || nextClip == ENEMY_CLIP::e_DOWN || nextClip == ENEMY_CLIP::e_DEATH;
-    return is_quick ? ns_QUICK_BLEND_SECONDS : ns_BLEND_SECONDS;
+    if(is_quick)return ns_QUICK_BLEND_SECONDS;
+
+    const bool is_recovering = previousClip == ENEMY_CLIP::e_HIT || previousClip == ENEMY_CLIP::e_GET_UP;
+    return is_recovering ? ns_RECOVER_BLEND_SECONDS : ns_BLEND_SECONDS;
   }
 
   // 補間の経過から、今の動きの割合を返す。始まりと終わりが滑らかになるよう、3次の補間（smoothstep）にする。
@@ -289,7 +295,7 @@ void EnemyModelPlayback::SwitchClip(ENEMY_CLIP nextClip)
   m_blend.previousClip = m_clip;
   m_blend.previousTimeSeconds = m_clipTimeSeconds;
   m_blend.elapsedSeconds = 0.0f;
-  m_blend.durationSeconds = GetBlendSeconds(nextClip);
+  m_blend.durationSeconds = GetBlendSeconds(m_clip,nextClip);
 
   // 今の動きを切り替え、時刻と保持の時間を、0へ戻す。
   m_clip = nextClip;

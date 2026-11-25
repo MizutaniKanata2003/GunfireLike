@@ -66,7 +66,7 @@ namespace
     return clipIndex == static_cast<std::size_t>(ENEMY_CLIP::e_TELEGRAPH);
   }
 
-  // 動き1つを読み込み、再生部を初期化する。
+  // 動き1つを読み込み、再生部を初期化する。怯み・転倒・起き上がりは、体が横へずれて見えないよう、腰の水平の位置を固定する。
   // filePath: 動きのFBXのパス。
   // clipIndex: 動きの添字。
   // assets: 読込先。モデルは、読込済みであること。
@@ -76,6 +76,13 @@ namespace
     SkinnedAnimationLoader animation_loader;
     if(!animation_loader.Load(filePath,assets.clips[clipIndex]))return false;
     if(!assets.players[clipIndex].Initialize(assets.model,assets.clips[clipIndex]))return false;
+
+    // 腰が見つからない場合は、-1が渡り、固定されない。
+    const bool is_horizontal_locked = clipIndex == static_cast<std::size_t>(ENEMY_CLIP::e_HIT) || clipIndex == static_cast<std::size_t>(ENEMY_CLIP::e_DOWN) ||
+      clipIndex == static_cast<std::size_t>(ENEMY_CLIP::e_GET_UP);
+    if(is_horizontal_locked){
+      assets.players[clipIndex].LockHorizontalMotion(assets.players[clipIndex].FindNodeIndexBySuffix(ns_HIPS_NODE_SUFFIX));
+    }
 
     assets.hasClip[clipIndex] = true;
     return true;

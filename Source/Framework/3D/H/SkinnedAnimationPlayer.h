@@ -4,11 +4,13 @@
 // 時刻から、ノードごとの位置・回転・拡大のキーを補間し、階層の親から順に変換を掛けて、逆バインド行列と合成する。
 // 同じモデルの別の動きと、ノードごとの位置・回転・拡大の段階で混ぜる（クロスフェード）計算も行う。ボーン行列そのものを混ぜると、体が潰れるため、行わない。
 // ノードの名前（末尾の一致）から番号を探す関数と、指定した時刻のノードの位置（モデル空間）を求める関数も持つ。歩きの速度の測定などに使う。
+// 指定したノード（腰など）の、水平の位置を、モデル空間の原点へ固定できる。よろめく・倒れる動きで、体が、横へずれて見えないようにするために使う。
 // 再生の進行（時刻を進める・切り替える・混ぜる割合を決める）、GPUへの転送、描画は担当しない。時刻は、呼出側が持つ。
 // モデルとアニメーションは借用し、所有しない。呼出側が、このクラスより長く生存させる。
 
 //========= C++標準ライブラリ インクルード=========
 #include <array> // std::arrayで、ボーン行列を固定長で出力する。
+#include <cstddef> // std::size_tで、ノードの番号を受け取る。
 #include <string> // std::stringで、ノードの名前の末尾の一致を調べる。
 #include <vector> // ノードごとの、チャンネルの番号と、全体の変換の作業領域を保持する。
 
@@ -54,8 +56,12 @@ public:
   // clip: 借用するアニメーション。読込済みであること。このPlayerより長く生存させ、内容を変えない。
   // 戻り値: ノードが1つ以上あり、1つ以上のチャンネルが、ノードに対応したらtrue。失敗した場合は、Warningのログへ出し、借用しない。
   [[nodiscard]] bool Initialize(const SKINNED_MODEL_DATA& model,const SKINNED_ANIMATION_CLIP& clip);
-  // 借用した参照と、作業領域を手放す。未初期化・終了済みでも呼出可能。
+  // 借用した参照と、作業領域を手放す。水平の固定も解除する。未初期化・終了済みでも呼出可能。
   void Uninit();
+  // 指定したノードの、水平（モデル空間のXとZ）の位置を、常に原点へ固定する。高さと回転は、動きのままにする。
+  // この動きと混ぜる直前の動きに、固定がある場合も、混ぜている間は、固定する。
+  // nodeIndex: 固定するノードの番号（腰など）。負の値なら、固定しない。
+  void LockHorizontalMotion(int nodeIndex) { m_horizontalLockNodeIndex = nodeIndex; }
 
   //========= 計算関数=========
   // 時刻を、アニメーションの範囲へ整える。繰り返す場合は、長さで割った余り、繰り返さない場合は、0〜長さへ制限する。
@@ -74,7 +80,7 @@ public:
   // blendInput: 直前の動きと、その時刻、今の動きの割合。
   // outBoneMatrices: 出力先。全てを書き換える。
   void EvaluateBlended(float timeSeconds,const ANIMATION_BLEND_INPUT& blendInput,BoneMatrixArray& outBoneMatrices);
-  // 指定した時刻の、ノードの位置を、スキニング後の頂点と同じ空間（モデル空間）で求める。ボーン行列と同じ計算の途中の値を使うため、頂点の位置と合う。
+  // 指定した時刻の、ノードの位置を、スキニング後の頂点と同じ空間（モデル空間）で求める。ボーン行列と同じ計算の途中の値を使うため、頂点の位置と合う。水平の固定は、反映される。
   // timeSeconds: 計算する時刻。単位は秒。
   // nodeIndices: 位置を求めるノードの番号の並び。範囲外の番号の位置は、原点にする。
   // outPositions: 出力先。nodeIndicesと同じ長さに、作り直す。借用していない場合は、全て原点。
@@ -88,10 +94,17 @@ public:
 
 private:
   //========= 計算の補助関数=========
-  // 全てのノードの、親を含めた全体の変換を、親が先の順で計算し、m_globalTransformsへ書く。
+  // 全てのノードの、親を含めた全体の変換を、親が先の順で計算し、m_globalTransformsへ書く。固定するノードは、計算の直後に、水平の位置を原点へ戻す。
   // timeSeconds: 計算する時刻。単位は秒。
   // blend: 混ぜる相手。nullptrなら、この動きだけで計算する。
   void ComputeGlobalTransforms(float timeSeconds,const ANIMATION_BLEND_INPUT* blend);
+  // 水平の位置を固定するノードの番号を決める。この動きに固定があれば、それを、なければ、混ぜる相手の固定を使う。
+  // blend: 混ぜる相手。nullptrなら、この動きの固定だけを見る。
+  // 戻り値: 固定するノードの番号。固定がなければ、-1。
+  [[nodiscard]] int DecideHorizontalLockNode(const ANIMATION_BLEND_INPUT* blend) const;
+  // ノード1つの、全体の変換の位置を、モデル空間で水平（XとZ）が原点になるよう、ずらす。ノードの子は、この後で計算するため、一緒にずれる。
+  // nodeIndex: 位置をずらすノードの番号。全体の変換を計算した直後であること。
+  void ApplyHorizontalLock(std::size_t nodeIndex);
   // m_globalTransformsから、ボーンごとの最終の行列を合成して出力する。
   // outBoneMatrices: 出力先。使わない分は、単位行列のまま。
   void ComposeBoneMatrices(BoneMatrixArray& outBoneMatrices) const;
@@ -118,4 +131,8 @@ private:
   std::vector<int> m_channelIndexByNode{};
   // ノードごとの、全体の変換。計算のたびに、書き換える作業領域。添字は、ノードの番号。
   std::vector<XMFLOAT4X4> m_globalTransforms{};
+
+  //========= 水平の固定=========
+  // 水平の位置を、原点へ固定するノードの番号。固定しない場合は-1。LockHorizontalMotionで設定する。
+  int m_horizontalLockNodeIndex{-1};
 };
