@@ -248,9 +248,9 @@ void EnemyController::UpdateActions(float worldDeltaTime)
 // 戦闘不能な敵の攻撃予告を取り消し、再攻撃待ちを設定する。
 bool EnemyController::CancelIfIncapacitated(std::size_t slotIndex,float recoverySeconds)
 {
-  // 生きていて、怯み・転倒をしておらず、プレイヤーも死亡していなければ、戦闘不能ではない。
+  // 生きていて、怯み・転倒・起き上がりの動きの再生をしておらず、プレイヤーも死亡していなければ、戦闘不能ではない。
   const Enemy& enemy = m_enemyManager.GetEnemies()[slotIndex];
-  if(enemy.IsAlive() && !enemy.IsFlinching() && !enemy.IsKnockedDown() && !m_playerHealth->IsDead())return false;
+  if(enemy.IsAlive() && !enemy.IsFlinching() && !enemy.IsKnockedDown() && !enemy.GetPlayback().IsGettingUp() && !m_playerHealth->IsDead())return false;
 
   // 予告中断時だけ再攻撃待ちを設定し、行動不能が続いても毎回は設定しない。
   JustDodgeJudge& judge = m_attackJudges[slotIndex];

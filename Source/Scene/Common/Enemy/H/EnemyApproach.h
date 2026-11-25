@@ -78,8 +78,8 @@ namespace ENEMY_APPROACH
   // collisionWorld: この敵のColliderを登録したCollisionWorld。
   inline void Update(Enemy& enemy,const XMFLOAT3& targetPosition,float deltaTime,CollisionWorld& collisionWorld)
   {
-    // 怯み中は追従しない。死亡・転倒中と時間の検証は、MoveTowardが行う。
-    if(enemy.IsFlinching())return;
+    // 怯み中と、起き上がりの動きの再生中は追従しない。死亡・転倒中と時間の検証は、MoveTowardが行う。
+    if(enemy.IsFlinching() || enemy.GetPlayback().IsGettingUp())return;
 
     // 速度は、歩きの動きの位相から求めた、足が地面を滑らない速さ。足の動きが速い時に速く、遅い時に遅く進む。
     MoveToward(enemy,ENEMY_MOVE_ORDER{targetPosition,enemy.GetModelMoveSpeed(ns_SPEED),ns_STOP_DISTANCE},deltaTime,collisionWorld);

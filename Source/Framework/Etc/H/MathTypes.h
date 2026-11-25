@@ -85,6 +85,8 @@ using DirectX::XMMatrixMultiply;
 using DirectX::XMMatrixDecompose;
 // 行と列を入れ替えた行列を返す。入力自体の書換えや、座標系の自動変換を行うラッパーではない。
 using DirectX::XMMatrixTranspose;
+// 逆行列を返す。第1引数は行列式の受け取り先で、不要ならnullptrを渡す。スキニングのモデル空間のずれを、ノードの全体の変換の空間へ直すために使用する。
+using DirectX::XMMatrixInverse;
 // 有効なXMFLOAT4X4から、演算用の行列へ読み込む。転置はしない。保存済みのボーン行列やノードの変換を、計算へ戻すために使用する。
 using DirectX::XMLoadFloat4x4;
 // 行列を有効なXMFLOAT4X4出力先へ保存する。転置は行わず、必要なら利用側が先にTransposeを適用する。
@@ -105,10 +107,12 @@ using DirectX::XMLoadFloat4;
 using DirectX::XMStoreFloat3;
 
 //========= ベクトル成分取得関数=========
-// 演算用ベクトルからX成分をfloatで取得する。HudTextRendererでは計測幅の取り出しに使用する。
+// 演算用ベクトルからX成分をfloatで取得する。HudTextRendererでは計測幅の取り出しに、スキニングのノードの位置のずれの計算にも使用する。
 using DirectX::XMVectorGetX;
 // 演算用ベクトルからY成分をfloatで取得する。HudTextRendererでは計測高さの取り出しに使用する。
 using DirectX::XMVectorGetY;
+// 演算用ベクトルからZ成分をfloatで取得する。スキニングのノードの位置から、水平（XとZ）のずれの量を求めるために使用する。
+using DirectX::XMVectorGetZ;
 
 //========= ベクトル演算関数=========
 // XYZを3次元方向として単位化する元の関数。ゼロ長などに対する独自の条件判定・代替方向は追加しない。
@@ -117,6 +121,10 @@ using DirectX::XMVector3Normalize;
 using DirectX::XMVector3Cross;
 // 2つのベクトルの間を、割合で直線補間する。割合0で第1引数、1で第2引数。位置・拡大のキーの補間に使用する。
 using DirectX::XMVectorLerp;
+// 2つのベクトルを、成分ごとに足す。スキニングで、ノードの位置へ、水平のずれの補正量を足すために使用する。
+using DirectX::XMVectorAdd;
+// ベクトルを、行列の拡大・回転だけで変換する（移動は加えない）。位置ではなく、ずれの量や方向を、別の空間へ直すために使用する。
+using DirectX::XMVector3TransformNormal;
 
 //========= クォータニオン関数=========
 // クォータニオンを、単位の長さへ整える。補間後の回転の誤差を取り除くために使用する。
@@ -127,6 +135,3 @@ using DirectX::XMQuaternionSlerp;
 //========= 既存の重複using宣言=========
 // 原本末尾にある同じ関数の再宣言を維持する。重複整理は今回混ぜず、新しい別名や関数実装も追加しない。
 using DirectX::XMMatrixPerspectiveFovLH;
-
-using DirectX::XMVectorGetZ;
-using DirectX::XMVectorAdd;

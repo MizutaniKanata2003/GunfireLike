@@ -33,7 +33,7 @@ namespace
   // 怯み・転倒・死亡へ切り替える時の、補間の時間。単位は秒。被弾への反応が遅れないよう、短くする。仮値。
   constexpr float ns_QUICK_BLEND_SECONDS = 0.08f;
   // 怯み・起き上がりから、別の動きへ戻る時の、補間の時間。単位は秒。反応の姿から、歩きへ、ゆっくり戻す。仮値。
-  constexpr float ns_RECOVER_BLEND_SECONDS = 0.4f;
+  constexpr float ns_RECOVER_BLEND_SECONDS = 0.5f;
 
   //========= 死亡時の高さの補正=========
   // 倒れた体が床に埋まらないよう、死亡の動きの最後に、描画だけを持ち上げる量。単位はワールド距離単位。動きの進行に比例して、0から、この量まで上げる。

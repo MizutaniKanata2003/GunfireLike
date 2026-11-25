@@ -53,5 +53,5 @@ namespace ENEMY_ANIMATION
   // 転倒（Down、2.2秒）の再生の倍率。ゲーム側の転倒の時間（1.5秒）に、ほぼ合わせる。仮値。
   inline constexpr float ns_MODEL_SPEED_DOWN = 1.5f;
   // 起き上がり（GetUp、6.0秒）の再生の倍率。長いため、約2秒にする。仮値。
-  inline constexpr float ns_MODEL_SPEED_GET_UP = 3.0f;
+  inline constexpr float ns_MODEL_SPEED_GET_UP = 1.5f;
 }

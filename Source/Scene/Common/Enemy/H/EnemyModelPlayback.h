@@ -92,7 +92,8 @@ public:
   // state: 敵の現在の状態。種類と識別値から、見た目を決める。
   // 戻り値: 生きている場合はfalse。死亡後で、完全に透明になったか、モデルで描けない場合はtrue。
   [[nodiscard]] bool IsCorpseGone(const ENEMY_PLAYBACK_STATE& state) const;
-
+  // 起き上がりの動きを再生中かを返す。起き上がりが終わるまで、呼出側は、敵の移動と攻撃を止める。モデルを使えない場合は、常にfalse。
+  [[nodiscard]] bool IsGettingUp() const { return m_clip == ENEMY_CLIP::e_GET_UP; }
 private:
   //========= 更新の補助関数=========
   // プレイヤーとの距離から、発覚しているかを更新する。発覚する距離と、発覚が解除される距離を変え、境目で判定が入れ替わらないようにする。
