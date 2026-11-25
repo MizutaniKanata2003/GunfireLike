@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// 敵1体の状態（種類・HP・怯み・転倒・射撃のダメージの印・攻撃予告の表示・生死・向き）と、球のColliderの登録、Cubeでの仮表示（待機の揺れ・怯みの傾きを含む）を担当する。
+// 敵1体の状態（種類・HP・怯み・転倒・射撃のダメージの印・攻撃予告の表示・生死・向き）と、球のColliderの登録、Cubeでの仮表示（待機の揺れ・怯みの傾き・予告の前傾・攻撃の突進を含む）を担当する。
 // 種類ごとの数値はEnemyTableから読む。敵の行動（移動・攻撃）は持たない。複数体の管理は、EnemyManagerが担当する。
 
 //========= C++標準ライブラリ インクルード=========
@@ -31,13 +31,17 @@ struct ENEMY_INIT_PARAMS
   std::uint32_t enemyId{};
 };
 
-// 敵1体の簡易アニメーション（待機の揺れ・怯みの傾き）の状態。Enemyのメンバー変数の数を抑えるため、1つにまとめる。
+// 敵1体の簡易アニメーション（待機の揺れ・怯みの傾き・予告の前傾・攻撃の突進）の状態。Enemyのメンバー変数の数を抑えるため、1つにまとめる。
 struct ENEMY_ANIMATION_STATE
 {
   // 待機の揺れの位相。単位は周期の数で、0以上1未満。Updateで進める。同時に生成した敵が揃って揺れないよう、Initializeで敵の識別値から初期値を決める。
   float idleBobPhase{};
   // 怯みの傾きの向き。1.0または-1.0。怯みが始まる被弾のたびに反転し、連射で怯みが続く間は変えない。
   float flinchTiltSign{1.0f};
+  // 攻撃の予告が続いている時間。単位は秒。予告中だけUpdateで進め、予告でなくなったら0へ戻す。前傾の強さを決める。
+  float telegraphSeconds{};
+  // 攻撃の突進の残り時間。単位は秒。0より大きい間は、突進中。StartAttackLungeで設定し、Updateで減らす。
+  float lungeRemainingSeconds{};
 };
 
 // 種類・HP・怯み・転倒を持ち、球のColliderで被弾を受ける敵1体。
@@ -56,7 +60,7 @@ public:
   void Uninit(CollisionWorld& collisionWorld);
 
   //========= 更新・描画関数=========
-  // 怯み・転倒・射撃のダメージの印の残り時間と、待機の揺れの位相を進める。
+  // 怯み・転倒・射撃のダメージの印の残り時間と、待機の揺れの位相・予告の経過時間・攻撃の突進の残り時間を進める。
   // deltaTime: この更新で進める経過時間。単位は秒。
   void Update(float deltaTime);
   // 地形との重なりを補正し、登録済みの球Colliderと描画位置を更新する。
@@ -68,8 +72,11 @@ public:
   // 死亡中・転倒中は向きを変えない。目標との水平距離がほぼ0で向きが定まらない場合も、直前の向きを保つ。
   // targetPosition: 向ける先のワールド座標。高さは使わない。
   void SetFacing(const XMFLOAT3& targetPosition);
+  // 攻撃の瞬間の突進を始める。向いている方向へ、一定時間、描画だけを前へ出して戻す。Colliderと攻撃の判定は変えない。
+  // 死亡している場合は何もしない。すでに突進中の場合は、最初から数え直す。
+  void StartAttackLunge();
   // 生きている場合だけ、Cubeで描画する。通常は種類の色、射撃のダメージの印が付いている間は紫、攻撃の予告中は黄、怯み中・転倒中は色を変え、転倒中は低く潰して描く。
-  // 転倒中以外は、待機の揺れで高さを上下させ、怯み中は、向きに対して横へ傾ける。
+  // 転倒中以外は、待機の揺れで高さを上下させ、攻撃の予告中は前へ傾け、怯み中は向きに対して横へ傾ける。突進中は、前へ出して戻す。
   // graphicsSystem: Rendererが使う描画基盤。
   // viewMatrix: World空間からView空間への変換行列。
   // projectionMatrix: View空間からClip空間への変換行列。
@@ -89,11 +96,11 @@ public:
   // damageScale: 射撃で受けるダメージの倍率。1.0より大きい値。
   // durationSeconds: 印が続く時間。単位は秒。この敵の側の時間（スローの影響を受ける時間）で数える。
   void ApplyShotDamageMark(float damageScale,float durationSeconds);
-  // HPを満タンへ戻して怯みと転倒と射撃のダメージの印を解除する。死亡していた場合はColliderを登録し直して生き返らせる。攻撃の予告の表示も解除する。
+  // HPを満タンへ戻して怯みと転倒と射撃のダメージの印を解除する。死亡していた場合はColliderを登録し直して生き返らせる。攻撃の予告の表示と、攻撃の突進も解除する。
   // collisionWorld: Initializeで渡したのと同じCollisionWorld。
   void Respawn(CollisionWorld& collisionWorld);
   // 攻撃の予告中の表示を切り替える。予告の状態そのものは、呼出側が管理し、毎回の更新で現在の状態を渡す。
-  // isTelegraphing: trueなら、通常時の色の代わりに予告の色で描く。怯み・転倒の色の方が優先される。
+  // isTelegraphing: trueなら、通常時の色の代わりに予告の色で描き、前へ傾ける。怯み・転倒の表示の方が優先される。
   void SetTelegraphing(bool isTelegraphing) { m_isTelegraphing = isTelegraphing; }
 
   //========= Getter関数=========
@@ -121,6 +128,11 @@ public:
   [[nodiscard]] COLLISION_SPHERE GetBodySphere() const;
 
 private:
+  //========= 描画の補助関数=========
+  // 簡易アニメーション（待機の揺れ・突進・怯みの傾き・予告の前傾）を、描画用のTransformへ反映する。転倒中は何もしない。
+  // drawTransform: 反映先の描画用Transform。位置は保持座標から作り直し、回転は保持している向きに、傾きを足す。Colliderと保持座標は変えない。
+  void ApplyAnimation(Transform& drawTransform) const;
+
   //========= 表示=========
   // Cube描画に使う共有Renderer。非所有で、ModelRegistryが所有する。未取得はnullptr。
   BasicMeshRenderer* m_cubeRenderer{};
@@ -130,7 +142,7 @@ private:
   bool m_isTelegraphing{};
 
   //========= アニメーション=========
-  // 待機の揺れの位相と、怯みの傾きの向き。簡易アニメーションの状態をまとめて保持する。
+  // 待機の揺れの位相・怯みの傾きの向き・予告の経過時間・突進の残り時間。簡易アニメーションの状態をまとめて保持する。
   ENEMY_ANIMATION_STATE m_animation{};
 
   //========= 種類=========

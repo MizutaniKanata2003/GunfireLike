@@ -1,11 +1,11 @@
 ﻿#include "../H/Enemy.h"
 
-// 敵1体のHP・怯み・転倒・射撃のダメージの印・向き・Collider登録・Cube表示（待機の揺れ・怯みの傾きを含む）を実装する。
+// 敵1体のHP・怯み・転倒・射撃のダメージの印・向き・Collider登録・Cube表示（待機の揺れ・怯みの傾き・予告の前傾・攻撃の突進を含む）を実装する。
 // 種類ごとのHP・当たり・大きさ・色はEnemyTableから、アニメーションの数値はEnemyAnimationTableから読み、怯みと転倒の時間と状態の色は、このファイルの定数にまとめた仮値。
 
 //========= C++標準ライブラリ インクルード=========
-#include <algorithm> // std::minで、怯みの傾きの強さを1以下に制限する。
-#include <cmath> // std::atan2で敵から目標への水平方向をY軸まわりの回転角へ変換し、std::sinで待機の揺れの高さを求め、std::floorで揺れの位相を0以上1未満へ戻す。
+#include <algorithm> // std::minで、怯みの傾きと予告の前傾の強さを1以下に制限する。
+#include <cmath> // std::atan2で敵から目標への水平方向をY軸まわりの回転角へ変換し、std::sin・std::cosで待機の揺れ・突進の動き・正面方向を求め、std::floorで揺れの位相を0以上1未満へ戻す。
 
 //========= Framework インクルード=========
 #include "Framework/3D/H/BasicMeshRenderer.h"
@@ -67,6 +67,29 @@ namespace
     const float tilt_strength = std::min(1.0f,remainingSeconds / ns_FLINCH_SECONDS);
     return tiltSign * tilt_strength * ENEMY_ANIMATION::ns_FLINCH_TILT_RADIANS;
   }
+
+  // 攻撃の予告中の前傾の角度を返す。予告の開始から、表の時間をかけて、最大の角度へ近づく。
+  // telegraphSeconds: 攻撃の予告が続いている時間。単位は秒。
+  // 戻り値: 向きに対して前へ傾ける（Pitch）角度。単位はラジアン。正の値で、上部が正面側へ倒れる。
+  float CalculateTelegraphLean(float telegraphSeconds)
+  {
+    // 最大の角度に達した後は、予告が長引いても、それ以上傾けない。
+    const float lean_strength = std::min(1.0f,telegraphSeconds / ENEMY_ANIMATION::ns_TELEGRAPH_LEAN_SECONDS);
+    return lean_strength * ENEMY_ANIMATION::ns_TELEGRAPH_LEAN_RADIANS;
+  }
+
+  // 攻撃の突進で、正面へ出ている距離を返す。突進の開始と終わりは0で、中間で最大になる。
+  // remainingSeconds: 突進の残り時間。単位は秒。
+  // 戻り値: 正面へ出ている距離。単位はワールド距離単位。突進中でなければ0。
+  float CalculateLungeOffset(float remainingSeconds)
+  {
+    // 突進中でなければ、前へ出さない。
+    if(remainingSeconds <= 0.0f)return 0.0f;
+
+    // 経過の割合（0から1）を求め、sinの半周期で、出て戻る動きにする。
+    const float progress = 1.0f - remainingSeconds / ENEMY_ANIMATION::ns_ATTACK_LUNGE_SECONDS;
+    return std::sin(progress * ENEMY_ANIMATION::ns_PI) * ENEMY_ANIMATION::ns_ATTACK_LUNGE_DISTANCE;
+  }
 }
 
 //========= 初期化・終了関数=========
@@ -97,10 +120,10 @@ bool Enemy::Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,co
   m_isAlive = true;
   m_colliderHandle = collisionWorld.AddSphere(COLLISION_SPHERE{initParams.position,params.colliderRadius},COLLISION_LAYER::ns_ENEMY,initParams.enemyId);
 
-  // 待機の揺れの位相の初期値を、敵の識別値から決める。同時に生成した敵が揃って揺れないよう、1周を等分した位置へずらす。傾きの向きも初期化する。
+  // 簡易アニメーションの状態を初期値へ戻す。待機の揺れの位相の初期値は、敵の識別値から決め、同時に生成した敵が揃って揺れないよう、1周を等分した位置へずらす。
+  m_animation = ENEMY_ANIMATION_STATE{};
   const std::uint32_t phase_step = initParams.enemyId % ENEMY_ANIMATION::ns_IDLE_PHASE_STEP_COUNT;
   m_animation.idleBobPhase = static_cast<float>(phase_step) / static_cast<float>(ENEMY_ANIMATION::ns_IDLE_PHASE_STEP_COUNT);
-  m_animation.flinchTiltSign = 1.0f;
   return true;
 }
 
@@ -125,12 +148,29 @@ void Enemy::Uninit(CollisionWorld& collisionWorld)
 }
 
 //========= 更新・描画関数=========
-// 怯み・転倒・射撃のダメージの印の残り時間を減らし、待機の揺れの位相を進める。
+// 怯み・転倒・射撃のダメージの印の残り時間を減らし、待機の揺れの位相・予告の経過時間・攻撃の突進の残り時間を進める。
 void Enemy::Update(float deltaTime)
 {
   // 待機の揺れの位相を進め、1周を超えた分を除いて、0以上1未満に保つ。転倒中の揺れは、描画側で止めるため、位相は進め続ける。
   m_animation.idleBobPhase += deltaTime * ENEMY_ANIMATION::ns_IDLE_BOB_CYCLES_PER_SECOND;
   m_animation.idleBobPhase -= std::floor(m_animation.idleBobPhase);
+
+  // 攻撃の予告中の間だけ、前傾に使う経過時間を進める。予告でなくなったら0へ戻し、次の予告を最初から数える。
+  if(m_isTelegraphing){
+    m_animation.telegraphSeconds += deltaTime;
+  }
+  else{
+    m_animation.telegraphSeconds = 0.0f;
+  }
+
+  // 突進中の場合だけ時間を進め、0未満にならないようにする。突進中でなければ何もしない。
+  if(m_animation.lungeRemainingSeconds > 0.0f){
+    m_animation.lungeRemainingSeconds -= deltaTime;
+    // 残り時間が0以下になったら、突進を終えて0にそろえる。
+    if(m_animation.lungeRemainingSeconds < 0.0f){
+      m_animation.lungeRemainingSeconds = 0.0f;
+    }
+  }
 
   // 怯み中の場合だけ時間を進め、0未満にならないようにする。怯みでなければ何もしない。
   if(m_flinchRemainingSeconds > 0.0f){
@@ -197,6 +237,16 @@ void Enemy::SetFacing(const XMFLOAT3& targetPosition)
   m_transform.SetRotation(XMFLOAT3{0.0f,std::atan2(offset_x,offset_z),0.0f});
 }
 
+// 攻撃の突進を、最初から始める。
+void Enemy::StartAttackLunge()
+{
+  // 死亡している敵は描画されないため、突進を始めない。
+  if(!m_isAlive)return;
+
+  // 突進の残り時間を、表の時間へ設定する。すでに突進中の場合も、最初から数え直す。
+  m_animation.lungeRemainingSeconds = ENEMY_ANIMATION::ns_ATTACK_LUNGE_SECONDS;
+}
+
 // 生きている間だけ、Cubeを描く。
 void Enemy::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix) const
 {
@@ -224,15 +274,8 @@ void Enemy::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const
     color = ns_TELEGRAPH_COLOR;
   }
 
-  // 転倒中以外は、待機の揺れの量を高さへ足す。転倒中は、倒れたまま揺らさない。位置を変えるのは描画用のTransformだけで、Colliderと保持座標は変えない。
-  if(!IsKnockedDown()){
-    draw_transform.SetPosition(XMFLOAT3{m_position.x,m_position.y + CalculateIdleBobOffset(m_animation.idleBobPhase),m_position.z});
-  }
-  // 怯み中は、向き（PitchとYaw）を保ったまま、Rollだけを傾ける。Z軸は敵の正面方向のため、傾きは正面から見て横方向になる。
-  if(IsFlinching()){
-    const XMFLOAT3& facing_rotation = m_transform.GetRotation();
-    draw_transform.SetRotation(XMFLOAT3{facing_rotation.x,facing_rotation.y,CalculateFlinchTilt(m_flinchRemainingSeconds,m_animation.flinchTiltSign)});
-  }
+  // 簡易アニメーション（揺れ・突進・傾き・前傾）を、描画用のTransformへ反映する。転倒中は、反映の中で何もしない。
+  ApplyAnimation(draw_transform);
 
   // View行列とProjection行列、および、決めた色・UV倍率1・Object画像を、それぞれ1つの構造体にまとめて、Cubeを描く。
   const CAMERA_MATRICES camera{viewMatrix,projectionMatrix};
@@ -296,7 +339,7 @@ void Enemy::Respawn(CollisionWorld& collisionWorld)
   // 未初期化（Rendererを借用していない）の場合は、生き返らせる対象がないため戻る。
   if(m_cubeRenderer == nullptr)return;
 
-  // HPを満タンにして、怯みと転倒と射撃のダメージの印と、攻撃の予告の表示を解除する。
+  // HPを満タンにして、怯みと転倒と射撃のダメージの印と、攻撃の予告の表示と、予告の前傾・攻撃の突進を解除する。
   const ENEMY_PARAMS& params = ENEMY_TABLE::GetParams(m_kind);
   m_currentHP = params.maxHP;
   m_flinchRemainingSeconds = 0.0f;
@@ -304,6 +347,8 @@ void Enemy::Respawn(CollisionWorld& collisionWorld)
   m_shotDamageMarkRemainingSeconds = 0.0f;
   m_shotDamageScale = 1.0f;
   m_isTelegraphing = false;
+  m_animation.telegraphSeconds = 0.0f;
+  m_animation.lungeRemainingSeconds = 0.0f;
 
   // 死亡中だった場合だけ、Colliderを同じ位置へ登録し直して生きている状態にする。生きている場合は二重登録しない。
   if(!m_isAlive){
@@ -323,4 +368,30 @@ float Enemy::GetMaxHP() const
 COLLISION_SPHERE Enemy::GetBodySphere() const
 {
   return COLLISION_SPHERE{m_position,ENEMY_TABLE::GetParams(m_kind).colliderRadius};
+}
+
+//========= 描画の補助関数=========
+// 簡易アニメーションを、描画用のTransformへ反映する。
+void Enemy::ApplyAnimation(Transform& drawTransform) const
+{
+  // 転倒中は、倒れたまま動かさないため、揺れ・突進・傾きを全て止める。
+  if(IsKnockedDown())return;
+
+  // 保持している向き（Yaw）を、正面方向の計算と、回転の基準に使う。
+  const XMFLOAT3& facing_rotation = m_transform.GetRotation();
+
+  // 待機の揺れを高さへ、突進を正面方向の水平位置へ足す。正面方向は、Yawから求める。位置を変えるのは描画用のTransformだけで、Colliderと保持座標は変えない。
+  const float lunge_offset = CalculateLungeOffset(m_animation.lungeRemainingSeconds);
+  const float lunge_x = std::sin(facing_rotation.y) * lunge_offset;
+  const float lunge_z = std::cos(facing_rotation.y) * lunge_offset;
+  drawTransform.SetPosition(XMFLOAT3{m_position.x + lunge_x,m_position.y + CalculateIdleBobOffset(m_animation.idleBobPhase),m_position.z + lunge_z});
+
+  // 怯み中は、向き（PitchとYaw）を保ったまま、Rollだけを傾ける。Z軸は敵の正面方向のため、傾きは正面から見て横方向になる。
+  if(IsFlinching()){
+    drawTransform.SetRotation(XMFLOAT3{facing_rotation.x,facing_rotation.y,CalculateFlinchTilt(m_flinchRemainingSeconds,m_animation.flinchTiltSign)});
+  }
+  // 攻撃の予告中は、向き（YawとRoll）を保ったまま、Pitchで前へ傾ける。怯みの傾きを優先する。
+  else if(m_isTelegraphing){
+    drawTransform.SetRotation(XMFLOAT3{CalculateTelegraphLean(m_animation.telegraphSeconds),facing_rotation.y,facing_rotation.z});
+  }
 }
