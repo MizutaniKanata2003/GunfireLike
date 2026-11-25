@@ -72,8 +72,10 @@ struct SKINNED_BONE
 // 材質1つ。画像の情報だけを持つ。
 struct SKINNED_MATERIAL
 {
-  // 拡散色の画像のパス。FBXに埋め込まれた画像の場合は、「*0」のように、先頭が*の番号。画像がなければ空。
+  // 拡散色の画像のパス。FBXに書かれた元のパス。埋め込まれた画像は、このパスの名前で、探せる。画像がなければ空。
   std::string diffuseTexturePath{};
+  // FBXに埋め込まれた、拡散色の画像のファイルの中身。PNG・JPEGなどの、圧縮された形式のまま。埋め込まれていなければ空。
+  std::vector<std::uint8_t> diffuseImageData{};
 };
 
 // FBX 1ファイルから読み込んだ、スキニング付きモデルのデータ。

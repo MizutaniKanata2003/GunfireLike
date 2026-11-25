@@ -193,6 +193,16 @@ namespace
     return ApplyBoneWeights(mesh,base_vertex,boneLookup,model);
   }
 
+  // パスの名前で、FBXに埋め込まれた画像を探し、ファイルの中身を、そのままコピーして返す。圧縮された形式（高さ0）だけ、対応する。なければ空。
+  std::vector<std::uint8_t> ExtractEmbeddedImage(const aiScene& scene,const char* texturePath)
+  {
+    const aiTexture* texture = scene.GetEmbeddedTexture(texturePath);
+    if(texture == nullptr || texture->mHeight != 0 || texture->pcData == nullptr)return std::vector<std::uint8_t>{};
+
+    const std::uint8_t* head = reinterpret_cast<const std::uint8_t*>(texture->pcData);
+    return std::vector<std::uint8_t>(head,head + texture->mWidth);
+  }
+
   // 材質ごとに、拡散色の画像のパスを、modelへ書き込む。
   void AppendMaterials(const aiScene& scene,SKINNED_MODEL_DATA& model)
   {
@@ -201,6 +211,7 @@ namespace
       aiString texture_path;
       if(scene.mMaterials[material_index]->GetTexture(aiTextureType_DIFFUSE,0,&texture_path) == AI_SUCCESS){
         material.diffuseTexturePath = texture_path.C_Str();
+        material.diffuseImageData = ExtractEmbeddedImage(scene,texture_path.C_Str());
       }
       model.materials.push_back(material);
     }
@@ -211,22 +222,33 @@ namespace
   void LogSummary(const std::wstring& filePath,const SKINNED_MODEL_DATA& model)
   {
     Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_ASSET,
-      L"FBXを読み込みました: " + filePath
-      + L" | 頂点 " + std::to_wstring(model.vertices.size())
-      + L" / Index " + std::to_wstring(model.indices.size())
-      + L" / 描画範囲 " + std::to_wstring(model.submeshes.size())
-      + L" / ノード " + std::to_wstring(model.nodes.size())
-      + L" / ボーン " + std::to_wstring(model.bones.size())
-      + L" / 材質 " + std::to_wstring(model.materials.size())
-      + L" / 埋込画像 " + std::to_wstring(model.embeddedTextureCount)
-      + L" / 重みなし頂点 " + std::to_wstring(model.unweightedVertexCount));
+                  L"FBXを読み込みました: " + filePath
+                  + L" | 頂点 " + std::to_wstring(model.vertices.size())
+                  + L" / Index " + std::to_wstring(model.indices.size())
+                  + L" / 描画範囲 " + std::to_wstring(model.submeshes.size())
+                  + L" / ノード " + std::to_wstring(model.nodes.size())
+                  + L" / ボーン " + std::to_wstring(model.bones.size())
+                  + L" / 材質 " + std::to_wstring(model.materials.size())
+                  + L" / 埋込画像 " + std::to_wstring(model.embeddedTextureCount)
+                  + L" / 重みなし頂点 " + std::to_wstring(model.unweightedVertexCount));
 
     for(std::size_t material_index = 0; material_index < model.materials.size(); ++material_index){
       Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_ASSET,
-        L"  材質 " + std::to_wstring(material_index) + L" の画像: " + ToWide(model.materials[material_index].diffuseTexturePath));
+                    L"  材質 " + std::to_wstring(material_index) + L" の画像: " + ToWide(model.materials[material_index].diffuseTexturePath)
+                    + L" | 取り出した埋込画像 " + std::to_wstring(model.materials[material_index].diffuseImageData.size()) + L" バイト");
     }
   }
 
+  // FBXに埋め込まれた全ての画像の、名前・形式・大きさを、Infoのログへ出す。形式は、圧縮された形式なら、拡張子の文字。
+  void LogEmbeddedTextures(const aiScene& scene)
+  {
+    for(unsigned int texture_index = 0; texture_index < scene.mNumTextures; ++texture_index){
+      const aiTexture& texture = *scene.mTextures[texture_index];
+      Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_ASSET,
+                    L"  埋込画像 " + std::to_wstring(texture_index) + L": " + ToWide(texture.mFilename.C_Str())
+                    + L" | 形式 " + ToWide(texture.achFormatHint) + L" | 幅 " + std::to_wstring(texture.mWidth) + L" / 高さ " + std::to_wstring(texture.mHeight));
+    }
+  }
   // 読込の失敗を、Errorのログへ出す。
   void LogFailure(const std::wstring& filePath,const std::wstring& reason)
   {
@@ -270,5 +292,6 @@ bool SkinnedModelLoader::Load(const std::wstring& filePath,SKINNED_MODEL_DATA& o
   AppendMaterials(*scene,outModel);
   outModel.embeddedTextureCount = scene->mNumTextures;
   LogSummary(filePath,outModel);
+  LogEmbeddedTextures(*scene);
   return true;
 }
