@@ -41,6 +41,10 @@ namespace HUD_LAYOUT
   //========= 低HP警告=========
   // 画面全体を覆う、周辺が赤くなる警告。1280×720。
   inline constexpr UI_IMAGE_LAYOUT ns_LOW_HP_WARNING{L"Assets/Textures/UI/LowHpWarning.png",{0.0f,0.0f},{1280.0f,720.0f}};
+
+  //========= 速度線=========
+  // スライディング中に、画面全体へ重ねる、画面の縁へ向かう白い線。中央は透明。1280×720。
+  inline constexpr UI_IMAGE_LAYOUT ns_SLIDE_LINES{L"Assets/Textures/UI/SlideLines.png",{0.0f,0.0f},{1280.0f,720.0f}};
 }
 
 // 報酬選択の画像の配置をまとめる。画像は、Assets/Textures/UI/へ置く。
