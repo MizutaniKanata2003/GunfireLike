@@ -1,6 +1,6 @@
 ﻿#include "../H/SkinnedAnimationPlayer.h"
 
-// ボーン行列の計算を実装する。ノードとチャンネルの対応づけ、キーの補間（位置・拡大は直線、回転は球面）、階層の変換の合成、逆バインド行列との合成を行う。
+// ボーン行列の計算を実装する。ノードとチャンネルの対応づけ、キーの補間（位置・拡大は直線、回転は球面）、2つの動きの混ぜ合わせ、階層の変換の合成、逆バインド行列との合成を行う。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::upper_boundでキーを探し、std::clampで補間の割合を0〜1へ制限する。
@@ -11,7 +11,7 @@
 //========= Framework インクルード=========
 #include "Framework/Etc/H/Logger.h"
 
-// キーの探索と補間の補助関数をまとめる。
+// キーの探索と補間、姿勢の合成と混ぜ合わせの補助関数をまとめる。
 namespace
 {
   //========= キーの補助関数=========
@@ -55,6 +55,27 @@ namespace
 
     const float ratio = CalculateRatio(keys[index].timeSeconds,keys[index + 1].timeSeconds,timeSeconds);
     return XMQuaternionNormalize(XMQuaternionSlerp(start_rotation,XMLoadFloat4(&keys[index + 1].value),ratio));
+  }
+
+  //========= 姿勢の補助関数=========
+  // 姿勢を、行ベクトルの向きで「拡大 × 回転 × 位置」の順に合成した行列にする。
+  XMMATRIX ComposePoseMatrix(const ANIMATION_NODE_POSE& pose)
+  {
+    const XMMATRIX scale_rotation = XMMatrixMultiply(XMMatrixScalingFromVector(XMLoadFloat3(&pose.scale)),XMMatrixRotationQuaternion(XMLoadFloat4(&pose.rotation)));
+    return XMMatrixMultiply(scale_rotation,XMMatrixTranslationFromVector(XMLoadFloat3(&pose.translation)));
+  }
+
+  // 2つの姿勢を混ぜる。拡大と位置は直線補間、回転は球面補間。
+  // from: 割合0の姿勢。
+  // to: 割合1の姿勢。
+  // weight: 割合。0〜1。
+  ANIMATION_NODE_POSE BlendPose(const ANIMATION_NODE_POSE& from,const ANIMATION_NODE_POSE& to,float weight)
+  {
+    ANIMATION_NODE_POSE blended{};
+    XMStoreFloat3(&blended.scale,XMVectorLerp(XMLoadFloat3(&from.scale),XMLoadFloat3(&to.scale),weight));
+    XMStoreFloat4(&blended.rotation,XMQuaternionNormalize(XMQuaternionSlerp(XMLoadFloat4(&from.rotation),XMLoadFloat4(&to.rotation),weight)));
+    XMStoreFloat3(&blended.translation,XMVectorLerp(XMLoadFloat3(&from.translation),XMLoadFloat3(&to.translation),weight));
+    return blended;
   }
 }
 
@@ -134,15 +155,24 @@ void SkinnedAnimationPlayer::Evaluate(float timeSeconds,BoneMatrixArray& outBone
   outBoneMatrices.fill(identity);
   if(m_model == nullptr)return;
 
-  // 全てのノードの全体の変換を求め、ボーンごとに「逆バインド行列 × ノードの全体の変換 × 根の逆行列」を合成する。
-  ComputeGlobalTransforms(timeSeconds);
-  const XMMATRIX global_inverse = XMLoadFloat4x4(&m_model->globalInverseTransform);
-  for(std::size_t bone_index = 0; bone_index < m_model->bones.size(); ++bone_index){
-    const SKINNED_BONE& bone = m_model->bones[bone_index];
-    const XMMATRIX offset = XMLoadFloat4x4(&bone.offsetMatrix);
-    const XMMATRIX node_global = XMLoadFloat4x4(&m_globalTransforms[static_cast<std::size_t>(bone.nodeIndex)]);
-    XMStoreFloat4x4(&outBoneMatrices[bone_index],XMMatrixMultiply(XMMatrixMultiply(offset,node_global),global_inverse));
-  }
+  ComputeGlobalTransforms(timeSeconds,nullptr);
+  ComposeBoneMatrices(outBoneMatrices);
+}
+
+// 直前の動きと混ぜた、全ボーンの最終の行列を計算する。
+void SkinnedAnimationPlayer::EvaluateBlended(float timeSeconds,const ANIMATION_BLEND_INPUT& blendInput,BoneMatrixArray& outBoneMatrices)
+{
+  // 先に全て単位行列にして、使わない分と、借用していない場合に備える。
+  XMFLOAT4X4 identity{};
+  XMStoreFloat4x4(&identity,XMMatrixIdentity());
+  outBoneMatrices.fill(identity);
+  if(m_model == nullptr)return;
+
+  // 混ぜる相手がない、または、別のモデルの場合は、この動きだけで計算する。
+  const SkinnedAnimationPlayer* previous_player = blendInput.previousPlayer;
+  const bool can_blend = previous_player != nullptr && previous_player->m_model == m_model;
+  ComputeGlobalTransforms(timeSeconds,can_blend ? &blendInput : nullptr);
+  ComposeBoneMatrices(outBoneMatrices);
 }
 
 // アニメーションの長さを返す。
@@ -153,10 +183,10 @@ float SkinnedAnimationPlayer::GetDurationSeconds() const
 
 //========= 計算の補助関数=========
 // 全てのノードの、親を含めた全体の変換を計算する。ノードは親が先に並ぶため、先頭から順に、親の結果を使える。
-void SkinnedAnimationPlayer::ComputeGlobalTransforms(float timeSeconds)
+void SkinnedAnimationPlayer::ComputeGlobalTransforms(float timeSeconds,const ANIMATION_BLEND_INPUT* blend)
 {
   for(std::size_t node_index = 0; node_index < m_model->nodes.size(); ++node_index){
-    const XMMATRIX local_transform = BuildLocalTransform(static_cast<int>(node_index),timeSeconds);
+    const XMMATRIX local_transform = BuildLocalTransform(static_cast<int>(node_index),timeSeconds,blend);
     const int parent_index = m_model->nodes[node_index].parentIndex;
 
     // 根は、親から見た変換が、そのまま全体の変換。それ以外は、行ベクトルの向きで、「自分 × 親」。
@@ -169,26 +199,59 @@ void SkinnedAnimationPlayer::ComputeGlobalTransforms(float timeSeconds)
   }
 }
 
-// ノード1つの、親から見た変換を作る。
-XMMATRIX SkinnedAnimationPlayer::BuildLocalTransform(int nodeIndex,float timeSeconds) const
+// ボーンごとに「逆バインド行列 × ノードの全体の変換 × 根の逆行列」を合成して出力する。
+void SkinnedAnimationPlayer::ComposeBoneMatrices(BoneMatrixArray& outBoneMatrices) const
 {
-  // チャンネルがないノードは、基準の姿勢のまま。
-  const SKINNED_NODE& node = m_model->nodes[static_cast<std::size_t>(nodeIndex)];
-  const XMMATRIX bind_transform = XMLoadFloat4x4(&node.localTransform);
-  const int channel_index = m_channelIndexByNode[static_cast<std::size_t>(nodeIndex)];
-  if(channel_index < 0)return bind_transform;
+  const XMMATRIX global_inverse = XMLoadFloat4x4(&m_model->globalInverseTransform);
+  for(std::size_t bone_index = 0; bone_index < m_model->bones.size(); ++bone_index){
+    const SKINNED_BONE& bone = m_model->bones[bone_index];
+    const XMMATRIX offset = XMLoadFloat4x4(&bone.offsetMatrix);
+    const XMMATRIX node_global = XMLoadFloat4x4(&m_globalTransforms[static_cast<std::size_t>(bone.nodeIndex)]);
+    XMStoreFloat4x4(&outBoneMatrices[bone_index],XMMatrixMultiply(XMMatrixMultiply(offset,node_global),global_inverse));
+  }
+}
 
+// ノード1つの、親から見た変換を作る。
+XMMATRIX SkinnedAnimationPlayer::BuildLocalTransform(int nodeIndex,float timeSeconds,const ANIMATION_BLEND_INPUT* blend) const
+{
+  // どちらの動きにもチャンネルがないノードは、基準の姿勢のまま。基準の行列を、分解と合成で変えないよう、そのまま返す。
+  const std::size_t node_slot = static_cast<std::size_t>(nodeIndex);
+  const XMMATRIX bind_transform = XMLoadFloat4x4(&m_model->nodes[node_slot].localTransform);
+  const bool has_current_channel = m_channelIndexByNode[node_slot] >= 0;
+
+  // 混ぜない場合は、この動きだけの姿勢から作る。
+  if(blend == nullptr)return has_current_channel ? ComposePoseMatrix(SampleNodePose(nodeIndex,timeSeconds)) : bind_transform;
+
+  // 混ぜる場合は、直前の動きの姿勢から、今の動きの姿勢へ、割合で混ぜる。
+  const SkinnedAnimationPlayer& previous = *blend->previousPlayer;
+  if(!has_current_channel && previous.m_channelIndexByNode[node_slot] < 0)return bind_transform;
+
+  const ANIMATION_NODE_POSE previous_pose = previous.SampleNodePose(nodeIndex,blend->previousTimeSeconds);
+  return ComposePoseMatrix(BlendPose(previous_pose,SampleNodePose(nodeIndex,timeSeconds),blend->currentWeight));
+}
+
+// ノード1つの、親から見た姿勢を、この動きだけで求める。
+ANIMATION_NODE_POSE SkinnedAnimationPlayer::SampleNodePose(int nodeIndex,float timeSeconds) const
+{
   // 基準の姿勢を、拡大・回転・位置へ分け、キーのない種類の代わりに使う。
-  XMVECTOR bind_scale{};
-  XMVECTOR bind_rotation{};
-  XMVECTOR bind_translation{};
-  XMMatrixDecompose(&bind_scale,&bind_rotation,&bind_translation,bind_transform);
+  const std::size_t node_slot = static_cast<std::size_t>(nodeIndex);
+  XMVECTOR scale{};
+  XMVECTOR rotation{};
+  XMVECTOR translation{};
+  XMMatrixDecompose(&scale,&rotation,&translation,XMLoadFloat4x4(&m_model->nodes[node_slot].localTransform));
 
-  // 時刻の拡大・回転・位置を補間で求め、行ベクトルの向きで「拡大 × 回転 × 位置」の順に合成する。
-  const ANIMATION_CHANNEL& channel = m_clip->channels[static_cast<std::size_t>(channel_index)];
-  const XMVECTOR scale = SampleVector(channel.scaleKeys,timeSeconds,bind_scale);
-  const XMVECTOR rotation = SampleRotation(channel.rotationKeys,timeSeconds,bind_rotation);
-  const XMVECTOR translation = SampleVector(channel.positionKeys,timeSeconds,bind_translation);
-  const XMMATRIX scale_rotation = XMMatrixMultiply(XMMatrixScalingFromVector(scale),XMMatrixRotationQuaternion(rotation));
-  return XMMatrixMultiply(scale_rotation,XMMatrixTranslationFromVector(translation));
+  // チャンネルがあるノードだけ、時刻の拡大・回転・位置を、補間で求める。
+  const int channel_index = m_channelIndexByNode[node_slot];
+  if(channel_index >= 0){
+    const ANIMATION_CHANNEL& channel = m_clip->channels[static_cast<std::size_t>(channel_index)];
+    scale = SampleVector(channel.scaleKeys,timeSeconds,scale);
+    rotation = SampleRotation(channel.rotationKeys,timeSeconds,rotation);
+    translation = SampleVector(channel.positionKeys,timeSeconds,translation);
+  }
+
+  ANIMATION_NODE_POSE pose{};
+  XMStoreFloat3(&pose.scale,scale);
+  XMStoreFloat4(&pose.rotation,rotation);
+  XMStoreFloat3(&pose.translation,translation);
+  return pose;
 }

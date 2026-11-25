@@ -2,7 +2,8 @@
 
 // スキニング付きモデル1つと、アニメーション1本の組合せについて、指定した時刻の、全ボーンの最終の行列を計算するクラス。
 // 時刻から、ノードごとの位置・回転・拡大のキーを補間し、階層の親から順に変換を掛けて、逆バインド行列と合成する。
-// 再生の進行（時刻を進める・切り替える・混ぜる）、GPUへの転送、描画は担当しない。時刻は、呼出側が持つ。
+// 同じモデルの別の動きと、ノードごとの位置・回転・拡大の段階で混ぜる（クロスフェード）計算も行う。ボーン行列そのものを混ぜると、体が潰れるため、行わない。
+// 再生の進行（時刻を進める・切り替える・混ぜる割合を決める）、GPUへの転送、描画は担当しない。時刻は、呼出側が持つ。
 // モデルとアニメーションは借用し、所有しない。呼出側が、このクラスより長く生存させる。
 
 //========= C++標準ライブラリ インクルード=========
@@ -15,6 +16,31 @@
 
 // 全ボーンの最終の行列。添字は、SKINNED_MODEL_DATAのbonesの添字。使わない分は、単位行列。DirectXMathの向き（行ベクトル）のまま、転置していない。
 using BoneMatrixArray = std::array<XMFLOAT4X4,SKINNED_MODEL::ns_MAX_BONE_COUNT>;
+
+// ノード1つの、親から見た姿勢（拡大・回転・位置）。2つの動きを混ぜるために、行列へ合成する前の形で扱う。
+struct ANIMATION_NODE_POSE
+{
+  // 拡大。
+  XMFLOAT3 scale{1.0f,1.0f,1.0f};
+  // 回転。正規化したクォータニオン。
+  XMFLOAT4 rotation{0.0f,0.0f,0.0f,1.0f};
+  // 位置。
+  XMFLOAT3 translation{};
+};
+
+//========= 前方宣言=========
+class SkinnedAnimationPlayer;
+
+// 2つの動きを混ぜる時の、混ぜる相手（直前の動き）と、割合。EvaluateBlendedの引数の数を減らすための値の束。
+struct ANIMATION_BLEND_INPUT
+{
+  // 直前の動きの再生部。借用で、同じモデルのものであること。
+  const SkinnedAnimationPlayer* previousPlayer{};
+  // 直前の動きの時刻。単位は秒。範囲を整えた値を渡す。
+  float previousTimeSeconds{};
+  // 今の動きの割合。0で、直前の動きだけ、1で、今の動きだけ。
+  float currentWeight{1.0f};
+};
 
 // モデルとアニメーションの組合せから、ボーン行列を計算するクラス。
 class SkinnedAnimationPlayer final
@@ -40,6 +66,12 @@ public:
   // timeSeconds: 計算する時刻。単位は秒。範囲の外の値は、最初か最後のキーに止まる。繰り返しは、NormalizeTimeで整えてから渡す。
   // outBoneMatrices: 出力先。全てを書き換える。
   void Evaluate(float timeSeconds,BoneMatrixArray& outBoneMatrices);
+  // この動きと、直前の動き（同じモデル）を、ノードごとに、位置・拡大は直線補間、回転は球面補間で混ぜた、全ボーンの最終の行列を計算する。
+  // 混ぜる相手がない、または、別のモデルの場合は、Evaluateと同じ結果にする。
+  // timeSeconds: この動きの時刻。単位は秒。範囲を整えた値を渡す。
+  // blendInput: 直前の動きと、その時刻、今の動きの割合。
+  // outBoneMatrices: 出力先。全てを書き換える。
+  void EvaluateBlended(float timeSeconds,const ANIMATION_BLEND_INPUT& blendInput,BoneMatrixArray& outBoneMatrices);
   // アニメーションの長さを返す。単位は秒。借用していない場合は0。
   [[nodiscard]] float GetDurationSeconds() const;
 
@@ -47,12 +79,22 @@ private:
   //========= 計算の補助関数=========
   // 全てのノードの、親を含めた全体の変換を、親が先の順で計算し、m_globalTransformsへ書く。
   // timeSeconds: 計算する時刻。単位は秒。
-  void ComputeGlobalTransforms(float timeSeconds);
-  // ノード1つの、親から見た変換を作る。チャンネルがなければ基準の姿勢。キーの種類がなければ、その種類は基準の姿勢の値を使う。
+  // blend: 混ぜる相手。nullptrなら、この動きだけで計算する。
+  void ComputeGlobalTransforms(float timeSeconds,const ANIMATION_BLEND_INPUT* blend);
+  // m_globalTransformsから、ボーンごとの最終の行列を合成して出力する。
+  // outBoneMatrices: 出力先。使わない分は、単位行列のまま。
+  void ComposeBoneMatrices(BoneMatrixArray& outBoneMatrices) const;
+  // ノード1つの、親から見た変換を作る。どちらの動きにもチャンネルがなければ基準の姿勢。キーの種類がなければ、その種類は基準の姿勢の値を使う。
   // nodeIndex: ノードの番号。
   // timeSeconds: 計算する時刻。単位は秒。
+  // blend: 混ぜる相手。nullptrなら、この動きだけで計算する。
   // 戻り値: 親から見た変換。
-  [[nodiscard]] XMMATRIX BuildLocalTransform(int nodeIndex,float timeSeconds) const;
+  [[nodiscard]] XMMATRIX BuildLocalTransform(int nodeIndex,float timeSeconds,const ANIMATION_BLEND_INPUT* blend) const;
+  // ノード1つの、親から見た姿勢（拡大・回転・位置）を、この動きだけで求める。チャンネルがなければ、基準の姿勢を分解した値。
+  // nodeIndex: ノードの番号。
+  // timeSeconds: 計算する時刻。単位は秒。
+  // 戻り値: 親から見た姿勢。
+  [[nodiscard]] ANIMATION_NODE_POSE SampleNodePose(int nodeIndex,float timeSeconds) const;
 
   //========= 参照先=========
   // 借用したモデル。未登録はnullptr。

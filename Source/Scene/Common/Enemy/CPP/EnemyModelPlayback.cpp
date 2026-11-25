@@ -1,9 +1,9 @@
 ﻿#include "../H/EnemyModelPlayback.h"
 
-// 敵1体のモデルの動きの選択・時刻の進行・描画を実装する。数値は、EnemyAnimationTableと、このファイルの定数にまとめた仮値。
+// 敵1体のモデルの動きの選択・時刻の進行・動きの切替の補間・描画を実装する。数値は、EnemyAnimationTableと、このファイルの定数にまとめた仮値。
 
 //========= C++標準ライブラリ インクルード=========
-#include <algorithm> // std::clampで、死亡の動きの進行の割合を0〜1へ制限する。
+#include <algorithm> // std::clampで、死亡の動きの進行の割合と、補間の割合を0〜1へ制限する。
 
 //========= Scene インクルード=========
 #include "Scene/Common/Enemy/H/EnemyAnimationTable.h"
@@ -18,6 +18,12 @@ namespace
   constexpr float ns_MOVE_START_SPEED = 0.5f;
   // 止まったと判定する、水平の速さの閾値（移動中の状態から）。開始の閾値より小さくし、境目で判定が入れ替わらないようにする。単位はワールド距離単位/秒。
   constexpr float ns_MOVE_STOP_SPEED = 0.2f;
+
+  //========= 動きの補間=========
+  // 動きの切替を、前の動きから混ぜる時間。単位は秒。待機・移動・攻撃・起き上がりへの切替に使う。仮値。
+  constexpr float ns_BLEND_SECONDS = 0.2f;
+  // 怯み・転倒・死亡へ切り替える時の、補間の時間。単位は秒。被弾への反応が遅れないよう、短くする。仮値。
+  constexpr float ns_QUICK_BLEND_SECONDS = 0.08f;
 
   //========= 死亡時の高さの補正=========
   // 倒れた体が床に埋まらないよう、死亡の動きの最後に、描画だけを持ち上げる量。単位はワールド距離単位。動きの進行に比例して、0から、この量まで上げる。
@@ -62,6 +68,24 @@ namespace
     }
   }
 
+  // 切り替える先の動きに応じた、補間の時間を返す。怯み・転倒・死亡は、短い。
+  // nextClip: 切り替える先の動き。
+  // 戻り値: 補間の時間。単位は秒。
+  float GetBlendSeconds(ENEMY_CLIP nextClip)
+  {
+    const bool is_quick = nextClip == ENEMY_CLIP::e_HIT || nextClip == ENEMY_CLIP::e_DOWN || nextClip == ENEMY_CLIP::e_DEATH;
+    return is_quick ? ns_QUICK_BLEND_SECONDS : ns_BLEND_SECONDS;
+  }
+
+  // 補間の経過から、今の動きの割合を返す。始まりと終わりが滑らかになるよう、3次の補間（smoothstep）にする。
+  // blend: 補間の状態。durationSecondsが正であること。
+  // 戻り値: 今の動きの割合。0〜1。
+  float CalculateBlendWeight(const ENEMY_CLIP_BLEND& blend)
+  {
+    const float ratio = std::clamp(blend.elapsedSeconds / blend.durationSeconds,0.0f,1.0f);
+    return ratio * ratio * (3.0f - 2.0f * ratio);
+  }
+
   // 死亡の動きの進行に応じて、描画の高さへ足す量を返す。死亡以外の動きは、0。
   // clip: 再生中の動き。
   // clipTimeSeconds: 動きの時刻。単位は秒。
@@ -76,12 +100,13 @@ namespace
 }
 
 //========= 設定・初期化関数=========
-// 動きの状態を、待機の最初へ戻す。
+// 動きの状態を、待機の最初へ戻し、補間を止める。
 void EnemyModelPlayback::Reset(const XMFLOAT3& position,float idleStartSeconds)
 {
   m_clip = ENEMY_CLIP::e_IDLE;
   m_clipTimeSeconds = idleStartSeconds;
   m_clipHoldSeconds = 0.0f;
+  m_blend = ENEMY_CLIP_BLEND{};
   m_lastPosition = position;
   m_isMoving = false;
   m_wasTelegraphing = false;
@@ -90,9 +115,7 @@ void EnemyModelPlayback::Reset(const XMFLOAT3& position,float idleStartSeconds)
 // 死亡の動きを、最初から始める。
 void EnemyModelPlayback::StartDeath()
 {
-  m_clip = ENEMY_CLIP::e_DEATH;
-  m_clipTimeSeconds = 0.0f;
-  m_clipHoldSeconds = 0.0f;
+  SwitchClip(ENEMY_CLIP::e_DEATH);
 }
 
 //========= 更新・描画関数=========
@@ -116,14 +139,13 @@ void EnemyModelPlayback::Update(const ENEMY_PLAYBACK_STATE& state,float deltaTim
   const bool is_finished = current_player == nullptr || m_clipTimeSeconds >= current_player->GetDurationSeconds();
   const ENEMY_CLIP next_clip = ApplyLocomotionHold(ChooseClip(state,is_finished));
 
-  // 動きが変わった時と、攻撃の予告が始まった時は、最初から数え直す。連続した攻撃で、前の攻撃の動きが残らないようにする。
+  // 動きが変わった時と、攻撃の予告が始まった時は、補間を始めて、最初から数え直す。連続した攻撃で、前の攻撃の動きが残らないようにする。
   if(next_clip != m_clip || (is_telegraph_start && next_clip == ENEMY_CLIP::e_ATTACK)){
-    m_clip = next_clip;
-    m_clipTimeSeconds = 0.0f;
-    m_clipHoldSeconds = 0.0f;
+    SwitchClip(next_clip);
   }
   m_clipTimeSeconds += deltaTime * GetClipSpeed(m_clip);
   m_clipHoldSeconds += deltaTime;
+  AdvanceBlend(deltaTime);
 }
 
 // モデルで描く。
@@ -146,9 +168,9 @@ bool EnemyModelPlayback::Draw(GraphicsSystem& graphicsSystem,const CAMERA_MATRIC
   XMFLOAT3 draw_position = state.position;
   draw_position.y += CalculateDeathLift(m_clip,m_clipTimeSeconds,duration_seconds);
 
-  // 時刻を整えて、全ボーンの行列を求め、位置・向き・倍率から作ったワールド行列で描く。
+  // 全ボーンの行列を求め（補間中は直前の動きと混ぜ）、位置・向き・倍率から作ったワールド行列で描く。
   BoneMatrixArray bone_matrices{};
-  player->Evaluate(player->NormalizeTime(m_clipTimeSeconds,IsLoopingClip(m_clip)),bone_matrices);
+  EvaluateBoneMatrices(appearance,*player,bone_matrices);
   SKINNED_DRAW_PARAMS draw_params{};
   draw_params.worldMatrix = EnemyModelLibrary::BuildWorldMatrix(appearance,draw_position,state.yawRadians);
   draw_params.boneMatrices = &bone_matrices;
@@ -199,4 +221,52 @@ ENEMY_CLIP EnemyModelPlayback::ApplyLocomotionHold(ENEMY_CLIP desiredClip) const
   if(is_locomotion_switch && m_clipHoldSeconds < ns_LOCOMOTION_MIN_HOLD_SECONDS)return m_clip;
 
   return desiredClip;
+}
+
+// 動きを切り替え、直前の動きから、短い時間で混ぜる。
+void EnemyModelPlayback::SwitchClip(ENEMY_CLIP nextClip)
+{
+  // 直前の動きと、その時刻を、補間の元として残す。補間の途中で、さらに切り替わった場合は、その時点の動きだけを、元にする。
+  m_blend.isActive = true;
+  m_blend.previousClip = m_clip;
+  m_blend.previousTimeSeconds = m_clipTimeSeconds;
+  m_blend.elapsedSeconds = 0.0f;
+  m_blend.durationSeconds = GetBlendSeconds(nextClip);
+
+  // 今の動きを切り替え、時刻と保持の時間を、0へ戻す。
+  m_clip = nextClip;
+  m_clipTimeSeconds = 0.0f;
+  m_clipHoldSeconds = 0.0f;
+}
+
+// 補間を進める。
+void EnemyModelPlayback::AdvanceBlend(float deltaTime)
+{
+  if(!m_blend.isActive)return;
+
+  // 直前の動きの時刻も、補間の間は進め、動きが止まって見えないようにする。補間の時間が過ぎたら、終える。
+  m_blend.previousTimeSeconds += deltaTime * GetClipSpeed(m_blend.previousClip);
+  m_blend.elapsedSeconds += deltaTime;
+  if(m_blend.elapsedSeconds >= m_blend.durationSeconds){
+    m_blend.isActive = false;
+  }
+}
+
+//========= 描画の補助関数=========
+// 全ボーンの最終の行列を求める。
+void EnemyModelPlayback::EvaluateBoneMatrices(ENEMY_APPEARANCE appearance,SkinnedAnimationPlayer& player,BoneMatrixArray& outBoneMatrices) const
+{
+  // 今の動きの時刻を、動きの範囲へ整える。
+  const float current_time = player.NormalizeTime(m_clipTimeSeconds,IsLoopingClip(m_clip));
+
+  // 補間中でなければ、または、直前の動きの再生部がなければ、今の動きだけで求める。
+  SkinnedAnimationPlayer* previous_player = m_blend.isActive ? m_library->FindPlayer(appearance,m_blend.previousClip) : nullptr;
+  if(previous_player == nullptr){
+    player.Evaluate(current_time,outBoneMatrices);
+    return;
+  }
+
+  // 直前の動きと、その時刻、今の動きの割合を渡して、混ぜる。
+  const float previous_time = previous_player->NormalizeTime(m_blend.previousTimeSeconds,IsLoopingClip(m_blend.previousClip));
+  player.EvaluateBlended(current_time,ANIMATION_BLEND_INPUT{previous_player,previous_time,CalculateBlendWeight(m_blend)},outBoneMatrices);
 }

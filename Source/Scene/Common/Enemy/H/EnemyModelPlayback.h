@@ -1,8 +1,8 @@
 ﻿#pragma once
 
-// 敵1体の、モデルの動き（状態から動きを選ぶ・時刻を進める・ボーン行列を求めて描く）を担当する。
+// 敵1体の、モデルの動き（状態から動きを選ぶ・時刻を進める・動きの切替を補間する・ボーン行列を求めて描く）を担当する。
 // 共有の読込（EnemyModelLibrary）は、借用するだけで、所有しない。敵の状態（HP・怯み・転倒など）は持たず、毎回の更新と描画で、呼出側（Enemy）が渡す。
-// 動きの補間（H8e-3b-2）、歩きの速度（H8e-3c）、死体のフェード（H8e-3d）は、後の工程で追加する。
+// 歩きの速度（H8e-3c）、死体のフェード（H8e-3d）は、後の工程で追加する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <cstdint> // std::uint32_tで、敵の識別値を受け取る。
@@ -18,7 +18,7 @@
 //========= 前方宣言=========
 class GraphicsSystem;
 
-// 動きの選択と描画に使う、敵1体の状態。更新と描画の引数の数を減らすための値の束で、Enemyが毎回作って渡す。
+// 動きと描画に使う、敵1体の状態。更新と描画の引数の数を減らすための値の束で、Enemyが毎回作って渡す。
 struct ENEMY_PLAYBACK_STATE
 {
   // 敵の種類。見た目（モデル）を選ぶために使う。
@@ -41,6 +41,21 @@ struct ENEMY_PLAYBACK_STATE
   XMFLOAT4 color{1.0f,1.0f,1.0f,1.0f};
 };
 
+// 動きの切替の補間の状態。切替の直前の動きと、その時刻を保持し、短い時間で、今の動きへ混ぜていく。
+struct ENEMY_CLIP_BLEND
+{
+  // 補間中か。falseの間は、他の値を使わない。
+  bool isActive{};
+  // 切替の直前の動き。
+  ENEMY_CLIP previousClip{ENEMY_CLIP::e_IDLE};
+  // 直前の動きの時刻。単位は秒。補間の間も、進め続ける。
+  float previousTimeSeconds{};
+  // 補間を始めてからの経過時間。単位は秒。
+  float elapsedSeconds{};
+  // 補間にかける時間。単位は秒。
+  float durationSeconds{};
+};
+
 // 敵1体のモデルの動きを選び、時刻を進め、描くクラス。
 class EnemyModelPlayback final
 {
@@ -49,19 +64,19 @@ public:
   // 全ての敵が共有する、モデルと動きの読込を設定する。参照だけを保持し、所有しない。
   // library: 共有の読込。非所有で、このクラスが使い終わるまで生存させる。nullptrなら、描画はfalseを返す。
   void SetLibrary(EnemyModelLibrary* library) { m_library = library; }
-  // 動きの状態を、待機の最初へ戻す。共有の読込への参照は、変えない。
+  // 動きの状態を、待機の最初へ戻し、補間を止める。共有の読込への参照は、変えない。
   // position: 敵の位置。移動の判定の、基準の位置にする。
   // idleStartSeconds: 待機の動きの開始位置。単位は秒。
   void Reset(const XMFLOAT3& position,float idleStartSeconds);
-  // 死亡の動きを、最初から始める。倒された最初の描画から、死亡の動きになる。
+  // 死亡の動きを、最初から始める。倒された最初の描画から、死亡の動きになる。直前の動きからは、短い補間でつなぐ。
   void StartDeath();
 
   //========= 更新・描画関数=========
-  // 状態から動きを選び、変わった時は時刻を0へ戻し、変わらない時は進める。共有の読込がない場合や、時間が進まない場合は、何もしない。
+  // 状態から動きを選び、変わった時は補間を始めて時刻を0へ戻し、変わらない時は進める。共有の読込がない場合や、時間が進まない場合は、何もしない。
   // state: 敵の現在の状態。
   // deltaTime: この更新で進める経過時間。単位は秒。0以下なら何もしない。
   void Update(const ENEMY_PLAYBACK_STATE& state,float deltaTime);
-  // モデルで描く。読込済みの見た目と動きがある場合だけ描く。死亡後は、動きが終わり、保持の時間が過ぎたら、描かずに、trueを返す。
+  // モデルで描く。読込済みの見た目と動きがある場合だけ描く。補間中は、直前の動きと混ぜる。死亡後は、動きが終わり、保持の時間が過ぎたら、描かずに、trueを返す。
   // graphicsSystem: Rendererが使う描画基盤。
   // camera: View行列とProjection行列。
   // state: 敵の現在の状態。位置・向き・色を使う。
@@ -83,6 +98,19 @@ private:
   // desiredClip: 選ばれた動き。
   // 戻り値: 実際に再生する動き。
   [[nodiscard]] ENEMY_CLIP ApplyLocomotionHold(ENEMY_CLIP desiredClip) const;
+  // 動きを切り替える。直前の動きと、その時刻を、補間の元として残し、今の動きの時刻を0へ戻す。
+  // nextClip: 切り替える先の動き。
+  void SwitchClip(ENEMY_CLIP nextClip);
+  // 補間の経過時間と、直前の動きの時刻を進め、補間の時間が過ぎたら終える。
+  // deltaTime: この更新で進める経過時間。単位は秒。
+  void AdvanceBlend(float deltaTime);
+
+  //========= 描画の補助関数=========
+  // 全ボーンの最終の行列を求める。補間中で、直前の動きがあれば、混ぜた結果を、なければ、今の動きだけの結果を返す。
+  // appearance: 見た目。直前の動きの再生部を探すために使う。
+  // player: 今の動きの再生部。
+  // outBoneMatrices: 出力先。
+  void EvaluateBoneMatrices(ENEMY_APPEARANCE appearance,SkinnedAnimationPlayer& player,BoneMatrixArray& outBoneMatrices) const;
 
   //========= 参照先=========
   // 全ての敵が共有する、モデルと動きの読込。非所有で、EnemyControllerが所有する。未設定はnullptr。
@@ -95,6 +123,8 @@ private:
   float m_clipTimeSeconds{};
   // 現在の動きに切り替わってからの経過時間。単位は秒。待機と移動の最短の保持に使う。
   float m_clipHoldSeconds{};
+  // 動きの切替の補間の状態。
+  ENEMY_CLIP_BLEND m_blend{};
 
   //========= 判定用の履歴=========
   // 前回のUpdateでの位置。移動中かの判定に使う。
