@@ -62,30 +62,47 @@ void GameSession::Initialize()
   m_runController.Initialize();
 }
 
+// 工程の、バーの進み具合への重みを返す。
+float GameSession::GetInitStepWeight(int stepIndex)
+{
+  // 重みは、Debugの実測（敵のモデルの読込が、全体の大半）を参考にした仮値。見た目を確認して調整する。
+  constexpr float render_weight = 1.0f;
+  constexpr float model_weight = 5.0f;
+  constexpr float enemy_controller_weight = 0.2f;
+  constexpr float player_weight = 0.5f;
+  constexpr float wave_weight = 0.5f;
+
+  // 工程の並びは、RunInitStepと同じ。
+  const int model_count = static_cast<int>(ENEMY_MODEL::ns_APPEARANCE_COUNT);
+  if(stepIndex == 0)return render_weight;
+  if(stepIndex <= model_count)return model_weight;
+  if(stepIndex == model_count + 1)return enemy_controller_weight;
+  if(stepIndex == model_count + 2)return player_weight;
+  if(stepIndex == model_count + 3)return wave_weight;
+  return 1.0f;
+}
+
 // 初期化の工程を、番号の順に1つ実行する。
 bool GameSession::RunInitStep(int stepIndex)
 {
-  // 工程ごとに、対応する初期化を呼ぶ。順序は、後の対象が前の対象の参照を借用するため変えない。範囲外の番号は、失敗として扱う。
-  switch(stepIndex){
-    // 描画Resourceと、ステージの生成Objectを用意する。
-  case 0:
-  return InitRenderResources();
+  // 工程の並び: 描画Resource、敵の見た目ごとの読込、敵の更新への参照の登録、プレイヤー側とデバッグ、第1ウェーブ。順序は、後の対象が前の対象の参照を借用するため変えない。
+  const int model_count = static_cast<int>(ENEMY_MODEL::ns_APPEARANCE_COUNT);
+  if(stepIndex == 0)return InitRenderResources();
 
-  // 敵の更新へ参照を渡し、敵のモデルとアニメーションを読み込む。最も時間がかかる。
-  case 1:
-  return InitEnemyController();
-
-  // プレイヤー側・ショップ・報酬とショップの入力の受渡し・デバッグ操作へ、参照を渡す。
-  case 2:
-  return InitPlayerAndDebug();
-
-  // 第1部屋の敵を生成する。
-  case 3:
-  return TrySpawnCurrentWave();
-
-  default:
-  return false;
+  // 敵の見た目を1つ読み込む。読み込めなくても、ゲームは続ける。失敗した場合は、全て解放し、敵の更新の初期化（InitModelLibrary）が、もう一度、読み込みを試みる。
+  if(stepIndex >= 1 && stepIndex <= model_count){
+    EnemyModelLibrary& model_library = m_enemyController.GetModelLibrary();
+    if(!model_library.LoadAppearanceStep(m_graphicsSystem,static_cast<std::size_t>(stepIndex - 1))){
+      Logger::Write(e_LogLevel::e_WARNING,e_LogCategory::e_SCENE,L"GameSessionの敵のモデルの読込に失敗しました。Cubeで描画します。工程の番号: " + std::to_wstring(stepIndex));
+      model_library.Uninit();
+    }
+    return true;
   }
+
+  if(stepIndex == model_count + 1)return InitEnemyController();
+  if(stepIndex == model_count + 2)return InitPlayerAndDebug();
+  if(stepIndex == model_count + 3)return TrySpawnCurrentWave();
+  return false;
 }
 
 // 全ての工程が成功した後にだけ、ゲーム操作とBGMへ切り替える。

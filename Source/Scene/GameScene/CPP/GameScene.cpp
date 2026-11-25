@@ -2,9 +2,6 @@
 
 // GameSceneのライフサイクルを、読込画面とGameSessionへ中継し、読込からプレイへの暗転と、読込の失敗とプレイの結果（タイトルへ戻る・やり直し・クリア）を、遷移の予約へ反映する。
 
-//========= C++標準ライブラリ インクルード=========
-#include <iterator> // std::sizeで、工程の重みの表の長さを求める。
-
 //========= Windows インクルード=========
 #include <windows.h> // VK_SPACEの仮想キーコードで、読込の完了後の確認の入力を指定する。
 
@@ -17,14 +14,9 @@
 #include "Scene/ResultScene/H/ResultScene.h"
 #include "Scene/TitleScene/H/TitleScene.h"
 
-// 読込の工程の重みと、暗転の時間をまとめる。見た目を確認して調整する仮値。
+// 暗転の時間をまとめる。見た目を確認して調整する仮値。
 namespace
 {
-  //========= 工程の重み=========
-  // GameSession::RunInitStepの工程の順（描画Resource・敵・プレイヤーとデバッグ・第1ウェーブ）に対応する、バーの進み具合の重み。敵のモデルの読込が、最も重い（Debugで約1.0〜1.4秒）。
-  // 工程の数がこの表より多い場合は、超えた工程の重みを1とする。
-  constexpr float ns_INIT_STEP_WEIGHTS[]{2.0f,6.0f,1.0f,1.0f};
-
   //========= 暗転=========
   // 読込からプレイへの切替の、フェードアウトとフェードインそれぞれの時間。単位は秒。SceneManagerのSceneの切替と同じ値。
   constexpr float ns_FADE_SECONDS = 0.35f;
@@ -129,12 +121,10 @@ void GameScene::Finalize()
 // プレイの初期化の工程を、実行する順に作る。
 std::vector<LOADING_STEP> GameScene::BuildLoadingSteps()
 {
-  // 工程の番号ごとに、GameSessionの初期化を呼ぶ関数と、重みを組にする。関数は、このGameSceneを借用する。
+  // 工程の番号ごとに、GameSessionの初期化を呼ぶ関数と、GameSessionが決めた重みを組にする。関数は、このGameSceneを借用する。
   std::vector<LOADING_STEP> steps;
   for(int step_index = 0; step_index < GameSession::GetInitStepCount(); ++step_index){
-    const bool has_weight = static_cast<std::size_t>(step_index) < std::size(ns_INIT_STEP_WEIGHTS);
-    const float weight = has_weight ? ns_INIT_STEP_WEIGHTS[step_index] : 1.0f;
-    steps.push_back(LOADING_STEP{[this,step_index](){return m_session.RunInitStep(step_index); },weight});
+    steps.push_back(LOADING_STEP{[this,step_index](){return m_session.RunInitStep(step_index); },GameSession::GetInitStepWeight(step_index)});
   }
   return steps;
 }
