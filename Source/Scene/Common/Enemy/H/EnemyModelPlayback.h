@@ -83,6 +83,11 @@ public:
   // 戻り値: モデルで処理した（描いた、または、死亡後に描かないと決めた）場合はtrue。モデルを使えず、呼出側がCubeで描く必要がある場合はfalse。
   [[nodiscard]] bool Draw(GraphicsSystem& graphicsSystem,const CAMERA_MATRICES& camera,const ENEMY_PLAYBACK_STATE& state) const;
 
+  // 足が地面を滑らない、追従の移動速度を返す。歩きの動きの再生中は、動きの位相に対応する速度、それ以外は、歩きの速度の平均を使い、歩きの再生の倍率を掛ける。
+  // state: 敵の現在の状態。種類と識別値から、見た目を決める。
+  // fallbackSpeed: 速度の表がない（モデルがない・足のノードが見つからなかった）時に返す、既定の速度。単位はワールド距離単位/秒。
+  // 戻り値: 移動速度。単位はワールド距離単位/秒。
+  [[nodiscard]] float GetMoveSpeed(const ENEMY_PLAYBACK_STATE& state,float fallbackSpeed) const;
 private:
   //========= 更新の補助関数=========
   // 前回の更新からの水平の移動の速さで、移動中かを更新する。開始と終了の閾値を変え、判定が、毎フレーム入れ替わらないようにする。

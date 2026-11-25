@@ -140,7 +140,9 @@ public:
   [[nodiscard]] std::uint32_t GetEnemyId() const { return m_enemyId; }
   // 敵の体の当たりを表す球を返す。中心は敵の位置、半径は種類の表の値でColliderと同じ。
   [[nodiscard]] COLLISION_SPHERE GetBodySphere() const;
-
+  // 追従の移動速度を返す。モデルの歩きの動きから測った、足が地面を滑らない速度で、動きの位相によって変わる。モデルを使えない時は、既定の速度を返す。
+  // fallbackSpeed: モデルがない時に返す、既定の速度。単位はワールド距離単位/秒。
+  [[nodiscard]] float GetModelMoveSpeed(float fallbackSpeed) const { return m_playback.GetMoveSpeed(BuildPlaybackState(XMFLOAT4{1.0f,1.0f,1.0f,1.0f}),fallbackSpeed); }
 private:
   //========= 更新の補助関数=========
   // 怯み・転倒・射撃のダメージの印の残り時間を減らし、0未満にならないようにする。

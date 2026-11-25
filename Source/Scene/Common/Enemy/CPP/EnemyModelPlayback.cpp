@@ -1,14 +1,14 @@
 ﻿#include "../H/EnemyModelPlayback.h"
 
-// 敵1体のモデルの動きの選択・時刻の進行・動きの切替の補間・描画を実装する。数値は、EnemyAnimationTableと、このファイルの定数にまとめた仮値。
+// 敵1体のモデルの動きの選択・時刻の進行・動きの切替の補間・移動速度・描画を実装する。数値は、EnemyAnimationTableと、このファイルの定数にまとめた仮値。
 
 //========= C++標準ライブラリ インクルード=========
-#include <algorithm> // std::clampで、死亡の動きの進行の割合と、補間の割合を0〜1へ制限する。
+#include <algorithm> // std::clampで、死亡の動きの進行の割合と、補間の割合を0〜1へ制限し、std::maxで、移動速度の下限を守る。
 
 //========= Scene インクルード=========
 #include "Scene/Common/Enemy/H/EnemyAnimationTable.h"
 
-// 動きの切替と、死亡時の高さの補正の数値をまとめる。見た目を確認して、調整する仮値。
+// 動きの切替と、移動速度、死亡時の高さの補正の数値をまとめる。見た目を確認して、調整する仮値。
 namespace
 {
   //========= 動きの切替=========
@@ -18,6 +18,12 @@ namespace
   constexpr float ns_MOVE_START_SPEED = 0.5f;
   // 止まったと判定する、水平の速さの閾値（移動中の状態から）。開始の閾値より小さくし、境目で判定が入れ替わらないようにする。単位はワールド距離単位/秒。
   constexpr float ns_MOVE_STOP_SPEED = 0.2f;
+
+  //========= 歩きと移動速度=========
+  // 歩きの動きの、再生の速さの倍率。足の運びが速くなり、足の速度の表から求めた移動速度も、同じ倍率で速くなるため、足は滑らない。1.0で、動きの本来の速さ（平均0.35程度で、遅い）。仮値。
+  constexpr float ns_WALK_PLAYBACK_SPEED = 1.7f;
+  // 移動速度の下限。歩きの速度の平均に対する割合。足の動きの位相によって、速度が0に近づいても、敵が止まったままにならないようにする。仮値。
+  constexpr float ns_MIN_SPEED_RATIO = 0.3f;
 
   //========= 動きの補間=========
   // 動きの切替を、前の動きから混ぜる時間。単位は秒。待機・移動・攻撃・起き上がりへの切替に使う。仮値。
@@ -53,6 +59,9 @@ namespace
   float GetClipSpeed(ENEMY_CLIP clip)
   {
     switch(clip){
+    case ENEMY_CLIP::e_WALK:
+    return ns_WALK_PLAYBACK_SPEED;
+
     case ENEMY_CLIP::e_HIT:
     return ENEMY_ANIMATION::ns_MODEL_SPEED_HIT;
 
@@ -62,7 +71,7 @@ namespace
     case ENEMY_CLIP::e_GET_UP:
     return ENEMY_ANIMATION::ns_MODEL_SPEED_GET_UP;
 
-    // 待機・移動・予告・攻撃・死亡は、等倍。
+    // 待機・予告・攻撃・死亡は、等倍。
     default:
     return ENEMY_ANIMATION::ns_MODEL_SPEED_NORMAL;
     }
@@ -177,6 +186,27 @@ bool EnemyModelPlayback::Draw(GraphicsSystem& graphicsSystem,const CAMERA_MATRIC
   draw_params.color = state.color;
   renderer->Draw(graphicsSystem,camera,draw_params);
   return true;
+}
+
+// 足が地面を滑らない、追従の移動速度を返す。
+float EnemyModelPlayback::GetMoveSpeed(const ENEMY_PLAYBACK_STATE& state,float fallbackSpeed) const
+{
+  // 歩きの速度の表がない（共有の読込がない・見た目がない・読込済みでない・足のノードが見つからなかった）場合は、既定の速度を使う。
+  ENEMY_APPEARANCE appearance{};
+  float average_speed = 0.0f;
+  if(m_library == nullptr || !EnemyModelLibrary::TryGetAppearance(state.kind,state.enemyId,appearance) || !m_library->IsLoaded(appearance)
+     || !m_library->TryGetWalkSpeedAverage(appearance,average_speed))return fallbackSpeed;
+
+  // 歩きの動きの再生中は、動きの位相に対応する速度、それ以外（動き出す前など）は、平均の速度を使う。
+  float ground_speed = average_speed;
+  const SkinnedAnimationPlayer* walk_player = m_clip == ENEMY_CLIP::e_WALK ? m_library->FindPlayer(appearance,ENEMY_CLIP::e_WALK) : nullptr;
+  if(walk_player != nullptr && walk_player->GetDurationSeconds() > 0.0f){
+    const float phase = walk_player->NormalizeTime(m_clipTimeSeconds,true) / walk_player->GetDurationSeconds();
+    static_cast<void>(m_library->TryGetWalkSpeed(appearance,phase,ground_speed));
+  }
+
+  // 位相によって速度が0に近づいても止まったままにならないよう、平均に対する下限を守り、歩きの再生の倍率を掛ける。
+  return std::max(ground_speed,average_speed * ns_MIN_SPEED_RATIO) * GetClipSpeed(ENEMY_CLIP::e_WALK);
 }
 
 //========= 更新の補助関数=========

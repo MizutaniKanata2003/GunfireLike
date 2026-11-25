@@ -14,7 +14,7 @@
 namespace ENEMY_APPROACH
 {
   //========= 接近型の移動設定=========
-  // 追従速度。単位はワールド距離単位/秒。Walkの動き（足の運び）に合わせて、遅くした試遊用の仮値。足が滑って見える場合は、さらに調整する。
+  // 追従速度の既定値。単位はワールド距離単位/秒。モデルの歩きの速度の表がある敵は、足の動きに合わせた速度を使うため、この値は使わない。モデルを使えない時（Cubeの表示）と、速度の表を作れなかった時にだけ使う。
   inline constexpr float ns_SPEED = 0.6f;
   // 追従を止める水平中心間距離。単位はワールド距離単位。攻撃範囲ではない。
   inline constexpr float ns_STOP_DISTANCE = 1.5f;
@@ -71,7 +71,7 @@ namespace ENEMY_APPROACH
     }
   }
 
-  // 接近型の追従。敵が行動可能（生きていて、怯み・転倒していない）なら、接近型の速度と停止距離で、目標との水平距離を縮める。
+  // 接近型の追従。敵が行動可能（生きていて、怯み・転倒していない）なら、足の動きに合わせた速度（モデルがない時は既定の速度）と、接近型の停止距離で、目標との水平距離を縮める。
   // enemy: 追従する敵。死亡・怯み・転倒中は移動しない。
   // targetPosition: 目標のワールド座標。Yは追従方向に使わない。
   // deltaTime: 敵側の経過時間。単位は秒。0以下または非有限値なら移動しない。
@@ -81,6 +81,7 @@ namespace ENEMY_APPROACH
     // 怯み中は追従しない。死亡・転倒中と時間の検証は、MoveTowardが行う。
     if(enemy.IsFlinching())return;
 
-    MoveToward(enemy,ENEMY_MOVE_ORDER{targetPosition,ns_SPEED,ns_STOP_DISTANCE},deltaTime,collisionWorld);
+    // 速度は、歩きの動きの位相から求めた、足が地面を滑らない速さ。足の動きが速い時に速く、遅い時に遅く進む。
+    MoveToward(enemy,ENEMY_MOVE_ORDER{targetPosition,enemy.GetModelMoveSpeed(ns_SPEED),ns_STOP_DISTANCE},deltaTime,collisionWorld);
   }
 }
