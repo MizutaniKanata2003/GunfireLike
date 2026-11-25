@@ -225,6 +225,9 @@
     <ClCompile Include="Source\Scene\Common\UI\CPP\ButtonMenuFlow.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Scene\GameScene\CPP\SessionEconomyFlow.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Framework\Imgui\H\ImGuiManager.h">
@@ -531,6 +534,9 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Source\Scene\Common\Enemy\H\EnemyAnimationTable.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Scene\GameScene\H\SessionEconomyFlow.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

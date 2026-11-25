@@ -1,10 +1,10 @@
 ﻿#include "../H/GameSession.h"
 
-// 1回のプレイの初期化、入力に応じた状態更新、プレイの終了の判定、射撃・近接攻撃・回避・回復・被弾の反映、部屋のクリア後の報酬選択とその効果の反映、
-// ショップへの入力の受渡し、ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、描画とデバッグUIの呼出し、Resource終了を実装する。
+// 1回のプレイの初期化、入力に応じた状態更新、プレイの終了の判定、射撃・近接攻撃・回避・回復・被弾の反映、部屋のクリア後の報酬選択とショップへの入力の受渡し（SessionEconomyFlowへ任せる）、
+// ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、描画とデバッグUIの呼出し、Resource終了を実装する。
 
 //========= Windows インクルード=========
-#include <windows.h> // VK_F1・VK_F2・VK_F4・VK_LBUTTON・VK_RETURNの仮想キーコードで、Capture切替・タイトルへ戻る要求・再開・クリック・ショップを閉じるキーを指定する。
+#include <windows.h> // VK_F1・VK_F2・VK_F4・VK_LBUTTONの仮想キーコードで、Capture切替・タイトルへ戻る要求・再開・クリックを指定する。
 
 //========= 外部ライブラリ インクルード=========
 #include <DirectXMath.h>
@@ -86,9 +86,7 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
 
   // F3・F5〜F9・Insertのデバッグ操作を反映する。F11が押された場合は、現在のウェーブの敵を全て倒して、次のウェーブまたは出口の開放へ進める。
   // Capture解除中も操作できるよう、Captureの判定より前に処理する。
-  if(m_debugController.UpdateCommands()){
-    SkipCurrentWave();
-  }
+  if(m_debugController.UpdateCommands())SkipCurrentWave();
 
   // 報酬選択中とショップが開いている間は、時間を進めない。
   // ヒットストップ・スロー・回復アイテムの間隔・表示の時間も、この更新では0を渡して、画面を閉じるまで止める。
@@ -117,9 +115,9 @@ GAME_SESSION_RESULT GameSession::Update(float deltaTime)
   }
 
   // 部屋のクリアの結果を受けて、報酬選択へ入る・抜ける。抜けた更新で、続けてショップを開く。
-  // ショップが開いている間は、購入・売却・強化・閉じる操作を処理する。
-  UpdateReward();
-  UpdateShop();
+  // ショップが開いている間は、購入・売却・強化・閉じる操作を処理する。どちらの入力の受渡しも、SessionEconomyFlowが行う。
+  m_sessionEconomy.UpdateReward(m_stage.GetRoomController().GetPhase());
+  m_sessionEconomy.UpdateShop();
 
   // マウスを解放している間と、報酬選択中・ショップが開いている間は、カメラ・移動・戦闘の操作更新をまとめて停止し、ここで戻る。
   if(!m_inputSystem.IsMouseCaptureEnabled() || m_economy.GetReward().IsSelecting() || m_shopFlow.IsOpen())return GAME_SESSION_RESULT::e_CONTINUE;
@@ -165,6 +163,7 @@ void GameSession::Finalize()
   // 遷移先のInit後に呼ばれても、遷移先が設定したCaptureやBGMを上書きしない。
   // 各Controllerの参照を先に手放し、敵・敵の弾・範囲の予告は、Collisionと共有Rendererを借用しているため、ステージを解放する前に先に終了する。
   m_debugController.Uninit();
+  m_sessionEconomy.Unlink();
   m_shopFlow.Unlink();
   m_player.Uninit();
   m_enemyController.Uninit();
@@ -198,15 +197,13 @@ bool GameSession::InitEnemyController()
   enemy_links.collisionWorld = &m_stage.GetCollisionWorld();
   enemy_links.playerController = &m_player.GetPlayerController();
   enemy_links.playerHealth = &m_player.GetPlayerHealth();
-  enemy_links.onAttackEvent = [this](const ENEMY_ATTACK_EVENT& attackEvent){
-    ApplyEnemyAttackEvent(attackEvent);
-  };
+  enemy_links.onAttackEvent = [this](const ENEMY_ATTACK_EVENT& attackEvent){ApplyEnemyAttackEvent(attackEvent); };
 
   // 敵の弾と範囲の予告のCube Rendererを借用する。借用できなければ、敵の更新の登録は失敗する。
   return InitCheck::Succeeded(m_enemyController.Initialize(enemy_links),e_LogCategory::e_SCENE,L"GameSessionの敵の更新の初期化に失敗しました。");
 }
 
-// プレイヤー側一式・ショップ・デバッグ操作へ、使用する参照と通知先を渡す。
+// プレイヤー側一式・ショップ・報酬とショップの入力の受渡し・デバッグ操作へ、使用する参照と通知先を渡す。
 bool GameSession::InitPlayerAndDebug()
 {
   // プレイヤー側一式に使う参照と、ヒットストップの通知先を用意する。ヒットストップは、すでに残っている場合は長い方を使う。
@@ -216,14 +213,21 @@ bool GameSession::InitPlayerAndDebug()
   player_links.collisionWorld = &m_stage.GetCollisionWorld();
   player_links.enemyManager = &m_enemyController.GetEnemyManager();
   player_links.collisionDebugView = &collision_debug_view;
-  player_links.onHitStopRequested = [this](float hitStopSeconds){
-    m_timeScale.RequestHitStop(hitStopSeconds);
-  };
+  player_links.onHitStopRequested = [this](float hitStopSeconds){m_timeScale.RequestHitStop(hitStopSeconds); };
 
   // ショップが、支払いと反映に使う通貨と射撃を用意する。
   SHOP_FLOW_LINKS shop_links{};
   shop_links.wallet = &m_economy.GetWallet();
   shop_links.shotController = &m_player.GetShotController();
+
+  // 報酬選択とショップへの入力の受渡しに使う、入力・描画基盤・通貨と報酬・ショップ・射撃・プレイヤーの戦闘を用意する。
+  SESSION_ECONOMY_FLOW_LINKS economy_flow_links{};
+  economy_flow_links.inputSystem = &m_inputSystem;
+  economy_flow_links.graphicsSystem = &m_graphicsSystem;
+  economy_flow_links.economyController = &m_economy;
+  economy_flow_links.shopFlow = &m_shopFlow;
+  economy_flow_links.shotController = &m_player.GetShotController();
+  economy_flow_links.playerCombat = &m_player.GetPlayerCombat();
 
   // デバッグ操作とデバッグUIに使う参照を用意する。ゲームの状態は、各クラスの公開関数を通じてだけ変更される。
   GAME_DEBUG_CONTROLLER_LINKS debug_links{};
@@ -238,10 +242,11 @@ bool GameSession::InitPlayerAndDebug()
   debug_links.shotController = &m_player.GetShotController();
   debug_links.timeScale = &m_timeScale;
 
-  // プレイヤー側一式、ショップ、デバッグ操作の順に登録する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。
-  // プレイヤー側一式の失敗のログは、PlayerSuiteが、ショップの失敗のログは、ShopFlowが記録する。
+  // プレイヤー側一式、ショップ、報酬とショップの入力の受渡し、デバッグ操作の順に登録する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。
+  // プレイヤー側一式の失敗のログは、PlayerSuiteが、ショップの失敗のログは、ShopFlowが、入力の受渡しの失敗のログは、SessionEconomyFlowが記録する。
   return m_player.Init(player_links)
     && m_shopFlow.Link(shop_links)
+    && m_sessionEconomy.Link(economy_flow_links)
     // 参照先の登録に失敗した場合は、デバッグ操作の登録が失敗する。
     && InitCheck::Succeeded(m_debugController.Initialize(debug_links),e_LogCategory::e_SCENE,L"GameSessionのデバッグ操作の初期化に失敗しました。");
 }
@@ -251,14 +256,10 @@ bool GameSession::InitPlayerAndDebug()
 bool GameSession::UpdateSessionInput()
 {
   // F2が押された瞬間は、同じフレームのCapture切替や移動を行わず、呼出側へ戻るよう伝える。Scene遷移の予約は、呼出側が行う。
-  if(m_inputSystem.IsKeyTriggered(VK_F2)){
-    return true;
-  }
+  if(m_inputSystem.IsKeyTriggered(VK_F2))return true;
 
   // F1が押された瞬間は、ゲーム操作とImGui操作に使うCapture状態を反転する。
-  if(m_inputSystem.IsKeyTriggered(VK_F1)){
-    m_inputSystem.SetMouseCaptureEnabled(!m_inputSystem.IsMouseCaptureEnabled());
-  }
+  if(m_inputSystem.IsKeyTriggered(VK_F1))m_inputSystem.SetMouseCaptureEnabled(!m_inputSystem.IsMouseCaptureEnabled());
 
   // F4では最初の部屋から作り直す。旧ウェーブと、旧ウェーブの弾・範囲の予告は、同じ更新の生成処理で置き換わる。
   // 通貨・報酬の取得数・武器の所持と強化は、そのまま引き継ぐ。
@@ -286,9 +287,7 @@ void GameSession::UpdateWorldAndRoom(float worldDeltaTime)
   m_enemyController.GetEnemyManager().SeparateEnemies(m_stage.GetCollisionWorld());
 
   // 生成待ちなら現在のウェーブを生成し、結果を記録する。失敗した場合は再試行せず、F4で最初からやり直すまで敵なしで待つ。
-  if(m_stage.ShouldSpawnWave()){
-    m_stage.RecordSpawnResult(TrySpawnCurrentWave());
-  }
+  if(m_stage.ShouldSpawnWave())m_stage.RecordSpawnResult(TrySpawnCurrentWave());
 
   // 敵の全滅の結果から、ウェーブまたは部屋を進め、出口を開閉する。
   m_stage.UpdateProgress(m_enemyController.GetEnemyManager().HasLivingEnemies());
@@ -302,57 +301,6 @@ void GameSession::UpdateTimers(float deltaTime,float gameplayDeltaTime)
   m_renderer.GetCollisionDebugView().Update(deltaTime);
 }
 
-// 部屋のクリアで報酬選択へ入る判定と、カードが選ばれた時に抜ける判定を行い、取得した報酬の効果を各クラスへ渡す。
-void GameSession::UpdateReward()
-{
-  // 部屋の進行状態と、カーソルの位置（基準Canvas上）、左クリック、カードの番号のキーを渡して、状態の変化を受け取る。
-  // 上限に達した報酬の置換の通貨と、選ばれた報酬のログは、EconomyControllerが処理する。
-  const XMFLOAT2 cursor_position = GAME_INPUT_HELPER::ConvertCursorToCanvas(m_inputSystem,m_graphicsSystem);
-  const int key_choice_index = GAME_INPUT_HELPER::FindTriggeredNumberKey(m_inputSystem,REWARD_TABLE::ns_CARD_COUNT);
-  const REWARD_UPDATE_RESULT reward_result = m_economy.UpdateReward(m_stage.GetRoomController().GetPhase(),cursor_position,
-                                                                    m_inputSystem.IsKeyTriggered(VK_LBUTTON),key_choice_index);
-
-  // 入った更新では、Captureを解除して、マウスをカードの操作へ渡す。ゲームの操作と時間は、Updateが止める。
-  if(reward_result == REWARD_UPDATE_RESULT::e_STARTED){
-    m_inputSystem.SetMouseCaptureEnabled(false);
-    Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,L"部屋のクリアで、報酬選択へ入りました。");
-  }
-  // 抜けた更新では、続けてショップを開く。Captureは、ショップを閉じるまで解除したままにする。出口は、すでに開いている。
-  else if(reward_result == REWARD_UPDATE_RESULT::e_FINISHED){
-    m_shopFlow.Open();
-  }
-
-  // 常に効く特殊強化の効果を、使う側へ渡す。毎回渡して、再開や初期化の後も、取得数と一致させる。
-  // 制圧射撃は、射撃で敵へ与える怯み時間の倍率として、射撃の担当へ渡す。
-  // 殴打追撃は、殴打が当たった敵へ付ける印の倍率と時間として、戦闘の担当へ渡す。
-  // 回避反撃は、ジャスト回避の時だけ効くため、ここでは渡さない（StartJustDodgeEffectsが渡す）。
-  const RewardController& reward = m_economy.GetReward();
-  m_player.GetShotController().SetFlinchScale(reward.GetSuppressiveFlinchScale());
-  m_player.GetPlayerCombat().SetFollowUpStrike(reward.GetFollowUpDamageScale(),REWARD_TABLE::ns_FOLLOW_UP_SECONDS);
-}
-
-// ショップが開いている間、入力をShopFlowへ渡し、閉じる操作があればCaptureを再開する。
-void GameSession::UpdateShop()
-{
-  // 閉じている間は、何もしない。
-  if(!m_shopFlow.IsOpen())return;
-
-  // カーソルの位置（基準Canvas上）、左クリック、数字キー、Enter、Uを渡す。
-  // 数字キーは、売買のページの武器と弾薬のボタンの数だけ調べる（強化のページは、先頭の5個を使う）。
-  SHOP_FLOW_INPUT shop_input{};
-  shop_input.cursorCanvasPosition = GAME_INPUT_HELPER::ConvertCursorToCanvas(m_inputSystem,m_graphicsSystem);
-  shop_input.isClickTriggered = m_inputSystem.IsKeyTriggered(VK_LBUTTON);
-  shop_input.numberKeyIndex = GAME_INPUT_HELPER::FindTriggeredNumberKey(m_inputSystem,SHOP_TABLE::ns_UPGRADE_BUTTON_OFFSET);
-  shop_input.isCloseKeyTriggered = m_inputSystem.IsKeyTriggered(VK_RETURN);
-  shop_input.isSwitchKeyTriggered = m_inputSystem.IsKeyTriggered(GAME_INPUT_HELPER::ns_SHOP_SWITCH_KEY);
-
-  // 閉じた場合は、Captureを戻して、ゲームの操作へ戻る。選んだクリックが射撃にならないよう、入力の保護が、続けて働く。
-  if(m_shopFlow.Update(shop_input)){
-    m_inputSystem.SetMouseCaptureEnabled(true);
-    Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,L"ショップを閉じました。");
-  }
-}
-
 // ジャスト回避が成立した時の効果を反映する。
 void GameSession::StartJustDodgeEffects()
 {
@@ -361,9 +309,7 @@ void GameSession::StartJustDodgeEffects()
 
   // 回避反撃を取得している（倍率が1.0より大きい）場合だけ、一定時間、射撃のダメージを増やす。未取得なら、何も増やさない。
   const float damage_scale = m_economy.GetReward().GetCounterDodgeDamageScale();
-  if(damage_scale > 1.0f){
-    m_player.GetShotController().ActivateDamageBoost(damage_scale,REWARD_TABLE::ns_COUNTER_DODGE_SECONDS);
-  }
+  if(damage_scale > 1.0f)m_player.GetShotController().ActivateDamageBoost(damage_scale,REWARD_TABLE::ns_COUNTER_DODGE_SECONDS);
 }
 
 // 視点・プレイヤーの動作・出口の通過・殴打でのリロードのキャンセル・視野角を更新する。
@@ -411,9 +357,7 @@ void GameSession::UpdateDodgeJudge(float worldDeltaTime)
 void GameSession::ApplyEnemyAttackEvent(const ENEMY_ATTACK_EVENT& attackEvent)
 {
   // 表示用の記録が求められた場合だけ、直近の判定結果を更新する。接近型の結果は求めない。
-  if(attackEvent.shouldRecordResult){
-    m_debugController.RecordJudgeResult(attackEvent.result);
-  }
+  if(attackEvent.shouldRecordResult)m_debugController.RecordJudgeResult(attackEvent.result);
 
   // 無敵でなく命中した場合は、ダメージ・怯み・ヒットストップを与える。
   if(attackEvent.result == DODGE_JUDGE_RESULT::e_HIT){

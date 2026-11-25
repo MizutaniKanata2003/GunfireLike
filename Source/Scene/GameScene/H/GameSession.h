@@ -17,6 +17,7 @@
 #include "Scene/GameScene/H/EconomyController.h"
 #include "Scene/GameScene/H/GameRenderer.h"
 #include "Scene/GameScene/H/RunController.h"
+#include "Scene/GameScene/H/SessionEconomyFlow.h"
 #include "Scene/GameScene/H/ShopFlow.h"
 
 //========= 前方宣言=========
@@ -70,7 +71,7 @@ private:
   // 敵の更新へ、使用する参照と通知先を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
   // 戻り値: 登録に成功したらtrue。
   [[nodiscard]] bool InitEnemyController();
-  // プレイヤー側一式・ショップ・デバッグ操作へ、使用する参照と通知先を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
+  // プレイヤー側一式・ショップ・報酬とショップの入力の受渡し・デバッグ操作へ、使用する参照と通知先を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
   // 戻り値: 全ての登録に成功したらtrue。
   [[nodiscard]] bool InitPlayerAndDebug();
 
@@ -85,11 +86,6 @@ private:
   // deltaTime: 実時間の経過時間。単位は秒。表示用と反動の時間に使う。報酬選択中とショップが開いている間は0。
   // gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。回復アイテムの間隔に使う。
   void UpdateTimers(float deltaTime,float gameplayDeltaTime);
-  // 部屋のクリアで報酬選択へ入る判定と、カードが選ばれた時に抜ける判定を行い、入る時はCaptureを解除する。カードが選ばれたら、続けてショップを開く。
-  // 取得した報酬の効果のうち、常に効くもの（制圧射撃・殴打追撃）を、使う側へ渡す。
-  void UpdateReward();
-  // ショップが開いている間、カーソルとキーの入力をShopFlowへ渡す。閉じる操作があった場合は、Captureを再開する。
-  void UpdateShop();
   // ジャスト回避が成立した時の効果を反映する。スローを開始し、回避反撃を取得していれば、一定時間、射撃のダメージを増やす。
   void StartJustDodgeEffects();
   // 視点・プレイヤーの動作・出口の通過・殴打でのリロードのキャンセル・視野角を更新する。Capture中だけ呼ぶ。
@@ -142,6 +138,8 @@ private:
   EconomyController m_economy{};
   // 武器の所持・強化・持ち替えと、武器と弾薬の購入・売却・強化の画面を担当する。画面は、報酬選択の後に開き、開いている間は、時間とプレイヤーの操作を止める。
   ShopFlow m_shopFlow{};
+  // 報酬選択とショップへの、入力の受渡しと、Captureの切替を担当する。m_economyとm_shopFlowを借用するため、その後に宣言する。
+  SessionEconomyFlow m_sessionEconomy{};
   // 3Dのワールド・画像のHUD・Collision可視化の描画を担当する。Collision可視化は、プレイヤー・デバッグが借用する。
   GameRenderer m_renderer{};
   // 1回のプレイの状態（プレイ中・死亡・クリア）と、終了後の待ち時間を担当する。終了した後は、世界の更新を止める。
