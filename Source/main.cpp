@@ -23,12 +23,6 @@
 //========= Scene インクルード=========
 #include "Scene/Common/Core/H/SceneManager.h"
 
-#include <algorithm>
-#include <cstdio>
-#include "Framework/3D/H/SkinnedAnimationLoader.h"
-#include "Framework/3D/H/SkinnedAnimationPlayer.h"
-#include "Framework/3D/H/SkinnedModelLoader.h"
-
 //========= ライブラリ指定=========
 #pragma comment(lib,"imm32.lib") // ImmDisableIMEの実装を含む。
 
@@ -203,44 +197,7 @@ int WINAPI WinMain(HINSTANCE instance,HINSTANCE,LPSTR,int showCommand)
   // 各Systemが生存している間にSceneを初期化し、TitleSceneの開始を試行する。
   SceneManager scene_manager;
   scene_manager.Initialize(input_system,graphics_system,audio_system);
-  // 一時確認用。確認後に削除する。
-  {
-    SkinnedModelLoader model_loader;
-    SkinnedAnimationLoader animation_loader;
-    SKINNED_MODEL_DATA model_data;
-    SKINNED_ANIMATION_CLIP clip_data;
-    if(model_loader.Load(L"Assets/Models/Enemy/Melee/Model/MeleeA.fbx",model_data)
-       && animation_loader.Load(L"Assets/Models/Enemy/Melee/Animation/Idle.fbx",clip_data)){
-      SkinnedAnimationPlayer player;
-      if(player.Initialize(model_data,clip_data)){
-        const float sample_times[] = {0.0f,1.0f,2.0f};
-        for(const float sample_time : sample_times){
-          BoneMatrixArray bone_matrices;
-          player.Evaluate(sample_time,bone_matrices);
 
-          // 全頂点を、CPUでスキニングして、範囲を調べる。
-          DirectX::XMFLOAT3 min_point{1e9f,1e9f,1e9f};
-          DirectX::XMFLOAT3 max_point{-1e9f,-1e9f,-1e9f};
-          for(const SKINNED_VERTEX& vertex : model_data.vertices){
-            DirectX::XMVECTOR sum = DirectX::XMVectorZero();
-            const DirectX::XMVECTOR position = DirectX::XMVectorSet(vertex.position.x,vertex.position.y,vertex.position.z,1.0f);
-            for(std::size_t slot = 0; slot < SKINNED_MODEL::ns_BONES_PER_VERTEX; ++slot){
-              if(vertex.boneWeights[slot] <= 0.0f)continue;
-              const DirectX::XMMATRIX matrix = DirectX::XMLoadFloat4x4(&bone_matrices[vertex.boneIndices[slot]]);
-              sum = DirectX::XMVectorAdd(sum,DirectX::XMVectorScale(DirectX::XMVector3Transform(position,matrix),vertex.boneWeights[slot]));
-            }
-            DirectX::XMFLOAT3 result;
-            DirectX::XMStoreFloat3(&result,sum);
-            min_point = {std::min(min_point.x,result.x),std::min(min_point.y,result.y),std::min(min_point.z,result.z)};
-            max_point = {std::max(max_point.x,result.x),std::max(max_point.y,result.y),std::max(max_point.z,result.z)};
-          }
-          char text[256]{};
-          sprintf_s(text,"Skin t=%.1f | min(%.1f,%.1f,%.1f) max(%.1f,%.1f,%.1f)\n",sample_time,min_point.x,min_point.y,min_point.z,max_point.x,max_point.y,max_point.z);
-          OutputDebugStringA(text);
-        }
-      }
-    }
-  }
   // 終了メッセージを受けるまで、メッセージ処理とゲームフレームを繰り返す。
   bool is_running = true;
   while(is_running){
