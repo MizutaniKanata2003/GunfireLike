@@ -85,6 +85,10 @@
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -103,6 +107,10 @@
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -137,6 +145,7 @@ copy /Y "$(ProjectDir)Shaders\BasicColorVS.cso" "$(OutDir)Shaders\BasicColorVS.c
 copy /Y "$(ProjectDir)Shaders\BasicColorPS.cso" "$(OutDir)Shaders\BasicColorPS.cso"
 copy /Y "$(ProjectDir)Shaders\HudVS.cso" "$(OutDir)Shaders\HudVS.cso"
 copy /Y "$(ProjectDir)Shaders\HudPS.cso" "$(OutDir)Shaders\HudPS.cso"
+copy /Y "$(ProjectDir)Shaders\SkinnedVS.cso" "$(OutDir)Shaders\SkinnedVS.cso"
 
 xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     </PostBuildEvent>
@@ -178,6 +187,7 @@ copy /Y "$(ProjectDir)Shaders\BasicColorVS.cso" "$(OutDir)Shaders\BasicColorVS.c
 copy /Y "$(ProjectDir)Shaders\BasicColorPS.cso" "$(OutDir)Shaders\BasicColorPS.cso"
 copy /Y "$(ProjectDir)Shaders\HudVS.cso" "$(OutDir)Shaders\HudVS.cso"
 copy /Y "$(ProjectDir)Shaders\HudPS.cso" "$(OutDir)Shaders\HudPS.cso"
+copy /Y "$(ProjectDir)Shaders\SkinnedVS.cso" "$(OutDir)Shaders\SkinnedVS.cso"
 
 xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     </PostBuildEvent>
@@ -199,6 +209,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Framework\3D\CPP\SkinnedAnimationLoader.cpp" />
     <ClCompile Include="Source\Framework\3D\CPP\SkinnedAnimationPlayer.cpp" />
     <ClCompile Include="Source\Framework\3D\CPP\SkinnedModelLoader.cpp" />
+    <ClCompile Include="Source\Framework\3D\CPP\SkinnedModelRenderer.cpp" />
     <ClCompile Include="Source\Framework\Audio\CPP\AudioSystem.cpp" />
     <ClCompile Include="Source\Debug\CPP\CollisionDebugDrawer.cpp" />
     <ClCompile Include="Source\Framework\Collision\CPP\CollisionMath.cpp" />
@@ -278,6 +289,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\3D\H\SkinnedAnimationPlayer.h" />
     <ClInclude Include="Source\Framework\3D\H\SkinnedModelData.h" />
     <ClInclude Include="Source\Framework\3D\H\SkinnedModelLoader.h" />
+    <ClInclude Include="Source\Framework\3D\H\SkinnedModelRenderer.h" />
     <ClInclude Include="Source\Framework\Audio\H\AudioSystem.h" />
     <ClInclude Include="Source\Framework\2D\H\FadeOverlay.h" />
     <ClInclude Include="Source\Debug\H\CollisionDebugDrawer.h" />
@@ -416,6 +428,20 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <FxCompile Include="Source\Framework\Shaders\ShaderCommon.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Source\Framework\Shaders\SkinnedVS.hlsl">
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">5.0</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">5.0</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)Shaders\SkinnedVS.cso</ObjectFileOutput>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)Shaders\SkinnedVS.cso</ObjectFileOutput>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)Shaders\SkinnedVS.cso</ObjectFileOutput>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)Shaders\SkinnedVS.cso</ObjectFileOutput>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

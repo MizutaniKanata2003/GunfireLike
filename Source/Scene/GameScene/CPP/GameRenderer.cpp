@@ -13,6 +13,11 @@
 #include "Scene/Common/Enemy/H/EnemyController.h"
 #include "Scene/Common/Stage/H/StageController.h"
 
+#include <windows.h>
+#include "Framework/3D/H/SkinnedAnimationLoader.h"
+#include "Framework/3D/H/SkinnedAnimationPlayer.h"
+#include "Framework/3D/H/SkinnedModelLoader.h"
+#include "Framework/3D/H/SkinnedModelRenderer.h"
 //========= 初期化・終了関数=========
 // 参照先を登録し、Collision可視化とHUDと演出を初期化する。
 bool GameRenderer::Initialize(GraphicsSystem& graphicsSystem,const GAME_RENDERER_LINKS& links)
@@ -72,7 +77,37 @@ void GameRenderer::DrawWorld(GraphicsSystem& graphicsSystem,const XMMATRIX& view
 
   // 敵と弾の後に、演出の粒を描画する。残っている粒がなければ、何も描かない。
   m_effectController.Draw(graphicsSystem,viewMatrix,projectionMatrix);
+  // 一時確認用。確認後に削除する。
+  {
+    static SKINNED_MODEL_DATA test_model;
+    static SKINNED_ANIMATION_CLIP test_clip;
+    static SkinnedAnimationPlayer test_player;
+    static SkinnedModelRenderer test_renderer;
+    static bool is_tried = false;
+    static bool is_ready = false;
+    if(!is_tried){
+      is_tried = true;
+      SkinnedModelLoader model_loader;
+      SkinnedAnimationLoader animation_loader;
+      is_ready = model_loader.Load(L"Assets/Models/Enemy/Melee/Model/MeleeA.fbx",test_model)
+        && animation_loader.Load(L"Assets/Models/Enemy/Melee/Animation/Idle.fbx",test_clip)
+        && test_player.Initialize(test_model,test_clip)
+        && test_renderer.Initialize(graphicsSystem,test_model);
+    }
+    if(is_ready){
+      const float test_yaw = 0.0f;
+      BoneMatrixArray bone_matrices;
+      const float test_time = static_cast<float>((GetTickCount64() % 1000000) / 1000.0);
+      test_player.Evaluate(test_player.NormalizeTime(test_time,true),bone_matrices);
 
+      SKINNED_DRAW_PARAMS draw_params{};
+      XMStoreFloat4x4(&draw_params.worldMatrix,XMMatrixMultiply(XMMatrixMultiply(XMMatrixScaling(0.01f,0.01f,0.01f),
+                      XMMatrixRotationRollPitchYaw(0.0f,test_yaw,0.0f)),XMMatrixTranslation(0.0f,0.0f,4.0f)));
+      draw_params.boneMatrices = &bone_matrices;
+      draw_params.color = XMFLOAT4{0.8f,0.4f,0.4f,1.0f};
+      test_renderer.Draw(graphicsSystem,CAMERA_MATRICES{viewMatrix,projectionMatrix},draw_params);
+    }
+  }
   // 演出の後に、表示中ならCollisionの線を重ねる。View行列とProjection行列は、1つの構造体にまとめて渡す。
   const CAMERA_MATRICES camera_matrices{viewMatrix,projectionMatrix};
   m_collisionDebugView.Draw(graphicsSystem,m_stage->GetCollisionWorld(),*m_camera,camera_matrices);

@@ -61,18 +61,32 @@ using DirectX::AudioEngine_Default;
 // 以下は元の関数を修飾なしで参照するための宣言であり、独自関数や引数検証を追加するものではない。
 // X・Y・Z各軸の倍率から拡大縮小行列を生成する。距離や角度ではなく、各軸のScaleを受け取る。
 using DirectX::XMMatrixScaling;
+// 3成分ベクトルの各成分を、X・Y・Z各軸の倍率として、拡大縮小行列を生成する。スキニングのアニメーションの拡大のキーから、行列を作るために使用する。
+using DirectX::XMMatrixScalingFromVector;
 // Pitch・Yaw・Rollの各角度をラジアンで受け取り、回転行列を生成する。度からの変換は利用側で行う。
 using DirectX::XMMatrixRotationRollPitchYaw;
+// クォータニオンから回転行列を生成する。入力は単位の長さであること。スキニングのアニメーションの回転のキーから、行列を作るために使用する。
+using DirectX::XMMatrixRotationQuaternion;
 // X・Y・Zの移動量から平行移動行列を生成する。どの座標系で使うかは合成する利用側が決める。
 using DirectX::XMMatrixTranslation;
+// 3成分ベクトルを移動量として、平行移動行列を生成する。スキニングのアニメーションの位置のキーから、行列を作るために使用する。
+using DirectX::XMMatrixTranslationFromVector;
+// 何も変換しない単位行列を生成する。行列の初期値や、使わないボーン行列の埋め草に使用する。
+using DirectX::XMMatrixIdentity;
 // 視点位置・視線方向・上方向から左手系View行列を生成する。第2引数は注視点ではなく方向。
 using DirectX::XMMatrixLookToLH;
 // 垂直視野角(ラジアン)、幅/高さの比、近・遠Clip距離から左手系Projection行列を生成する。
 using DirectX::XMMatrixPerspectiveFovLH;
 
-//========= 行列変換・格納関数=========
+//========= 行列演算・変換・格納関数=========
+// 2つの行列の積を返す。行ベクトルの向きで、第1引数の変換を先に、第2引数の変換を後に適用する順序で合成する。
+using DirectX::XMMatrixMultiply;
+// 行列を、拡大・回転（クォータニオン）・移動の3つへ分解する。分解できなければfalseを返し、出力は不定。
+using DirectX::XMMatrixDecompose;
 // 行と列を入れ替えた行列を返す。入力自体の書換えや、座標系の自動変換を行うラッパーではない。
 using DirectX::XMMatrixTranspose;
+// 有効なXMFLOAT4X4から、演算用の行列へ読み込む。転置はしない。保存済みのボーン行列やノードの変換を、計算へ戻すために使用する。
+using DirectX::XMLoadFloat4x4;
 // 行列を有効なXMFLOAT4X4出力先へ保存する。転置は行わず、必要なら利用側が先にTransposeを適用する。
 using DirectX::XMStoreFloat4x4;
 
@@ -85,6 +99,8 @@ using DirectX::XMConvertToRadians;
 using DirectX::XMVectorSet;
 // 有効なXMFLOAT3のXYZを演算用ベクトルへ読み込む。元データを所有したり位置へ自動変換したりしない。
 using DirectX::XMLoadFloat3;
+// 有効なXMFLOAT4のXYZWを演算用ベクトルへ読み込む。クォータニオンや色を、計算へ渡すために使用する。
+using DirectX::XMLoadFloat4;
 // 演算用ベクトルのXYZを有効なXMFLOAT3出力先へ書き込む。W成分はこの出力型には保存しない。
 using DirectX::XMStoreFloat3;
 
@@ -99,29 +115,15 @@ using DirectX::XMVectorGetY;
 using DirectX::XMVector3Normalize;
 // XYZの外積を求める。引数順を逆にすると符号が反転するため、利用側で左右方向との対応を維持する。
 using DirectX::XMVector3Cross;
+// 2つのベクトルの間を、割合で直線補間する。割合0で第1引数、1で第2引数。位置・拡大のキーの補間に使用する。
+using DirectX::XMVectorLerp;
+
+//========= クォータニオン関数=========
+// クォータニオンを、単位の長さへ整える。補間後の回転の誤差を取り除くために使用する。
+using DirectX::XMQuaternionNormalize;
+// 2つのクォータニオンの間を、割合で球面補間する。割合0で第1引数、1で第2引数。回転のキーの補間に使用する。
+using DirectX::XMQuaternionSlerp;
 
 //========= 既存の重複using宣言=========
 // 原本末尾にある同じ関数の再宣言を維持する。重複整理は今回混ぜず、新しい別名や関数実装も追加しない。
 using DirectX::XMMatrixPerspectiveFovLH;
-
-using DirectX::XMMatrixMultiply;
-
-using DirectX::XMMatrixIdentity;
-
-using DirectX::XMVectorLerp;
-
-using DirectX::XMQuaternionNormalize;
-
-using DirectX::XMQuaternionSlerp;
-
-using DirectX::XMLoadFloat4;
-
-using DirectX::XMLoadFloat4x4;
-
-using DirectX::XMMatrixDecompose;
-
-using DirectX::XMMatrixScalingFromVector;
-
-using DirectX::XMMatrixTranslationFromVector;
-
-using DirectX::XMMatrixRotationQuaternion;
