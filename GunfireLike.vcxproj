@@ -226,7 +226,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Framework\Etc\CPP\GameTimer.cpp" />
     <ClCompile Include="Source\Framework\Etc\CPP\Logger.cpp" />
     <ClCompile Include="Source\Framework\Input\CPP\InputSystem.cpp" />
-    <ClCompile Include="Source\Framework\2D\CPP\FadeOverlay.cpp" />
+    <ClCompile Include="Source\Framework\SceneParts\CPP\FadeOverlay.cpp" />
     <ClCompile Include="Source\Framework\Imgui\CPP\ImGuiManager.cpp" />
     <ClCompile Include="Source\Framework\Input\CPP\FpsCamera.cpp" />
     <ClCompile Include="Source\Framework\3D\CPP\BasicMeshRenderer.cpp" />
@@ -297,7 +297,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\3D\H\SkinnedModelLoader.h" />
     <ClInclude Include="Source\Framework\3D\H\SkinnedModelRenderer.h" />
     <ClInclude Include="Source\Framework\Audio\H\AudioSystem.h" />
-    <ClInclude Include="Source\Framework\2D\H\FadeOverlay.h" />
+    <ClInclude Include="Source\Framework\SceneParts\H\FadeOverlay.h" />
     <ClInclude Include="Source\Debug\H\CollisionDebugDrawer.h" />
     <ClInclude Include="Source\Framework\Collision\H\CollisionMath.h" />
     <ClInclude Include="Source\Framework\Collision\H\CollisionResolver.h" />
