@@ -242,6 +242,8 @@ void EnemyController::UpdateMeleeSlot(std::size_t slotIndex,float worldDeltaTime
 
     // 予告を消費したので、範囲外の空振りでも再攻撃待ちに入る。
     recovery_seconds = COMBAT_TABLE::ns_ENEMY_MELEE_RECOVERY_SECONDS;
+    // 攻撃の瞬間の見た目として、前へ突進させる。範囲外の空振りでも突進し、攻撃の判定には影響しない。
+    enemy.StartAttackLunge();
     // 予告終了時点で範囲外なら、被弾もジャスト回避のスローも発生しない。
     if(!is_in_reach)return;
 
