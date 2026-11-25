@@ -300,6 +300,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\3D\H\ObjModelRenderer.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\AreaTelegraph.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\BossController.h" />
+    <ClInclude Include="Source\Scene\Common\Enemy\H\EnemyAnimationTable.h" />
     <ClInclude Include="Source\Scene\Common\Player\H\PlayerSuite.h" />
     <ClInclude Include="Source\Scene\Common\Player\H\Wallet.h" />
     <ClInclude Include="Source\Scene\Common\Reward\H\RewardController.h" />

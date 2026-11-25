@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// 敵1体の状態（種類・HP・怯み・転倒・射撃のダメージの印・攻撃予告の表示・生死・向き）と、球のColliderの登録、Cubeでの仮表示を担当する。
+// 敵1体の状態（種類・HP・怯み・転倒・射撃のダメージの印・攻撃予告の表示・生死・向き）と、球のColliderの登録、Cubeでの仮表示（待機の揺れ・怯みの傾きを含む）を担当する。
 // 種類ごとの数値はEnemyTableから読む。敵の行動（移動・攻撃）は持たない。複数体の管理は、EnemyManagerが担当する。
 
 //========= C++標準ライブラリ インクルード=========
@@ -31,6 +31,15 @@ struct ENEMY_INIT_PARAMS
   std::uint32_t enemyId{};
 };
 
+// 敵1体の簡易アニメーション（待機の揺れ・怯みの傾き）の状態。Enemyのメンバー変数の数を抑えるため、1つにまとめる。
+struct ENEMY_ANIMATION_STATE
+{
+  // 待機の揺れの位相。単位は周期の数で、0以上1未満。Updateで進める。同時に生成した敵が揃って揺れないよう、Initializeで敵の識別値から初期値を決める。
+  float idleBobPhase{};
+  // 怯みの傾きの向き。1.0または-1.0。怯みが始まる被弾のたびに反転し、連射で怯みが続く間は変えない。
+  float flinchTiltSign{1.0f};
+};
+
 // 種類・HP・怯み・転倒を持ち、球のColliderで被弾を受ける敵1体。
 class Enemy final
 {
@@ -47,7 +56,7 @@ public:
   void Uninit(CollisionWorld& collisionWorld);
 
   //========= 更新・描画関数=========
-  // 怯み・転倒・射撃のダメージの印の残り時間を進める。
+  // 怯み・転倒・射撃のダメージの印の残り時間と、待機の揺れの位相を進める。
   // deltaTime: この更新で進める経過時間。単位は秒。
   void Update(float deltaTime);
   // 地形との重なりを補正し、登録済みの球Colliderと描画位置を更新する。
@@ -60,6 +69,7 @@ public:
   // targetPosition: 向ける先のワールド座標。高さは使わない。
   void SetFacing(const XMFLOAT3& targetPosition);
   // 生きている場合だけ、Cubeで描画する。通常は種類の色、射撃のダメージの印が付いている間は紫、攻撃の予告中は黄、怯み中・転倒中は色を変え、転倒中は低く潰して描く。
+  // 転倒中以外は、待機の揺れで高さを上下させ、怯み中は、向きに対して横へ傾ける。
   // graphicsSystem: Rendererが使う描画基盤。
   // viewMatrix: World空間からView空間への変換行列。
   // projectionMatrix: View空間からClip空間への変換行列。
@@ -118,6 +128,10 @@ private:
   Transform m_transform{};
   // 攻撃の予告中の表示か。呼出側がSetTelegraphingで毎回設定する。
   bool m_isTelegraphing{};
+
+  //========= アニメーション=========
+  // 待機の揺れの位相と、怯みの傾きの向き。簡易アニメーションの状態をまとめて保持する。
+  ENEMY_ANIMATION_STATE m_animation{};
 
   //========= 種類=========
   // 敵の種類。Initializeで設定する。未初期化の間は接近型として扱う。

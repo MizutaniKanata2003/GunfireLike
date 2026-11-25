@@ -1,10 +1,11 @@
 ﻿#include "../H/Enemy.h"
 
-// 敵1体のHP・怯み・転倒・射撃のダメージの印・向き・Collider登録・Cube表示を実装する。
-// 種類ごとのHP・当たり・大きさ・色はEnemyTableから読み、怯みと転倒の時間と状態の色は、このファイルの定数にまとめた仮値。
+// 敵1体のHP・怯み・転倒・射撃のダメージの印・向き・Collider登録・Cube表示（待機の揺れ・怯みの傾きを含む）を実装する。
+// 種類ごとのHP・当たり・大きさ・色はEnemyTableから、アニメーションの数値はEnemyAnimationTableから読み、怯みと転倒の時間と状態の色は、このファイルの定数にまとめた仮値。
 
 //========= C++標準ライブラリ インクルード=========
-#include <cmath> // std::atan2で、敵から目標への水平方向を、Y軸まわりの回転角へ変換する。
+#include <algorithm> // std::minで、怯みの傾きの強さを1以下に制限する。
+#include <cmath> // std::atan2で敵から目標への水平方向をY軸まわりの回転角へ変換し、std::sinで待機の揺れの高さを求め、std::floorで揺れの位相を0以上1未満へ戻す。
 
 //========= Framework インクルード=========
 #include "Framework/3D/H/BasicMeshRenderer.h"
@@ -13,6 +14,7 @@
 #include "Framework/Collision/H/CollisionWorld.h"
 
 //========= Scene インクルード=========
+#include "Scene/Common/Enemy/H/EnemyAnimationTable.h"
 #include "Scene/Common/Enemy/H/EnemyTable.h"
 #include "Scene/Common/Object/H/ModelRegistry.h"
 
@@ -44,6 +46,29 @@ namespace
   constexpr XMFLOAT4 ns_KNOCKDOWN_COLOR{0.5f,0.6f,1.0f,1.0f};
 }
 
+// 簡易アニメーションの値を求める補助関数をまとめる。数値はEnemyAnimationTableから読む。
+namespace
+{
+  // 待機の揺れで、高さへ足す量を返す。
+  // phase: 揺れの位相。単位は周期の数で、0以上1未満。
+  // 戻り値: 高さへ足す量。単位はワールド距離単位。位相に対する正弦波で、中心から上下へ表の振幅だけ動く。
+  float CalculateIdleBobOffset(float phase)
+  {
+    return std::sin(phase * ENEMY_ANIMATION::ns_TWO_PI) * ENEMY_ANIMATION::ns_IDLE_BOB_AMPLITUDE;
+  }
+
+  // 怯みの傾きの角度を返す。怯みの残り時間が短くなるにつれて、傾きを0へ戻す。
+  // remainingSeconds: 怯みの残り時間。単位は秒。
+  // tiltSign: 傾きの向き。1.0または-1.0。
+  // 戻り値: 向きに対する横方向（Roll）の角度。単位はラジアン。
+  float CalculateFlinchTilt(float remainingSeconds,float tiltSign)
+  {
+    // 残り時間が通常の怯みの時間以上の間は、最大の傾きにする。強化で怯みが伸びた場合も、傾きが最大を超えないようにする。
+    const float tilt_strength = std::min(1.0f,remainingSeconds / ns_FLINCH_SECONDS);
+    return tiltSign * tilt_strength * ENEMY_ANIMATION::ns_FLINCH_TILT_RADIANS;
+  }
+}
+
 //========= 初期化・終了関数=========
 // Cube Rendererを借用し、種類の表からHPと大きさを設定して、球のColliderを登録する。
 bool Enemy::Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,const ENEMY_INIT_PARAMS& initParams)
@@ -71,6 +96,11 @@ bool Enemy::Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,co
   m_isTelegraphing = false;
   m_isAlive = true;
   m_colliderHandle = collisionWorld.AddSphere(COLLISION_SPHERE{initParams.position,params.colliderRadius},COLLISION_LAYER::ns_ENEMY,initParams.enemyId);
+
+  // 待機の揺れの位相の初期値を、敵の識別値から決める。同時に生成した敵が揃って揺れないよう、1周を等分した位置へずらす。傾きの向きも初期化する。
+  const std::uint32_t phase_step = initParams.enemyId % ENEMY_ANIMATION::ns_IDLE_PHASE_STEP_COUNT;
+  m_animation.idleBobPhase = static_cast<float>(phase_step) / static_cast<float>(ENEMY_ANIMATION::ns_IDLE_PHASE_STEP_COUNT);
+  m_animation.flinchTiltSign = 1.0f;
   return true;
 }
 
@@ -95,9 +125,13 @@ void Enemy::Uninit(CollisionWorld& collisionWorld)
 }
 
 //========= 更新・描画関数=========
-// 怯み・転倒・射撃のダメージの印の残り時間を減らす。
+// 怯み・転倒・射撃のダメージの印の残り時間を減らし、待機の揺れの位相を進める。
 void Enemy::Update(float deltaTime)
 {
+  // 待機の揺れの位相を進め、1周を超えた分を除いて、0以上1未満に保つ。転倒中の揺れは、描画側で止めるため、位相は進め続ける。
+  m_animation.idleBobPhase += deltaTime * ENEMY_ANIMATION::ns_IDLE_BOB_CYCLES_PER_SECOND;
+  m_animation.idleBobPhase -= std::floor(m_animation.idleBobPhase);
+
   // 怯み中の場合だけ時間を進め、0未満にならないようにする。怯みでなければ何もしない。
   if(m_flinchRemainingSeconds > 0.0f){
     m_flinchRemainingSeconds -= deltaTime;
@@ -190,6 +224,16 @@ void Enemy::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const
     color = ns_TELEGRAPH_COLOR;
   }
 
+  // 転倒中以外は、待機の揺れの量を高さへ足す。転倒中は、倒れたまま揺らさない。位置を変えるのは描画用のTransformだけで、Colliderと保持座標は変えない。
+  if(!IsKnockedDown()){
+    draw_transform.SetPosition(XMFLOAT3{m_position.x,m_position.y + CalculateIdleBobOffset(m_animation.idleBobPhase),m_position.z});
+  }
+  // 怯み中は、向き（PitchとYaw）を保ったまま、Rollだけを傾ける。Z軸は敵の正面方向のため、傾きは正面から見て横方向になる。
+  if(IsFlinching()){
+    const XMFLOAT3& facing_rotation = m_transform.GetRotation();
+    draw_transform.SetRotation(XMFLOAT3{facing_rotation.x,facing_rotation.y,CalculateFlinchTilt(m_flinchRemainingSeconds,m_animation.flinchTiltSign)});
+  }
+
   // View行列とProjection行列、および、決めた色・UV倍率1・Object画像を、それぞれ1つの構造体にまとめて、Cubeを描く。
   const CAMERA_MATRICES camera{viewMatrix,projectionMatrix};
   const BasicMeshRenderer::CUBE_APPEARANCE appearance{color,XMFLOAT2{1.0f,1.0f},BasicMeshRenderer::TextureType::Object};
@@ -202,6 +246,11 @@ bool Enemy::ApplyDamage(float damage,CollisionWorld& collisionWorld,float flinch
 {
   // すでに死亡している場合は、ダメージも怯みも与えずfalseを返す。
   if(!m_isAlive)return false;
+
+  // 怯みが始まる被弾の時だけ、傾きの向きを反転する。連射で怯みが続く間は向きを変えず、傾きが左右に細かく振れるのを避ける。
+  if(m_flinchRemainingSeconds <= 0.0f){
+    m_animation.flinchTiltSign = -m_animation.flinchTiltSign;
+  }
 
   // HPを減らし、怯みの時間を、倍率を掛けた長さで最初から数え直す。
   m_currentHP -= damage;
