@@ -140,6 +140,12 @@ public:
   [[nodiscard]] std::uint32_t GetEnemyId() const { return m_enemyId; }
   // 敵の体の当たりを表す球を返す。中心は敵の位置、半径は種類の表の値でColliderと同じ。
   [[nodiscard]] COLLISION_SPHERE GetBodySphere() const;
+  // 倒された敵（初期化済みで、死亡している枠）かを返す。未使用の枠（Uninit済み）は、false。ウェーブの切替で、死体を預ける対象を選ぶために使う。
+  [[nodiscard]] bool IsCorpse() const { return !m_isAlive && m_cubeRenderer != nullptr; }
+  // モデルの動きの状態を返す。倒された敵の死体を、預けるために使う。
+  [[nodiscard]] const EnemyModelPlayback& GetPlayback() const { return m_playback; }
+  // モデルの動きの選択と描画に使う、敵の現在の状態を返す。色は白。
+  [[nodiscard]] ENEMY_PLAYBACK_STATE GetPlaybackState() const { return BuildPlaybackState(XMFLOAT4{1.0f,1.0f,1.0f,1.0f}); }
   // 追従の移動速度を返す。モデルの歩きの動きから測った、足が地面を滑らない速度で、動きの位相によって変わる。モデルを使えない時は、既定の速度を返す。
   // fallbackSpeed: モデルがない時に返す、既定の速度。単位はワールド距離単位/秒。
   [[nodiscard]] float GetModelMoveSpeed(float fallbackSpeed) const { return m_playback.GetMoveSpeed(BuildPlaybackState(XMFLOAT4{1.0f,1.0f,1.0f,1.0f}),fallbackSpeed); }

@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// 敵の種類別の更新（接近型の追従と近接、射撃型の距離維持と発射、範囲攻撃型の接近と範囲の予告・判定、ボスの接近と2種類の攻撃）、敵の弾、範囲の予告、ウェーブの生成、敵側の描画を担当する。
+// 敵の種類別の更新（接近型の追従と近接、射撃型の距離維持と発射、範囲攻撃型の接近と範囲の予告・判定、ボスの接近と2種類の攻撃）、敵の弾、範囲の予告、ウェーブの生成、倒された敵の死体、敵側の描画を担当する。
 // プレイヤーの位置・状態とHPは読み取るだけで、命中・回避の結果は攻撃イベントとして呼出側へ通知する。
 // ダメージ・怯み・ヒットストップの反映、スローの開始、判定結果の記録、部屋の進行状態の更新、プレイヤーの攻撃による敵のダメージは担当しない。
 
@@ -16,6 +16,7 @@
 #include "Scene/Common/Combat/H/JustDodgeJudge.h"
 #include "Scene/Common/Enemy/H/AreaTelegraph.h"
 #include "Scene/Common/Enemy/H/BossController.h"
+#include "Scene/Common/Enemy/H/EnemyCorpseFader.h"
 #include "Scene/Common/Enemy/H/EnemyManager.h"
 #include "Scene/Common/Enemy/H/EnemyProjectile.h"
 #include "Scene/Common/Enemy/H/EnemyModelLibrary.h"
@@ -58,7 +59,7 @@ struct ENEMY_CONTROLLER_LINKS
   std::function<void(const ENEMY_ATTACK_EVENT&)> onAttackEvent{};
 };
 
-// 現在のウェーブの敵・敵の弾・範囲の予告・敵ごとの攻撃予告を所有し、更新と描画を行う。
+// 現在のウェーブの敵・敵の弾・範囲の予告・敵ごとの攻撃予告・倒された敵の死体を所有し、更新と描画を行う。
 class EnemyController final
 {
 public:
@@ -67,21 +68,21 @@ public:
   // links: 借用する参照先と通知先。必須の項目が欠けている場合は何も登録しない。
   // 戻り値: 登録と借用に成功したらtrue。falseの場合も、呼出側がUninitで部分的な状態を解放する。
   [[nodiscard]] bool Initialize(const ENEMY_CONTROLLER_LINKS& links);
-  // 全枠のColliderを解除し、敵の弾・範囲の予告を解放して、参照先を手放す。未初期化でも、繰り返しても呼出可能。
+  // 全枠のColliderを解除し、敵の弾・範囲の予告・死体を解放して、参照先を手放す。未初期化でも、繰り返しても呼出可能。
   // 登録先のCollisionWorldと共有Registryより先に呼ぶこと。
   void Uninit();
-  // 全枠の攻撃予告と再攻撃待ちを初期状態へ戻し、飛行中の敵の弾と範囲の予告を消し、ボスの攻撃の状態を戻す。旧ウェーブの状態を持ち越さないために使う。
+  // 全枠の攻撃予告と再攻撃待ちを初期状態へ戻し、飛行中の敵の弾と範囲の予告を消し、ボスの攻撃の状態を戻す。旧ウェーブの状態を持ち越さないために使う。預かっている死体は、消さない。
   void ResetAttackState();
 
   //========= 生成関数=========
-  // 指定した部屋とウェーブの敵を生成し、成功した場合だけ攻撃状態・敵の弾・範囲の予告を初期化する。Initialize成功後に呼ぶ。
+  // 指定した部屋とウェーブの敵を生成し、成功した場合だけ攻撃状態・敵の弾・範囲の予告を初期化する。Initialize成功後に呼ぶ。生成の前に、旧ウェーブの死体を、徐々に消える死体として預ける。
   // roomNumber: 1始まりの部屋番号。
   // waveNumber: 1始まりのウェーブ番号。
   // 戻り値: 全ての敵の登録に成功したらtrue。失敗した場合はEnemyManagerが空にし、攻撃状態は変えない。
   [[nodiscard]] bool TrySpawnWave(int roomNumber,int waveNumber);
 
   //========= 更新・描画関数=========
-  // 全枠の敵を出現順に、種類に応じて更新し、全ての敵をプレイヤーの方へ向け、予告中の敵の表示を切り替える。
+  // 全枠の敵を出現順に、種類に応じて更新し、全ての敵をプレイヤーの方へ向け、予告中の敵の表示を切り替える。続けて、敵の弾と、預かっている死体を進める。
   // worldDeltaTime: 敵側の経過時間。単位は秒。スローとヒットストップ反映済みで、ヒットストップ中は0。
   void Update(float worldDeltaTime);
   // 予告中の範囲を、床の上の赤い板として描く。敵・出口より先に描くことで、敵の体が予告の上に重なる。
@@ -89,7 +90,7 @@ public:
   // viewMatrix: World空間からView空間への変換行列。
   // projectionMatrix: View空間からClip空間への変換行列。
   void DrawAreaTelegraph(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix) const;
-  // 全枠の敵を出現順に描き、続けて飛行中の敵の弾を描く。死亡枠はEnemy::Drawが描画を省略する。
+  // 全枠の敵を出現順に描き、続けて預かっている死体と、飛行中の敵の弾を描く。死亡枠はEnemy::Drawが描画を省略する。
   // graphicsSystem: Rendererが使う描画基盤。
   // viewMatrix: World空間からView空間への変換行列。
   // projectionMatrix: View空間からClip空間への変換行列。
@@ -110,6 +111,8 @@ private:
   void InitModelLibrary(GraphicsSystem& graphicsSystem);
 
   //========= 更新の補助関数=========
+  // 倒されている敵の死体を、全て、死体を預かるクラスへ預ける。ウェーブの生成で、敵の枠が解除される前に呼ぶ。
+  void StoreCorpses();
   // 全枠の敵を出現順に、種類に応じて更新し、予告中の敵の表示を切り替える。
   // worldDeltaTime: 敵側の経過時間。単位は秒。
   void UpdateActions(float worldDeltaTime);
@@ -159,6 +162,8 @@ private:
   EnemyManager m_enemyManager{};
   // 敵の見た目ごとのモデルとアニメーションを、共有して所有する。GPU Resourceを持つため、Uninitで、共有Registryより先に解放する。
   EnemyModelLibrary m_modelLibrary{};
+  // 倒された敵の死体。ウェーブが切り替わった後も、動きの最後のポーズで、徐々に消えるまで、描き続ける。共有の読込を借用するため、Uninitで、共有の読込より先に手放す。
+  EnemyCorpseFader m_corpseFader{};
   // 射撃型の敵が撃った、飛行中の弾。Cube Rendererを借用するため、Uninitで共有Registryより先に解除する。
   EnemyProjectileManager m_enemyProjectiles{};
   // 範囲攻撃型の敵とボスが予告中の、床の上の範囲。Cube Rendererを借用するため、Uninitで共有Registryより先に解除する。

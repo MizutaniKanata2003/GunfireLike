@@ -1,6 +1,6 @@
 ﻿#include "../H/EnemyController.h"
 
-// 敵の種類別の更新（接近型の追従と近接、射撃型の距離維持と発射、範囲攻撃型の接近と範囲の予告・判定、ボスの攻撃結果の通知）、全ての敵の向き、敵の弾の更新、ウェーブの生成、敵側の描画を実装する。
+// 敵の種類別の更新（接近型の追従と近接、射撃型の距離維持と発射、範囲攻撃型の接近と範囲の予告・判定、ボスの攻撃結果の通知）、全ての敵の向き、敵の弾の更新、ウェーブの生成、倒された敵の死体の預かり、敵側の描画を実装する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <chrono> // std::chronoで、敵のモデルの読込にかかった時間を測る。
@@ -9,6 +9,7 @@
 #include <vector> // 敵の弾の判定結果を、std::vectorで受け取る。
 
 //========= Framework インクルード=========
+#include "Framework/3D/H/CameraMatrices.h"
 #include "Framework/Collision/H/CollisionWorld.h"
 #include "Framework/Etc/H/Logger.h"
 #include "Framework/Etc/H/MathTypes.h"
@@ -79,7 +80,7 @@ bool EnemyController::Initialize(const ENEMY_CONTROLLER_LINKS& links)
   return m_bossController.Initialize(boss_links);
 }
 
-// 全枠のColliderを解除し、敵の弾・範囲の予告を解放して、参照先を手放す。
+// 全枠のColliderを解除し、敵の弾・範囲の予告・死体を解放して、参照先を手放す。
 void EnemyController::Uninit()
 {
   // 登録先のCollisionWorldが分かっている場合だけ、全枠のColliderを解除する。Initialize前は敵が未登録のため、何もしない。
@@ -92,6 +93,8 @@ void EnemyController::Uninit()
   m_bossController.Uninit();
   m_enemyProjectiles.Uninit();
   m_areaTelegraph.Uninit();
+  // 預かっている死体は、解放する共有の読込を参照するため、共有の読込より先に手放す。
+  m_corpseFader.Clear();
   // 敵が、解放する共有の読込を参照し続けないよう、先に参照を外す。
   for(Enemy& enemy : m_enemyManager.GetEnemies()){
     enemy.SetModelLibrary(nullptr);
@@ -114,6 +117,7 @@ void EnemyController::ResetAttackState()
   m_recoverySeconds.fill(0.0f);
 
   // 旧ウェーブの飛行中の弾と範囲の予告を消す。ボスの予告と待ち時間も戻し、新しいボスが、最初の攻撃までの待ち時間から始まるようにする。
+  // 預かっている死体は、ウェーブが切り替わった後も、徐々に消えるまで残すため、ここでは消さない。
   m_enemyProjectiles.Clear();
   m_areaTelegraph.Clear();
   m_bossController.Reset();
@@ -123,6 +127,9 @@ void EnemyController::ResetAttackState()
 // 指定した部屋とウェーブを生成し、成功した場合だけ攻撃状態を新しい編成に合わせる。
 bool EnemyController::TrySpawnWave(int roomNumber,int waveNumber)
 {
+  // 旧ウェーブの敵の枠は、生成の中で解除されるため、倒されている敵の死体を、先に預ける。
+  StoreCorpses();
+
   // 登録に失敗した場合は、EnemyManagerが生成済みの枠を解除して空にする。攻撃状態は変えず、失敗を返す。
   if(!m_enemyManager.SpawnWave(roomNumber,waveNumber,*m_modelRegistry,*m_collisionWorld)){
     Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"EnemyControllerの部屋ウェーブの生成に失敗しました。");
@@ -135,12 +142,13 @@ bool EnemyController::TrySpawnWave(int roomNumber,int waveNumber)
 }
 
 //========= 更新・描画関数=========
-// 全枠の敵を更新し、続けて敵の弾を進める。
+// 全枠の敵を更新し、続けて敵の弾と、預かっている死体を進める。
 void EnemyController::Update(float worldDeltaTime)
 {
   // 敵の行動を先に更新し、射撃型が今回の更新で生成した弾を、同じ更新の中で進める。
   UpdateActions(worldDeltaTime);
   UpdateProjectiles(worldDeltaTime);
+  m_corpseFader.Update(worldDeltaTime);
 }
 
 // 予告中の範囲を、床の上の赤い板として描く。
@@ -149,7 +157,7 @@ void EnemyController::DrawAreaTelegraph(GraphicsSystem& graphicsSystem,const XMM
   m_areaTelegraph.Draw(graphicsSystem,viewMatrix,projectionMatrix);
 }
 
-// 全枠の敵を出現順に描き、続けて飛行中の敵の弾を描く。
+// 全枠の敵を出現順に描き、続けて預かっている死体と、飛行中の敵の弾を描く。
 void EnemyController::DrawEnemies(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix) const
 {
   // 全枠の敵を出現順に描画する。死亡枠はEnemy::Drawが描画を省略する。
@@ -157,7 +165,10 @@ void EnemyController::DrawEnemies(GraphicsSystem& graphicsSystem,const XMMATRIX&
     enemy.Draw(graphicsSystem,viewMatrix,projectionMatrix);
   }
 
-  // 敵の後に、飛行中の敵の弾を描画する。
+  // 敵の後に、預かっている死体（ウェーブが切り替わった後に、徐々に消える）を描画する。
+  m_corpseFader.Draw(graphicsSystem,CAMERA_MATRICES{viewMatrix,projectionMatrix});
+
+  // 続けて、飛行中の敵の弾を描画する。
   m_enemyProjectiles.Draw(graphicsSystem,viewMatrix,projectionMatrix);
 }
 
@@ -184,6 +195,17 @@ void EnemyController::InitModelLibrary(GraphicsSystem& graphicsSystem)
 }
 
 //========= 更新の補助関数=========
+// 倒されている敵の死体を、全て、死体を預かるクラスへ預ける。
+void EnemyController::StoreCorpses()
+{
+  // 倒された敵（初期化済みで、死亡している枠）だけを預ける。未使用の枠は、預けない。
+  for(const Enemy& enemy : m_enemyManager.GetEnemies()){
+    if(!enemy.IsCorpse())continue;
+
+    static_cast<void>(m_corpseFader.Add(enemy.GetPlayback(),enemy.GetPlaybackState()));
+  }
+}
+
 // 全枠の敵を出現順に、種類に応じて更新し、全ての敵をプレイヤーの方へ向け、予告中の敵の表示を切り替える。
 void EnemyController::UpdateActions(float worldDeltaTime)
 {
