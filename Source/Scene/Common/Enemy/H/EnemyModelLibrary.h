@@ -112,6 +112,15 @@ public:
   [[nodiscard]] bool Initialize(GraphicsSystem& graphicsSystem);
   // 全ての所有物を解放する。未初期化・終了済みでも呼出可能。ContextのBind解除・GPU完了待機は行わない。
   void Uninit();
+  // 見た目を1つだけ読み込む。読込画面が、見た目ごとに工程を分けて、バーを滑らかに進めるために使う。他の見た目は変更しない。Scene初期化中にだけ呼ぶ。
+  // 既に読み込み済みの見た目は、何もせずtrueを返す。Initializeと違い、旧Resourceの解放も、失敗時の全解放も行わない。失敗した場合は、呼出側が、Uninitで全て解放する。
+  // graphicsSystem: 描画部の生成に使うDeviceの取得元。参照は保持しない。
+  // appearanceIndex: 見た目の添字。ENEMY_APPEARANCEの値と同じ。範囲外ならfalse。
+  // 戻り値: 読み込めたか、既に読み込み済みならtrue。失敗の理由は、各Loaderがログへ記録する。歩きの速度の表を作れなくても、失敗にしない。
+  [[nodiscard]] bool LoadAppearanceStep(GraphicsSystem& graphicsSystem,std::size_t appearanceIndex);
+  // 全ての見た目を、描画に使えるかを返す。
+  // 戻り値: 全ての見た目で、モデルと必須の動きを読み込み済みならtrue。
+  [[nodiscard]] bool IsAllLoaded() const;
 
   //========= 取得関数=========
   // 敵の種類と識別値から、使う見た目を決める。接近型は、識別値が偶数ならA、奇数ならB。

@@ -172,13 +172,18 @@ void EnemyController::DrawEnemies(GraphicsSystem& graphicsSystem,const XMMATRIX&
   m_enemyProjectiles.Draw(graphicsSystem,viewMatrix,projectionMatrix);
 }
 
-//========= 初期化の補助関数=========
-// 敵のモデルとアニメーションを、全て読み込み、読込の時間をログへ出す。
+// 全ての敵の枠へ共有の読込を渡し、敵のモデルとアニメーションを、全て読み込み済みにして、読込の時間をログへ出す。
 void EnemyController::InitModelLibrary(GraphicsSystem& graphicsSystem)
 {
   // 全ての枠の敵へ、共有の読込を渡す。読み込めなかった場合も渡し、描画側が、読込済みかを見て、Cubeへ戻す。
   for(Enemy& enemy : m_enemyManager.GetEnemies()){
     enemy.SetModelLibrary(&m_modelLibrary);
+  }
+
+  // 読込画面が、見た目ごとに、先に全て読み込んでいた場合は、読込を省く。
+  if(m_modelLibrary.IsAllLoaded()){
+    Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_SCENE,L"敵のモデルは読み込み済みのため、読込を省きます。");
+    return;
   }
 
   // 読込にかかった時間を測る。

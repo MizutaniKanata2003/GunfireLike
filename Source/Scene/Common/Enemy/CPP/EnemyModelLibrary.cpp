@@ -239,6 +239,22 @@ void EnemyModelLibrary::Uninit()
   }
 }
 
+// 見た目を1つだけ読み込む。
+bool EnemyModelLibrary::LoadAppearanceStep(GraphicsSystem& graphicsSystem,std::size_t appearanceIndex)
+{
+  // 範囲外はfalse。読み込み済みの見た目は、二重に読み込まず、成功として扱う。
+  if(appearanceIndex >= ENEMY_MODEL::ns_APPEARANCE_COUNT)return false;
+  if(m_assets[appearanceIndex].isLoaded)return true;
+
+  return LoadAppearance(graphicsSystem,appearanceIndex);
+}
+
+// 全ての見た目を、描画に使えるかを返す。
+bool EnemyModelLibrary::IsAllLoaded() const
+{
+  return std::all_of(m_assets.begin(),m_assets.end(),[](const ENEMY_APPEARANCE_ASSETS& assets){return assets.isLoaded; });
+}
+
 //========= 取得関数=========
 // 敵の種類と識別値から、使う見た目を決める。
 bool EnemyModelLibrary::TryGetAppearance(ENEMY_KIND kind,std::uint32_t enemyId,ENEMY_APPEARANCE& outAppearance)
