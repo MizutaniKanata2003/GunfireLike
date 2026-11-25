@@ -196,6 +196,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Framework\2D\CPP\HudSpriteRenderer.cpp" />
     <ClCompile Include="Source\Framework\3D\CPP\BasicColorPipeline.cpp" />
     <ClCompile Include="Source\Debug\CPP\DebugLineRenderer.cpp" />
+    <ClCompile Include="Source\Framework\3D\CPP\SkinnedAnimationLoader.cpp" />
     <ClCompile Include="Source\Framework\3D\CPP\SkinnedModelLoader.cpp" />
     <ClCompile Include="Source\Framework\Audio\CPP\AudioSystem.cpp" />
     <ClCompile Include="Source\Debug\CPP\CollisionDebugDrawer.cpp" />
@@ -271,6 +272,8 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Framework\3D\H\BasicColorPipeline.h" />
     <ClInclude Include="Source\Debug\H\DebugLineRenderer.h" />
     <ClInclude Include="Source\Framework\3D\H\CameraMatrices.h" />
+    <ClInclude Include="Source\Framework\3D\H\SkinnedAnimationData.h" />
+    <ClInclude Include="Source\Framework\3D\H\SkinnedAnimationLoader.h" />
     <ClInclude Include="Source\Framework\3D\H\SkinnedModelData.h" />
     <ClInclude Include="Source\Framework\3D\H\SkinnedModelLoader.h" />
     <ClInclude Include="Source\Framework\Audio\H\AudioSystem.h" />
