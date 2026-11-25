@@ -66,6 +66,11 @@ private:
   // model: 初期データにするモデル。
   // 戻り値: 両方成功したらtrue。
   [[nodiscard]] bool CreateMeshBuffers(ID3D11Device* device,const SKINNED_MODEL_DATA& model);
+  // 先頭の描画範囲の材質から、埋め込まれた拡散色の画像を読み、SRVとSamplerを生成する。画像がない材質は、成功とし、単色で描く。
+  // device: 生成に使うDevice。
+  // model: 材質と、画像のファイルの中身を持つモデル。
+  // 戻り値: 成功、または、画像がなければtrue。画像があるのに展開できなければfalse。
+  [[nodiscard]] bool CreateTexture(ID3D11Device* device,const SKINNED_MODEL_DATA& model);
   // BasicColorの設定を接続した後で、スキニング用のShaderと、ボーンの定数Bufferへ上書きして描画する。
   // context: 描画に使う即時Context。
   void BindAndDraw(ID3D11DeviceContext* context) const;
@@ -85,6 +90,12 @@ private:
   ComPtr<ID3D11Buffer> m_indexBuffer{};
   // ボーン行列の定数Buffer。Vertex Shaderのb5へ設定する。
   ConstantBuffer<BONE_CONSTANTS> m_boneBuffer{};
+
+  //========= 画像関連=========
+  // 拡散色の画像のSRVの所有参照。画像がなければ空で、色の指定だけで描く。
+  ComPtr<ID3D11ShaderResourceView> m_textureView{};
+  // 画像の参照用Samplerの所有参照。Linear補間・WRAP。
+  ComPtr<ID3D11SamplerState> m_textureSampler{};
 
   //========= 描画情報=========
   // 初期0、生成完了後にIndexの数、Uninitで0。バイト数ではない。

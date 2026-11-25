@@ -125,12 +125,50 @@ namespace
       WriteTextureAssetError(L"IWICImagingFactory::CreateDecoderFromFilename",filePath,decoder_result);
       return false;
     }
-
     // Index 0の先頭フレームだけを取得する。全フレーム列挙やアニメーション再生は行わない。
     const HRESULT frame_result = source.decoder->GetFrame(0,source.frame.GetAddressOf());
     // 先頭フレーム取得失敗ならデコードを続けず、Assetログを出してfalseを返す。
     if(FAILED(frame_result)){
       WriteTextureAssetError(L"IWICBitmapDecoder::GetFrame",filePath,frame_result);
+      return false;
+    }
+    return true;
+  }
+
+  // WIC Factoryを生成し、メモリ上の画像を、Streamとして開き、先頭フレームを取得する。失敗はAsset分類へ記録する。
+  // image: 画像のファイルの中身。デコードが終わるまで、有効であること。
+  // source: Factory・Decoder・Frameの出力先。
+  // 戻り値: 全て成功したらtrue。
+  bool OpenFirstFrameFromMemory(const ENCODED_IMAGE_VIEW& image,WIC_SOURCE& source)
+  {
+    const HRESULT factory_result = CoCreateInstance(CLSID_WICImagingFactory,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(source.factory.GetAddressOf()));
+    if(FAILED(factory_result)){
+      WriteTextureAssetError(L"CoCreateInstance(IWICImagingFactory)",image.name,factory_result);
+      return false;
+    }
+
+    // メモリの範囲を、読取専用のStreamとして開く。WICは、読込の間だけ、このメモリを参照する。
+    ComPtr<IWICStream> stream{};
+    const HRESULT stream_result = source.factory->CreateStream(stream.GetAddressOf());
+    if(FAILED(stream_result)){
+      WriteTextureAssetError(L"IWICImagingFactory::CreateStream",image.name,stream_result);
+      return false;
+    }
+    const HRESULT stream_initialize_result = stream->InitializeFromMemory(const_cast<BYTE*>(image.data),static_cast<DWORD>(image.size));
+    if(FAILED(stream_initialize_result)){
+      WriteTextureAssetError(L"IWICStream::InitializeFromMemory",image.name,stream_initialize_result);
+      return false;
+    }
+
+    // StreamからDecoderを作り、Index 0の先頭フレームだけを取得する。
+    const HRESULT decoder_result = source.factory->CreateDecoderFromStream(stream.Get(),nullptr,WICDecodeMetadataCacheOnLoad,source.decoder.GetAddressOf());
+    if(FAILED(decoder_result)){
+      WriteTextureAssetError(L"IWICImagingFactory::CreateDecoderFromStream",image.name,decoder_result);
+      return false;
+    }
+    const HRESULT frame_result = source.decoder->GetFrame(0,source.frame.GetAddressOf());
+    if(FAILED(frame_result)){
+      WriteTextureAssetError(L"IWICBitmapDecoder::GetFrame",image.name,frame_result);
       return false;
     }
     return true;
@@ -268,4 +306,28 @@ bool TextureLoader::LoadWicTexture(ID3D11Device* device,std::wstring_view filePa
 
   // 成功した出力SRVだけを残す。
   return CreateShaderResource(device,image,filePath,textureView);
+}
+
+// メモリ上の画像から、TextureとSRVを生成し、成功したViewだけを出力先へ残す。
+bool TextureLoader::LoadWicTextureFromMemory(ID3D11Device* device,const ENCODED_IMAGE_VIEW& image,ComPtr<ID3D11ShaderResourceView>& textureView)
+{
+  // 引数検証より先に、旧SRVの所有参照を解放する。失敗しても、旧画像へ戻さない。
+  textureView.Reset();
+  if(device == nullptr){
+    Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_GRAPHICS,L"TextureLoaderにDeviceが渡されていません。");
+    return false;
+  }
+  if(image.data == nullptr || image.size == 0){
+    Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_ASSET,L"Textureの画像データが空です。");
+    return false;
+  }
+
+  // 先頭フレームの取得→BGRAへの変換→GPU生成の順に進め、最初の失敗で止める。
+  WIC_SOURCE source{};
+  DECODED_IMAGE decoded{};
+  if(!OpenFirstFrameFromMemory(image,source))return false;
+  if(!ConvertToBGRA(source,image.name,decoded))return false;
+  Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_ASSET,
+                L"画像を展開しました: " + std::wstring{image.name} + L" | " + std::to_wstring(decoded.width) + L" x " + std::to_wstring(decoded.height));
+  return CreateShaderResource(device,decoded,image.name,textureView);
 }

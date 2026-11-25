@@ -4,6 +4,8 @@
 // 成功したSRVの所有参照を呼出側へ渡す。ShaderへのBind、Sampler設定、描画、自動Mip生成は担当しない。
 
 //========= C++標準ライブラリ インクルード=========
+#include <cstddef> // std::size_tで、画像のバイト数を表す。
+#include <cstdint> // std::uint8_tで、画像のファイルの中身を、バイト列として扱う。
 #include <string_view> // 呼出側のワイド文字パスをstd::wstring_viewで非所有のまま受け取る。
 
 //========= 外部ライブラリ インクルード=========
@@ -11,6 +13,17 @@
 
 //========= Framework インクルード=========
 #include "Framework/Etc/H/MathTypes.h"
+
+// メモリ上にある、圧縮された画像（PNG・JPEGなど）のファイルの中身の、借用の束。読込の引数の数を減らす。所有はしない。
+struct ENCODED_IMAGE_VIEW
+{
+  // ファイルの中身の先頭。呼出中だけ有効であればよい。
+  const std::uint8_t* data{};
+  // ファイルの中身のバイト数。
+  std::size_t size{};
+  // ログに使う名前。
+  std::wstring_view name{};
+};
 
 // デコード用COM参照と一時Textureを呼出中のローカルで所有する、状態を持たない画像Loader。
 class TextureLoader final
@@ -30,6 +43,12 @@ public:
   // アニメーション処理・自動Mip生成は行わない。公開名LoadWicTextureは既存参照との互換性のため維持する。
   static bool LoadWicTexture(ID3D11Device* device,std::wstring_view filePath,ComPtr<ID3D11ShaderResourceView>& textureView);
 
+  // メモリ上の、圧縮された画像の、先頭フレームをBGRAへ変換し、TextureとSRVを生成する。条件・失敗の扱いは、LoadWicTextureと同じ。
+  // device: 生成に使うDevice。nullptrならGraphicsログを出してfalse。
+  // image: 画像のファイルの中身。dataがnullptr、またはsizeが0ならAssetログを出してfalse。
+  // textureView: SRVの出力先。引数検証より前にResetし、成功したViewの所有参照へ置き換える。
+  // 戻り値: 全処理成功ならtrue。
+  static bool LoadWicTextureFromMemory(ID3D11Device* device,const ENCODED_IMAGE_VIEW& image,ComPtr<ID3D11ShaderResourceView>& textureView);
 private:
   //========= 生成禁止関数=========
   // 静的な読込関数だけを使用するため、インスタンス生成を禁止する。
