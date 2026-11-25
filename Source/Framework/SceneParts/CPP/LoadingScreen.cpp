@@ -127,8 +127,9 @@ void LoadingScreen::Update(float deltaTime,bool isConfirmPressed)
 // 読込中と確認待ちの間だけ、バーと文字を描く。
 void LoadingScreen::Draw(GraphicsSystem& graphicsSystem)
 {
-  // 読込中と確認待ちの間だけ描く。それ以外は、何も描かず、次の工程の実行も許可しない。
-  if(m_state != LOADING_STATE::e_LOADING && m_state != LOADING_STATE::e_READY)return;
+  // 読込中・確認待ち・完了の間だけ描く。完了した後も、最後の見た目を保つ。それ以外は、何も描かず、次の工程の実行も許可しない。
+  const bool is_visible = m_state == LOADING_STATE::e_LOADING || m_state == LOADING_STATE::e_READY || m_state == LOADING_STATE::e_FINISHED;
+  if(!is_visible)return;
 
   // 描いたことを記録する。次の更新で、次の工程を実行してよい。
   m_hasDrawnSinceStep = true;
