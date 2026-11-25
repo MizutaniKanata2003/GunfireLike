@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// 敵1体の状態（種類・HP・怯み・転倒・射撃のダメージの印・攻撃予告の表示・生死）と、球のColliderの登録、Cubeでの仮表示を担当する。
+// 敵1体の状態（種類・HP・怯み・転倒・射撃のダメージの印・攻撃予告の表示・生死・向き）と、球のColliderの登録、Cubeでの仮表示を担当する。
 // 種類ごとの数値はEnemyTableから読む。敵の行動（移動・攻撃）は持たない。複数体の管理は、EnemyManagerが担当する。
 
 //========= C++標準ライブラリ インクルード=========
@@ -55,6 +55,10 @@ public:
   // collisionWorld: この敵のColliderを登録したCollisionWorld。
   // 戻り値: Colliderと描画位置を更新できればtrue。死亡中または更新失敗時はfalse。
   [[nodiscard]] bool TryMoveTo(const XMFLOAT3& targetPosition,CollisionWorld& collisionWorld);
+  // 目標の方へ、水平方向に向ける。Y軸まわりの回転だけを変え、位置とColliderは変えない。
+  // 死亡中・転倒中は向きを変えない。目標との水平距離がほぼ0で向きが定まらない場合も、直前の向きを保つ。
+  // targetPosition: 向ける先のワールド座標。高さは使わない。
+  void SetFacing(const XMFLOAT3& targetPosition);
   // 生きている場合だけ、Cubeで描画する。通常は種類の色、射撃のダメージの印が付いている間は紫、攻撃の予告中は黄、怯み中・転倒中は色を変え、転倒中は低く潰して描く。
   // graphicsSystem: Rendererが使う描画基盤。
   // viewMatrix: World空間からView空間への変換行列。
@@ -110,7 +114,7 @@ private:
   //========= 表示=========
   // Cube描画に使う共有Renderer。非所有で、ModelRegistryが所有する。未取得はnullptr。
   BasicMeshRenderer* m_cubeRenderer{};
-  // 位置と大きさを保持し、World行列を作るTransform。
+  // 位置・向き・大きさを保持し、World行列を作るTransform。向きは、SetFacingがY軸まわりの回転だけを更新する。
   Transform m_transform{};
   // 攻撃の予告中の表示か。呼出側がSetTelegraphingで毎回設定する。
   bool m_isTelegraphing{};

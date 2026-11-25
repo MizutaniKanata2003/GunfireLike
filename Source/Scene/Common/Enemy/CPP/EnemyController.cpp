@@ -1,6 +1,6 @@
 ﻿#include "../H/EnemyController.h"
 
-// 敵の種類別の更新（接近型の追従と近接、射撃型の距離維持と発射、範囲攻撃型の接近と範囲の予告・判定、ボスの攻撃結果の通知）、敵の弾の更新、ウェーブの生成、敵側の描画を実装する。
+// 敵の種類別の更新（接近型の追従と近接、射撃型の距離維持と発射、範囲攻撃型の接近と範囲の予告・判定、ボスの攻撃結果の通知）、全ての敵の向き、敵の弾の更新、ウェーブの生成、敵側の描画を実装する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで、再攻撃待ちの残り時間を0未満にしない。
@@ -153,7 +153,7 @@ void EnemyController::DrawEnemies(GraphicsSystem& graphicsSystem,const XMMATRIX&
 }
 
 //========= 更新の補助関数=========
-// 全枠の敵を出現順に、種類に応じて更新し、予告中の敵の表示を切り替える。
+// 全枠の敵を出現順に、種類に応じて更新し、全ての敵をプレイヤーの方へ向け、予告中の敵の表示を切り替える。
 void EnemyController::UpdateActions(float worldDeltaTime)
 {
   // 全枠を先頭から更新する。死亡枠や行動不能の敵は、枠ごとの更新の中で予告を中断する。
@@ -181,6 +181,10 @@ void EnemyController::UpdateActions(float worldDeltaTime)
     UpdateBossSlot(slot_index,worldDeltaTime);
     break;
     }
+
+    // 移動の後の位置から、プレイヤーの方へ向ける。枠ごとの更新は、行動不能やヒットストップ中に途中で戻るため、ここで全種類をまとめて向ける。
+    // 死亡中・転倒中の敵は、Enemy側で向きを変えない。向きは表示だけに使い、移動・攻撃の判定には使わない。
+    m_enemyManager.GetEnemies()[slot_index].SetFacing(m_playerController->GetPosition());
 
     // 予告の状態を、その敵の表示へ反映する。死亡・怯みなどで予告が中断された場合は、解除される。ボスの予告は、BossControllerが持つ。
     const bool is_telegraphing = kind == ENEMY_KIND::e_BOSS ? m_bossController.IsTelegraphing() : m_attackJudges[slot_index].HasIncomingAttack();

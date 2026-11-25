@@ -1,7 +1,10 @@
 ﻿#include "../H/Enemy.h"
 
-// 敵1体のHP・怯み・転倒・射撃のダメージの印・Collider登録・Cube表示を実装する。
+// 敵1体のHP・怯み・転倒・射撃のダメージの印・向き・Collider登録・Cube表示を実装する。
 // 種類ごとのHP・当たり・大きさ・色はEnemyTableから読み、怯みと転倒の時間と状態の色は、このファイルの定数にまとめた仮値。
+
+//========= C++標準ライブラリ インクルード=========
+#include <cmath> // std::atan2で、敵から目標への水平方向を、Y軸まわりの回転角へ変換する。
 
 //========= Framework インクルード=========
 #include "Framework/3D/H/BasicMeshRenderer.h"
@@ -26,6 +29,10 @@ namespace
   // 転倒中のCubeの高さの倍率。1辺に掛けて低く潰し、倒れたことを示す。足元の位置は変えず、中心を下げる。仮値。
   constexpr float ns_KNOCKDOWN_HEIGHT_SCALE = 0.4f;
 
+  //========= 向き=========
+  // 向きを更新する、目標との水平距離の二乗の下限。この値以下では、目標とほぼ同じ位置にいて向きが定まらないため、向きを変えない。単位はワールド距離単位の二乗。仮値。
+  constexpr float ns_FACING_MIN_DISTANCE_SQUARED = 0.0001f;
+
   //========= 状態の色=========
   // 射撃のダメージの印が付いている間の色。紫で、Object画像の色へ乗算して色味を変える。種類の色の代わりに使い、予告・怯み・転倒の色より後にする。
   constexpr XMFLOAT4 ns_MARK_COLOR{0.9f,0.4f,1.0f,1.0f};
@@ -46,7 +53,7 @@ bool Enemy::Initialize(ModelRegistry& registry,CollisionWorld& collisionWorld,co
   // Registryが未初期化ならnullptrが返るため、Colliderを登録せず失敗とする。
   if(m_cubeRenderer == nullptr)return false;
 
-  // 種類・位置・識別値・大きさを設定する。Cubeは1辺1のため、倍率がそのまま1辺の長さになる。
+  // 種類・位置・識別値・大きさを設定する。Cubeは1辺1のため、倍率がそのまま1辺の長さになる。向きは、SetFacingが呼ばれるまで、回転なしにする。
   const ENEMY_PARAMS& params = ENEMY_TABLE::GetParams(initParams.kind);
   m_kind = initParams.kind;
   m_position = initParams.position;
@@ -137,6 +144,23 @@ bool Enemy::TryMoveTo(const XMFLOAT3& targetPosition,CollisionWorld& collisionWo
   m_position = body_sphere.center;
   m_transform.SetPosition(m_position);
   return true;
+}
+
+// 目標の方へ、Y軸まわりの回転だけで向ける。
+void Enemy::SetFacing(const XMFLOAT3& targetPosition)
+{
+  // 死亡中は描画されず、転倒中は倒れたまま向きを変えないため、更新しない。
+  if(!m_isAlive || IsKnockedDown())return;
+
+  // 敵の位置から目標までの水平方向の差を求める。高さは使わない。
+  const float offset_x = targetPosition.x - m_position.x;
+  const float offset_z = targetPosition.z - m_position.z;
+  // 水平距離がほぼ0の場合は、向きが定まらず、わずかな位置の違いで向きが急に変わってしまうため、直前の向きを保つ。
+  if(offset_x * offset_x + offset_z * offset_z <= ns_FACING_MIN_DISTANCE_SQUARED)return;
+
+  // +Z方向を基準に、Y軸まわりの回転角を求める。atan2(X成分,Z成分)は、回転後の+Z方向が目標の方を向く角度（ラジアン）になる。
+  // X（Pitch）とZ（Roll）の回転は0のままにし、Colliderと位置は変えない。
+  m_transform.SetRotation(XMFLOAT3{0.0f,std::atan2(offset_x,offset_z),0.0f});
 }
 
 // 生きている間だけ、Cubeを描く。
