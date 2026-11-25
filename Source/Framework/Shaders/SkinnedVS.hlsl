@@ -1,5 +1,5 @@
-// スキニング付きモデル用のVertex Shader。頂点を、最大4本のボーンの行列で変形してから、BasicColorと同じ流れでClip空間へ変換する。
-// Pixel Shaderは、BasicColorPSを共用するため、出力の形（VSOutput）は、BasicColorVSと同じにする。
+// スキニング付きモデル用のVertex Shader。頂点と法線を、最大4本のボーンの行列で変形してから、Clip空間へ変換する。
+// 出力は、Pixel Shader（SkinnedPS）が、光の計算に使う、ワールド空間の法線を含む。
 
 //========= 共通Shaderインクルード=========
 #include "ShaderCommon.hlsl"
@@ -18,7 +18,7 @@ struct SkinnedVSInput
 {
   // Local空間の3成分頂点座標。
   float3 position: POSITION;
-  // 法線。現在は、照明を使わないため、参照しない。
+  // Local空間の法線。単位ベクトル。
   float3 normal: NORMAL;
   // 頂点の2成分Texture座標。
   float2 uv: TEXCOORD0;
@@ -28,28 +28,51 @@ struct SkinnedVSInput
   float4 boneWeights: BLENDWEIGHT;
 };
 
-//========= Vertex Shaderエントリーポイント=========
-// Local頂点を、ボーンで変形し、World、Clipの順に変換する。色とタイリング済みUVを返す。
-// input: スキニング付きの頂点情報。
-// 戻り値: ラスタライズに使う座標と、Pixel Shaderへ渡す色・UV。
-VSOutput main(SkinnedVSInput input)
+//========= Vertex Shader出力=========
+// Pixel Shaderへ渡す、座標・色・UV・ワールド空間の法線。
+struct SkinnedVSOutput
 {
-  VSOutput output;
+  // Clip空間の同次座標。
+  float4 position: SV_POSITION;
+  // ObjectのRGBA色。
+  float4 color: COLOR0;
+  // タイリング倍率を反映したUV。
+  float2 uv: TEXCOORD0;
+  // ワールド空間の法線。補間されるため、Pixel Shaderで、正規化し直す。
+  float3 worldNormal: TEXCOORD1;
+};
+
+//========= Vertex Shaderエントリーポイント=========
+// Local頂点と法線を、ボーンで変形し、World、Clipの順に変換する。色とタイリング済みUVを返す。
+// input: スキニング付きの頂点情報。
+// 戻り値: ラスタライズに使う座標と、Pixel Shaderへ渡す色・UV・法線。
+SkinnedVSOutput main(SkinnedVSInput input)
+{
+  SkinnedVSOutput output;
 
   // 4本のボーンの変形を、重みで混ぜる。重みが全て0の頂点は、変形せず、そのまま使う。
   const float4 localPosition = float4(input.position,1.0f);
+  const float4 localNormal = float4(input.normal,0.0f);
   const float totalWeight = input.boneWeights.x + input.boneWeights.y + input.boneWeights.z + input.boneWeights.w;
   float4 skinnedPosition = localPosition;
-  if(totalWeight > 0.0f){
-    skinnedPosition = mul(localPosition,boneMatrices[input.boneIndices.x]) * input.boneWeights.x
-                    + mul(localPosition,boneMatrices[input.boneIndices.y]) * input.boneWeights.y
-                    + mul(localPosition,boneMatrices[input.boneIndices.z]) * input.boneWeights.z
-                    + mul(localPosition,boneMatrices[input.boneIndices.w]) * input.boneWeights.w;
+  float4 skinnedNormal = localNormal;
+  if(totalWeight > 0.0f)
+  {
+    skinnedPosition = float4(0.0f,0.0f,0.0f,0.0f);
+    skinnedNormal = float4(0.0f,0.0f,0.0f,0.0f);
+    [unroll]
+    for(int slot = 0; slot < 4; ++slot)
+    {
+      const matrix boneMatrix = boneMatrices[input.boneIndices[slot]];
+      skinnedPosition += mul(localPosition,boneMatrix) * input.boneWeights[slot];
+      skinnedNormal += mul(localNormal,boneMatrix) * input.boneWeights[slot];
+    }
   }
 
-  // 行ベクトル形式の既存mul順を保ち、変形後の座標をWorld座標、Clip座標へ変換する。
+  // 行ベクトル形式の既存mul順を保ち、変形後の座標をWorld座標、Clip座標へ変換する。法線は、移動を含めず、Worldの回転だけを掛ける（拡大は、全軸同じ前提）。
   const float4 worldPosition = mul(skinnedPosition,worldMatrix);
   output.position = mul(worldPosition,viewProjectionMatrix);
+  output.worldNormal = normalize(mul(float4(skinnedNormal.xyz,0.0f),worldMatrix).xyz);
 
   // Object色はそのまま渡し、UVだけMaterialのタイリング倍率を反映する。
   output.color = color;

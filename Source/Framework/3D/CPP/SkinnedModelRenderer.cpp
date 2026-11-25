@@ -1,17 +1,19 @@
 ﻿#include "../H/SkinnedModelRenderer.h"
 
-// スキニング付きモデルの、GPU Bufferの生成・ボーン行列の転送・Bind・描画・解放を実装する。
+// スキニング付きモデルの、GPU Bufferと材質ごとの画像の生成・ボーン行列の転送・Bind・描画範囲ごとの描画・解放を実装する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <cstddef> // offsetofで、頂点の属性のOffsetを、Input Layoutへ指定する。
+#include <string> // std::stringで、材質の画像のパスを扱い、std::wstringで、画像の名前を作る。
+#include <unordered_map> // 画像のパスから、読み込み済みの材質の番号を引き、同じ画像を共有する。
 #include <vector> // std::vector<char>で、CSOのバイナリデータを連続領域へ保持する。
 
 //========= Framework インクルード=========
 #include "Framework/DirectX/H/GraphicsErrorLog.h"
 #include "Framework/DirectX/H/GraphicsSystem.h"
 #include "Framework/DirectX/H/MeshBuffers.h"
-#include "Framework/DirectX/H/ShaderBinaryLoader.h"
 #include "Framework/DirectX/H/SamplerFactory.h"
+#include "Framework/DirectX/H/ShaderBinaryLoader.h"
 #include "Framework/DirectX/H/TextureLoader.h"
 #include "Framework/Etc/H/Logger.h"
 
@@ -21,6 +23,8 @@ namespace
   //========= Shaderファイルパス定数=========
   // スキニング用のVertex ShaderのCSOファイルパス。
   constexpr char ns_SKINNED_VERTEX_SHADER_CSO_PATH[] = "Shaders/SkinnedVS.cso";
+  // スキニング用のPixel ShaderのCSOファイルパス。
+  constexpr char ns_SKINNED_PIXEL_SHADER_CSO_PATH[] = "Shaders/SkinnedPS.cso";
 
   //========= 定数Bufferのslot=========
   // ボーン行列の定数BufferをBindするVertex Shaderのslot。b3・b4はLightとPostProcessの割当のため、b5を使う。
@@ -33,6 +37,28 @@ namespace
   constexpr char ns_TEXCOORD_SEMANTIC_NAME[] = "TEXCOORD";
   constexpr char ns_BLEND_INDICES_SEMANTIC_NAME[] = "BLENDINDICES";
   constexpr char ns_BLEND_WEIGHT_SEMANTIC_NAME[] = "BLENDWEIGHT";
+
+  //========= Pixel Shader・光の設定=========
+  // 光の定数BufferをBindするPixel Shaderのslot。ShaderCommon.hlslの、Light用の割当と同じ。
+  constexpr UINT ns_LIGHT_CONSTANT_SLOT = 3;
+  // 光の進む向き（正規化前）。奥（+Z）へ向かい、やや下へ。見た目を確認して、調整する仮値。
+  constexpr float ns_LIGHT_DIRECTION_X = 0.2f;
+  constexpr float ns_LIGHT_DIRECTION_Y = -0.7f;
+  constexpr float ns_LIGHT_DIRECTION_Z = 0.7f;
+  // 平行光源の強さと、環境光の強さ。仮値。
+  constexpr float ns_LIGHT_INTENSITY = 0.8f;
+  constexpr float ns_AMBIENT_INTENSITY = 0.45f;
+
+  // 光の定数を作る。向きは、正規化して保存する。
+  LIGHT_CONSTANTS MakeLightConstants()
+  {
+    LIGHT_CONSTANTS light{};
+    XMStoreFloat3(&light.direction,XMVector3Normalize(XMVectorSet(ns_LIGHT_DIRECTION_X,ns_LIGHT_DIRECTION_Y,ns_LIGHT_DIRECTION_Z,0.0f)));
+    light.intensity = ns_LIGHT_INTENSITY;
+    light.color = XMFLOAT3{1.0f,0.97f,0.92f};
+    light.ambientIntensity = ns_AMBIENT_INTENSITY;
+    return light;
+  }
 }
 
 //========= ライフサイクル・描画関数=========
@@ -42,51 +68,63 @@ bool SkinnedModelRenderer::Initialize(GraphicsSystem& graphicsSystem,const SKINN
   // 旧所有参照を先に解放する。以後の失敗でも旧状態へは復帰しない。
   Uninit();
 
-  // Deviceがない場合と、頂点・Indexが空の場合は、生成できない。
+  // Deviceがない場合と、頂点・Index・描画範囲が空の場合は、生成できない。
   ID3D11Device* device = graphicsSystem.GetDevice();
   if(device == nullptr)return false;
-  if(model.vertices.empty() || model.indices.empty()){
-    Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_GRAPHICS,L"SkinnedModelRendererの初期化に失敗しました。頂点またはIndexが空です。");
+  if(model.vertices.empty() || model.indices.empty() || model.submeshes.empty()){
+    Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_GRAPHICS,L"SkinnedModelRendererの初期化に失敗しました。頂点・Index・描画範囲のどれかが空です。");
     return false;
   }
 
-  // BasicColorの共用部分と、スキニング用のShader、Buffer、ボーンの定数Bufferを、この順に生成する。最初に失敗した時点で、全て解放してfalseを返す。
-  HRESULT bone_buffer_result{};
-  if(!m_pipeline.Initialize(device) || !CreateShader(device) || !CreateMeshBuffers(device,model) || !CreateTexture(device,model)){
+  // BasicColorの共用部分と、スキニング用のShader、Buffer、画像を、この順に生成する。最初に失敗した時点で、全て解放してfalseを返す。
+  if(!m_pipeline.Initialize(device) || !CreateShader(device) || !CreateMeshBuffers(device,model) || !CreateMaterialTextures(device,model)){
     Uninit();
     return false;
   }
+
+  // ボーンの定数Bufferを生成する。
+  HRESULT bone_buffer_result{};
   if(!m_boneBuffer.Init(device,bone_buffer_result)){
     GraphicsErrorLog::Write(L"ID3D11Device::CreateBuffer(BONE_CONSTANTS)",bone_buffer_result);
     Uninit();
     return false;
   }
 
-  // 全生成後にだけ、Indexの数を確定する。
-  m_indexCount = static_cast<unsigned int>(model.indices.size());
+  // 光の定数Bufferを生成する。
+  HRESULT light_buffer_result{};
+  if(!m_lightBuffer.Init(device,light_buffer_result)){
+    GraphicsErrorLog::Write(L"ID3D11Device::CreateBuffer(LIGHT_CONSTANTS)",light_buffer_result);
+    Uninit();
+    return false;
+  }
+  // 全生成後にだけ、描画範囲を確定する。
+  m_submeshes = model.submeshes;
   return true;
 }
 
 // 所有参照を解放する。
 void SkinnedModelRenderer::Uninit()
 {
+  m_lightBuffer.Uninit();
+  m_pixelShader.Reset();
+  m_submeshes.clear();
+  m_materialViews.clear();
+  m_hasTexture = false;
   m_textureSampler.Reset();
-  m_textureView.Reset();
   m_boneBuffer.Uninit();
   m_indexBuffer.Reset();
   m_vertexBuffer.Reset();
   m_inputLayout.Reset();
   m_vertexShader.Reset();
   m_pipeline.Uninit();
-  m_indexCount = 0;
 }
 
-// ボーン行列で変形したモデルを、単色で描く。
+// ボーン行列で変形したモデルを、材質ごとの画像で描く。
 void SkinnedModelRenderer::Draw(GraphicsSystem& graphicsSystem,const CAMERA_MATRICES& camera,const SKINNED_DRAW_PARAMS& params)
 {
   // 必須のResourceと、ボーン行列がなければ、描かない。
   if(params.boneMatrices == nullptr || !m_vertexBuffer || !m_indexBuffer || !m_vertexShader || !m_inputLayout
-     || !m_boneBuffer.IsValid() || !m_pipeline.IsValid() || m_indexCount == 0)return;
+     || !m_boneBuffer.IsValid() || !m_pipeline.IsValid() || m_submeshes.empty() || !m_pixelShader || !m_lightBuffer.IsValid())return;
   ID3D11DeviceContext* context = graphicsSystem.GetContext();
   if(context == nullptr)return;
 
@@ -96,9 +134,10 @@ void SkinnedModelRenderer::Draw(GraphicsSystem& graphicsSystem,const CAMERA_MATR
     XMStoreFloat4x4(&bone_constants.boneMatrices[bone_index],XMMatrixTranspose(XMLoadFloat4x4(&(*params.boneMatrices)[bone_index])));
   }
   m_boneBuffer.Update(context,bone_constants);
+  m_lightBuffer.Update(context,MakeLightConstants());
 
-  // Camera・Object・Materialの定数を転送する。画像は使わず、色だけで描く。
-  const BASIC_COLOR_APPEARANCE appearance{params.color,XMFLOAT2{1.0f,1.0f},m_textureView != nullptr};
+  // Camera・Object・Materialの定数を転送する。画像を持つ場合は、画像の色に、指定色を乗算する。
+  const BASIC_COLOR_APPEARANCE appearance{params.color,XMFLOAT2{1.0f,1.0f},m_hasTexture};
   m_pipeline.UpdateModelConstants(context,XMLoadFloat4x4(&params.worldMatrix),camera,appearance);
 
   BindAndDraw(context);
@@ -132,6 +171,15 @@ bool SkinnedModelRenderer::CreateShader(ID3D11Device* device)
     GraphicsErrorLog::Write(L"ID3D11Device::CreateInputLayout(SKINNED_VERTEX)",input_layout_result);
     return false;
   }
+
+  // スキニング用のPixel Shaderを読み込み、生成する。読込の失敗のログは、ShaderBinaryLoaderが記録する。
+  std::vector<char> pixel_shader_binary{};
+  if(!ShaderBinaryLoader::Load(ns_SKINNED_PIXEL_SHADER_CSO_PATH,pixel_shader_binary))return false;
+  const HRESULT pixel_shader_result = device->CreatePixelShader(pixel_shader_binary.data(),pixel_shader_binary.size(),nullptr,m_pixelShader.GetAddressOf());
+  if(FAILED(pixel_shader_result)){
+    GraphicsErrorLog::Write(L"ID3D11Device::CreatePixelShader(SkinnedPS)",pixel_shader_result);
+    return false;
+  }
   return true;
 }
 
@@ -150,24 +198,36 @@ bool SkinnedModelRenderer::CreateMeshBuffers(ID3D11Device* device,const SKINNED_
   return MeshBuffers::Create(device,vertex_source,m_vertexBuffer) && MeshBuffers::Create(device,index_source,m_indexBuffer);
 }
 
-// 先頭の描画範囲の材質から、埋め込まれた拡散色の画像を読み、SRVとSamplerを生成する。
-bool SkinnedModelRenderer::CreateTexture(ID3D11Device* device,const SKINNED_MODEL_DATA& model)
+// Samplerと、材質ごとの拡散色の画像（Mip付き）を生成する。
+bool SkinnedModelRenderer::CreateMaterialTextures(ID3D11Device* device,const SKINNED_MODEL_DATA& model)
 {
   // Samplerは、画像の有無にかかわらず、生成する。
   if(!SamplerFactory::CreateLinear(device,D3D11_TEXTURE_ADDRESS_WRAP,m_textureSampler))return false;
 
-  // 先頭の描画範囲の材質を選ぶ。範囲外、または、埋め込まれた画像がなければ、単色で描く。
-  if(model.submeshes.empty())return true;
-  const unsigned int material_index = model.submeshes.front().materialIndex;
-  if(material_index >= model.materials.size())return true;
-  const std::vector<std::uint8_t>& image_data = model.materials[material_index].diffuseImageData;
-  if(image_data.empty())return true;
+  // 材質ごとに、画像を読む。同じパスの材質は、読み込み済みの画像を共有する。画像がない材質は、空のままにする。
+  std::unordered_map<std::string,std::size_t> loaded_materials{};
+  m_materialViews.resize(model.materials.size());
+  for(std::size_t material_index = 0; material_index < model.materials.size(); ++material_index){
+    const SKINNED_MATERIAL& material = model.materials[material_index];
+    if(material.diffuseImageData.empty())continue;
 
-  const ENCODED_IMAGE_VIEW image{image_data.data(),image_data.size(),L"SkinnedModel diffuse"};
-  return TextureLoader::LoadWicTextureFromMemory(device,image,m_textureView);
+    const auto found = loaded_materials.find(material.diffuseTexturePath);
+    if(found != loaded_materials.end()){
+      m_materialViews[material_index] = m_materialViews[found->second];
+      continue;
+    }
+
+    // 縮小表示のちらつきを防ぐため、Mipを生成して読む。
+    const std::wstring image_name = L"SkinnedModel material " + std::to_wstring(material_index);
+    const ENCODED_IMAGE_VIEW image{material.diffuseImageData.data(),material.diffuseImageData.size(),image_name,true};
+    if(!TextureLoader::LoadWicTextureFromMemory(device,image,m_materialViews[material_index]))return false;
+    loaded_materials[material.diffuseTexturePath] = material_index;
+    m_hasTexture = true;
+  }
+  return true;
 }
 
-// BasicColorの設定を接続した後で、スキニング用のShaderとボーンの定数Bufferへ上書きして描画する。
+// BasicColorの設定を接続した後で、スキニング用のShaderとボーンの定数Bufferへ上書きし、描画範囲ごとに描画する。
 void SkinnedModelRenderer::BindAndDraw(ID3D11DeviceContext* context) const
 {
   // 頂点Bufferのstrideと、定数Bufferの借用ポインターを、設定用の配列へまとめる。
@@ -175,7 +235,6 @@ void SkinnedModelRenderer::BindAndDraw(ID3D11DeviceContext* context) const
   const UINT vertex_offset{};
   ID3D11Buffer* vertex_buffers[]{m_vertexBuffer.Get()};
   ID3D11Buffer* bone_buffers[]{m_boneBuffer.Get()};
-  ID3D11ShaderResourceView* texture_views[]{m_textureView.Get()};
   ID3D11SamplerState* samplers[]{m_textureSampler.Get()};
 
   // Slot0の頂点1本と、32bit Indexを接続する。
@@ -188,10 +247,15 @@ void SkinnedModelRenderer::BindAndDraw(ID3D11DeviceContext* context) const
   context->IASetInputLayout(m_inputLayout.Get());
   context->VSSetShader(m_vertexShader.Get(),nullptr,0);
   context->VSSetConstantBuffers(ns_BONE_CONSTANT_SLOT,1,bone_buffers);
-
-  // 画像は使わないため、直前のSRVを残さないよう、nullptrを明示する。
-    // 画像がなければ、nullptrが入り、直前のSRVを残さない。
-  context->PSSetShaderResources(0,1,texture_views);
+  ID3D11Buffer* light_buffers[]{m_lightBuffer.Get()};
+  context->PSSetShader(m_pixelShader.Get(),nullptr,0);
+  context->PSSetConstantBuffers(ns_LIGHT_CONSTANT_SLOT,1,light_buffers);
   context->PSSetSamplers(0,1,samplers);
-  context->DrawIndexed(m_indexCount,0,0);
+
+  // 描画範囲ごとに、材質の画像を設定して描く。画像がない材質は、nullptrを設定し、直前のSRVを残さない。
+  for(const SKINNED_SUBMESH& submesh : m_submeshes){
+    ID3D11ShaderResourceView* texture_views[]{submesh.materialIndex < m_materialViews.size() ? m_materialViews[submesh.materialIndex].Get() : nullptr};
+    context->PSSetShaderResources(0,1,texture_views);
+    context->DrawIndexed(submesh.indexCount,submesh.indexStart,0);
+  }
 }

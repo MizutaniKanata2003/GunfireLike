@@ -23,6 +23,8 @@ struct ENCODED_IMAGE_VIEW
   std::size_t size{};
   // ログに使う名前。
   std::wstring_view name{};
+  // 縮小表示のちらつきを防ぐため、全てのMip（縮小画像）を、GPUで生成するか。trueなら、Mip付きのTextureにする。
+  bool generateMips{};
 };
 
 // デコード用COM参照と一時Textureを呼出中のローカルで所有する、状態を持たない画像Loader。

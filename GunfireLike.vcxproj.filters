@@ -246,6 +246,9 @@
     <ClCompile Include="Source\Framework\3D\CPP\SkinnedModelRenderer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Scene\Common\Enemy\CPP\EnemyModelLibrary.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Framework\Imgui\H\ImGuiManager.h">
@@ -581,6 +584,9 @@
     <ClInclude Include="Source\Framework\3D\H\SkinnedModelRenderer.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Scene\Common\Enemy\H\EnemyModelLibrary.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Source\Framework\Shaders\BasicColorVS.hlsl" />
@@ -589,6 +595,7 @@
     <FxCompile Include="Source\Framework\Shaders\HudPS.hlsl" />
     <FxCompile Include="Source\Framework\Shaders\HudVS.hlsl" />
     <FxCompile Include="Source\Framework\Shaders\SkinnedVS.hlsl" />
+    <FxCompile Include="Source\Framework\Shaders\SkinnedPS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

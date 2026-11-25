@@ -275,6 +275,49 @@ namespace
     }
     return true;
   }
+
+  // CPU側の画素配列から、全てのMipを持つGPU TextureとSRVを生成する。Mipは、GPUで、最上位の画像から生成する。失敗はGraphics分類へ記録する。
+  // device: 生成に使うDevice。nullptr不可。
+  // image: BGRAの画素配列と寸法。呼出中に有効であること。
+  // filePath: ログに使う画像のパス。
+  // textureView: SRVの出力先。成功時だけ、所有参照を受け取る。失敗時は、空にする。
+  // 戻り値: 成功したらtrue。
+  bool CreateMippedShaderResource(ID3D11Device* device,const DECODED_IMAGE& image,std::wstring_view filePath,ComPtr<ID3D11ShaderResourceView>& textureView)
+  {
+    // MipLevels=0は、1×1までの全てのMipを作る指定。Mipの生成には、Render Target用途とGENERATE_MIPSの指定が要る。初期データは渡さない。
+    D3D11_TEXTURE2D_DESC texture_description{};
+    texture_description.Width = image.width;
+    texture_description.Height = image.height;
+    texture_description.MipLevels = 0;
+    texture_description.ArraySize = 1;
+    texture_description.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    texture_description.SampleDesc.Count = 1;
+    texture_description.Usage = D3D11_USAGE_DEFAULT;
+    texture_description.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+    texture_description.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
+
+    ComPtr<ID3D11Texture2D> texture{};
+    const HRESULT texture_result = device->CreateTexture2D(&texture_description,nullptr,texture.GetAddressOf());
+    if(FAILED(texture_result)){
+      WriteTextureGraphicsError(L"ID3D11Device::CreateTexture2D(Mip)",filePath,texture_result);
+      return false;
+    }
+
+    // 全てのMipを含む既定のSRVを生成する。
+    const HRESULT texture_view_result = device->CreateShaderResourceView(texture.Get(),nullptr,textureView.GetAddressOf());
+    if(FAILED(texture_view_result)){
+      WriteTextureGraphicsError(L"ID3D11Device::CreateShaderResourceView(Mip)",filePath,texture_view_result);
+      textureView.Reset();
+      return false;
+    }
+
+    // 最上位の画像を転送し、残りのMipを、GPUで生成する。即時Contextは、読込を呼んだスレッドで使う。
+    ComPtr<ID3D11DeviceContext> context{};
+    device->GetImmediateContext(context.GetAddressOf());
+    context->UpdateSubresource(texture.Get(),0,nullptr,image.pixels.data(),image.rowPitch,0);
+    context->GenerateMips(textureView.Get());
+    return true;
+  }
 }
 
 //========= Texture読込関数=========
@@ -329,5 +372,6 @@ bool TextureLoader::LoadWicTextureFromMemory(ID3D11Device* device,const ENCODED_
   if(!ConvertToBGRA(source,image.name,decoded))return false;
   Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_ASSET,
                 L"画像を展開しました: " + std::wstring{image.name} + L" | " + std::to_wstring(decoded.width) + L" x " + std::to_wstring(decoded.height));
-  return CreateShaderResource(device,decoded,image.name,textureView);
+  // Mipの指定がある場合だけ、Mip付きのTextureを作る。ない場合は、従来どおり、1段のTextureにする。
+  return image.generateMips ? CreateMippedShaderResource(device,decoded,image.name,textureView) : CreateShaderResource(device,decoded,image.name,textureView);
 }

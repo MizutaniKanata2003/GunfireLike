@@ -146,6 +146,7 @@ copy /Y "$(ProjectDir)Shaders\BasicColorPS.cso" "$(OutDir)Shaders\BasicColorPS.c
 copy /Y "$(ProjectDir)Shaders\HudVS.cso" "$(OutDir)Shaders\HudVS.cso"
 copy /Y "$(ProjectDir)Shaders\HudPS.cso" "$(OutDir)Shaders\HudPS.cso"
 copy /Y "$(ProjectDir)Shaders\SkinnedVS.cso" "$(OutDir)Shaders\SkinnedVS.cso"
+copy /Y "$(ProjectDir)Shaders\SkinnedPS.cso" "$(OutDir)Shaders\SkinnedPS.cso"
 
 xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     </PostBuildEvent>
@@ -188,6 +189,7 @@ copy /Y "$(ProjectDir)Shaders\BasicColorPS.cso" "$(OutDir)Shaders\BasicColorPS.c
 copy /Y "$(ProjectDir)Shaders\HudVS.cso" "$(OutDir)Shaders\HudVS.cso"
 copy /Y "$(ProjectDir)Shaders\HudPS.cso" "$(OutDir)Shaders\HudPS.cso"
 copy /Y "$(ProjectDir)Shaders\SkinnedVS.cso" "$(OutDir)Shaders\SkinnedVS.cso"
+copy /Y "$(ProjectDir)Shaders\SkinnedPS.cso" "$(OutDir)Shaders\SkinnedPS.cso"
 
 xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     </PostBuildEvent>
@@ -233,6 +235,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Framework\3D\CPP\ObjModelRenderer.cpp" />
     <ClCompile Include="Source\Scene\Common\Enemy\CPP\AreaTelegraph.cpp" />
     <ClCompile Include="Source\Scene\Common\Enemy\CPP\BossController.cpp" />
+    <ClCompile Include="Source\Scene\Common\Enemy\CPP\EnemyModelLibrary.cpp" />
     <ClCompile Include="Source\Scene\Common\Player\CPP\PlayerSuite.cpp" />
     <ClCompile Include="Source\Scene\Common\Stage\CPP\ExitDoor.cpp" />
     <ClCompile Include="Source\Scene\Common\Stage\CPP\RoomController.cpp" />
@@ -324,6 +327,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\Common\Enemy\H\AreaTelegraph.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\BossController.h" />
     <ClInclude Include="Source\Scene\Common\Enemy\H\EnemyAnimationTable.h" />
+    <ClInclude Include="Source\Scene\Common\Enemy\H\EnemyModelLibrary.h" />
     <ClInclude Include="Source\Scene\Common\Player\H\PlayerSuite.h" />
     <ClInclude Include="Source\Scene\Common\Player\H\Wallet.h" />
     <ClInclude Include="Source\Scene\Common\Reward\H\RewardController.h" />
@@ -428,6 +432,20 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <FxCompile Include="Source\Framework\Shaders\ShaderCommon.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Source\Framework\Shaders\SkinnedPS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)Shaders\SkinnedPS.cso</ObjectFileOutput>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)Shaders\SkinnedPS.cso</ObjectFileOutput>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">5.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">5.0</ShaderModel>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)Shaders\SkinnedPS.cso</ObjectFileOutput>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)Shaders\SkinnedPS.cso</ObjectFileOutput>
     </FxCompile>
     <FxCompile Include="Source\Framework\Shaders\SkinnedVS.hlsl">
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">5.0</ShaderModel>
