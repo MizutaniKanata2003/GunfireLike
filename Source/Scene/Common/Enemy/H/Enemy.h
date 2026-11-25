@@ -1,18 +1,19 @@
 ﻿#pragma once
 
-// 敵1体の状態（種類・HP・怯み・転倒・射撃のダメージの印・攻撃予告の表示・生死・向き・モデルの動き）と、球のColliderの登録、モデル（読み込めない時はCube）での表示を担当する。
-// 種類ごとの数値はEnemyTableから読む。敵の行動（移動・攻撃）は持たない。複数体の管理は、EnemyManagerが担当する。
+// 敵1体の状態（種類・HP・怯み・転倒・射撃のダメージの印・攻撃予告の表示・生死・向き）と、球のColliderの登録、モデル（読み込めない時はCube）での表示を担当する。
+// 種類ごとの数値はEnemyTableから読む。モデルの動きの選択と描画は、EnemyModelPlaybackが担当する。敵の行動（移動・攻撃）は持たない。複数体の管理は、EnemyManagerが担当する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <cstdint> // std::uint32_tで、Colliderへ付ける敵の識別値を保持する。
 
 //========= Framework インクルード=========
-#include "Framework/Collision/H/CollisionShapes.h"
 #include "Framework/3D/H/CameraMatrices.h"
+#include "Framework/Collision/H/CollisionShapes.h"
 #include "Framework/Etc/H/MathTypes.h"
 
 //========= Scene インクルード=========
 #include "Scene/Common/Enemy/H/EnemyModelLibrary.h"
+#include "Scene/Common/Enemy/H/EnemyModelPlayback.h"
 #include "Scene/Common/Enemy/H/EnemyWaveTable.h"
 #include "Scene/Common/Object/H/Transform.h"
 
@@ -33,7 +34,7 @@ struct ENEMY_INIT_PARAMS
   std::uint32_t enemyId{};
 };
 
-// 敵1体の簡易アニメーション（待機の揺れ・怯みの傾き・予告の前傾・攻撃の突進）の状態。Enemyのメンバー変数の数を抑えるため、1つにまとめる。
+// 敵1体の簡易アニメーション（待機の揺れ・怯みの傾き・予告の前傾・攻撃の突進）と、向きの追従の状態。Enemyのメンバー変数の数を抑えるため、1つにまとめる。
 struct ENEMY_ANIMATION_STATE
 {
   // 待機の揺れの位相。単位は周期の数で、0以上1未満。Updateで進める。同時に生成した敵が揃って揺れないよう、Initializeで敵の識別値から初期値を決める。
@@ -44,24 +45,12 @@ struct ENEMY_ANIMATION_STATE
   float telegraphSeconds{};
   // 攻撃の突進の残り時間。単位は秒。0より大きい間は、突進中。StartAttackLungeで設定し、Updateで減らす。
   float lungeRemainingSeconds{};
+  // 向きの目標。単位はラジアン。0が+Z、πが-Z。SetFacingが設定し、Updateが、旋回の速さの上限で、この向きへ近づける。
+  float targetYaw{};
+  // 向きの目標を、すでに設定したか。最初の1回は、旋回の途中の姿を見せず、そのまま向ける。
+  bool hasFacingTarget{};
   // 倒された時の演出を、まだ出していないか。ApplyDamageで死亡した時にtrueになり、TakeDefeatEffectNoticeで取り出すとfalseへ戻る。Respawnでも、falseへ戻る。
   bool hasPendingDefeatEffect{};
-};
-
-
-// 敵1体のモデルの動きの状態。Enemyのメンバー変数の数を抑えるため、1つにまとめる。
-struct ENEMY_MODEL_STATE
-{
-  // 全ての敵が共有する、モデルと動きの読込。非所有で、EnemyControllerが所有する。SetModelLibraryで設定し、Uninit・Respawnでは変えない。未設定の間は、Cubeで描く。
-  EnemyModelLibrary* library{};
-  // 再生中の動き。
-  ENEMY_CLIP clip{ENEMY_CLIP::e_IDLE};
-  // 再生中の動きの時刻。単位は秒。動きごとの速さの倍率を掛けて進める。
-  float clipTimeSeconds{};
-  // 前回のUpdateでの位置。移動中かの判定に使う。
-  XMFLOAT3 lastPosition{};
-  // 前回のUpdateで、攻撃の予告中だったか。予告の開始を検出するために使う。
-  bool wasTelegraphing{};
 };
 
 // 種類・HP・怯み・転倒を持ち、球のColliderで被弾を受ける敵1体。
@@ -80,19 +69,19 @@ public:
   void Uninit(CollisionWorld& collisionWorld);
 
   //========= 更新・描画関数=========
-  // 怯み・転倒・射撃のダメージの印の残り時間と、待機の揺れの位相・予告の経過時間・攻撃の突進の残り時間を進める。
+  // 怯み・転倒・射撃のダメージの印の残り時間と、待機の揺れの位相・予告の経過時間・攻撃の突進の残り時間を進め、向きを目標へ近づけ、モデルの動きを選んで時刻を進める。
   // deltaTime: この更新で進める経過時間。単位は秒。
   void Update(float deltaTime);
   // 全ての敵が共有する、モデルと動きの読込を設定する。EnemyControllerが、Initialize時に、全ての枠へ渡し、Uninit時にnullptrを渡す。Enemy::Uninit・Respawnでは変えない。
   // modelLibrary: 共有の読込。非所有で、このEnemyが使い終わるまで生存させる。nullptrなら、Cubeで描く。
-  void SetModelLibrary(EnemyModelLibrary* modelLibrary) { m_modelState.library = modelLibrary; }
+  void SetModelLibrary(EnemyModelLibrary* modelLibrary) { m_playback.SetLibrary(modelLibrary); }
   // 地形との重なりを補正し、登録済みの球Colliderと描画位置を更新する。
   // targetPosition: 移動先候補のワールド座標。呼出側で1回の移動距離を制限する。
   // collisionWorld: この敵のColliderを登録したCollisionWorld。
   // 戻り値: Colliderと描画位置を更新できればtrue。死亡中または更新失敗時はfalse。
   [[nodiscard]] bool TryMoveTo(const XMFLOAT3& targetPosition,CollisionWorld& collisionWorld);
-  // 目標の方へ、水平方向に向ける。Y軸まわりの回転だけを変え、位置とColliderは変えない。
-  // 死亡中・転倒中は向きを変えない。目標との水平距離がほぼ0で向きが定まらない場合も、直前の向きを保つ。
+  // 目標の方へ、水平方向に向ける向きの目標を設定する。実際の向きは、Updateが、旋回の速さの上限で、目標へ近づける（最初の1回だけ、そのまま向ける）。位置とColliderは変えない。
+  // 死亡中・転倒中は向きの目標を変えない。目標との水平距離がほぼ0で向きが定まらない場合も、直前の目標を保つ。
   // targetPosition: 向ける先のワールド座標。高さは使わない。
   void SetFacing(const XMFLOAT3& targetPosition);
   // 攻撃の瞬間の突進を始める。向いている方向へ、一定時間、描画だけを前へ出して戻す。Colliderと攻撃の判定は変えない。
@@ -153,34 +142,27 @@ public:
   [[nodiscard]] COLLISION_SPHERE GetBodySphere() const;
 
 private:
+  //========= 更新の補助関数=========
+  // 怯み・転倒・射撃のダメージの印の残り時間を減らし、0未満にならないようにする。
+  // deltaTime: この更新で進める経過時間。単位は秒。
+  void UpdateStatusTimers(float deltaTime);
+  // 向きを、目標へ、旋回の速さの上限で近づける。目標が未設定、死亡中、転倒中は、何もしない。
+  // deltaTime: この更新で進める経過時間。単位は秒。
+  void UpdateFacing(float deltaTime);
+
   //========= 描画の補助関数=========
   // Cubeで描く。モデルを描けない時の代わり。生きている時だけ呼ぶ。
   // graphicsSystem: Rendererが使う描画基盤。
   // camera: View行列とProjection行列。
   void DrawCube(GraphicsSystem& graphicsSystem,const CAMERA_MATRICES& camera) const;
-  // モデルで描く。読込済みの見た目と動きがある場合だけ描く。死亡後は、保持の時間が過ぎたら、描かずに、trueを返す。
-  // graphicsSystem: Rendererが使う描画基盤。
-  // camera: View行列とProjection行列。
+  // モデルの動きの選択と描画に渡す、敵の現在の状態を作る。
   // color: モデルの画像に乗算する色。
-  // 戻り値: モデルで処理した（描いた、または、死亡後に描かないと決めた）場合はtrue。モデルを使えず、Cubeで描く必要がある場合はfalse。
-  [[nodiscard]] bool DrawModel(GraphicsSystem& graphicsSystem,const CAMERA_MATRICES& camera,const XMFLOAT4& color) const;
+  // 戻り値: 現在の状態を詰めた構造体。
+  [[nodiscard]] ENEMY_PLAYBACK_STATE BuildPlaybackState(const XMFLOAT4& color) const;
   // 転倒・怯み・予告の状態に応じた色を返す。優先順は、転倒、怯み、予告、基準の色。
   // baseColor: どの状態でもない時の色。
   // 戻り値: 乗算する色。
   [[nodiscard]] XMFLOAT4 DecideStateColor(const XMFLOAT4& baseColor) const;
-
-  //========= モデルの動きの補助関数=========
-  // 状態から動きを選び、変わった時は時刻を0へ戻し、変わらない時は進める。共有の読込がない場合や、時間が進まない場合は、何もしない。
-  // deltaTime: この更新で進める経過時間。単位は秒。
-  void UpdateModelClip(float deltaTime);
-  // 状態から、再生する動きを選ぶ。優先順は、死亡、転倒、怯み、起き上がり、攻撃、移動、待機。
-  // isMoving: 移動中か。
-  // isClipFinished: 現在の動きを、最後まで再生したか。
-  // 戻り値: 再生する動き。
-  [[nodiscard]] ENEMY_CLIP ChooseClip(bool isMoving,bool isClipFinished) const;
-  // モデルの動きの状態を、待機の最初へ戻す。共有の読込への参照は、変えない。
-  // idleStartSeconds: 待機の動きの開始位置。単位は秒。
-  void ResetModelState(float idleStartSeconds);
   // 簡易アニメーション（待機の揺れ・突進・怯みの傾き・予告の前傾）を、描画用のTransformへ反映する。転倒中は何もしない。
   // drawTransform: 反映先の描画用Transform。位置は保持座標から作り直し、回転は保持している向きに、傾きを足す。Colliderと保持座標は変えない。
   void ApplyAnimation(Transform& drawTransform) const;
@@ -188,16 +170,16 @@ private:
   //========= 表示=========
   // Cube描画に使う共有Renderer。非所有で、ModelRegistryが所有する。未取得はnullptr。
   BasicMeshRenderer* m_cubeRenderer{};
-  // 位置・向き・大きさを保持し、World行列を作るTransform。向きは、SetFacingがY軸まわりの回転だけを更新する。
+  // 位置・向き・大きさを保持し、World行列を作るTransform。向きは、UpdateFacingが、Y軸まわりの回転だけを更新する。
   Transform m_transform{};
   // 攻撃の予告中の表示か。呼出側がSetTelegraphingで毎回設定する。
   bool m_isTelegraphing{};
 
   //========= アニメーション=========
-  // 待機の揺れの位相・怯みの傾きの向き・予告の経過時間・突進の残り時間。簡易アニメーションの状態をまとめて保持する。
+  // 待機の揺れの位相・怯みの傾きの向き・予告の経過時間・突進の残り時間・向きの目標。簡易アニメーションと向きの状態をまとめて保持する。
   ENEMY_ANIMATION_STATE m_animation{};
-  // モデルの動きの状態。共有の読込への参照・再生中の動き・時刻・前回の位置・前回の予告の状態をまとめて保持する。
-  ENEMY_MODEL_STATE m_modelState{};
+  // モデルの動きの選択・時刻の進行・描画を担当する。共有の読込への参照は、SetModelLibraryで設定し、Uninit・Respawnでは変えない。
+  EnemyModelPlayback m_playback{};
 
   //========= 種類=========
   // 敵の種類。Initializeで設定する。未初期化の間は接近型として扱う。

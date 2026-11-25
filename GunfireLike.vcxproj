@@ -263,6 +263,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Scene\Common\Weapon\CPP\WeaponSystem.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\EconomyController.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\EffectController.cpp" />
+    <ClCompile Include="Source\Scene\Common\Enemy\CPP\EnemyModelPlayback.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameHud.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameHudScreenEffect.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\GameHudShop.cpp" />
@@ -375,6 +376,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\Common\Weapon\H\WeaponUpgrade.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EconomyController.h" />
     <ClInclude Include="Source\Scene\GameScene\H\EffectController.h" />
+    <ClInclude Include="Source\Scene\Common\Enemy\H\EnemyModelPlayback.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameHud.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameHudScreenEffect.h" />
     <ClInclude Include="Source\Scene\GameScene\H\GameHudStyle.h" />
