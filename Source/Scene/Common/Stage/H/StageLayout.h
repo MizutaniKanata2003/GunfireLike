@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 // Game画面の固定ステージ（床と4面の壁）を、OBJECT_CONFIGの表として定義する。
-// 以前のStageFieldが持っていた配置・倍率・色・UV倍率・描画順を、値を変えずに表へ移したもの。Resource生成や描画は担当しない。
+// 以前のStageFieldが持っていた配置・倍率・色・描画順を、値を変えずに表へ移したもの。壁のUV倍率だけは、H1bで、面の縦横比に合わせて変更した。Resource生成や描画は担当しない。
 
 //========= C++標準ライブラリ インクルード=========
 #include <cstddef> // std::size_tで表の行数を表す。
@@ -20,31 +20,33 @@ namespace STAGE_LAYOUT
   // 各行の並び: 形状、Cube画像、OBJパス、OBJ画像、位置(X,Y,Z)、回転(ラジアン)、倍率(X,Y,Z)、RGBA色、UV倍率(U,V)、Collisionレイヤー。
   // 座標はワールド空間。Cubeは1辺1のため、倍率が各軸の寸法になる。全行で回転なし、色は不透明な白。
   // 全行が動かない地形のため、STATICレイヤーのAABB Colliderとして登録する。
+  // UV倍率は、画像を面の上で何回繰り返すかを表す。Cubeの側面は、Uが水平方向（壁の長さ）、Vが垂直方向（壁の高さ）に対応する。画像はWRAPで繰り返す。
   inline constexpr OBJECT_CONFIG ns_OBJECTS[]
   {
-    // 床: 中心(0,-0.6,8)、X・Zとも20の広さでY方向の厚みは0.2。Floor画像をUV10倍で繰り返す。
+    // 床: 中心(0,-0.6,8)、X・Zとも20の広さでY方向の厚みは0.2。Floor画像をUV10倍で繰り返す。1枚は2×2の正方形になる。
     {OBJECT_MESH_KIND::e_CUBE,BasicMeshRenderer::TextureType::Floor,nullptr,nullptr,
     {0.0f,-0.6f,8.0f},{0.0f,0.0f,0.0f},{20.0f,0.2f,20.0f},{1.0f,1.0f,1.0f,1.0f},{10.0f,10.0f},
     COLLISION_LAYER::ns_STATIC},
 
-    // 左壁: -X側。X方向が厚み0.2、Y方向の高さ3.2、Z方向の長さ20。Wall画像をUV1倍で貼る。
+    // 左壁: -X側。X方向が厚み0.2、Y方向の高さ3.2、Z方向の長さ20。Wall画像をU方向6回・V方向1回で貼る。
+    // 見える面は長さ20×高さ3.2のため、1枚は約3.3×3.2になり、画像が正方形なら縦横の比率がほぼ保たれる。Wall画像の縦横比は未確認。
     {OBJECT_MESH_KIND::e_CUBE,BasicMeshRenderer::TextureType::Wall,nullptr,nullptr,
-    {-10.0f,1.1f,8.0f},{0.0f,0.0f,0.0f},{0.2f,3.2f,20.0f},{1.0f,1.0f,1.0f,1.0f},{1.0f,1.0f},
+    {-10.0f,1.1f,8.0f},{0.0f,0.0f,0.0f},{0.2f,3.2f,20.0f},{1.0f,1.0f,1.0f,1.0f},{6.0f,1.0f},
     COLLISION_LAYER::ns_STATIC},
 
     // 右壁: +X側。左壁と同じ倍率・色・UV倍率・画像を使う。
     {OBJECT_MESH_KIND::e_CUBE,BasicMeshRenderer::TextureType::Wall,nullptr,nullptr,
-    {10.0f,1.1f,8.0f},{0.0f,0.0f,0.0f},{0.2f,3.2f,20.0f},{1.0f,1.0f,1.0f,1.0f},{1.0f,1.0f},
+    {10.0f,1.1f,8.0f},{0.0f,0.0f,0.0f},{0.2f,3.2f,20.0f},{1.0f,1.0f,1.0f,1.0f},{6.0f,1.0f},
     COLLISION_LAYER::ns_STATIC},
 
-    // 手前壁: -Z側。Z方向が厚み0.2、X方向の長さ20、Y方向の高さ3.2。
+    // 手前壁: -Z側。Z方向が厚み0.2、X方向の長さ20、Y方向の高さ3.2。左右の壁と同じ長さ20×高さ3.2の面のため、同じUV倍率を使う。
     {OBJECT_MESH_KIND::e_CUBE,BasicMeshRenderer::TextureType::Wall,nullptr,nullptr,
-    {0.0f,1.1f,-2.0f},{0.0f,0.0f,0.0f},{20.0f,3.2f,0.2f},{1.0f,1.0f,1.0f,1.0f},{1.0f,1.0f},
+    {0.0f,1.1f,-2.0f},{0.0f,0.0f,0.0f},{20.0f,3.2f,0.2f},{1.0f,1.0f,1.0f,1.0f},{6.0f,1.0f},
     COLLISION_LAYER::ns_STATIC},
 
     // 奥壁: +Z側。手前壁と同じ倍率・色・UV倍率・画像を使う。
     {OBJECT_MESH_KIND::e_CUBE,BasicMeshRenderer::TextureType::Wall,nullptr,nullptr,
-    {0.0f,1.1f,18.0f},{0.0f,0.0f,0.0f},{20.0f,3.2f,0.2f},{1.0f,1.0f,1.0f,1.0f},{1.0f,1.0f},
+    {0.0f,1.1f,18.0f},{0.0f,0.0f,0.0f},{20.0f,3.2f,0.2f},{1.0f,1.0f,1.0f,1.0f},{6.0f,1.0f},
     COLLISION_LAYER::ns_STATIC}
   };
 
