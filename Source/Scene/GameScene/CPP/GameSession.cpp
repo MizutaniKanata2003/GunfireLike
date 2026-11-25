@@ -452,6 +452,7 @@ void GameSession::DrawHud()
   hud_state.ammo.isReloading = weapon.IsReloading();
   hud_state.ammo.reloadProgress = weapon.GetReloadProgress();
   hud_state.isAiming = m_player.GetPlayerController().IsAiming();
+  hud_state.isSliding = m_player.GetPlayerController().GetActionState() == PLAYER_ACTION_STATE::e_SLIDE;
   hud_state.currency = m_economy.GetWallet().GetBalance();
   hud_state.reward.isSelecting = reward.IsSelecting();
   hud_state.reward.hoveredIndex = reward.GetHoveredIndex();

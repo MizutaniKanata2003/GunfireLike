@@ -15,6 +15,7 @@
 //========= Scene インクルード=========
 #include "Scene/Common/Reward/H/RewardController.h" // 報酬の表（見出し・説明）と、カードの数を使用する。
 #include "Scene/Common/Shop/H/ShopController.h"   // ショップの表（価格・名前・弾薬の上限）と、ページ・行の状態を使用する。
+#include "Scene/GameScene/H/GameHudScreenEffect.h" // 画面全体に重ねる画像（暗幕・低HP警告・速度線）の描画を使用する。
 #include "Scene/GameScene/H/GameHudStyle.h"       // 文字を置く領域の型（HUD_TEXT_AREA）を使用する。
 
 //========= 前方宣言=========
@@ -115,6 +116,10 @@ struct GAME_HUD_STATE
   // 構えているか。trueなら照準を小さく描く。
   bool isAiming{};
 
+  //========= スライディング=========
+  // スライディング中か。trueなら、画面全体へ速度線を重ねる。
+  bool isSliding{};
+
   //========= 通貨=========
   // 現在の通貨の所持額。右上のアイコンの隣に、数字で表示する。
   int currency{};
@@ -144,7 +149,7 @@ private:
   // graphicsSystem: 描画基盤。
   // state: 描画する値。
   void DrawSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state);
-  // 低HP警告・照準・HPバー・弾薬の枠・通貨のアイコンを描く。
+  // 速度線・低HP警告（画面全体）・照準・HPバー・弾薬の枠・通貨のアイコンを描く。
   // graphicsSystem: 描画基盤。
   // state: 描画する値。HP・構えを使う。
   void DrawStatusSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state);
@@ -199,6 +204,10 @@ private:
   // 文字を描画するRenderer。
   HudTextRenderer m_textRenderer{};
 
+  //========= 画面全体の画像=========
+  // 画面全体に重ねる画像（暗幕・低HP警告・速度線）。画像の読込と描画に、上の画像用Rendererを借用する。
+  GameHudScreenEffect m_screenEffect{};
+
   //========= 読み込んだ画像=========
   // 照準の画像。
   HudTextureHandle m_crosshairTexture{};
@@ -208,12 +217,8 @@ private:
   HudTextureHandle m_hpFillTexture{};
   // 弾薬の枠の画像。
   HudTextureHandle m_ammoFrameTexture{};
-  // 低HP警告の画像。
-  HudTextureHandle m_lowHpWarningTexture{};
   // 通貨のアイコンの画像。
   HudTextureHandle m_currencyIconTexture{};
-  // 報酬選択とショップの背景（暗幕）の画像。
-  HudTextureHandle m_rewardBackdropTexture{};
   // 報酬のカードの枠の画像（通常）。
   HudTextureHandle m_rewardCardTexture{};
   // 報酬のカードの枠の画像（カーソルが乗っている時）。

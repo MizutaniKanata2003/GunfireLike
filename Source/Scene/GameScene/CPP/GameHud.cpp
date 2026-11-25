@@ -106,14 +106,16 @@ bool GameHud::Initialize(GraphicsSystem& graphicsSystem)
   m_hpFillTexture = m_spriteRenderer.LoadTexture(graphicsSystem,HUD_LAYOUT::ns_HP_FILL.texturePath);
   m_ammoFrameTexture = m_spriteRenderer.LoadTexture(graphicsSystem,HUD_LAYOUT::ns_AMMO_FRAME.texturePath);
   m_currencyIconTexture = m_spriteRenderer.LoadTexture(graphicsSystem,HUD_LAYOUT::ns_CURRENCY_ICON.texturePath);
-  m_lowHpWarningTexture = m_spriteRenderer.LoadTexture(graphicsSystem,HUD_LAYOUT::ns_LOW_HP_WARNING.texturePath);
-  m_rewardBackdropTexture = m_spriteRenderer.LoadTexture(graphicsSystem,REWARD_LAYOUT::ns_BACKDROP.texturePath);
   m_rewardCardTexture = m_spriteRenderer.LoadTexture(graphicsSystem,REWARD_LAYOUT::ns_CARD_FRAME_PATH);
   m_rewardCardHoverTexture = m_spriteRenderer.LoadTexture(graphicsSystem,REWARD_LAYOUT::ns_CARD_FRAME_HOVER_PATH);
   m_shopPanelTexture = m_spriteRenderer.LoadTexture(graphicsSystem,SHOP_LAYOUT::ns_PANEL.texturePath);
   m_shopButtonTexture = m_spriteRenderer.LoadTexture(graphicsSystem,SHOP_LAYOUT::ns_BUTTON_PATH);
   m_shopButtonHoverTexture = m_spriteRenderer.LoadTexture(graphicsSystem,SHOP_LAYOUT::ns_BUTTON_HOVER_PATH);
   m_shopButtonDisabledTexture = m_spriteRenderer.LoadTexture(graphicsSystem,SHOP_LAYOUT::ns_BUTTON_DISABLED_PATH);
+
+  // 画面全体に重ねる画像（暗幕・低HP警告・速度線）を、画像用Rendererを借用して読み込む。
+  m_screenEffect.Initialize(graphicsSystem,m_spriteRenderer);
+
   return true;
 }
 
@@ -150,14 +152,15 @@ void GameHud::Uninit()
   m_hpFillTexture = 0;
   m_ammoFrameTexture = 0;
   m_currencyIconTexture = 0;
-  m_lowHpWarningTexture = 0;
-  m_rewardBackdropTexture = 0;
   m_rewardCardTexture = 0;
   m_rewardCardHoverTexture = 0;
   m_shopPanelTexture = 0;
   m_shopButtonTexture = 0;
   m_shopButtonHoverTexture = 0;
   m_shopButtonDisabledTexture = 0;
+
+  // 借用した画像用Rendererへの参照と、画面全体の画像の識別値を手放す。
+  m_screenEffect.Uninit();
 }
 
 //========= 画像の描画関数=========
@@ -165,27 +168,19 @@ void GameHud::Uninit()
 void GameHud::DrawSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 {
   // 報酬選択中とショップが開いている間は、画面全体を暗くする背景を最初に描き、他のHUDとカード・パネルがその上に重なるようにする。
-  if(state.reward.isSelecting || state.shop.isOpen){
-    const HUD_SPRITE_APPEARANCE white_appearance{GAME_HUD_STYLE::ns_WHITE,1.0f};
-    m_spriteRenderer.DrawSprite(graphicsSystem,m_rewardBackdropTexture,
-                                HUD_RECT::FromPositionAndSize(REWARD_LAYOUT::ns_BACKDROP.position,REWARD_LAYOUT::ns_BACKDROP.size),white_appearance);
-  }
+  if(state.reward.isSelecting || state.shop.isOpen)m_screenEffect.DrawBackdrop(graphicsSystem);
 
   // 低HP警告・照準・HPバー・弾薬の枠・通貨のアイコンを描く。
   DrawStatusSprites(graphicsSystem,state);
 
   // 報酬選択中は、他の画像の後に、カードの枠を描く。
-  if(state.reward.isSelecting){
-    DrawRewardCards(graphicsSystem,state.reward.hoveredIndex);
-  }
+  if(state.reward.isSelecting)DrawRewardCards(graphicsSystem,state.reward.hoveredIndex);
 
   // ショップが開いている間は、パネルとボタンを描く。文字は、後の文字の描画で、上に重ねる。
-  if(state.shop.isOpen){
-    DrawShopSprites(graphicsSystem,state.shop);
-  }
+  if(state.shop.isOpen)DrawShopSprites(graphicsSystem,state.shop);
 }
 
-// 低HP警告・照準・HPバー・弾薬の枠・通貨のアイコンを描く。
+// 速度線・低HP警告・照準・HPバー・弾薬の枠・通貨のアイコンを描く。
 void GameHud::DrawStatusSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& state)
 {
   // 最大HPが正の場合だけ、HPの割合を0〜1で求める。0以下なら割合を0とし、HPに関する表示を省く。
@@ -195,11 +190,9 @@ void GameHud::DrawStatusSprites(GraphicsSystem& graphicsSystem,const GAME_HUD_ST
   // 画像本来の色（白）で、全体を描く見た目の指定。低HP警告・HPバーの枠・弾薬の枠・通貨のアイコンで使い回す。
   const HUD_SPRITE_APPEARANCE white_appearance{GAME_HUD_STYLE::ns_WHITE,1.0f};
 
-  // HPの割合が低HPの閾値以下なら、画面全体の警告を描き、他のHUDがその上に重なるようにする。
-  if(has_health && health_ratio <= ns_LOW_HP_RATIO){
-    m_spriteRenderer.DrawSprite(graphicsSystem,m_lowHpWarningTexture,
-                                HUD_RECT::FromPositionAndSize(HUD_LAYOUT::ns_LOW_HP_WARNING.position,HUD_LAYOUT::ns_LOW_HP_WARNING.size),white_appearance);
-  }
+  // 画面全体へ重ねる演出を描く。スライディング中は速度線、HPの割合が低HPの閾値以下なら低HP警告を、この順に描き、他のHUDがその上に重なるようにする。
+  m_screenEffect.DrawOverlays(graphicsSystem,state.isSliding,has_health && health_ratio <= ns_LOW_HP_RATIO);
+
   DrawCrosshair(graphicsSystem,state.isAiming);
 
   // HPバーの枠を描き、続けて中身を、HPの割合の分だけ左から描く。低HPなら色を赤にする。最大HPがない場合は、HPバー自体を描かない。

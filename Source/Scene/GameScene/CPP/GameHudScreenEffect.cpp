@@ -1,6 +1,9 @@
 ﻿#include "../H/GameHudScreenEffect.h"
 
-// 画面全体に重ねる画像（暗幕・低HP警告・速度線）の読込と描画を実装する。画像の配置は表から読み、見た目の色だけをこのファイルで決める。
+// 画面全体に重ねる画像（暗幕・低HP警告・速度線）の読込と描画を実装する。画像の配置は表から読み、見た目の色と、速度線の濃さの変化だけをこのファイルで決める。
+
+//========= C++標準ライブラリ インクルード=========
+#include <algorithm> // std::clampで速度線の濃さを0〜1へ制限し、std::minで1回に進める時間を上限までに抑える。
 
 //========= Scene インクルード=========
 #include "Scene/Common/UI/H/UiLayout.h"
@@ -10,8 +13,14 @@
 namespace
 {
   //========= 速度線の設定=========
-  // 速度線の濃さ。画像の透明度へ掛ける。画像は、縁で濃くなるため、画面を覆いすぎないよう、下げて描く。仮値。
+  // 速度線の最大の濃さ。画像の透明度へ掛ける。画像は、縁で濃くなるため、画面を覆いすぎないよう、下げて描く。仮値。
   constexpr float ns_SLIDE_LINES_ALPHA = 0.6f;
+  // 速度線が、見えない状態から最も濃くなるまでの時間。単位は秒。短すぎると、一瞬で出たように見える。仮値。
+  constexpr float ns_SLIDE_LINES_FADE_IN_SECONDS = 0.2f;
+  // 速度線が、最も濃い状態から見えなくなるまでの時間。単位は秒。出る時より、ゆっくり消す。仮値。
+  constexpr float ns_SLIDE_LINES_FADE_OUT_SECONDS = 0.4f;
+  // 1回の描画で進める実時間の上限。単位は秒。処理が長く止まった後に、濃さが一気に変わるのを防ぐ。
+  constexpr float ns_SLIDE_LINES_MAX_DELTA_SECONDS = 0.1f;
 }
 
 //========= 初期化・終了関数=========
@@ -25,7 +34,7 @@ void GameHudScreenEffect::Initialize(GraphicsSystem& graphicsSystem,HudSpriteRen
   m_slideLinesTexture = spriteRenderer.LoadTexture(graphicsSystem,HUD_LAYOUT::ns_SLIDE_LINES.texturePath);
 }
 
-// 借用した参照と、画像の識別値を手放す。
+// 借用した参照と、画像の識別値と、速度線の濃さを手放す。
 void GameHudScreenEffect::Uninit()
 {
   // 画像の識別値は、画像用Rendererの解放で無効になるため、0へ戻す。画像用Rendererは、所有しないため、解放しない。
@@ -33,6 +42,10 @@ void GameHudScreenEffect::Uninit()
   m_backdropTexture = 0;
   m_lowHpWarningTexture = 0;
   m_slideLinesTexture = 0;
+
+  // 速度線の濃さと、前回の時刻を、初期状態へ戻す。
+  m_slideLinesRatio = 0.0f;
+  m_hasLastAdvanceTime = false;
 }
 
 //========= 描画関数=========
@@ -51,12 +64,16 @@ void GameHudScreenEffect::DrawBackdrop(GraphicsSystem& graphicsSystem)
 // 速度線と低HP警告を、この順に描く。
 void GameHudScreenEffect::DrawOverlays(GraphicsSystem& graphicsSystem,bool isSliding,bool isLowHealth)
 {
-  // 画像用Rendererを借用していない場合は、描画しない。
+  // 画像用Rendererを借用していない場合は、描画しない。濃さも進めない。
   if(m_spriteRenderer == nullptr)return;
 
-  // スライディング中だけ、速度線を、表の濃さで描く。色のAlphaだけを下げ、色味は画像のまま。
-  if(isSliding){
-    const HUD_SPRITE_APPEARANCE slide_appearance{XMFLOAT4{GAME_HUD_STYLE::ns_WHITE.x,GAME_HUD_STYLE::ns_WHITE.y,GAME_HUD_STYLE::ns_WHITE.z,ns_SLIDE_LINES_ALPHA},1.0f};
+  // 速度線の濃さを時間で進め、見える間だけ描く。濃さの割合を、滑らかな曲線（0付近と1付近でゆっくり変わる）へ直し、最大の濃さへ掛ける。
+  // 色のAlphaだけを下げ、色味は画像のまま。
+  const float slide_ratio = AdvanceSlideLinesRatio(isSliding);
+  if(slide_ratio > 0.0f){
+    const float smooth_ratio = slide_ratio * slide_ratio * (3.0f - 2.0f * slide_ratio);
+    const HUD_SPRITE_APPEARANCE slide_appearance{XMFLOAT4{GAME_HUD_STYLE::ns_WHITE.x,GAME_HUD_STYLE::ns_WHITE.y,GAME_HUD_STYLE::ns_WHITE.z,
+      ns_SLIDE_LINES_ALPHA * smooth_ratio},1.0f};
     m_spriteRenderer->DrawSprite(graphicsSystem,m_slideLinesTexture,
                                  HUD_RECT::FromPositionAndSize(HUD_LAYOUT::ns_SLIDE_LINES.position,HUD_LAYOUT::ns_SLIDE_LINES.size),slide_appearance);
   }
@@ -67,4 +84,23 @@ void GameHudScreenEffect::DrawOverlays(GraphicsSystem& graphicsSystem,bool isSli
     m_spriteRenderer->DrawSprite(graphicsSystem,m_lowHpWarningTexture,
                                  HUD_RECT::FromPositionAndSize(HUD_LAYOUT::ns_LOW_HP_WARNING.position,HUD_LAYOUT::ns_LOW_HP_WARNING.size),white_appearance);
   }
+}
+
+//========= 速度線の補助関数=========
+// 前回の呼出しからの実時間で、速度線の濃さの割合を進める。
+float GameHudScreenEffect::AdvanceSlideLinesRatio(bool isSliding)
+{
+  // 前回の呼出しからの実時間を求める。初回は、前回の時刻がないため、0とする。長く止まった後は、上限までに抑える。
+  const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+  float delta_seconds = 0.0f;
+  if(m_hasLastAdvanceTime){
+    delta_seconds = std::min(std::chrono::duration<float>(now - m_lastAdvanceTime).count(),ns_SLIDE_LINES_MAX_DELTA_SECONDS);
+  }
+  m_lastAdvanceTime = now;
+  m_hasLastAdvanceTime = true;
+
+  // スライディング中は、出る時間で上げ、そうでなければ、消える時間で下げる。割合は、0〜1へ制限する。
+  const float change_per_second = isSliding ? 1.0f / ns_SLIDE_LINES_FADE_IN_SECONDS : -1.0f / ns_SLIDE_LINES_FADE_OUT_SECONDS;
+  m_slideLinesRatio = std::clamp(m_slideLinesRatio + change_per_second * delta_seconds,0.0f,1.0f);
+  return m_slideLinesRatio;
 }
