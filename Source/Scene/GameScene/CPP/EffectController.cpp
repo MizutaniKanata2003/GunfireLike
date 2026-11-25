@@ -1,6 +1,9 @@
 ﻿#include "../H/EffectController.h"
 
-// 演出の粒の生成・更新・描画を実装する。
+// 演出の粒の生成・更新・描画と、マズルフラッシュ・命中の火花の生成を実装する。
+
+//========= C++標準ライブラリ インクルード=========
+#include <cmath> // std::sqrtで、正面方向から、右方向の向きを求めるために、水平方向の長さを求める。
 
 //========= Framework インクルード=========
 #include "Framework/3D/H/BasicMeshRenderer.h"
@@ -9,6 +12,38 @@
 //========= Scene インクルード=========
 #include "Scene/Common/Object/H/ModelRegistry.h"
 #include "Scene/Common/Object/H/Transform.h"
+
+// 場面ごとの演出の数値をまとめる。企画書で未確定の数値は、プレイ確認後に調整する仮値。
+namespace
+{
+  //========= マズルフラッシュ=========
+  // 銃口の位置の、視点からのずれ。右・下・前の順。単位はワールド距離単位。Collision可視化の弾道の始点（右0.25・下0.3）と、同じ側にそろえる。
+  constexpr float ns_MUZZLE_OFFSET_RIGHT = 0.25f;
+  constexpr float ns_MUZZLE_OFFSET_DOWN = 0.3f;
+  constexpr float ns_MUZZLE_OFFSET_FORWARD = 0.5f;
+  // マズルフラッシュの粒の1辺の長さ。単位はワールド距離単位。
+  constexpr float ns_MUZZLE_FLASH_SIZE = 0.15f;
+  // マズルフラッシュが残る時間。単位は秒。
+  constexpr float ns_MUZZLE_FLASH_SECONDS = 0.05f;
+  // マズルフラッシュの色。黄。
+  constexpr XMFLOAT4 ns_MUZZLE_FLASH_COLOR{1.0f,0.9f,0.3f,1.0f};
+  // 視線がほぼ真上・真下を向く時の、水平方向の長さの下限。この値より小さい場合は、右方向をワールドのX軸にする。
+  constexpr float ns_MIN_HORIZONTAL_LENGTH = 0.0001f;
+
+  //========= 命中の火花=========
+  // 火花の粒の数。
+  constexpr std::size_t ns_SPARK_COUNT = 4;
+  // 火花の飛ぶ方向。斜め上へ、4方向に散らす。長さは正規化せず、速さの係数を掛けて、速度にする。
+  constexpr XMFLOAT3 ns_SPARK_DIRECTIONS[ns_SPARK_COUNT]{{1.0f,1.0f,1.0f},{-1.0f,1.0f,1.0f},{1.0f,1.0f,-1.0f},{-1.0f,1.0f,-1.0f}};
+  // 火花の速さの係数。方向に掛けて、速度（ワールド距離単位毎秒）にする。
+  constexpr float ns_SPARK_SPEED = 1.2f;
+  // 火花の粒の1辺の長さ。単位はワールド距離単位。
+  constexpr float ns_SPARK_SIZE = 0.08f;
+  // 火花が残る時間。単位は秒。
+  constexpr float ns_SPARK_SECONDS = 0.15f;
+  // 火花の色。橙。
+  constexpr XMFLOAT4 ns_SPARK_COLOR{1.0f,0.6f,0.1f,1.0f};
+}
 
 //========= 初期化・終了関数=========
 // Cube Rendererを借用し、全ての粒を消す。
@@ -110,5 +145,49 @@ void EffectController::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewM
     // 画像を使わない単色（Color）で、粒の色・UV倍率1を指定して描く。
     const BasicMeshRenderer::CUBE_APPEARANCE appearance{effect.color,XMFLOAT2{1.0f,1.0f},BasicMeshRenderer::TextureType::Color};
     m_cubeRenderer->DrawCube(graphicsSystem,transform.GetWorldMatrix(),camera,appearance);
+  }
+}
+
+//========= 場面の生成関数=========
+// マズルフラッシュを、銃口の位置へ出す。
+void EffectController::SpawnMuzzleFlash(const XMFLOAT3& eyePosition,const XMFLOAT3& forward)
+{
+  // 視線の右方向を、ワールドの上方向と正面方向の外積から求める。左手系のため、右 = 上 × 正面。
+  // 上方向は(0,1,0)のため、外積は(正面のZ,0,正面のX × -1)になり、水平方向の長さで割って、長さ1にする。
+  const float horizontal_length = std::sqrt(forward.x * forward.x + forward.z * forward.z);
+  XMFLOAT3 right{1.0f,0.0f,0.0f};
+  // ほぼ真上・真下を向いている場合は、水平方向が定まらないため、右方向をワールドのX軸のままにする。
+  if(horizontal_length > ns_MIN_HORIZONTAL_LENGTH){
+    right = XMFLOAT3{forward.z / horizontal_length,0.0f,-forward.x / horizontal_length};
+  }
+
+  // 視線の上方向を、正面方向と右方向の外積から求める。右方向のY成分は0のため、式が簡単になる。
+  const XMFLOAT3 up{forward.y * right.z,forward.z * right.x - forward.x * right.z,-forward.y * right.x};
+
+  // 視点から、右・下（上方向の逆）・前へずらした位置へ、動かない粒を1個出す。
+  EFFECT_SPAWN_PARAMS params{};
+  params.position = XMFLOAT3{eyePosition.x + right.x * ns_MUZZLE_OFFSET_RIGHT - up.x * ns_MUZZLE_OFFSET_DOWN + forward.x * ns_MUZZLE_OFFSET_FORWARD,
+    eyePosition.y + right.y * ns_MUZZLE_OFFSET_RIGHT - up.y * ns_MUZZLE_OFFSET_DOWN + forward.y * ns_MUZZLE_OFFSET_FORWARD,
+    eyePosition.z + right.z * ns_MUZZLE_OFFSET_RIGHT - up.z * ns_MUZZLE_OFFSET_DOWN + forward.z * ns_MUZZLE_OFFSET_FORWARD};
+  params.color = ns_MUZZLE_FLASH_COLOR;
+  params.size = ns_MUZZLE_FLASH_SIZE;
+  params.lifetimeSeconds = ns_MUZZLE_FLASH_SECONDS;
+  Spawn(params);
+}
+
+// 命中の火花を、命中点から斜め上へ散らして出す。
+void EffectController::SpawnHitSparks(const XMFLOAT3& hitPoint)
+{
+  // 全ての火花に共通の、位置・色・大きさ・残り時間を設定する。
+  EFFECT_SPAWN_PARAMS params{};
+  params.position = hitPoint;
+  params.color = ns_SPARK_COLOR;
+  params.size = ns_SPARK_SIZE;
+  params.lifetimeSeconds = ns_SPARK_SECONDS;
+
+  // 4方向へ、方向ごとの速度を設定して、1個ずつ出す。
+  for(const XMFLOAT3& direction : ns_SPARK_DIRECTIONS){
+    params.velocity = XMFLOAT3{direction.x * ns_SPARK_SPEED,direction.y * ns_SPARK_SPEED,direction.z * ns_SPARK_SPEED};
+    Spawn(params);
   }
 }

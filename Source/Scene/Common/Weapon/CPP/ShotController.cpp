@@ -1,6 +1,6 @@
 ﻿#include "../H/ShotController.h"
 
-// 射撃の更新、武器の装備、弾道の終点の通知、命中した敵へのダメージと怯み（弾ごと。特殊強化の効果を含む）、命中表示の時間管理を実装する。
+// 射撃の更新、武器の装備、弾道の終点の通知、命中した敵へのダメージと怯み（弾ごと。特殊強化の効果を含む）、命中表示の時間管理、発射の結果の保持と取り出しを実装する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::maxで、命中表示とダメージの増加の残り時間を0未満にしない。
@@ -86,11 +86,12 @@ void ShotController::Uninit()
   m_collisionDebugView = nullptr;
 }
 
-// 初期武器を満タンの弾薬で装備し直し、命中表示を消し、特殊強化の効果を通常へ戻す。
+// 初期武器を満タンの弾薬で装備し直し、命中表示と、取り出していない発射の結果を消し、特殊強化の効果を通常へ戻す。
 void ShotController::Reset()
 {
   m_weaponSystem.Initialize(WEAPON_TABLE::ns_ASSAULT_RIFLE);
   m_hitMarkerRemainingSeconds = 0.0f;
+  m_pendingShotResult = WEAPON_UPDATE_RESULT{};
   m_flinchScale = 1.0f;
   m_damageBoostScale = 1.0f;
   m_damageBoostRemainingSeconds = 0.0f;
@@ -110,6 +111,9 @@ void ShotController::Update(float gameplayDeltaTime)
 
   // 発射していない更新は、弾道の通知もダメージもないため、ここで戻る。
   if(!weapon_result.didFire)return;
+
+  // 発射の結果を、呼出側（演出）が取り出せるよう保持する。取り出されていない前回の結果は、新しい結果で置き換える。
+  m_pendingShotResult = weapon_result;
 
   // 弾道の終点を可視化へ伝える。可視化は弾道を1本だけ表示するため、複数の弾を撃つ武器では、先頭の弾の終点を使う。
   m_collisionDebugView->NotifyShot(GetShotTraceEnd(weapon_result.pellets[0]));
@@ -137,6 +141,18 @@ void ShotController::Update(float gameplayDeltaTime)
 void ShotController::UpdateHitMarker(float deltaTime)
 {
   m_hitMarkerRemainingSeconds = std::max(0.0f,m_hitMarkerRemainingSeconds - deltaTime);
+}
+
+// 発射した更新の結果を、1回だけ取り出す。
+bool ShotController::TryTakeShotResult(WEAPON_UPDATE_RESULT& outResult)
+{
+  // 前回の取り出しの後に発射がなければ、書込み先を変えずに、falseを返す。
+  if(!m_pendingShotResult.didFire)return false;
+
+  // 結果を渡し、保持している結果は、発射なしの状態へ戻して、同じ発射を二度渡さない。
+  outResult = m_pendingShotResult;
+  m_pendingShotResult = WEAPON_UPDATE_RESULT{};
+  return true;
 }
 
 //========= 武器の装備関数=========

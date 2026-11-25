@@ -2,7 +2,7 @@
 
 // 演出（小さなCubeの粒）を、固定長の配列で保持し、生成・更新・描画を担当する。
 // 粒は、位置・速度・色・大きさ・残り時間を持ち、時間とともに小さくなって消える。画像は使わず、単色のCubeで描く。配列が満杯の場合は、最も古い粒を置き換える。
-// どの場面で何を出すか（発砲・命中・撃破など）は担当せず、呼出側が、粒の生成を求める。Cube Rendererは、共有Registryから借用し、所有しない。
+// 発砲のマズルフラッシュと、命中の火花は、場面の位置と方向を受け取って、粒の組合せとして生成する。どの場面で出すか（発砲・命中の検出）は担当せず、呼出側が、生成を求める。Cube Rendererは、共有Registryから借用し、所有しない。
 
 //========= C++標準ライブラリ インクルード=========
 #include <array> // std::arrayで、演出の粒を、固定長で保持する。
@@ -65,6 +65,15 @@ public:
   // viewMatrix: World空間からView空間への変換行列。
   // projectionMatrix: View空間からClip空間への変換行列。
   void Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix) const;
+
+  //========= 場面の生成関数=========
+  // 発砲のマズルフラッシュを、銃口の位置へ、黄色の粒1個で出す。銃口は、視点から、右・下・前へずらした位置（Collision可視化の弾道の始点と同じ側）。
+  // eyePosition: 発砲した時の視点のワールド座標。
+  // forward: 発砲の方向。長さ1に正規化済みであること。
+  void SpawnMuzzleFlash(const XMFLOAT3& eyePosition,const XMFLOAT3& forward);
+  // 命中の火花を、命中点から、斜め上へ散る橙色の粒として、複数個出す。命中した相手が敵か地形かは問わない。
+  // hitPoint: 命中点のワールド座標。
+  void SpawnHitSparks(const XMFLOAT3& hitPoint);
 
 private:
   //========= 粒の状態=========
