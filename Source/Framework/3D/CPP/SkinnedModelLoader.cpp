@@ -1,8 +1,11 @@
 ﻿#include "../H/SkinnedModelLoader.h"
 
-// FBXの読込を実装する。Assimpの読込と、左手系への変換、ノードの階層・メッシュ・ボーンの重み・材質の画像のパスの取り出し、概要のログを行う。
+// FBXの読込を実装する。Assimpの読込と、左手系への変換、ノードの階層・メッシュ・ボーンの重み・材質の画像（FBXに埋め込まれた画像と、FBXの外のファイル）の取り出し、概要のログを行う。
 
 //========= C++標準ライブラリ インクルード=========
+#include <filesystem> // std::filesystem::pathで、FBXのあるフォルダーと、画像を探すフォルダーを組み立てる。
+#include <fstream> // std::ifstreamで、FBXの外にある画像のファイルを、バイト列として読む。
+#include <iterator> // std::istreambuf_iteratorで、ファイルの中身を、バイト列へ読み込む。
 #include <string> // std::wstringとstd::stringで、パスと名前を扱い、ログの文字列を組み立てる。
 #include <unordered_map> // ボーンの名前から、ボーンの番号を引く。複数のメッシュで、同じボーンを1本にまとめる。
 
@@ -25,6 +28,8 @@ namespace
   // 読込後に行う処理。三角形化・同じ頂点の統合・ボーンの影響を4本までに制限・法線の生成・左手系への変換（座標・UV・面の向き・行列）。
   constexpr unsigned int ns_IMPORT_FLAGS = aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_LimitBoneWeights
     | aiProcess_GenSmoothNormals | aiProcess_ConvertToLeftHanded;
+  // FBXの外の画像を探す時の、FBXと同じ階層にある、画像のフォルダーの名前。FBXのフォルダー、その中のこのフォルダー、FBXのフォルダーの親の中のこのフォルダーの順に探す。
+  constexpr wchar_t ns_TEXTURE_FOLDER_NAME[] = L"Textures";
 
   //========= 変換の補助関数=========
   // Assimpの行列（列ベクトル向き、移動は4列目）を、DirectXMathの行列（行ベクトル向き、移動は4行目）へ、転置して変換する。
@@ -203,15 +208,60 @@ namespace
     return std::vector<std::uint8_t>(head,head + texture->mWidth);
   }
 
-  // 材質ごとに、拡散色の画像のパスを、modelへ書き込む。
-  void AppendMaterials(const aiScene& scene,SKINNED_MODEL_DATA& model)
+  // ファイルの中身を、バイト列として読む。開けない場合は、空を返す。
+  std::vector<std::uint8_t> ReadFileBytes(const std::filesystem::path& filePath)
+  {
+    std::ifstream stream(filePath,std::ios::binary);
+    if(!stream)return std::vector<std::uint8_t>{};
+
+    return std::vector<std::uint8_t>(std::istreambuf_iterator<char>(stream),std::istreambuf_iterator<char>());
+  }
+
+  // FBXの外にある画像のファイルを探し、中身を返す。FBXに書かれたパスは、作った人のPCのパスのため使わず、最後のファイル名だけで探す。
+  // 探す場所は、FBXのフォルダー、その中のTexturesフォルダー、FBXのフォルダーの親の中のTexturesフォルダーの順。
+  // modelFilePath: FBXのパス。
+  // texturePath: FBXに書かれた画像のパス。
+  // 戻り値: 画像のファイルの中身。見つからなければ空。
+  std::vector<std::uint8_t> LoadExternalImage(const std::filesystem::path& modelFilePath,const std::string& texturePath)
+  {
+    // パスの区切り（/と\）の、最後より後ろを、ファイル名として取り出す。
+    const std::size_t separator_position = texturePath.find_last_of("/\\");
+    const std::string file_name_utf8 = separator_position == std::string::npos ? texturePath : texturePath.substr(separator_position + 1);
+    const std::filesystem::path file_name{ToWide(file_name_utf8)};
+
+    // 3つの場所を順に探し、最初に読めたものを返す。
+    const std::filesystem::path model_directory = modelFilePath.parent_path();
+    const std::filesystem::path candidates[]{model_directory / file_name,model_directory / ns_TEXTURE_FOLDER_NAME / file_name,
+      model_directory.parent_path() / ns_TEXTURE_FOLDER_NAME / file_name};
+    for(const std::filesystem::path& candidate : candidates){
+      std::vector<std::uint8_t> bytes = ReadFileBytes(candidate);
+      if(!bytes.empty())return bytes;
+    }
+    return std::vector<std::uint8_t>{};
+  }
+
+  // 材質の拡散色の画像のパスを、取り出す。FBXの拡散色（Diffuse）がなければ、基本色（Base Color）を試す。
+  // 戻り値: 画像のパスが見つかったらtrue。
+  bool FindDiffuseTexturePath(const aiMaterial& material,aiString& outPath)
+  {
+    return material.GetTexture(aiTextureType_DIFFUSE,0,&outPath) == AI_SUCCESS || material.GetTexture(aiTextureType_BASE_COLOR,0,&outPath) == AI_SUCCESS;
+  }
+
+  // 材質ごとに、拡散色の画像のパスと、画像の中身を、modelへ書き込む。中身は、FBXに埋め込まれた画像を先に探し、なければ、FBXの外のファイルを探す。
+  // modelFilePath: FBXのパス。FBXの外の画像を探す起点。
+  void AppendMaterials(const aiScene& scene,const std::filesystem::path& modelFilePath,SKINNED_MODEL_DATA& model)
   {
     for(unsigned int material_index = 0; material_index < scene.mNumMaterials; ++material_index){
       SKINNED_MATERIAL material{};
       aiString texture_path;
-      if(scene.mMaterials[material_index]->GetTexture(aiTextureType_DIFFUSE,0,&texture_path) == AI_SUCCESS){
+      if(FindDiffuseTexturePath(*scene.mMaterials[material_index],texture_path)){
         material.diffuseTexturePath = texture_path.C_Str();
         material.diffuseImageData = ExtractEmbeddedImage(scene,texture_path.C_Str());
+
+        // 埋め込まれていない場合は、FBXの外のファイルを探す。見つからなければ、中身は空のまま。
+        if(material.diffuseImageData.empty()){
+          material.diffuseImageData = LoadExternalImage(modelFilePath,material.diffuseTexturePath);
+        }
       }
       model.materials.push_back(material);
     }
@@ -235,7 +285,7 @@ namespace
     for(std::size_t material_index = 0; material_index < model.materials.size(); ++material_index){
       Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_ASSET,
                     L"  材質 " + std::to_wstring(material_index) + L" の画像: " + ToWide(model.materials[material_index].diffuseTexturePath)
-                    + L" | 取り出した埋込画像 " + std::to_wstring(model.materials[material_index].diffuseImageData.size()) + L" バイト");
+                    + L" | 取り出した画像 " + std::to_wstring(model.materials[material_index].diffuseImageData.size()) + L" バイト");
     }
   }
 
@@ -249,6 +299,7 @@ namespace
                     + L" | 形式 " + ToWide(texture.achFormatHint) + L" | 幅 " + std::to_wstring(texture.mWidth) + L" / 高さ " + std::to_wstring(texture.mHeight));
     }
   }
+
   // 読込の失敗を、Errorのログへ出す。
   void LogFailure(const std::wstring& filePath,const std::wstring& reason)
   {
@@ -287,9 +338,9 @@ bool SkinnedModelLoader::Load(const std::wstring& filePath,SKINNED_MODEL_DATA& o
     }
   }
 
-  // 重みをそろえ、材質と、埋込画像の数を記録して、概要を出す。
+  // 重みをそろえ、材質（画像の中身を含む）と、埋込画像の数を記録して、概要を出す。
   NormalizeWeights(outModel);
-  AppendMaterials(*scene,outModel);
+  AppendMaterials(*scene,std::filesystem::path{filePath},outModel);
   outModel.embeddedTextureCount = scene->mNumTextures;
   LogSummary(filePath,outModel);
   LogEmbeddedTextures(*scene);

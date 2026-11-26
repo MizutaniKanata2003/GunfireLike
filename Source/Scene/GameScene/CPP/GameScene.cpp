@@ -6,6 +6,8 @@
 #include <windows.h> // VK_SPACEの仮想キーコードで、読込の完了後の確認の入力を指定する。
 
 //========= Framework インクルード=========
+#include "Framework/3D/H/SkinnedAnimationLoader.h"
+#include "Framework/3D/H/SkinnedModelLoader.h"
 #include "Framework/Etc/H/Logger.h"
 #include "Framework/Input/H/InputSystem.h"
 
@@ -14,12 +16,28 @@
 #include "Scene/ResultScene/H/ResultScene.h"
 #include "Scene/TitleScene/H/TitleScene.h"
 
-// 暗転の時間をまとめる。見た目を確認して調整する仮値。
+// 暗転の時間と、銃のモデルの確認用の設定をまとめる。
 namespace
 {
   //========= 暗転=========
   // 読込からプレイへの切替の、フェードアウトとフェードインそれぞれの時間。単位は秒。SceneManagerのSceneの切替と同じ値。
   constexpr float ns_FADE_SECONDS = 0.35f;
+
+  //========= 銃のモデルの確認用（H4a-2aで削除する）=========
+  // 銃のモデルのFBXのパス。拳銃・散弾銃・連射銃・単発高威力銃の順。読み込んだ時のログで、動きの名前・長さ・ボーンの数・画像の読込を確認するために使う。
+  constexpr const wchar_t* ns_PROBE_WEAPON_MODEL_PATHS[]{L"Assets/Models/Gun/Pistol/Model/MyPistol.fbx",L"Assets/Models/Gun/Shotgun/Model/AnimatedShotgun.fbx",
+    L"Assets/Models/Gun/Scar/Model/SCAR.fbx",L"Assets/Models/Gun/Magnum/Model/AnimatedMagnum.fbx"};
+
+  // 銃のモデルとアニメーションを、全て読み込み、ログへ出す。確認だけのため、読み込んだデータは、すぐに捨てる。
+  void ProbeWeaponModels()
+  {
+    for(const wchar_t* model_path : ns_PROBE_WEAPON_MODEL_PATHS){
+      SKINNED_MODEL_DATA model{};
+      std::vector<SKINNED_ANIMATION_CLIP> clips{};
+      static_cast<void>(SkinnedModelLoader{}.Load(model_path,model));
+      static_cast<void>(SkinnedAnimationLoader{}.LoadAll(model_path,clips));
+    }
+  }
 }
 
 //========= 生成関数=========
@@ -51,6 +69,9 @@ bool GameScene::Init()
   if(!m_fadeOverlay.Initialize(m_graphicsSystem)){
     Logger::Write(e_LogLevel::e_WARNING,e_LogCategory::e_SCENE,L"GameSceneの暗転の画像の初期化に失敗しました。暗転の画像は描画されません。");
   }
+
+  // 銃のモデルの確認用。読み込んだ時のログを見るために、ここで1回だけ読む。H4a-2aで削除する。
+  ProbeWeaponModels();
 
   // 工程を登録する。実行は、Updateの中で、1フレームに1工程ずつ行う。
   m_loadingScreen.Begin(BuildLoadingSteps());
