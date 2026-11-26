@@ -1,7 +1,7 @@
 ﻿#include "../H/Enemy.h"
 
 // 敵1体のHP・怯み（確率で起こした怯みと、怯みの耐性）・転倒・射撃のダメージの印・向き・プレイヤーとの距離・Collider登録・表示（モデルでの描画、読み込めない時のCube表示）を実装する。
-// 種類ごとのHP・当たり・大きさ・色はEnemyTableから、Cubeの簡易アニメーションの数値はEnemyAnimationTableから読み、怯みと転倒の時間・旋回の速さ・状態の色は、このファイルの定数にまとめた仮値。
+// 種類ごとのHP・当たり・大きさ・色はEnemyTableから、Cubeの簡易アニメーションの数値はEnemyAnimationTableから読み、怯みと転倒の時間・旋回の速さ・状態の色は、このファイルの定数にまとめた。
 // モデルの動きの選択と描画は、EnemyModelPlaybackへ任せる。
 
 //========= C++標準ライブラリ インクルード=========
@@ -19,37 +19,35 @@
 #include "Scene/Common/Enemy/H/EnemyTable.h"
 #include "Scene/Common/Object/H/ModelRegistry.h"
 
-// 検証用の敵の状態の数値と色をまとめる。企画書で未確定の数値は仮値。
+// 検証用の敵の状態の数値と色をまとめる。
 namespace
 {
-  //========= 戦闘の仮値=========
-  // 被弾後に怯む時間。単位は秒。企画書では「命中時に敵によって怯む」とだけ定められており、具体値は未確定の仮値。射撃の怯みは確率で起こすため、短くした。
+  //========= 戦闘の数値=========
+  // 被弾後に怯む時間。単位は秒。企画書では「命中時に敵によって怯む」とだけ定められている。射撃の怯みは確率で起こすため、短くした。
   constexpr float ns_FLINCH_SECONDS = 0.6f;
-  // 怯みが終わってから、射撃で続けて怯まない時間。単位は秒。怯み続けて、動けなくならないようにする仮値。
+  // 怯みが終わってから、射撃で続けて怯まない時間。単位は秒。怯み続けて、動けなくならないようにする。
   constexpr float ns_FLINCH_IMMUNE_SECONDS = 0.5f;
-  // 転倒している時間。単位は秒。企画書で未確定の仮値。
+  // 転倒している時間。単位は秒。
   constexpr float ns_KNOCKDOWN_SECONDS = 1.5f;
 
   //========= 形状=========
-  // 転倒中のCubeの高さの倍率。1辺に掛けて低く潰し、倒れたことを示す。足元の位置は変えず、中心を下げる。仮値。
+  // 転倒中のCubeの高さの倍率。1辺に掛けて低く潰し、倒れたことを示す。足元の位置は変えず、中心を下げる。
   constexpr float ns_KNOCKDOWN_HEIGHT_SCALE = 0.4f;
 
   //========= 向き=========
-  // 向きを更新する、目標との水平距離の二乗の下限。この値以下では、目標とほぼ同じ位置にいて向きが定まらないため、向きを変えない。単位はワールド距離単位の二乗。仮値。
+  // 向きを更新する、目標との水平距離の二乗の下限。この値以下では、目標とほぼ同じ位置にいて向きが定まらないため、向きを変えない。単位はワールド距離単位の二乗。
   constexpr float ns_FACING_MIN_DISTANCE_SQUARED = 0.0001f;
-  // 向きを目標へ近づける、旋回の速さの上限。単位はラジアン/秒。9.4248は、1秒に540度（1.5回転）。プレイヤーの動きで、向きが急に変わらないようにする仮値。
+  // 向きを目標へ近づける、旋回の速さの上限。単位はラジアン/秒。9.4248は、1秒に540度（1.5回転）。プレイヤーの動きで、向きが急に変わらないようにする。
   constexpr float ns_TURN_SPEED_RADIANS = 9.4248f;
 
   //========= 状態の色=========
-  // 射撃のダメージの印が付いている間の色。紫で、Object画像の色へ乗算して色味を変える。種類の色の代わりに使い、予告・怯み・転倒の色より後にする。
+  // 射撃のダメージの印が付いている間の色。紫で、Object画像の色へ乗算して色味を変える。種類の色の代わりに使い、予告・転倒の色より後にする。
   constexpr XMFLOAT4 ns_MARK_COLOR{0.9f,0.4f,1.0f,1.0f};
-  // モデルの画像に乗算する、通常の色。白で、画像の色をそのまま出す。射撃のダメージの印・予告・怯み・転倒の色は、これを置き換える。
+  // モデルの画像に乗算する、通常の色。白で、画像の色をそのまま出す。射撃のダメージの印・予告・転倒の色は、これを置き換える。
   constexpr XMFLOAT4 ns_MODEL_BASE_COLOR{1.0f,1.0f,1.0f,1.0f};
-  // 攻撃の予告中の色。黄で、Object画像の色へ乗算して色味を変える。種類の色と印の色より優先し、怯みの色より後にする。
+  // 攻撃の予告中の色。黄で、Object画像の色へ乗算して色味を変える。種類の色と印の色より優先し、転倒の色より後にする。
   constexpr XMFLOAT4 ns_TELEGRAPH_COLOR{1.0f,1.0f,0.3f,1.0f};
-  // 怯み中の色。橙で、Object画像の色へ乗算して色味を変える。予告の色より優先する。
-  constexpr XMFLOAT4 ns_FLINCH_COLOR{1.0f,0.5f,0.2f,1.0f};
-  // 転倒中の色。青みがかった灰色で、Object画像の色へ乗算して色味を変える。怯みの色より優先する。
+  // 転倒中の色。青みがかった灰色で、Object画像の色へ乗算して色味を変える。予告の色より優先する。
   constexpr XMFLOAT4 ns_KNOCKDOWN_COLOR{0.5f,0.6f,1.0f,1.0f};
 }
 
@@ -267,7 +265,7 @@ void Enemy::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const
     return;
   }
 
-  // 生きている間は、モデルで描く。射撃のダメージの印は、基準の色を置き換え、予告・怯み・転倒の色が、それより優先する。
+  // 生きている間は、モデルで描く。射撃のダメージの印は、基準の色を置き換え、予告・転倒の色が、それより優先する。
   const XMFLOAT4 base_color = IsShotDamageMarked() ? ns_MARK_COLOR : ns_MODEL_BASE_COLOR;
   if(m_playback.Draw(graphicsSystem,camera,BuildPlaybackState(DecideStateColor(base_color))))return;
 
@@ -411,7 +409,7 @@ void Enemy::UpdateFacing(float deltaTime)
 // Cubeで描く。
 void Enemy::DrawCube(GraphicsSystem& graphicsSystem,const CAMERA_MATRICES& camera) const
 {
-  // 描画用のTransformと色を決める。通常は保持しているTransformと、種類の色。射撃のダメージの印が付いている間は、印の色にする。予告・怯み・転倒の色が、それより優先する。
+  // 描画用のTransformと色を決める。通常は保持しているTransformと、種類の色。射撃のダメージの印が付いている間は、印の色にする。予告・転倒の色が、それより優先する。
   const ENEMY_PARAMS& params = ENEMY_TABLE::GetParams(m_kind);
   Transform draw_transform = m_transform;
   const XMFLOAT4 color = DecideStateColor(IsShotDamageMarked() ? ns_MARK_COLOR : params.normalColor);
@@ -451,9 +449,8 @@ ENEMY_PLAYBACK_STATE Enemy::BuildPlaybackState(const XMFLOAT4& color) const
 // 状態に応じた色を返す。
 XMFLOAT4 Enemy::DecideStateColor(const XMFLOAT4& baseColor) const
 {
-  // 転倒の表示を最優先にし、次に怯み、次に攻撃の予告とする。
+  // 転倒の表示を最優先にし、次に攻撃の予告とする。怯み中は、色を変えない。
   if(IsKnockedDown())return ns_KNOCKDOWN_COLOR;
-  if(IsFlinching())return ns_FLINCH_COLOR;
   if(m_isTelegraphing)return ns_TELEGRAPH_COLOR;
   return baseColor;
 }

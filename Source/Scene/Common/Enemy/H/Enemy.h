@@ -94,7 +94,7 @@ public:
   // 倒された時の演出を、まだ出していない場合だけ、trueを返し、出す旨を記録する。同じ敵について、二度目以降はfalseを返す。生きている敵は、常にfalse。
   [[nodiscard]] bool TakeDefeatEffectNotice();
   // 生きている場合は、モデルで描く（待機・移動・攻撃・怯み・転倒・起き上がりの動き）。モデルがない種類や、読み込めなかった場合は、Cubeで描く。死亡後は、死亡の動きが終わり、保持の時間が過ぎてから、徐々に消えるまで、モデルだけを描く。
-  // 色は、通常は白（モデルの画像の色）、射撃のダメージの印が付いている間は紫、攻撃の予告中は黄、怯み中は橙、転倒中は青みがかった灰色で、画像の色へ乗算する。Cubeの描画では、転倒中に低く潰し、待機の揺れ・前傾・怯みの傾き・突進を加える。
+  // 色は、通常は白（モデルの画像の色）、射撃のダメージの印が付いている間は紫、攻撃の予告中は黄、転倒中は青みがかった灰色で、画像の色へ乗算する。怯み中は、色を変えない。Cubeの描画では、転倒中に低く潰し、待機の揺れ・前傾・怯みの傾き・突進を加える。
   // graphicsSystem: Rendererが使う描画基盤。
   // viewMatrix: World空間からView空間への変換行列。
   // projectionMatrix: View空間からClip空間への変換行列。
@@ -105,10 +105,10 @@ public:
   // damage: 受けるダメージ。正の値。
   // collisionWorld: Initializeで渡したのと同じCollisionWorld。死亡時にColliderを解除する。
   // flinchScale: 怯みの時間に掛ける倍率。1.0で通常。特殊強化（制圧射撃）で、射撃の怯みを伸ばす時に1.0より大きい値を渡す。正の値であること。省略すると1.0。
-  // shouldFlinch: 怯ませるか。射撃は、確率で決めた結果を渡す。省略するとtrueで、蹴り・殴打などの近接攻撃は、これまでどおり、必ず怯ませる。
+  // shouldFlinch: 怯ませるか。射撃は、確率で決めた結果を渡す。省略するとtrueで、殴打などの近接攻撃は、これまでどおり、必ず怯ませる。
   // 戻り値: このダメージで死亡したらtrue。すでに死亡している場合はダメージを受けずfalse。
   bool ApplyDamage(float damage,CollisionWorld& collisionWorld,float flinchScale = 1.0f,bool shouldFlinch = true);
-  // 転倒させる。転倒中は怯みも解除され、蹴りの対象にならない。すでに転倒中、死亡している、または範囲攻撃型（転倒しない種類）の場合は何もしない。
+  // 転倒させる。転倒中は怯みも解除される。すでに転倒中、死亡している、または範囲攻撃型（転倒しない種類）の場合は何もしない。
   // 戻り値: 新しく転倒させたらtrue。何もしなかった場合はfalse。
   bool ApplyKnockdown();
   // 一定時間、この敵が射撃で受けるダメージを増やす印を付ける。特殊強化（殴打追撃）の効果。すでに印が付いている場合は、倍率と時間を新しい値へ置き換える。死亡している場合は何もしない。
@@ -119,7 +119,7 @@ public:
   // collisionWorld: Initializeで渡したのと同じCollisionWorld。
   void Respawn(CollisionWorld& collisionWorld);
   // 攻撃の予告中の表示を切り替える。予告の状態そのものは、呼出側が管理し、毎回の更新で現在の状態を渡す。
-  // isTelegraphing: trueなら、通常時の色の代わりに予告の色で描き、前へ傾ける。怯み・転倒の表示の方が優先される。
+  // isTelegraphing: trueなら、通常時の色の代わりに予告の色で描き、前へ傾ける。転倒の表示の方が優先される。
   void SetTelegraphing(bool isTelegraphing) { m_isTelegraphing = isTelegraphing; }
 
   //========= Getter関数=========
@@ -129,7 +129,7 @@ public:
   [[nodiscard]] bool IsFlinching() const { return m_flinchRemainingSeconds > 0.0f; }
   // 怯みの耐性中かを返す。怯みが終わった後の短い間は、射撃で、続けて怯まない。
   [[nodiscard]] bool IsFlinchImmune() const { return m_animation.flinchImmuneRemainingSeconds > 0.0f; }
-  // 転倒中かを返す。転倒は一定時間続き、その間は蹴れない。
+  // 転倒中かを返す。転倒は一定時間続く。
   [[nodiscard]] bool IsKnockedDown() const { return m_knockdownRemainingSeconds > 0.0f; }
   // 攻撃の予告中の表示になっているかを返す。
   [[nodiscard]] bool IsTelegraphing() const { return m_isTelegraphing; }
@@ -175,7 +175,7 @@ private:
   // color: モデルの画像に乗算する色。
   // 戻り値: 現在の状態を詰めた構造体。
   [[nodiscard]] ENEMY_PLAYBACK_STATE BuildPlaybackState(const XMFLOAT4& color) const;
-  // 転倒・怯み・予告の状態に応じた色を返す。優先順は、転倒、怯み、予告、基準の色。
+  // 転倒・予告の状態に応じた色を返す。優先順は、転倒、予告、基準の色。怯み中は、色を変えない。
   // baseColor: どの状態でもない時の色。
   // 戻り値: 乗算する色。
   [[nodiscard]] XMFLOAT4 DecideStateColor(const XMFLOAT4& baseColor) const;
