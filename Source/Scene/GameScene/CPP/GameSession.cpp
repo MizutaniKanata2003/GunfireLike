@@ -304,9 +304,8 @@ bool GameSession::UpdateSessionInput()
     m_player.GetPlayerCombat().ClearSlideKnockdownRecord();
 
     // 報酬選択かショップの最中に再開した場合は、解除したCaptureを戻して、選択と購入画面を終える。
-    if(m_economy.GetReward().IsSelecting() || m_shopFlow.IsOpen()){
-      m_inputSystem.SetMouseCaptureEnabled(true);
-    }
+    if(m_economy.GetReward().IsSelecting() || m_shopFlow.IsOpen())m_inputSystem.SetMouseCaptureEnabled(true);
+
     m_economy.ResetRewardSelection();
     m_shopFlow.Close();
   }

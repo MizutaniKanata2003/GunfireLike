@@ -38,7 +38,7 @@ public:
   void Initialize()
   {
     m_isOwned.fill(false);
-    m_isOwned[static_cast<int>(WEAPON_TYPE::e_ASSAULT_RIFLE)] = true;
+    m_isOwned[static_cast<int>(WEAPON_TYPE::e_SCAR)] = true;
     for(WEAPON_UPGRADE_LEVELS& levels : m_upgradeLevels){
       levels.fill(0);
     }

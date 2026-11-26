@@ -34,7 +34,7 @@ namespace
   constexpr float ns_HIT_MARKER_SECONDS = 0.3f;
 
   //========= 頭の判定=========
-  // 命中点が、敵の球の中心より、この高さ以上に高い場合を、頭に当たったとみなす。単位はワールド距離単位。専用のColliderを作らず、高さだけで決める仮値。
+  // 命中点が、敵の球の中心より、この高さ以上に高い場合を、頭に当たったとみなす。単位はワールド距離単位。専用のColliderを作らず、高さだけで決める。
   constexpr float ns_HEADSHOT_HEIGHT_OFFSET = 0.2f;
 
   //========= 弾道の補助関数=========
@@ -108,7 +108,7 @@ void ShotController::Uninit()
 // 初期武器を満タンの弾薬で装備し直し、命中表示と、取り出していない発射の結果を消し、特殊強化の効果を通常へ戻す。
 void ShotController::Reset()
 {
-  m_weaponSystem.Initialize(WEAPON_TABLE::ns_ASSAULT_RIFLE);
+  m_weaponSystem.Initialize(WEAPON_TABLE::ns_SCAR);
   m_hitMarkerRemainingSeconds = 0.0f;
   m_pendingShotResult = WEAPON_UPDATE_RESULT{};
   m_flinchScale = 1.0f;
