@@ -1,12 +1,13 @@
 ﻿#include "../H/WeaponView.h"
 
-// 4種の銃のモデルとアニメーションの読込、待機の姿勢の計算、カメラの前への配置と描画、調整の画面を実装する。
+// 4種の銃のモデルとアニメーションの読込、待機の姿勢と視点の計算、カメラの前への配置と描画、調整の画面を実装する。
 
 //========= C++標準ライブラリ インクルード=========
 #include <algorithm> // std::minとstd::maxで、頂点の位置の範囲（最小と最大）を更新する。
 #include <cfloat> // FLT_MAXで、表示範囲の最小値の初期値を作る。
 #include <cstddef> // std::size_tで、アニメーションと頂点の添字を表す。
 #include <string> // std::stringで、アニメーションの名前の末尾を調べ、std::wstringで、ログの文字列を組み立てる。
+#include <vector> // 視点と注視点のノードの番号と、位置の計算結果を受け渡す。
 
 //========= 外部ライブラリ インクルード=========
 #include "imgui.h"
@@ -30,6 +31,17 @@ namespace
   constexpr char ns_FALLBACK_POSE_CLIP_NAME[] = "Take";
   // 待機の動きがある場合に、待機の姿勢を計算する時刻。単位は秒。待機の動きは、1コマだけのため、先頭を使う。
   constexpr float ns_IDLE_POSE_SECONDS = 0.0f;
+
+  //========= 視点=========
+  // モデルの視点のノードの名前。モデルの作者が、一人称の見え方の基準として置いたノード。末尾の一致で探す。
+  constexpr char ns_EYE_NODE_NAME[] = "camera";
+  // 視点から見る先のノードの名前。視点からこのノードへの向きを、画面の正面にする。末尾の一致で探す。
+  constexpr char ns_EYE_TARGET_NODE_NAME[] = "camera_target";
+  // モデルの空間で、画面の上にする向き。調整の画面で、X（Pitch）を90度にした時に、腕が立って見えたため、モデルの-Zを上とする。
+  // 元のFBXが、Z軸が上（Blenderの標準）で、読込の左手系への変換で、Zの符号が反転した、という見立てだが、FBXの設定は、確認していない。
+  constexpr XMFLOAT3 ns_MODEL_UP_DIRECTION{0.0f,0.0f,-1.0f};
+  // 見る向きと上の向きの外積の長さの2乗が、この値以下なら、2つの向きが平行に近く、画面の向きが決まらないとみなす。
+  constexpr float ns_MIN_EYE_CROSS_LENGTH_SQ = 1.0e-6f;
 
   //========= 調整の画面=========
   // 大きさの倍率を動かせる範囲。対数の目盛りで動かす。
@@ -93,6 +105,41 @@ namespace
                   L"銃の表示範囲（待機の姿勢） 武器 " + std::to_wstring(weaponIndex)
                   + L" | 最小 X " + std::to_wstring(minimum.x) + L" Y " + std::to_wstring(minimum.y) + L" Z " + std::to_wstring(minimum.z)
                   + L" | 最大 X " + std::to_wstring(maximum.x) + L" Y " + std::to_wstring(maximum.y) + L" Z " + std::to_wstring(maximum.z));
+  }
+
+  // 待機の姿勢で、視点（cameraノード）から、注視点（camera_targetノード）を見る行列を作る。2つの位置と距離を、ログへ出す。
+  // weaponIndex: 武器の種類の値。ログの表示に使う。
+  // player: 待機の動きの再生部。初期化済みであること。ノードの位置の計算で、作業領域を書き換える。
+  // poseSeconds: 待機の姿勢の時刻。単位は秒。
+  // 戻り値: モデルの空間から、視点の空間（視点が原点で、+Zが注視点の向き）への変換行列。ノードがない、または、向きが決まらない場合は、単位行列。
+  XMMATRIX BuildEyeMatrix(int weaponIndex,SkinnedAnimationPlayer& player,float poseSeconds)
+  {
+    // 視点と注視点のノードを探す。どちらかがなければ、視点を使わず、表示の位置だけで置く。
+    const int eye_node_index = player.FindNodeIndexBySuffix(ns_EYE_NODE_NAME);
+    const int target_node_index = player.FindNodeIndexBySuffix(ns_EYE_TARGET_NODE_NAME);
+    if(eye_node_index < 0 || target_node_index < 0){
+      Logger::Write(e_LogLevel::e_WARNING,e_LogCategory::e_ASSET,L"銃の視点のノードが見つかりません。視点を使わずに置きます: 武器 " + std::to_wstring(weaponIndex));
+      return XMMatrixIdentity();
+    }
+
+    // 2つのノードの位置を、スキニング後の頂点と同じ空間（モデル空間）で求める。
+    std::vector<XMFLOAT3> positions;
+    player.EvaluateNodePositions(poseSeconds,std::vector<int>{eye_node_index,target_node_index},positions);
+    const XMVECTOR eye_position = XMLoadFloat3(&positions[0]);
+    const XMVECTOR forward = DirectX::XMVectorSubtract(XMLoadFloat3(&positions[1]),eye_position);
+    Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_ASSET,
+                  L"銃の視点（待機の姿勢） 武器 " + std::to_wstring(weaponIndex)
+                  + L" | 視点 X " + std::to_wstring(positions[0].x) + L" Y " + std::to_wstring(positions[0].y) + L" Z " + std::to_wstring(positions[0].z)
+                  + L" | 注視点 X " + std::to_wstring(positions[1].x) + L" Y " + std::to_wstring(positions[1].y) + L" Z " + std::to_wstring(positions[1].z)
+                  + L" | 距離 " + std::to_wstring(XMVectorGetX(DirectX::XMVector3Length(forward))));
+
+    // 見る向きが長さ0、または、上の向きと平行に近いと、画面の向きが決まらないため、視点を使わない。
+    const XMVECTOR up_direction = XMLoadFloat3(&ns_MODEL_UP_DIRECTION);
+    if(XMVectorGetX(DirectX::XMVector3LengthSq(XMVector3Cross(forward,up_direction))) <= ns_MIN_EYE_CROSS_LENGTH_SQ){
+      Logger::Write(e_LogLevel::e_WARNING,e_LogCategory::e_ASSET,L"銃の視点の向きが決まりません。視点を使わずに置きます: 武器 " + std::to_wstring(weaponIndex));
+      return XMMatrixIdentity();
+    }
+    return XMMatrixLookToLH(eye_position,forward,up_direction);
   }
 }
 
@@ -228,21 +275,23 @@ bool WeaponView::LoadWeapon(GraphicsSystem& graphicsSystem,int weaponIndex)
     return false;
   }
 
-  // 待機の姿勢を計算し、表示の範囲をログへ出す。
+  // 待機の姿勢と視点を計算し、表示の範囲をログへ出す。
   assets.idlePlayer.Evaluate(pose_seconds,assets.idleBoneMatrices);
+  XMStoreFloat4x4(&assets.eyeMatrix,BuildEyeMatrix(weaponIndex,assets.idlePlayer,pose_seconds));
   LogPoseBounds(weaponIndex,assets.model,assets.idleBoneMatrices);
   assets.isLoaded = true;
   return true;
 }
 
-// 大きさ・向き・位置を、この順に合成する。
+// 視点・大きさ・向き・位置を、この順に合成する。
 XMMATRIX WeaponView::BuildWorldMatrix() const
 {
-  // 行ベクトルの向きで、「大きさ → 回転 → 移動」の順に合成する。回転の角度は、度から、ラジアンへ直す。
+  // 行ベクトルの向きで、「視点 → 大きさ → 回転 → 移動」の順に合成する。視点で、モデルの視点を原点へ移してから拡大するため、拡大で、画面上の見え方は変わらない。回転の角度は、度から、ラジアンへ直す。
   const WEAPON_VIEW_PLACEMENT& placement = m_placements[m_selectedWeaponIndex];
   const XMMATRIX scale_matrix = XMMatrixScaling(placement.scale,placement.scale,placement.scale);
   const XMMATRIX rotation_matrix = XMMatrixRotationRollPitchYaw(XMConvertToRadians(placement.rotationDegrees.x),XMConvertToRadians(placement.rotationDegrees.y),
                                                                 XMConvertToRadians(placement.rotationDegrees.z));
   const XMMATRIX translation_matrix = XMMatrixTranslation(placement.offset.x,placement.offset.y,placement.offset.z);
-  return XMMatrixMultiply(XMMatrixMultiply(scale_matrix,rotation_matrix),translation_matrix);
+  const XMMATRIX eye_scale_matrix = XMMatrixMultiply(XMLoadFloat4x4(&m_assets[m_selectedWeaponIndex].eyeMatrix),scale_matrix);
+  return XMMatrixMultiply(XMMatrixMultiply(eye_scale_matrix,rotation_matrix),translation_matrix);
 }

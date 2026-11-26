@@ -88,22 +88,24 @@ namespace
     return -1;
   }
 
-  //========= ボーンの補助関数=========
-  // ボーンの番号を返す。まだなければ追加する。名前が同じボーンは、複数のメッシュにまたがっても、1本にまとめる。
-  // 戻り値: ボーンの番号。ボーンの上限を超える場合と、対応するノードがない場合は-1。
+  // ボーン名による共有を、H4a-2a-4適用前の実装へ戻す。
+ // bone: 読込中のメッシュが持つボーン。
+ // boneLookup: 名前と、登録済みボーン番号の対応表。
+ // model: ノードとボーンの出力先。
+ // 戻り値: ボーン番号。上限を超えるか、対応ノードがない場合は-1。
   int FindOrAddBone(const aiBone& bone,std::unordered_map<std::string,int>& boneLookup,SKINNED_MODEL_DATA& model)
   {
-    // すでに追加したボーンは、その番号を返す。
+    // 登録済みの名前は、以前と同じ番号を再利用する。
     const std::string bone_name = bone.mName.C_Str();
     const auto found = boneLookup.find(bone_name);
     if(found != boneLookup.end())return found->second;
 
-    // 上限を超える場合と、同じ名前のノードがない場合は、追加できない。
+    // 上限を超える場合、または対応するノードがない場合は、追加しない。
     if(static_cast<int>(model.bones.size()) >= SKINNED_MODEL::ns_MAX_BONE_COUNT)return -1;
     const int node_index = FindNodeIndex(model.nodes,bone_name);
     if(node_index < 0)return -1;
 
-    // 新しいボーンとして追加する。
+    // 従来のデータ構造と共有方法へ戻し、前回変更による登録数の増加を取り消す。
     SKINNED_BONE skinned_bone{};
     skinned_bone.nodeIndex = node_index;
     skinned_bone.offsetMatrix = ConvertMatrix(bone.mOffsetMatrix);
