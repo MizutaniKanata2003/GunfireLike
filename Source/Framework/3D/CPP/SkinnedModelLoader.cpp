@@ -115,31 +115,155 @@ namespace
     return bone_index;
   }
 
-  // メッシュのボーンの重みを、頂点へ書き込む。1つの頂点につき、空いている枠へ、先頭から入れる。
-  // baseVertex: このメッシュの先頭の頂点の、modelのverticesでの添字。
-  bool ApplyBoneWeights(const aiMesh& mesh,unsigned int baseVertex,std::unordered_map<std::string,int>& boneLookup,SKINNED_MODEL_DATA& model)
+  // 有効な重みを持つボーンかを調べる。制御用ノードなど、頂点を動かさないボーンは共有表へ追加しない。
+ // bone: 調べるメッシュ側のボーン。
+ // 戻り値: 正の重みが1つでもあればtrue。
+  bool HasPositiveSkinWeight(const aiBone& bone)
   {
-    // メッシュの全てのボーンを順に処理する。
-    for(unsigned int bone_slot = 0; bone_slot < mesh.mNumBones; ++bone_slot){
-      const aiBone& bone = *mesh.mBones[bone_slot];
-      const int bone_index = FindOrAddBone(bone,boneLookup,model);
-      if(bone_index < 0)return false;
+    // 頂点に影響する重みを先頭から探す。
+    for(unsigned int weight_index = 0; weight_index < bone.mNumWeights; ++weight_index){
+      // 0の重みだけのボーンは、座標補正の基準にも使わない。
+      if(bone.mWeights[weight_index].mWeight > 0.0f)return true;
+    }
+    return false;
+  }
 
-      // ボーンが影響する全ての頂点の、空いている枠へ、ボーン番号と重みを書く。範囲外の頂点と、重みが0の影響は、無視する。
-      for(unsigned int weight_slot = 0; weight_slot < bone.mNumWeights; ++weight_slot){
-        const aiVertexWeight& weight = bone.mWeights[weight_slot];
-        const std::size_t vertex_index = static_cast<std::size_t>(baseVertex) + weight.mVertexId;
-        if(vertex_index >= model.vertices.size() || weight.mWeight <= 0.0f)continue;
+  // メッシュから共有メッシュ座標への補正を求め、同一メッシュ内で補正が一貫しているか確認する。
+  // bone: メッシュ固有の逆バインド行列を持つボーン。
+  // sharedBone: 名前で共有されたボーン。アニメーションの変換先ノードはboneと同じ。
+  // correction: 最初の有効ボーンから求める補正の出力先。後続のボーンでは比較対象。
+  // hasCorrection: 補正を設定済みか。設定した場合はtrueにする。
+  // 戻り値: 逆行列を求められ、同一メッシュ内で補正が一致すればtrue。
+  bool UpdateMeshCorrection(const aiBone& bone,const SKINNED_BONE& sharedBone,XMFLOAT4X4& correction,bool& hasCorrection)
+  {
+    // 行ベクトルでは C * O_shared = O_mesh なので、C = O_mesh * inverse(O_shared) とする。
+    const XMFLOAT4X4 mesh_offset = ConvertMatrix(bone.mOffsetMatrix);
+    DirectX::XMVECTOR determinant{};
+    const DirectX::XMMATRIX shared_inverse = DirectX::XMMatrixInverse(&determinant,DirectX::XMLoadFloat4x4(&sharedBone.offsetMatrix));
+    const float determinant_value = DirectX::XMVectorGetX(determinant);
+    // 特異行列では補正できないため、部分データを呼出側へ失敗として返す。
+    if(determinant_value == 0.0f)return false;
 
-        SKINNED_VERTEX& vertex = model.vertices[vertex_index];
-        for(std::size_t slot = 0; slot < SKINNED_MODEL::ns_BONES_PER_VERTEX; ++slot){
-          if(vertex.boneWeights[slot] > 0.0f)continue;
-          vertex.boneIndices[slot] = static_cast<std::uint8_t>(bone_index);
-          vertex.boneWeights[slot] = weight.mWeight;
-          break;
-        }
+    XMFLOAT4X4 candidate{};
+    DirectX::XMStoreFloat4x4(&candidate,DirectX::XMMatrixMultiply(DirectX::XMLoadFloat4x4(&mesh_offset),shared_inverse));
+    // 最初に頂点へ影響するボーンを、このメッシュの座標補正の基準にする。
+    if(!hasCorrection){
+      correction = candidate;
+      hasCorrection = true;
+      return true;
+    }
+
+    // 相対誤差と絶対誤差を組み合わせ、書出し時の小さな丸め差を許容する。
+    constexpr float MATRIX_COMPARE_TOLERANCE = 0.001f;
+    // 全16成分が同じ補正を表すか確認し、異なる変換を無理に1つへまとめない。
+    for(int row_index = 0; row_index < 4; ++row_index){
+      for(int column_index = 0; column_index < 4; ++column_index){
+        const float expected = correction.m[row_index][column_index];
+        const float actual = candidate.m[row_index][column_index];
+        const float absolute_expected = expected < 0.0f ? -expected : expected;
+        const float absolute_actual = actual < 0.0f ? -actual : actual;
+        const float difference = actual - expected;
+        const float absolute_difference = difference < 0.0f ? -difference : difference;
+        const float magnitude = absolute_expected > absolute_actual ? absolute_expected : absolute_actual;
+        // 許容範囲を超えた場合は、呼出側でメッシュ名を記録して読込を止める。
+        if(absolute_difference > MATRIX_COMPARE_TOLERANCE * (1.0f + magnitude))return false;
       }
     }
+    return true;
+  }
+
+  // 1本のボーンの重みを、追加済みの頂点へ書く。番号は共有ボーンの番号を使う。
+  // bone: メッシュ内の頂点番号と重み。
+  // baseVertex: このメッシュの先頭の頂点番号。
+  // boneIndex: 共有ボーンの番号。上限内であること。
+  // model: 頂点の出力先。
+  void WriteMeshBoneWeights(const aiBone& bone,unsigned int baseVertex,int boneIndex,SKINNED_MODEL_DATA& model)
+  {
+    // このボーンが影響する頂点を順に処理する。
+    for(unsigned int weight_index = 0; weight_index < bone.mNumWeights; ++weight_index){
+      const aiVertexWeight& weight = bone.mWeights[weight_index];
+      const std::size_t vertex_index = static_cast<std::size_t>(baseVertex) + weight.mVertexId;
+      // 無効な頂点番号と、影響のない重みは書き込まない。
+      if(vertex_index >= model.vertices.size() || weight.mWeight <= 0.0f)continue;
+
+      SKINNED_VERTEX& vertex = model.vertices[vertex_index];
+      // 空いている影響枠に、番号と重みを対にして登録する。
+      for(std::size_t slot = 0; slot < SKINNED_MODEL::ns_BONES_PER_VERTEX; ++slot){
+        // 登録済みの枠を飛ばし、最初の空き枠だけへ書く。
+        if(vertex.boneWeights[slot] > 0.0f)continue;
+        vertex.boneIndices[slot] = static_cast<std::uint8_t>(boneIndex);
+        vertex.boneWeights[slot] = weight.mWeight;
+        break;
+      }
+    }
+  }
+
+  // メッシュの頂点を、共有ボーンの逆バインド行列が期待する座標系へ移す。
+  // mesh: 対象メッシュ。処理する頂点数を取得する。
+  // baseVertex: 出力モデルに追加した、このメッシュの先頭位置。
+  // correction: メッシュ座標から共有座標への変換。反転する場合は面の向きも補正する。
+  // model: 位置・法線・Indexを書き換えるモデル。
+  void CorrectMeshCoordinates(const aiMesh& mesh,unsigned int baseVertex,const XMFLOAT4X4& correction,SKINNED_MODEL_DATA& model)
+  {
+    // 法線には、位置の変換の逆転置を使う。移動成分はTransformNormalにより使われない。
+    const DirectX::XMMATRIX transform = DirectX::XMLoadFloat4x4(&correction);
+    const DirectX::XMMATRIX normal_transform = DirectX::XMMatrixTranspose(DirectX::XMMatrixInverse(nullptr,transform));
+    // 頂点を1回だけ補正し、GPU側では従来の共有ボーン行列をそのまま使う。
+    for(unsigned int vertex_index = 0; vertex_index < mesh.mNumVertices; ++vertex_index){
+      SKINNED_VERTEX& vertex = model.vertices[static_cast<std::size_t>(baseVertex) + vertex_index];
+      const DirectX::XMVECTOR position = DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(&vertex.position),transform);
+      const DirectX::XMVECTOR normal = DirectX::XMVector3TransformNormal(DirectX::XMLoadFloat3(&vertex.normal),normal_transform);
+      DirectX::XMStoreFloat3(&vertex.position,position);
+      DirectX::XMStoreFloat3(&vertex.normal,DirectX::XMVector3Normalize(normal));
+    }
+
+    // 反転を含まなければ、既存の三角形の頂点順を維持する。
+    if(DirectX::XMVectorGetX(DirectX::XMMatrixDeterminant(transform)) >= 0.0f)return;
+
+    // AppendMeshが最後に追加した描画範囲の各三角形を反転し、表面の向きを維持する。
+    const SKINNED_SUBMESH& submesh = model.submeshes.back();
+    for(unsigned int offset = 0; offset + 2 < submesh.indexCount; offset += 3){
+      const std::size_t index = static_cast<std::size_t>(submesh.indexStart) + offset;
+      const unsigned int saved_index = model.indices[index + 1];
+      model.indices[index + 1] = model.indices[index + 2];
+      model.indices[index + 2] = saved_index;
+    }
+  }
+
+  // ボーン数を増やさず、メッシュ固有の座標系を補正してから、共有ボーンで動かせるようにする。
+  // mesh: AppendMeshが頂点・Index・描画範囲を追加済みのメッシュ。
+  // baseVertex: このメッシュの先頭の頂点番号。
+  // boneLookup: 名前による共有ボーン表。FindOrAddBoneは復旧後の名前による共有版を使う。
+  // model: 重みと補正済み頂点の出力先。失敗時はLoadの既存処理が全体を空にする。
+  // 戻り値: 共有ボーン登録・座標補正が成立すればtrue。
+  bool ApplyBoneWeights(const aiMesh& mesh,unsigned int baseVertex,std::unordered_map<std::string,int>& boneLookup,SKINNED_MODEL_DATA& model)
+  {
+    XMFLOAT4X4 correction{};
+    bool has_correction = false;
+    // 頂点を実際に動かすボーンだけを共有し、座標補正が一貫するか確認する。
+    for(unsigned int bone_slot = 0; bone_slot < mesh.mNumBones; ++bone_slot){
+      const aiBone& bone = *mesh.mBones[bone_slot];
+      // 制御用ノードなど、重みを持たないボーンを基準から除外する。
+      if(!HasPositiveSkinWeight(bone))continue;
+
+      const int bone_index = FindOrAddBone(bone,boneLookup,model);
+      // 登録できない場合は、既存の読込失敗処理へ戻す。
+      if(bone_index < 0)return false;
+
+      // 同一メッシュで補正を統一できない場合は、不正な姿勢を生成せず停止する。
+      if(!UpdateMeshCorrection(bone,model.bones[static_cast<std::size_t>(bone_index)],correction,has_correction)){
+        Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_ASSET,L"メッシュの座標補正を統一できません: " + ToWide(mesh.mName.C_Str()) + L" / " + ToWide(bone.mName.C_Str()));
+        return false;
+      }
+      WriteMeshBoneWeights(bone,baseVertex,bone_index,model);
+    }
+
+    // ボーンを持たないメッシュは変更しない。所有ノードによる剛体描画は、この修正の対象外。
+    if(!has_correction)return true;
+
+    // 全ボーンの確認後に頂点を補正し、途中の失敗で一部だけ変形しないようにする。
+    CorrectMeshCoordinates(mesh,baseVertex,correction,model);
+    Logger::Write(e_LogLevel::e_INFO,e_LogCategory::e_ASSET,L"メッシュの座標補正を適用しました: " + ToWide(mesh.mName.C_Str()));
     return true;
   }
 

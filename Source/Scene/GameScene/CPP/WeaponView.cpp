@@ -146,14 +146,17 @@ namespace
 // 武器の読込元の数が、武器の種類の数と一致していることを確認する。
 static_assert(sizeof(ns_WEAPON_MODEL_PATHS) / sizeof(ns_WEAPON_MODEL_PATHS[0]) == WEAPON_TABLE::ns_WEAPON_COUNT,"銃のモデルのパスの数と、武器の種類の数を一致させること。");
 
-//========= 初期化・終了関数=========
-// 4種の銃を読み込む。
+// 4種の銃を読み込み、拳銃の表示位置を確定した設定へ戻す。
 bool WeaponView::Initialize(GraphicsSystem& graphicsSystem)
 {
   // 旧Resourceを先に解放する。以後の失敗でも、旧状態へは復帰しない。
   Uninit();
 
-  // 全ての武器を順に読み込む。1つ失敗しても、残りの武器は読み込み、全て成功した場合だけ、trueを返す。
+  // 拳銃だけに確認済みの配置を設定する。回転は度、Offsetはモデル内カメラで変換した後のカメラ空間の移動量。
+  // Scale 0.01、Rotation (0,-180,0)、Offset (0,-33,3)。他の武器の配置は変更しない。
+  m_placements[static_cast<int>(WEAPON_TYPE::e_PISTOL)] = WEAPON_VIEW_PLACEMENT{0.01f,XMFLOAT3{0.0f,-180.0f,0.0f},XMFLOAT3{0.0f,-33.0f,3.0f}};
+
+  // 全ての武器を順に読み込む。1つ失敗しても残りは読み込み、全て成功した場合だけtrueを返す。
   bool is_all_loaded = true;
   for(int weapon_index = 0; weapon_index < WEAPON_TABLE::ns_WEAPON_COUNT; ++weapon_index){
     is_all_loaded = LoadWeapon(graphicsSystem,weapon_index) && is_all_loaded;
@@ -201,45 +204,41 @@ void WeaponView::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& projectionM
   assets.renderer.Draw(graphicsSystem,camera,draw_params);
 }
 
-// 選んだ武器の表示の位置を、調整する画面を出す。
+// 配置を、範囲制限のない数値入力と、細かいドラッグ操作で調整する。
 void WeaponView::DrawTuningUi()
 {
-  // 選んだ武器の表示の位置を、スライダーとボタンで動かす。値は、そのまま、次の描画から反映される。
+  // 移動量はカメラ空間の値。ドラッグは1pixelあたり0.001、直接入力は小数点以下6桁で扱う。
+  constexpr float OFFSET_DRAG_SPEED = 0.001f;
+  constexpr float OFFSET_STEP = 0.01f;
+  constexpr float OFFSET_FAST_STEP = 1.0f;
   WEAPON_VIEW_PLACEMENT& placement = m_placements[m_selectedWeaponIndex];
   ImGui::Begin("Weapon View (tuning)");
-  ImGui::Text("Selected weapon index: %d (follows the equipped weapon) / loaded: %s",m_selectedWeaponIndex,m_assets[m_selectedWeaponIndex].isLoaded ? "yes" : "NO");
-  ImGui::SliderFloat("Scale",&placement.scale,ns_TUNING_SCALE_MIN,ns_TUNING_SCALE_MAX,"%.4f",ImGuiSliderFlags_Logarithmic);
-  ImGui::SliderFloat3("Rotation (deg X Y Z)",&placement.rotationDegrees.x,-ns_TUNING_ROTATION_LIMIT_DEGREES,ns_TUNING_ROTATION_LIMIT_DEGREES);
-  ImGui::SliderFloat3("Offset (X Y Z)",&placement.offset.x,-ns_TUNING_OFFSET_LIMIT,ns_TUNING_OFFSET_LIMIT);
+  ImGui::Text("Weapon index: %d / loaded: %s",m_selectedWeaponIndex,m_assets[m_selectedWeaponIndex].isLoaded ? "yes" : "NO");
 
-  // 向きの早見。モデルの正面と上の向きが分からない時に、順に押して、画面に腕と銃が出る向きを探す。
-  ImGui::Text("Yaw:");
-  ImGui::SameLine();
-  if(ImGui::Button("0")) placement.rotationDegrees.y = 0.0f;
-  ImGui::SameLine();
-  if(ImGui::Button("90")) placement.rotationDegrees.y = ns_QUARTER_TURN_DEGREES;
-  ImGui::SameLine();
-  if(ImGui::Button("180")) placement.rotationDegrees.y = ns_HALF_TURN_DEGREES;
-  ImGui::SameLine();
-  if(ImGui::Button("-90")) placement.rotationDegrees.y = -ns_QUARTER_TURN_DEGREES;
-  ImGui::Text("Pitch:");
-  ImGui::SameLine();
-  if(ImGui::Button("P0")) placement.rotationDegrees.x = 0.0f;
-  ImGui::SameLine();
-  if(ImGui::Button("P90")) placement.rotationDegrees.x = ns_QUARTER_TURN_DEGREES;
-  ImGui::SameLine();
-  if(ImGui::Button("P-90")) placement.rotationDegrees.x = -ns_QUARTER_TURN_DEGREES;
-  ImGui::Text("Scale:");
-  ImGui::SameLine();
-  if(ImGui::Button("1")) placement.scale = 1.0f;
-  ImGui::SameLine();
-  if(ImGui::Button("0.1")) placement.scale = 0.1f;
-  ImGui::SameLine();
-  if(ImGui::Button("0.01")) placement.scale = 0.01f;
+  // 正の縮尺を数値で入力する。従来のスライダーの範囲には制限しない。
+  ImGui::InputFloat("Scale exact",&placement.scale,0.0001f,0.01f,"%.6f");
+  // 0以下の縮尺による消失や意図しない鏡映を防ぐ。
+  if(placement.scale <= 0.0f)placement.scale = 0.000001f;
 
-  // 決めた値を、報告しやすいよう、文字で出す。
-  ImGui::Text("index %d: scale %.4f / rotation %.1f %.1f %.1f / offset %.3f %.3f %.3f",m_selectedWeaponIndex,placement.scale,
-              placement.rotationDegrees.x,placement.rotationDegrees.y,placement.rotationDegrees.z,placement.offset.x,placement.offset.y,placement.offset.z);
+  // Rotationは追加回転。0へ戻した状態で、先にOffsetだけを調整できるようにする。
+  ImGui::InputFloat3("Rotation exact (deg)",&placement.rotationDegrees.x,"%.3f");
+  // 全体の向きを変えずに配置を探すため、追加回転だけを解除する。
+  if(ImGui::Button("Reset rotation to 0"))placement.rotationDegrees = XMFLOAT3{};
+
+  // 最小値と最大値を同じにして、ドラッグ操作の移動範囲を制限しない。
+  ImGui::DragFloat3("Offset fine drag",&placement.offset.x,OFFSET_DRAG_SPEED,0.0f,0.0f,"%.6f");
+  // 軸ごとに直接入力する。従来の-3から3の範囲を超えた値も入力できる。
+  ImGui::InputFloat("Offset X (right)",&placement.offset.x,OFFSET_STEP,OFFSET_FAST_STEP,"%.6f");
+  ImGui::InputFloat("Offset Y (up)",&placement.offset.y,OFFSET_STEP,OFFSET_FAST_STEP,"%.6f");
+  ImGui::InputFloat("Offset Z (forward)",&placement.offset.z,OFFSET_STEP,OFFSET_FAST_STEP,"%.6f");
+  // 移動量だけを解除し、回転と縮尺は維持する。
+  if(ImGui::Button("Reset offset"))placement.offset = XMFLOAT3{};
+
+  // 報告用の値を、入力と同じ精度で表示する。
+  ImGui::Text("Scale %.6f / Rotation %.3f %.3f %.3f",placement.scale,
+              placement.rotationDegrees.x,placement.rotationDegrees.y,placement.rotationDegrees.z);
+  ImGui::Text("Offset %.6f %.6f %.6f",placement.offset.x,placement.offset.y,placement.offset.z);
+  ImGui::TextUnformatted("Direct input has no offset limits. Ctrl-click a drag field to type a value.");
   ImGui::End();
 }
 
