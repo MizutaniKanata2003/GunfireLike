@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// プレイヤー側一式（プレイヤー・HP・回復アイテム・カメラ・近接攻撃と接触と回復・射撃・視野角）を所有し、初期化・解放・更新・開始位置への復帰を担当する。
+// プレイヤー側一式（プレイヤー・HP・回復アイテム・カメラ・殴打と接触と回復・射撃・視野角）を所有し、初期化・解放・更新・開始位置への復帰を担当する。
 // 敵の生成と更新・ステージ・時間（ヒットストップとスロー）の管理・描画・デバッグ操作は担当しない。ヒットストップは、通知先へ求めるだけで、残り時間は持たない。
 // 出口の通過の判定と更新順序の仲介は呼出側が行う。移動と視野角の更新を分けているのは、呼出側が、その間に出口の通過を判定するため。
 
@@ -58,13 +58,13 @@ public:
   // deltaTime: 実時間の経過時間。単位は秒。命中表示と反動に使う。
   // gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。回復アイテムの間隔に使う。
   void UpdateTimers(float deltaTime,float gameplayDeltaTime);
-  // 視線を更新し、蹴れる敵の有無を調べてから、プレイヤーの動作と位置を更新して、カメラ位置を合わせる。Capture中だけ呼ぶ。
+  // 視線を更新し、プレイヤーの動作と位置を更新して、カメラ位置を合わせる。Capture中だけ呼ぶ。
   // gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。
   void UpdateMovement(float gameplayDeltaTime);
   // 動作の状態を記録し、殴打の開始でリロードをキャンセルし、動作の状態と構えに応じた視野角へ近づける。UpdateMovementの後に呼ぶ。
   // deltaTime: 実時間の経過時間。単位は秒。視野角の補間に使う。
   void UpdateView(float deltaTime);
-  // 近接攻撃・接触・回復・射撃を、この順に更新する。Capture中だけ呼ぶ。
+  // 殴打・接触・回復・射撃を、この順に更新する。Capture中だけ呼ぶ。
   // gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。
   void UpdateCombat(float gameplayDeltaTime);
   // プレイヤーを開始位置へ戻し、カメラ位置を合わせる。次の部屋へ進んだ時に使う。
@@ -92,11 +92,9 @@ private:
   InputSystem* m_inputSystem{};
   // 壁からの押し戻しに使うCollisionWorld。非所有。未登録はnullptr。
   CollisionWorld* m_collisionWorld{};
-  // 蹴れる敵の検索に使う敵の所有者。非所有。未登録はnullptr。
-  EnemyManager* m_enemyManager{};
 
   //========= プレイヤー側の状態=========
-  // 位置・動作の状態・構え・近接攻撃・怯み・壁からの押し戻しを管理するプレイヤー。
+  // 位置・動作の状態・構え・殴打・怯み・壁からの押し戻しを管理するプレイヤー。
   PlayerController m_playerController{};
   // プレイヤーのHP。
   PlayerHealth m_playerHealth{};
@@ -104,7 +102,7 @@ private:
   HealItems m_healItems{};
   // マウスによる視線方向と、プレイヤー位置に追従するView行列の生成状態。
   FpsCamera m_FPSCamera{};
-  // 蹴り・殴打の当たり・敵との接触・スライディングの転倒・回復アイテムの使用・被弾の反応と、一撃で倒すデバッグ設定を担当する。
+  // 殴打の当たり・敵との接触・スライディングの転倒・回復アイテムの使用・被弾の反応と、一撃で倒すデバッグ設定を担当する。
   PlayerCombatController m_playerCombat{};
   // 射撃・リロードの更新、弾道の終点の通知、命中した敵へのダメージ、命中表示の時間を担当し、武器を所有する。
   ShotController m_shotController{};

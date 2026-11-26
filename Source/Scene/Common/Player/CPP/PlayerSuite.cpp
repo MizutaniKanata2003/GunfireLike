@@ -11,7 +11,6 @@
 
 //========= Scene インクルード=========
 #include "Scene/Common/Combat/H/CombatTable.h"
-#include "Scene/Common/Enemy/H/EnemyManager.h"
 
 // プレイヤーの開始位置に使用する固定設定をまとめる。戦闘の数値はCombatTableにある。
 namespace
@@ -47,7 +46,6 @@ bool PlayerSuite::Init(const PLAYER_SUITE_LINKS& links)
   // 参照先を登録する。欠けている場合は、下の判定で失敗を返すため、登録された値は使われない。
   m_inputSystem = links.inputSystem;
   m_collisionWorld = links.collisionWorld;
-  m_enemyManager = links.enemyManager;
 
   // プレイヤーの戦闘に使う参照と、ヒットストップの通知先を用意する。
   PLAYER_COMBAT_LINKS player_combat_links{};
@@ -88,7 +86,6 @@ void PlayerSuite::Uninit()
   m_playerCombat.Uninit();
   m_inputSystem = nullptr;
   m_collisionWorld = nullptr;
-  m_enemyManager = nullptr;
 }
 
 //========= 更新関数=========
@@ -106,13 +103,9 @@ void PlayerSuite::UpdateTimers(float deltaTime,float gameplayDeltaTime)
 // 視線・プレイヤーの動作と位置・カメラ位置を更新する。
 void PlayerSuite::UpdateMovement(float gameplayDeltaTime)
 {
-  // 視線を先に更新し、その向きで、蹴れる敵がいるかを調べてから、プレイヤーを更新する。ヒットストップ中も視線は動かせる。
+  // 視線を先に更新し、その向きを基準に、プレイヤーを更新する。ヒットストップ中も視線は動かせる。
   m_FPSCamera.Update(*m_inputSystem);
-  const bool can_kick = m_enemyManager->FindMeleeTarget(m_FPSCamera.GetPosition(),m_FPSCamera.GetForward(),true) != nullptr;
-
-  // 経過時間と、蹴れる相手がいるかを、1つの値にまとめて渡す。
-  const PLAYER_UPDATE_REQUEST update_request{gameplayDeltaTime,can_kick};
-  m_playerController.Update(update_request,*m_inputSystem,m_FPSCamera,*m_collisionWorld);
+  m_playerController.Update(gameplayDeltaTime,*m_inputSystem,m_FPSCamera,*m_collisionWorld);
   m_FPSCamera.SetPosition(m_playerController.GetPosition());
 }
 
@@ -130,10 +123,10 @@ void PlayerSuite::UpdateView(float deltaTime)
   m_cameraFov.Update(deltaTime,action_state,m_playerController.IsAiming());
 }
 
-// 近接攻撃・接触・回復・射撃を更新する。
+// 殴打・接触・回復・射撃を更新する。
 void PlayerSuite::UpdateCombat(float gameplayDeltaTime)
 {
-  // 近接攻撃・接触・回復・射撃を、この順に更新する。
+  // 殴打・接触・回復・射撃を、この順に更新する。
   m_playerCombat.Update(gameplayDeltaTime);
   m_shotController.Update(gameplayDeltaTime);
 }

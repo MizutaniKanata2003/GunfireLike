@@ -1,6 +1,6 @@
 ﻿#include "../H/PlayerController.h"
 
-// 動作の状態の切替、状態ごとの移動速度・視点の高さ、構え、近接攻撃の当たりの通知、怯み、地形のAABBからの押し戻しを実装する。
+// 動作の状態の切替、状態ごとの移動速度・視点の高さ、構え、殴打の当たりの通知、怯み、地形のAABBからの押し戻しを実装する。
 // 移動方向は視線を水平面へ投影して求める。移動を小さな距離に分けて押し戻すことで、薄い壁を1回の移動で通り抜けることを防ぐ。
 // 数値はPlayerActionTable.hの表にまとめた。
 
@@ -59,28 +59,28 @@ void PlayerController::Initialize(const XMFLOAT3& startPosition)
   m_isDashLocked = false;
   m_secondsSinceDodgeStart = PLAYER_ACTION_TABLE::ns_SECONDS_WITHOUT_DODGE;
 
-  // 近接攻撃の当たりの通知と、怯みを解除する。
+  // 殴打の当たりの通知と、怯みを解除する。
   m_isMeleeImpactPending = false;
   m_isMeleeImpactReady = false;
   m_flinchRemainingSeconds = 0.0f;
 }
 
 // 動作の状態の切替・移動・視点の高さ・構えを更新し、分割した移動ごとに押し戻す。
-void PlayerController::Update(const PLAYER_UPDATE_REQUEST& request,const InputSystem& input,const FpsCamera& camera,const CollisionWorld& collisionWorld)
+void PlayerController::Update(float deltaTime,const InputSystem& input,const FpsCamera& camera,const CollisionWorld& collisionWorld)
 {
   // 入力を読み取り、経過時間を進める。回避からの経過時間は、回避中も、回避後も増え続ける。怯みの残り時間は0未満にしない。
   const PLAYER_MOVE_INPUT move_input = ReadMoveInput(input,camera);
-  m_stateElapsedSeconds += request.deltaTime;
-  m_secondsSinceDodgeStart += request.deltaTime;
-  m_flinchRemainingSeconds = std::max(0.0f,m_flinchRemainingSeconds - request.deltaTime);
+  m_stateElapsedSeconds += deltaTime;
+  m_secondsSinceDodgeStart += deltaTime;
+  m_flinchRemainingSeconds = std::max(0.0f,m_flinchRemainingSeconds - deltaTime);
 
-  // 入力から動作の状態を切り替え、蹴り・殴打の当たる時刻を迎えていれば、当たりを通知できる状態にする。
-  UpdateActionState(input,move_input,request.canKick);
+  // 入力から動作の状態を切り替え、殴打の当たる時刻を迎えていれば、当たりを通知できる状態にする。
+  UpdateActionState(input,move_input);
   UpdateMeleeImpact();
 
-  // 右クリックを押している間は構える。ただし、ダッシュ・回避・蹴り・殴打の間は構えられず、構え入力があっても解除される。
+  // 右クリックを押している間は構える。ただし、ダッシュ・回避・殴打の間は構えられず、構え入力があっても解除される。
   m_isAiming = input.IsKeyPressed(VK_RBUTTON) && m_actionState != PLAYER_ACTION_STATE::e_DASH && m_actionState != PLAYER_ACTION_STATE::e_DODGE &&
-    m_actionState != PLAYER_ACTION_STATE::e_KICK && m_actionState != PLAYER_ACTION_STATE::e_PUNCH;
+    m_actionState != PLAYER_ACTION_STATE::e_PUNCH;
 
   // 動作の状態ごとの移動の内容を決める。
   PLAYER_MOTION motion = DecideMotion(move_input);
@@ -92,7 +92,7 @@ void PlayerController::Update(const PLAYER_UPDATE_REQUEST& request,const InputSy
   }
 
   // 視点の高さを近づけ、分割した移動ごとに、地形のAABBから押し戻す。
-  MoveAndResolve(motion,request.deltaTime,collisionWorld);
+  MoveAndResolve(motion,deltaTime,collisionWorld);
 }
 
 // 怯みの残り時間を、長い方へ更新する。
@@ -101,15 +101,14 @@ void PlayerController::ApplyFlinch(float seconds)
   m_flinchRemainingSeconds = std::max(m_flinchRemainingSeconds,seconds);
 }
 
-// 当たりが発生していれば、動作の種類から近接攻撃の種類を決めて通知を消費する。
-bool PlayerController::TryConsumeMeleeImpact(PLAYER_MELEE_TYPE& meleeType)
+// 当たりが発生していれば、通知を消費する。
+bool PlayerController::TryConsumeMeleeImpact()
 {
-  // 当たりが発生していなければ、出力先を変更せずfalseを返す。
+  // 当たりが発生していなければ、falseを返す。
   if(!m_isMeleeImpactReady)return false;
 
-  // 通知を消費し、蹴りの動作中なら蹴り、そうでなければ殴打として返す。
+  // 通知を消費する。
   m_isMeleeImpactReady = false;
-  meleeType = m_actionState == PLAYER_ACTION_STATE::e_KICK ? PLAYER_MELEE_TYPE::e_KICK : PLAYER_MELEE_TYPE::e_PUNCH;
   return true;
 }
 
@@ -120,7 +119,7 @@ COLLISION_SPHERE PlayerController::GetBodySphere() const
   return COLLISION_SPHERE{m_position,PLAYER_ACTION_TABLE::ns_BODY_RADIUS};
 }
 
-// 回避・蹴り・殴打の、それぞれの無敵の時間の内なら、無敵とする。
+// 回避・殴打の、それぞれの無敵の時間の内なら、無敵とする。
 bool PlayerController::IsInvincible() const
 {
   // 動作の状態ごとに、開始からの経過時間と無敵の時間を比べる。無敵がない動作では、falseを返す。
@@ -128,10 +127,6 @@ bool PlayerController::IsInvincible() const
     // 回避は、開始から無敵の時間の内なら無敵。
   case PLAYER_ACTION_STATE::e_DODGE:
   return m_stateElapsedSeconds <= PLAYER_ACTION_TABLE::ns_DODGE_INVINCIBLE_SECONDS;
-
-  // 蹴りは、動作中ずっと無敵。
-  case PLAYER_ACTION_STATE::e_KICK:
-  return m_stateElapsedSeconds <= PLAYER_ACTION_TABLE::ns_KICK_INVINCIBLE_SECONDS;
 
   // 殴打は、前半だけ無敵。
   case PLAYER_ACTION_STATE::e_PUNCH:
@@ -143,10 +138,10 @@ bool PlayerController::IsInvincible() const
   }
 }
 
-// 回避・蹴り・殴打の間は射撃できない。それ以外は射撃できる。
+// 回避・殴打の間は射撃できない。それ以外は射撃できる。
 bool PlayerController::IsShootingAllowed() const
 {
-  return m_actionState != PLAYER_ACTION_STATE::e_DODGE && m_actionState != PLAYER_ACTION_STATE::e_KICK && m_actionState != PLAYER_ACTION_STATE::e_PUNCH;
+  return m_actionState != PLAYER_ACTION_STATE::e_DODGE && m_actionState != PLAYER_ACTION_STATE::e_PUNCH;
 }
 
 //========= 入力の読取関数=========
@@ -202,17 +197,17 @@ PLAYER_MOVE_INPUT PlayerController::ReadMoveInput(const InputSystem& input,const
 }
 
 //========= 動作の状態の関数=========
-// 状態を切り替え、経過時間を0へ戻す。蹴り・殴打に入る場合は、当たる時刻を待つ状態にする。
+// 状態を切り替え、経過時間を0へ戻す。殴打に入る場合は、当たる時刻を待つ状態にする。
 void PlayerController::EnterState(PLAYER_ACTION_STATE newState)
 {
   m_actionState = newState;
   m_stateElapsedSeconds = 0.0f;
-  m_isMeleeImpactPending = newState == PLAYER_ACTION_STATE::e_KICK || newState == PLAYER_ACTION_STATE::e_PUNCH;
+  m_isMeleeImpactPending = newState == PLAYER_ACTION_STATE::e_PUNCH;
   m_isMeleeImpactReady = false;
 }
 
 // 時間で終わる動作の確認、新しい動作の開始、ダッシュ・しゃがみの切替を、この順に判断する。
-void PlayerController::UpdateActionState(const InputSystem& input,const PLAYER_MOVE_INPUT& moveInput,bool canKick)
+void PlayerController::UpdateActionState(const InputSystem& input,const PLAYER_MOVE_INPUT& moveInput)
 {
   // 左ShiftとCキーの押下状態を取得し、左Shiftを離していれば、ダッシュの禁止を解く。
   const bool is_shift_pressed = input.IsKeyPressed(VK_SHIFT);
@@ -222,17 +217,17 @@ void PlayerController::UpdateActionState(const InputSystem& input,const PLAYER_M
     m_isDashLocked = false;
   }
 
-  // 回避中・スライディング中・蹴り中・殴打中は、時間が経つまで、他の入力で状態を変えない（途中でやめられない）。
+  // 回避中・スライディング中・殴打中は、時間が経つまで、他の入力で状態を変えない（途中でやめられない）。
   if(UpdateTimedAction(is_crouch_pressed))return;
 
-  // 回避・殴打・蹴り・スライディングを始める入力があれば、その動作へ入り、他の切替は行わない。
-  if(TryStartAction(input,moveInput,canKick))return;
+  // 回避・殴打・スライディングを始める入力があれば、その動作へ入り、他の切替は行わない。
+  if(TryStartAction(input,moveInput))return;
 
   // 始める動作がなければ、ダッシュとしゃがみの切替を判断する。
   UpdateDashAndCrouch(input,moveInput.hasMoveInput,is_shift_pressed,is_crouch_pressed);
 }
 
-// 回避・スライディング・蹴り・殴打は時間で終わる。長さを超えていれば、次の状態へ移す。
+// 回避・スライディング・殴打は時間で終わる。長さを超えていれば、次の状態へ移す。
 bool PlayerController::UpdateTimedAction(bool isCrouchPressed)
 {
   // 動作の状態ごとに、終わる長さを比べる。時間で終わらない状態では、falseを返し、入力による切替へ進ませる。
@@ -253,14 +248,6 @@ bool PlayerController::UpdateTimedAction(bool isCrouchPressed)
   }
   return true;
 
-  // 蹴りは、長さを超えたら通常へ戻る。
-  case PLAYER_ACTION_STATE::e_KICK:
-  // 蹴りの長さを超えていれば、通常へ戻る。
-  if(m_stateElapsedSeconds >= PLAYER_ACTION_TABLE::ns_KICK_SECONDS){
-    EnterState(PLAYER_ACTION_STATE::e_NORMAL);
-  }
-  return true;
-
   // 殴打は、長さを超えたら通常へ戻る。
   case PLAYER_ACTION_STATE::e_PUNCH:
   // 殴打の長さを超えていれば、通常へ戻る。
@@ -275,10 +262,10 @@ bool PlayerController::UpdateTimedAction(bool isCrouchPressed)
   }
 }
 
-// 回避・殴打・蹴り・スライディングの開始の入力を、この順に調べる。
-bool PlayerController::TryStartAction(const InputSystem& input,const PLAYER_MOVE_INPUT& moveInput,bool canKick)
+// 回避・殴打・スライディングの開始の入力を、この順に調べる。
+bool PlayerController::TryStartAction(const InputSystem& input,const PLAYER_MOVE_INPUT& moveInput)
 {
-  // Spaceを押した瞬間に移動入力があれば、その方向へ回避を始める。方向なしのSpaceは未確定の仕様のため、何もしない。
+  // Spaceを押した瞬間に移動入力があれば、その方向へ回避を始める。方向なしのSpaceは、何もしない。
   if(input.IsKeyTriggered(VK_SPACE) && moveInput.hasMoveInput){
     m_fixedDirectionX = moveInput.moveX;
     m_fixedDirectionZ = moveInput.moveZ;
@@ -292,12 +279,6 @@ bool PlayerController::TryStartAction(const InputSystem& input,const PLAYER_MOVE
     m_fixedDirectionX = moveInput.forwardX;
     m_fixedDirectionZ = moveInput.forwardZ;
     EnterState(PLAYER_ACTION_STATE::e_PUNCH);
-    return true;
-  }
-
-  // Fを押した瞬間に、蹴れる相手（射程内で怯んでいて転倒していない敵）がいれば、蹴りを始める。いなければ何もしない。
-  if(input.IsKeyTriggered('F') && canKick){
-    EnterState(PLAYER_ACTION_STATE::e_KICK);
     return true;
   }
 
@@ -342,18 +323,14 @@ void PlayerController::UpdateDashAndCrouch(const InputSystem& input,bool hasMove
   }
 }
 
-// 蹴り・殴打の当たる時刻を迎えていれば、当たりを通知できる状態にする。
+// 殴打の当たる時刻を迎えていれば、当たりを通知できる状態にする。
 void PlayerController::UpdateMeleeImpact()
 {
-  // 当たる時刻をまだ迎えていない蹴り・殴打がなければ、何もしない。
+  // 当たる時刻をまだ迎えていない殴打がなければ、何もしない。
   if(!m_isMeleeImpactPending)return;
 
-  // 当たる時刻は、動作の種類で異なる。蹴りの動作中なら蹴りの時刻、そうでなければ殴打の時刻を使う。
-  const float impact_seconds = m_actionState == PLAYER_ACTION_STATE::e_KICK ? PLAYER_ACTION_TABLE::ns_KICK_IMPACT_SECONDS :
-    PLAYER_ACTION_TABLE::ns_PUNCH_IMPACT_SECONDS;
-
   // 動作の開始から当たる時刻に達していれば、待ち状態を終えて、当たりを通知できる状態にする。
-  if(m_stateElapsedSeconds >= impact_seconds){
+  if(m_stateElapsedSeconds >= PLAYER_ACTION_TABLE::ns_PUNCH_IMPACT_SECONDS){
     m_isMeleeImpactPending = false;
     m_isMeleeImpactReady = true;
   }
@@ -387,7 +364,7 @@ PLAYER_MOTION PlayerController::DecideMotion(const PLAYER_MOVE_INPUT& moveInput)
   motion.targetEyeHeight = PLAYER_ACTION_TABLE::ns_CROUCH_EYE_HEIGHT;
   break;
 
-  // スライディング・回避・蹴り・殴打は、入力の方向を使わない動作のため、別の関数で上書きする。
+  // スライディング・回避・殴打は、入力の方向を使わない動作のため、別の関数で上書きする。
   default:
   ApplyFixedMotion(motion);
   break;
@@ -395,7 +372,7 @@ PLAYER_MOTION PlayerController::DecideMotion(const PLAYER_MOVE_INPUT& moveInput)
   return motion;
 }
 
-// 入力の方向を使わない動作（スライディング・回避・蹴り・殴打）の移動の内容を上書きする。
+// 入力の方向を使わない動作（スライディング・回避・殴打）の移動の内容を上書きする。
 void PlayerController::ApplyFixedMotion(PLAYER_MOTION& motion) const
 {
   // 動作の状態ごとに、固定した方向・速度・目標の視点の高さへ上書きする。他の状態では、何も変えない。
@@ -418,12 +395,6 @@ void PlayerController::ApplyFixedMotion(PLAYER_MOTION& motion) const
   motion.directionZ = m_fixedDirectionZ;
   motion.speed = PLAYER_ACTION_TABLE::ns_DODGE_SPEED;
   motion.targetEyeHeight = PLAYER_ACTION_TABLE::ns_DODGE_EYE_HEIGHT;
-  break;
-
-  // 蹴りは、その場で行う。移動せず、視点を少し低くする。
-  case PLAYER_ACTION_STATE::e_KICK:
-  motion.speed = 0.0f;
-  motion.targetEyeHeight = PLAYER_ACTION_TABLE::ns_KICK_EYE_HEIGHT;
   break;
 
   // 殴打は、開始からの踏み込みの時間だけ、固定した前方向へ進み、その後は止まる。

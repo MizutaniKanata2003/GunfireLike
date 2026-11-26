@@ -107,19 +107,16 @@ public:
   // 視点と視線から近接攻撃の射程と範囲に入る、最も近い生存中の敵を探す。
   // eyePosition: プレイヤーの視点のワールド座標。
   // forward: 視線方向の単位ベクトル。
-  // requiresKickable: trueなら蹴れる状態（怯み中で転倒していない敵）に限る。
   // 戻り値: 対象の敵への非所有ポインター。対象なしはnullptr。次のClearやSpawnWaveをまたいで保持しない。
-  [[nodiscard]] Enemy* FindMeleeTarget(const XMFLOAT3& eyePosition,const XMFLOAT3& forward,bool requiresKickable)
+  [[nodiscard]] Enemy* FindMeleeTarget(const XMFLOAT3& eyePosition,const XMFLOAT3& forward)
   {
     Enemy* nearest_enemy = nullptr;
     float nearest_distance_squared = 0.0f;
 
     // 全枠を先頭から調べ、条件を満たす敵の中で視点からの距離が最も短いものを残す。
     for(Enemy& enemy : m_enemies){
-      const bool is_target = requiresKickable ? CombatResolver::CanKickEnemy(eyePosition,forward,enemy) :
-        CombatResolver::IsEnemyInMeleeReach(eyePosition,forward,enemy);
-      // 範囲外・死亡・蹴れない敵は候補に入れず、次の枠へ進む。
-      if(!is_target)continue;
+      // 範囲外・死亡した敵は候補に入れず、次の枠へ進む。
+      if(!CombatResolver::IsEnemyInMeleeReach(eyePosition,forward,enemy))continue;
 
       // 比較だけに使うため、平方根を取らず距離の二乗で近さを決める。
       const XMFLOAT3 center = enemy.GetBodySphere().center;

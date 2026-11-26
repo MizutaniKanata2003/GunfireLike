@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// プレイヤーの移動速度・動作の長さ・無敵の時間・視点の高さ・体の大きさ・キー割り当ての数値を1か所へまとめる。企画書で未確定の数値は、プレイ確認後に調整する仮値。
+// プレイヤーの移動速度・動作の長さ・無敵の時間・視点の高さ・体の大きさ・キー割り当ての数値を1か所へまとめる。
 // 数値の定義だけを持ち、動作の判断や状態は担当しない。単位は、特に記載がない限り、ワールド距離単位と秒。
 
 // プレイヤーの動作に使う数値をまとめる。
@@ -20,66 +20,56 @@ namespace PLAYER_ACTION_TABLE
   //========= 移動速度=========
   // 通常時の水平移動速度。単位はワールド距離単位/秒。旧DebugPlayerの設定と同じ。
   inline constexpr float ns_WALK_SPEED = 6.0f;
-  // 構え中の移動速度の倍率。企画書では「構え射撃は移動速度が低下する」とだけ定められており、具体値は未確定の仮値。
+  // 構え中の移動速度の倍率。企画書では「構え射撃は移動速度が低下する」とだけ定められている。
   inline constexpr float ns_AIM_SPEED_MULTIPLIER = 0.5f;
-  // ダッシュの移動速度。単位はワールド距離単位/秒。通常の1.5倍の仮値。
+  // ダッシュの移動速度。単位はワールド距離単位/秒。通常の1.5倍。
   inline constexpr float ns_DASH_SPEED = 9.0f;
-  // しゃがみ中の移動速度の倍率。仮値。
+  // しゃがみ中の移動速度の倍率。
   inline constexpr float ns_CROUCH_SPEED_MULTIPLIER = 0.5f;
-  // 怯み中の移動速度の倍率。通常・ダッシュ・しゃがみの速度へ掛ける。企画書で未確定の仮値。
+  // 怯み中の移動速度の倍率。通常・ダッシュ・しゃがみの速度へ掛ける。
   inline constexpr float ns_FLINCH_SPEED_MULTIPLIER = 0.4f;
 
   //========= スライディング=========
-  // スライディングの長さ。単位は秒。仮値。
+  // スライディングの長さ。単位は秒。
   inline constexpr float ns_SLIDE_SECONDS = 0.8f;
-  // スライディング開始時の速度。単位はワールド距離単位/秒。ダッシュより速い仮値。
+  // スライディング開始時の速度。単位はワールド距離単位/秒。ダッシュより速い。
   inline constexpr float ns_SLIDE_START_SPEED = 10.0f;
   // スライディング終了時の速度。単位はワールド距離単位/秒。開始から終了へ、時間に比例して減速する。
   inline constexpr float ns_SLIDE_END_SPEED = 4.0f;
 
   //========= 回避=========
-  // 回避の長さ。単位は秒。途中でやめられない。仮値。
+  // 回避の長さ。単位は秒。途中でやめられない。
   inline constexpr float ns_DODGE_SECONDS = 0.3f;
-  // 回避の移動速度。単位はワールド距離単位/秒。0.3秒で約3.6進む仮値。
+  // 回避の移動速度。単位はワールド距離単位/秒。0.3秒で約3.6進む。
   inline constexpr float ns_DODGE_SPEED = 12.0f;
-  // 回避の開始から無敵が続く時間。単位は秒。回避の長さ以下の仮値。
+  // 回避の開始から無敵が続く時間。単位は秒。回避の長さ以下。
   inline constexpr float ns_DODGE_INVINCIBLE_SECONDS = 0.25f;
   // 一度も回避していない状態を表す、十分に大きい経過時間。単位は秒。
   inline constexpr float ns_SECONDS_WITHOUT_DODGE = 1000.0f;
 
-  //========= 蹴り=========
-  // 蹴りの長さ。単位は秒。途中でやめられない。仮値。
-  inline constexpr float ns_KICK_SECONDS = 0.45f;
-  // 蹴りの開始から、相手へ当たるまでの時間。単位は秒。蹴りの長さ以下の仮値。
-  inline constexpr float ns_KICK_IMPACT_SECONDS = 0.15f;
-  // 蹴りの開始から無敵が続く時間。単位は秒。企画書では「動作中無敵」のため、蹴りの長さと同じ。
-  inline constexpr float ns_KICK_INVINCIBLE_SECONDS = ns_KICK_SECONDS;
-
   //========= 殴打=========
-  // 殴打の長さ。単位は秒。途中でやめられない。仮値。
+  // 殴打の長さ。単位は秒。途中でやめられない。
   inline constexpr float ns_PUNCH_SECONDS = 0.5f;
-  // 殴打の開始から、相手へ当たるまでの時間。単位は秒。殴打の長さ以下の仮値。
+  // 殴打の開始から、相手へ当たるまでの時間。単位は秒。殴打の長さ以下。
   inline constexpr float ns_PUNCH_IMPACT_SECONDS = 0.15f;
-  // 殴打の開始から無敵が続く時間。単位は秒。企画書で未確定の仮値。
+  // 殴打の開始から無敵が続く時間。単位は秒。
   inline constexpr float ns_PUNCH_INVINCIBLE_SECONDS = 0.35f;
-  // 殴打で前へ踏み込む時間。単位は秒。開始からこの時間だけ前へ進み、その後は止まる。仮値。
+  // 殴打で前へ踏み込む時間。単位は秒。開始からこの時間だけ前へ進み、その後は止まる。
   inline constexpr float ns_PUNCH_LUNGE_SECONDS = 0.25f;
-  // 殴打の踏み込みの速度。単位はワールド距離単位/秒。仮値。
+  // 殴打の踏み込みの速度。単位はワールド距離単位/秒。
   inline constexpr float ns_PUNCH_LUNGE_SPEED = 3.0f;
 
   //========= 視点の高さ=========
   // 立っている時の視点の高さ。単位はワールド距離単位。旧DebugPlayerの初期の高さ。
   inline constexpr float ns_STAND_EYE_HEIGHT = 1.6f;
-  // しゃがみ中の視点の高さ。しゃがみとスライディングの違いが分かるよう、スライディングより高くする仮値。
+  // しゃがみ中の視点の高さ。しゃがみとスライディングの違いが分かるよう、スライディングより高くする。
   inline constexpr float ns_CROUCH_EYE_HEIGHT = 1.05f;
-  // スライディング中の視点の高さ。しゃがみより明確に低い、地面に近い仮値。
+  // スライディング中の視点の高さ。しゃがみより明確に低い、地面に近い高さ。
   inline constexpr float ns_SLIDE_EYE_HEIGHT = 0.55f;
-  // 回避中の視点の高さ。少し低くして、身をかわす動きを出す仮値。
+  // 回避中の視点の高さ。少し低くして、身をかわす動きを出す。
   inline constexpr float ns_DODGE_EYE_HEIGHT = 1.3f;
-  // 蹴り中の視点の高さ。仮値。
-  inline constexpr float ns_KICK_EYE_HEIGHT = 1.4f;
-  // 殴打中の視点の高さ。仮値。
+  // 殴打中の視点の高さ。
   inline constexpr float ns_PUNCH_EYE_HEIGHT = 1.5f;
-  // 視点の高さが目標へ近づく速さ。1秒あたりに差の何倍を縮めるかを表し、大きいほど速い。仮値。
+  // 視点の高さが目標へ近づく速さ。1秒あたりに差の何倍を縮めるかを表し、大きいほど速い。
   inline constexpr float ns_EYE_HEIGHT_SMOOTHING_RATE = 14.0f;
 }

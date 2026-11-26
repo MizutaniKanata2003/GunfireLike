@@ -137,7 +137,7 @@ bool EnemyProjectileManager::AdvanceProjectile(PROJECTILE_STATE& projectile,cons
     projectile.position.z += projectile.direction.z * step_distance;
     // 重なった場合は、無敵・回避の状態から命中・回避・ジャスト回避を判定し、結果を追加して弾を消す。
     if(CollisionMath::IntersectSphereSphere(COLLISION_SPHERE{projectile.position,ENEMY_PROJECTILE::ns_RADIUS},input.playerBody)){
-      // 回避の動作中だけ回避の開始からの経過時間を使い、それ以外の無敵（蹴り・殴打）は、ジャスト回避にならない大きな値にする。
+      // 回避の動作中だけ回避の開始からの経過時間を使い、それ以外の無敵（殴打）は、ジャスト回避にならない大きな値にする。
       const float dodge_age_seconds = input.isDodging ? input.secondsSinceDodgeStart : ENEMY_PROJECTILE::ns_NON_DODGE_AGE_SECONDS;
       // 予告時間0の使い捨ての判定で、この瞬間の結果だけを得る。
       JustDodgeJudge judge;

@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// 近接攻撃が届くかの判定を提供する。プレイヤーの視点と視線方向から、敵が射程と範囲の内にいるか、蹴れる状態かを調べる。
+// 近接攻撃が届くかの判定を提供する。プレイヤーの視点と視線方向から、敵が射程と範囲の内にいるかを調べる。
 // 状態を持たない静的関数だけで、ダメージの適用・動作の開始は担当しない。数値はCombatTableにまとめている。
 
 //========= Framework インクルード=========
@@ -20,11 +20,6 @@ public:
   // enemy: 調べる敵。死亡している敵は、範囲の外として扱う。
   // 戻り値: 視点から敵の中心までの距離が射程以内で、視線方向と敵の方向のなす角が範囲以内ならtrue。
   [[nodiscard]] static bool IsEnemyInMeleeReach(const XMFLOAT3& eyePosition,const XMFLOAT3& forward,const Enemy& enemy);
-  // 敵を蹴れるかを返す。射程と範囲の内にいて、怯んでいて、転倒していない場合だけ蹴れる。
-  // eyePosition: プレイヤーの視点のワールド座標。
-  // forward: 視線方向の単位ベクトル。
-  // enemy: 調べる敵。
-  [[nodiscard]] static bool CanKickEnemy(const XMFLOAT3& eyePosition,const XMFLOAT3& forward,const Enemy& enemy);
 
 private:
   //========= 生成禁止関数=========

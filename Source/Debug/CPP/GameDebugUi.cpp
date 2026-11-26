@@ -39,10 +39,6 @@ namespace
     case PLAYER_ACTION_STATE::e_DODGE:
     return "DODGE";
 
-    // 蹴り。
-    case PLAYER_ACTION_STATE::e_KICK:
-    return "KICK";
-
     // 殴打。
     case PLAYER_ACTION_STATE::e_PUNCH:
     return "PUNCH";
@@ -118,7 +114,7 @@ void GameDebugUi::Draw(const GAME_DEBUG_INFO& info)
   // 操作の案内を表示する。
   ImGui::TextUnformatted("WASD: Move / Mouse: Look / Left click: Shoot / Right click (hold): Aim / R: Reload / Q: Heal");
   ImGui::TextUnformatted("Shift (hold): Dash / C (hold): Crouch / C while dashing: Slide / Space + WASD: Dodge");
-  ImGui::TextUnformatted("F: Kick (flinching enemy only) / E: Punch (cancels reload, knocks down)");
+  ImGui::TextUnformatted("E: Punch (cancels reload, knocks down)");
   ImGui::TextUnformatted("F1: Capture / F2: Title / F3: Collision / F4: Restart rooms / F5: Damage / F6: Heal full / F7: Incoming attack / F8: +Heal item");
   ImGui::TextUnformatted("F9: One-hit kill ON/OFF / F11: Skip wave (defeat all enemies)");
 

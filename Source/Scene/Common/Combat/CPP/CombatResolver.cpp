@@ -35,9 +35,3 @@ bool CombatResolver::IsEnemyInMeleeReach(const XMFLOAT3& eyePosition,const XMFLO
   // 余弦が下限以上（なす角が範囲以内）なら、範囲内。
   return dot >= COMBAT_TABLE::ns_MELEE_MIN_FORWARD_DOT;
 }
-
-// 範囲内にいて、怯んでいて、転倒していない敵だけを、蹴れるとする。
-bool CombatResolver::CanKickEnemy(const XMFLOAT3& eyePosition,const XMFLOAT3& forward,const Enemy& enemy)
-{
-  return IsEnemyInMeleeReach(eyePosition,forward,enemy) && enemy.IsFlinching() && !enemy.IsKnockedDown();
-}

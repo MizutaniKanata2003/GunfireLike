@@ -124,7 +124,7 @@ void ShotController::Update(float gameplayDeltaTime)
   m_damageBoostRemainingSeconds = std::max(0.0f,m_damageBoostRemainingSeconds - gameplayDeltaTime);
 
   // 射撃を更新する。リロード・連射間隔・弾薬の処理と、弾ごとの命中判定は武器が行い、ダメージの反映だけをここで行う。
-  // 経過時間・構えているか・射撃してよいかを、1つの構造体にまとめて渡す。回避・蹴り・殴打の間は射撃できない。
+  // 経過時間・構えているか・射撃してよいかを、1つの構造体にまとめて渡す。回避・殴打の間は射撃できない
   const WEAPON_UPDATE_REQUEST weapon_request{gameplayDeltaTime,m_playerController->IsAiming(),m_playerController->IsShootingAllowed()};
   const WEAPON_UPDATE_RESULT weapon_result = m_weaponSystem.Update(weapon_request,*m_inputSystem,*m_camera,*m_collisionWorld);
 

@@ -460,7 +460,7 @@ void EnemyController::UpdateBossSlot(std::size_t slotIndex,float worldDeltaTime)
 // 弾を進め、プレイヤーへ命中・回避した弾の結果を、攻撃イベントとして通知する。
 void EnemyController::UpdateProjectiles(float worldDeltaTime)
 {
-  // 回避の動作中だけ、回避の開始からの経過時間がジャスト回避の判定に使われる。蹴り・殴打の無敵は、通常の回避として扱う。
+  // 回避の動作中だけ、回避の開始からの経過時間がジャスト回避の判定に使われる。殴打の無敵は、通常の回避として扱う。
   const bool is_dodging = m_playerController->GetActionState() == PLAYER_ACTION_STATE::e_DODGE;
 
   // 弾を進め、今回の更新で命中・回避した弾ごとの判定結果を受け取る。
