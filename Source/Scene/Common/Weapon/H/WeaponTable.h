@@ -58,6 +58,10 @@ struct WEAPON_DATA
   // 1回の発射で撃つ弾（ペレット）の数。1なら通常の1発。2以上なら、同じ散布の範囲から、弾ごとに独立した方向へ飛び、それぞれが命中を判定する。
   // 1〜WEAPON_TABLE::ns_MAX_PELLET_COUNTの範囲で使う。表で省略した武器は1になる。
   int pelletCount{1};
+
+  //========= 連射=========
+  // 連射できる武器か。trueなら、左クリックを押している間、発射間隔ごとに撃ち続ける。falseなら、左クリックを押した瞬間だけ撃ち、長押しでは連射しない（離してから、押し直す）。表で省略した武器はtrue。
+  bool isAutomatic{true};
 };
 
 // 武器の性能値の表をまとめる。
@@ -73,6 +77,10 @@ namespace WEAPON_TABLE
   //========= 散弾の上限=========
   // 1回の発射で撃てる弾（ペレット）の数の上限。発射の結果を固定長の配列で返すための大きさで、これを超える値は、上限へ収める。
   inline constexpr int ns_MAX_PELLET_COUNT = 12;
+
+  //========= 先行入力=========
+  // 連射しない武器（単発武器）で、発射間隔の途中に押した左クリックを覚えておく時間。単位は秒。この時間の内に、発射間隔が終われば、その時に撃つ。長押しは、覚えない（押した瞬間だけを覚える）。
+  inline constexpr float ns_FIRE_INPUT_BUFFER_SECONDS = 0.15f;
 
   //========= 反動の制御=========
   // 連射武器の反動の制御。射撃を続けている間は、視線のずれを戻さず（上限まで上がり続け）、射撃をやめた時に、すぐ元へ戻り始める。
@@ -92,22 +100,22 @@ namespace WEAPON_TABLE
     12.0f * ns_RECOIL_LIMIT_SCALE,6.0f * ns_RECOIL_LIMIT_SCALE};
 
   //========= 武器の性能値=========
-  // 並び: 発射間隔(秒)、ダメージ、最大射程、通常射撃の散布(度)、構え射撃の散布(度)、反動の上(度)、反動の左右(度)、装弾数、初期予備弾薬、リロード時間(秒)、反動の制御、表示名、弾の数。
-  // 1発ごとの反動量は、基準値に、反動量の倍率を掛けた値。弾の数を省略した武器は、1つ。
+  // 並び: 発射間隔(秒)、ダメージ、最大射程、通常射撃の散布(度)、構え射撃の散布(度)、反動の上(度)、反動の左右(度)、装弾数、初期予備弾薬、リロード時間(秒)、反動の制御、表示名、弾の数、連射できるか。
+  // 1発ごとの反動量は、基準値に、反動量の倍率を掛けた値。弾の数を省略した武器は、1つ。連射できるかを省略した武器は、連射できる。
 
-  // 拳銃（Pistol）。初期武器。弱い単発で、ダメージは、単発高威力銃より、ずっと低い。装弾数が多く、反動が小さい。基準の反動は、上1.0度・左右0.3度。
+  // 拳銃（Pistol）。初期武器。弱い単発で、ダメージは、単発高威力銃より、ずっと低い。装弾数が多く、反動が小さい。基準の反動は、上1.0度・左右0.3度。連射しない。
   inline constexpr WEAPON_DATA ns_PISTOL{0.35f,20.0f,100.0f,3.0f,0.2f,1.0f * ns_RECOIL_KICK_SCALE,0.3f * ns_RECOIL_KICK_SCALE,12,60,1.5f,
-    ns_RECOIL_PROFILE_SINGLE_SHOT,L"Sparrow"};
+    ns_RECOIL_PROFILE_SINGLE_SHOT,L"Sparrow",1,false};
   // 散弾銃（Shotgun）。近距離向けで、散布が大きく、射程が短い。1回の発射で6つの弾を撃ち、ダメージは、弾1つあたり。
-  // 6つ全てが当たると、弾1つのダメージの6倍になる。基準の反動は、上5.0度・左右0.8度。
+  // 6つ全てが当たると、弾1つのダメージの6倍になる。基準の反動は、上5.0度・左右0.8度。連射しない。
   inline constexpr WEAPON_DATA ns_SHOTGUN{0.9f,12.0f,25.0f,6.0f,4.0f,5.0f * ns_RECOIL_KICK_SCALE,0.8f * ns_RECOIL_KICK_SCALE,6,36,3.0f,
-    ns_RECOIL_PROFILE_SHOTGUN,L"Hailstorm",6};
-  // 連射銃（Scar）。ショップで買う。企画書の方針（無強化では連射が遅く、反動が大きく、リロードが遅い）に沿った値。基準の反動は、上1.2度・左右0.4度。
+    ns_RECOIL_PROFILE_SHOTGUN,L"Hailstorm",6,false};
+  // 連射銃（Scar）。ショップで買う。企画書の方針（無強化では連射が遅く、反動が大きく、リロードが遅い）に沿った値。基準の反動は、上1.2度・左右0.4度。連射できる。
   inline constexpr WEAPON_DATA ns_SCAR{0.25f,10.0f,100.0f,4.0f,0.3f,1.2f * ns_RECOIL_KICK_SCALE,0.4f * ns_RECOIL_KICK_SCALE,20,120,2.5f,
     ns_RECOIL_PROFILE_SCAR,L"Viper"};
-  // 単発高威力銃（Magnum）。1発のダメージが大きく、構え射撃では正確に飛ぶ。弾は1つ。基準の反動は、上3.5度・左右0.5度。
+  // 単発高威力銃（Magnum）。1発のダメージが大きく、構え射撃では正確に飛ぶ。弾は1つ。基準の反動は、上3.5度・左右0.5度。連射しない。
   inline constexpr WEAPON_DATA ns_MAGNUM{0.6f,60.0f,100.0f,2.5f,0.0f,3.5f * ns_RECOIL_KICK_SCALE,0.5f * ns_RECOIL_KICK_SCALE,6,30,2.0f,
-    ns_RECOIL_PROFILE_SINGLE_SHOT,L"Behemoth"};
+    ns_RECOIL_PROFILE_SINGLE_SHOT,L"Behemoth",1,false};
 
   //========= 武器の表=========
   // 武器の種類（WEAPON_TYPE）の値を添字にする表。並びは、WEAPON_TYPEの並びと同じにする。

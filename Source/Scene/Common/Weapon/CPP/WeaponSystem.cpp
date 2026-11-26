@@ -1,13 +1,13 @@
 ﻿#include "../H/WeaponSystem.h"
 
-// 連射間隔・リロード・弾薬の管理と、Rayによる射撃の判定（弾ごと）、視線の反動を実装する。
+// 連射間隔・リロード・弾薬の管理と、発射の要求の判定（連射できる武器は長押し、連射しない武器は押した瞬間と先行入力）、Rayによる射撃の判定（弾ごと）、視線の反動を実装する。
 // ダメージの適用は呼出側が行う。数値は性能値の表から受け取り、このファイルでは固定しない。
 
 //========= Windows インクルード=========
 #include <windows.h> // VK_LBUTTONで射撃入力、'R'のキーコードでリロード入力を判定する。
 
 //========= C++標準ライブラリ インクルード=========
-#include <algorithm> // std::maxで連射間隔の残り時間を0以上に保ち、std::minでリロードの補充数と進み具合の上限を制限し、std::clampで弾の数を範囲内に収める。
+#include <algorithm> // std::maxで連射間隔と覚えている入力の残り時間を0以上に保ち、std::minでリロードの補充数と進み具合の上限を制限し、std::clampで弾の数を範囲内に収める。
 #include <cmath> // std::tan・std::sqrt・std::cos・std::sinで、弾のばらつきの方向を円錐内から求める。
 #include <cstdint> // std::uint32_tで、命中判定の対象にするレイヤーのbitのマスクを保持する。
 
@@ -37,10 +37,11 @@ void WeaponSystem::Initialize(const WEAPON_DATA& weaponData)
   m_magazineAmmo = weaponData.magazineSize;
   m_reserveAmmo = weaponData.initialReserveAmmo;
 
-  // 連射間隔とリロードの状態を解除し、弾薬を消費しないデバッグ設定も無効へ戻す。
+  // 連射間隔とリロードの状態を解除し、覚えている左クリックを消す。弾薬を消費しないデバッグ設定も無効へ戻す。
   m_fireCooldownSeconds = 0.0f;
   m_isReloading = false;
   m_reloadElapsedSeconds = 0.0f;
+  m_fireBufferSeconds = 0.0f;
   m_isInfiniteAmmo = false;
 }
 
@@ -54,6 +55,9 @@ WEAPON_UPDATE_RESULT WeaponSystem::Update(const WEAPON_UPDATE_REQUEST& request,c
   // 連射方式の反動は、trueの間は戻らず、falseになった更新から戻り始める。弾が尽きた時や、リロード、射撃の禁止でも、falseになる。
   const bool is_firing = request.isShootingAllowed && input.IsKeyPressed(VK_LBUTTON) && !m_isReloading && (m_magazineAmmo > 0 || m_isInfiniteAmmo);
   camera.SetRecoilHold(is_firing);
+
+  // 発射が求められているかを、毎回の更新で判定する。リロード中や、連射間隔の途中でも、連射しない武器の押した瞬間を覚えるため。
+  const bool is_fire_requested = UpdateFireRequest(request,input);
 
   // 連射間隔の残り時間を進める。0未満にはせず、発射可能の状態を0で表す。
   m_fireCooldownSeconds = std::max(0.0f,m_fireCooldownSeconds - request.deltaTime);
@@ -82,17 +86,18 @@ WEAPON_UPDATE_RESULT WeaponSystem::Update(const WEAPON_UPDATE_REQUEST& request,c
     return result;
   }
 
-  // 射撃が許可されていない、左クリックを押し続けていない、連射間隔が残っている場合は発射しない。
+  // 射撃が許可されていない、発射が求められていない、連射間隔が残っている場合は発射しない。
   // 装填弾がない場合も発射しないが、弾薬を消費しないデバッグ設定が有効なら、装填弾数に関係なく発射できる。
-  if(!request.isShootingAllowed || !input.IsKeyPressed(VK_LBUTTON) || m_fireCooldownSeconds > 0.0f)return result;
+  if(!request.isShootingAllowed || !is_fire_requested || m_fireCooldownSeconds > 0.0f)return result;
   if(m_magazineAmmo <= 0 && !m_isInfiniteAmmo)return result;
 
   // 弾薬を1つ消費し、次の発射までの連射間隔を設定する。弾薬を消費しないデバッグ設定が有効なら、弾は減らさない。
-  // 複数の弾（ペレット）を撃つ武器でも、減るのは1回の発射につき1つ。
+  // 複数の弾（ペレット）を撃つ武器でも、減るのは1回の発射につき1つ。覚えていた左クリックは、この発射で使い切る。
   if(!m_isInfiniteAmmo){
     --m_magazineAmmo;
   }
   m_fireCooldownSeconds = m_weaponData.fireIntervalSeconds;
+  m_fireBufferSeconds = 0.0f;
 
   // 構えているかに応じた散布で、弾ごとの方向と命中を決める。反動は方向を決めた後に、1回の発射につき1回だけ加える。
   const float spread_degrees = request.isAiming ? m_weaponData.aimSpreadDegrees : m_weaponData.hipSpreadDegrees;
@@ -117,6 +122,19 @@ float WeaponSystem::GetReloadProgress() const
 }
 
 //========= 補助関数=========
+// 発射が求められているかを求める。
+bool WeaponSystem::UpdateFireRequest(const WEAPON_UPDATE_REQUEST& request,const InputSystem& input)
+{
+  // 連射できる武器は、左クリックを押している間、発射を求め続ける。
+  if(m_weaponData.isAutomatic)return input.IsKeyPressed(VK_LBUTTON);
+
+  // 連射しない武器は、覚えている時間を進める。射撃してよい時に、左クリックを押した瞬間だけ、先行入力の時間まで覚え直す。長押しでは、覚え直さない。
+  m_fireBufferSeconds = std::max(0.0f,m_fireBufferSeconds - request.deltaTime);
+  if(request.isShootingAllowed && input.IsKeyTriggered(VK_LBUTTON))m_fireBufferSeconds = WEAPON_TABLE::ns_FIRE_INPUT_BUFFER_SECONDS;
+
+  return m_fireBufferSeconds > 0.0f;
+}
+
 // 弾（ペレット）ごとに、別の方向のRayを作り、命中を調べる。
 void WeaponSystem::CastPellets(const FpsCamera& camera,float spreadDegrees,const CollisionWorld& collisionWorld,WEAPON_UPDATE_RESULT& result)
 {
