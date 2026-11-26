@@ -10,7 +10,7 @@
 #include "Scene/Common/UI/H/UiLayout.h"
 #include "Scene/Common/Weapon/H/WeaponInventory.h"
 
-// ショップの表示ルールに使う固定設定と、ボタンの補助関数をまとめる。企画書で未確定の見た目の数値は、仮値。
+// ショップの表示ルールに使う固定設定と、ボタンの補助関数をまとめる。
 namespace
 {
   //========= ボタンの文字の色=========
@@ -32,10 +32,10 @@ namespace
   constexpr float ns_BUTTON_TEXT_TARGET_HEIGHT = 30.0f;
 
   //========= 文字の配置（売買のページ）=========
-  // 各行の武器名の領域。X座標は基準Canvas上の絶対座標で、武器のボタン（左端580）の手前に収める。Yは、行の上端からの距離で、行の高さ（96）の上側へ置く。大きさは（360×44）、文字の高さの目標は30。
-  const HUD_TEXT_AREA ns_TRADE_NAME_AREA{XMFLOAT2{200.0f,8.0f},XMFLOAT2{360.0f,44.0f},30.0f};
-  // 各行の予備弾薬の領域。X座標は絶対座標で、Yは、行の上端からの距離。行の高さ（96）の下側へ置く。大きさは（360×36）、文字の高さの目標は22。基準Canvas上の大きさ。
-  const HUD_TEXT_AREA ns_TRADE_RESERVE_AREA{XMFLOAT2{200.0f,52.0f},XMFLOAT2{360.0f,36.0f},22.0f};
+  // 各行の武器名の領域。X座標は基準Canvas上の絶対座標で、武器のボタン（左端580）の手前に収める。Yは、行の上端からの距離で、行の高さ（72）の上側へ置く。大きさは（360×34）、文字の高さの目標は28。
+  const HUD_TEXT_AREA ns_TRADE_NAME_AREA{XMFLOAT2{200.0f,4.0f},XMFLOAT2{360.0f,34.0f},28.0f};
+  // 各行の予備弾薬の領域。X座標は絶対座標で、Yは、行の上端からの距離。行の高さ（72）の下側へ置く。大きさは（360×30）、文字の高さの目標は20。基準Canvas上の大きさ。
+  const HUD_TEXT_AREA ns_TRADE_RESERVE_AREA{XMFLOAT2{200.0f,38.0f},XMFLOAT2{360.0f,30.0f},20.0f};
 
   //========= 文字の配置（強化のページ）=========
   // 強化の各行の、項目名と段階の領域のX座標。基準Canvas上の絶対座標。強化のボタン（左端840）の手前に収める。
@@ -107,6 +107,13 @@ namespace
 
     // 未定義の状態は、文字を描かない。
     return L"";
+  }
+
+  // 売買のページの操作の案内の文字を返す。数字キーの範囲は、武器の行の数から求める（武器が1〜行の数、弾薬がその次から行の数の2倍まで）。
+  std::wstring BuildTradeGuideText()
+  {
+    return L"CLICK  (1-" + std::to_wstring(SHOP_TABLE::ns_ROW_COUNT) + L": WEAPON  " + std::to_wstring(SHOP_TABLE::ns_ROW_COUNT + 1) + L"-" +
+      std::to_wstring(SHOP_TABLE::ns_ROW_COUNT * 2) + L": AMMO)   SELL: PRESS TWICE   U: UPGRADES   ENTER: CLOSE";
   }
 
   // ボタンが、押せる状態かを返す。ページ切替と閉じるボタンは、常に押せる。
@@ -209,7 +216,7 @@ void GameHud::DrawShopTradeTexts(const GAME_HUD_STATE& state)
   DrawFittedText(L"SHOP",ns_TITLE_AREA,GAME_HUD_STYLE::ns_TITLE_TEXT_COLOR);
   DrawFittedText(L"SLOTS " + std::to_wstring(state.shop.ownedWeaponCount) + L" / " + std::to_wstring(WEAPON_INVENTORY_TABLE::ns_MAX_WEAPONS),
                  ns_INFO_AREA,GAME_HUD_STYLE::ns_BODY_TEXT_COLOR);
-  DrawFittedText(L"CLICK  (1-3: WEAPON  4-6: AMMO)   SELL: PRESS TWICE   U: UPGRADES   ENTER: CLOSE",ns_GUIDE_AREA,GAME_HUD_STYLE::ns_BODY_TEXT_COLOR);
+  DrawFittedText(BuildTradeGuideText(),ns_GUIDE_AREA,GAME_HUD_STYLE::ns_BODY_TEXT_COLOR);
 
   // 各行の武器名・予備弾薬・2つのボタンの文字を、行の順に描く。
   for(int row_index = 0; row_index < SHOP_TABLE::ns_ROW_COUNT; ++row_index){

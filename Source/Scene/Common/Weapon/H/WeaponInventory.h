@@ -34,11 +34,11 @@ class WeaponInventory final
 {
 public:
   //========= 初期化関数=========
-  // 所持・強化・保存した弾薬を初期状態へ戻す。初期武器の連射銃だけを、所持している状態にする。新しいプレイの開始の時に呼ぶ。
+  // 所持・強化・保存した弾薬を初期状態へ戻す。初期武器の拳銃だけを、所持している状態にする。新しいプレイの開始の時に呼ぶ。
   void Initialize()
   {
     m_isOwned.fill(false);
-    m_isOwned[static_cast<int>(WEAPON_TYPE::e_SCAR)] = true;
+    m_isOwned[static_cast<int>(WEAPON_TYPE::e_PISTOL)] = true;
     for(WEAPON_UPGRADE_LEVELS& levels : m_upgradeLevels){
       levels.fill(0);
     }

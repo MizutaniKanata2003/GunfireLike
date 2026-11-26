@@ -24,7 +24,7 @@ enum class SHOP_PAGE
   e_UPGRADE // 装備中の武器の強化のページ。
 };
 
-// ショップの表をまとめる。文字は、HUDのFontで描ける英字にする。価格・弾数は企画書で未確定の仮値。
+// ショップの表をまとめる。文字は、HUDのFontで描ける英字にする。
 namespace SHOP_TABLE
 {
   //========= 行とボタン=========
@@ -44,12 +44,12 @@ namespace SHOP_TABLE
   inline constexpr int ns_BUTTON_COUNT = ns_CLOSE_INDEX + 1;
 
   //========= 武器の価格と名前=========
-  // 武器ごとの購入の価格。添字は、WEAPON_TYPEの値と同じ。連射銃は、最初から所持しているが、売却した後に買い戻せるよう、価格を決める。通貨の獲得（敵1体あたり10〜20）に対する仮値。
-  inline constexpr int ns_WEAPON_PRICES[ns_ROW_COUNT]{60,100,150};
-  // 武器ごとの売却の基本の価格。添字は、WEAPON_TYPEの値と同じ。購入の価格の半分。強化に使った費用は、別に回収する（GetSellPriceを参照）。仮値。
-  inline constexpr int ns_WEAPON_SELL_PRICES[ns_ROW_COUNT]{30,50,75};
+  // 武器ごとの購入の価格。添字は、WEAPON_TYPEの値と同じ。価格の順は、拳銃 ＜ 散弾銃 ＝ 連射銃 ＜ 単発高威力銃。拳銃は、最初から所持しているが、売却した後に買い戻せるよう、価格を決める。通貨の獲得（敵1体あたり10〜20）に対する値。
+  inline constexpr int ns_WEAPON_PRICES[ns_ROW_COUNT]{40,100,100,150};
+  // 武器ごとの売却の基本の価格。添字は、WEAPON_TYPEの値と同じ。購入の価格の半分。強化に使った費用は、別に回収する（GetSellPriceを参照）。
+  inline constexpr int ns_WEAPON_SELL_PRICES[ns_ROW_COUNT]{20,50,50,75};
   // 武器ごとの表示名。添字は、WEAPON_TYPEの値と同じ。静的な文字列定数を指し、所有しない。
-  inline constexpr const wchar_t* ns_WEAPON_NAMES[ns_ROW_COUNT]{L"ASSAULT RIFLE",L"SHOTGUN",L"HAND CANNON"};
+  inline constexpr const wchar_t* ns_WEAPON_NAMES[ns_ROW_COUNT]{L"SPARROW",L"HAILSTORM",L"VIPER",L"BEHEMOTH"};
 
   //========= 売却の価格=========
   // 武器の売却で得る通貨を返す。購入の価格の半分に、強化に使った費用の半分を足した値。企画書の「売却時に購入・強化費用の一部を回収する」に当たる。
@@ -61,12 +61,12 @@ namespace SHOP_TABLE
   }
 
   //========= 弾薬の価格と数=========
-  // 弾薬1回の購入で増える予備弾薬の数。添字は、WEAPON_TYPEの値と同じ。装弾数のおよそ2倍。仮値。
-  inline constexpr int ns_AMMO_PACK_SIZES[ns_ROW_COUNT]{40,12,6};
-  // 弾薬1回の購入の価格。添字は、WEAPON_TYPEの値と同じ。仮値。
-  inline constexpr int ns_AMMO_PRICES[ns_ROW_COUNT]{20,25,30};
-  // 予備弾薬の上限。添字は、WEAPON_TYPEの値と同じ。初期の予備弾薬（120・36・30）のおよそ2倍。仮値。
-  inline constexpr int ns_AMMO_RESERVE_CAPS[ns_ROW_COUNT]{240,72,60};
+  // 弾薬1回の購入で増える予備弾薬の数。添字は、WEAPON_TYPEの値と同じ。装弾数と同じか、およそ2倍。
+  inline constexpr int ns_AMMO_PACK_SIZES[ns_ROW_COUNT]{24,12,40,6};
+  // 弾薬1回の購入の価格。添字は、WEAPON_TYPEの値と同じ。
+  inline constexpr int ns_AMMO_PRICES[ns_ROW_COUNT]{15,25,20,30};
+  // 予備弾薬の上限。添字は、WEAPON_TYPEの値と同じ。初期の予備弾薬（60・36・120・30）のおよそ2倍。
+  inline constexpr int ns_AMMO_RESERVE_CAPS[ns_ROW_COUNT]{120,72,240,60};
 
   //========= ページごとのボタン=========
   // ボタンが、指定したページで使われるかを返す。ページ切替と閉じるボタンは、どちらのページでも使う。

@@ -108,7 +108,7 @@ void ShotController::Uninit()
 // 初期武器を満タンの弾薬で装備し直し、命中表示と、取り出していない発射の結果を消し、特殊強化の効果を通常へ戻す。
 void ShotController::Reset()
 {
-  m_weaponSystem.Initialize(WEAPON_TABLE::ns_SCAR);
+  m_weaponSystem.Initialize(WEAPON_TABLE::ns_PISTOL);
   m_hitMarkerRemainingSeconds = 0.0f;
   m_pendingShotResult = WEAPON_UPDATE_RESULT{};
   m_flinchScale = 1.0f;

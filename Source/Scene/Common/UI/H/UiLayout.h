@@ -78,7 +78,7 @@ namespace SHOP_LAYOUT
 {
   //========= 行とボタンの数=========
   // 武器の行の数。武器の種類の数（SHOP_TABLE）と同じにする。
-  inline constexpr int ns_ROW_COUNT = 3;
+  inline constexpr int ns_ROW_COUNT = 4;
   // 強化の行の数。強化の項目の数（SHOP_TABLE）と同じにする。
   inline constexpr int ns_UPGRADE_COUNT = 5;
   // ボタンの数。武器、弾薬の購入、強化、ページ切替、閉じるボタン。
@@ -91,8 +91,8 @@ namespace SHOP_LAYOUT
   //========= 行=========
   // 売買のページで、最初の行の上端のY座標。パネルの上端（90）から、見出しの領域の分だけ下げた位置。基準Canvas上の座標。
   inline constexpr float ns_ROW_TOP = 190.0f;
-  // 売買のページの、行の高さと、行の間隔。基準Canvas上の大きさ。行は、隙間なく並ぶ。
-  inline constexpr float ns_ROW_HEIGHT = 96.0f;
+  // 売買のページの、行の高さと、行の間隔。基準Canvas上の大きさ。行は、隙間なく並ぶ。4行で、最後の行の下端は478になる。
+  inline constexpr float ns_ROW_HEIGHT = 72.0f;
   // 強化のページで、最初の行の上端のY座標。5行を並べるため、売買のページより少し上から始める。基準Canvas上の座標。
   inline constexpr float ns_UPGRADE_ROW_TOP = 186.0f;
   // 強化のページの、行の間隔。基準Canvas上の大きさ。
@@ -109,11 +109,11 @@ namespace SHOP_LAYOUT
   inline constexpr const wchar_t* ns_BUTTON_DISABLED_PATH = L"Assets/Textures/UI/ShopButtonDisabled.png";
   // ボタン1つの幅と高さ。基準Canvas上の大きさ。
   inline constexpr XMFLOAT2 ns_BUTTON_SIZE{240.0f,64.0f};
-  // ボタンの左上の位置。並びは、武器の購入と売却3つ（売買のページ。行の中ほど）、弾薬の購入3つ（売買のページ。行の右端）、強化5つ（強化のページ。右端）、
-  // ページ切替（左下）、閉じるボタン（下側の中央）の順。購入のボタンは、行の中央に揃える（行の上端から16下）。右端のボタンの右端は1080で、パネルの右端（1120）から40の余白を残す。
+  // ボタンの左上の位置。並びは、武器の購入と売却4つ（売買のページ。行の中ほど）、弾薬の購入4つ（売買のページ。行の右端）、強化5つ（強化のページ。右端）、
+  // ページ切替（左下）、閉じるボタン（下側の中央）の順。購入のボタンは、行の中央に揃える（行の上端から4下）。右端のボタンの右端は1080で、パネルの右端（1120）から40の余白を残す。
   inline constexpr XMFLOAT2 ns_BUTTON_POSITIONS[ns_BUTTON_COUNT]{
-    {580.0f,206.0f},{580.0f,302.0f},{580.0f,398.0f},
-    {840.0f,206.0f},{840.0f,302.0f},{840.0f,398.0f},
+    {580.0f,194.0f},{580.0f,266.0f},{580.0f,338.0f},{580.0f,410.0f},
+    {840.0f,194.0f},{840.0f,266.0f},{840.0f,338.0f},{840.0f,410.0f},
     {840.0f,186.0f},{840.0f,254.0f},{840.0f,322.0f},{840.0f,390.0f},{840.0f,458.0f},
     {200.0f,546.0f},
     {520.0f,546.0f}
