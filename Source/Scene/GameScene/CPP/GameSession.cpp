@@ -216,6 +216,7 @@ bool GameSession::InitRenderResources()
   renderer_links.stage = &m_stage;
   renderer_links.enemyController = &m_enemyController;
   renderer_links.camera = &m_player.GetCamera();
+  renderer_links.shotController = &m_player.GetShotController();
 
   // 2つの初期化を、この順に実行する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。
   // 後始末は、呼出側のInitがFinalizeで行う。共有Renderer・床と壁・出口の失敗のログはStageControllerが、描画の失敗のログはGameRendererが記録する。

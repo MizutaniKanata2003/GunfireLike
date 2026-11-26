@@ -1,6 +1,6 @@
 ﻿#include "../H/GameRenderer.h"
 
-// ゲーム中の3Dのワールド、画像のHUD、Collision可視化、演出の初期化・描画・解放を実装する。
+// ゲーム中の3Dのワールド、一人称の銃、画像のHUD、Collision可視化、演出の初期化・描画・解放を実装する。
 
 //========= Framework インクルード=========
 #include "Framework/3D/H/CameraMatrices.h"
@@ -12,13 +12,14 @@
 //========= Scene インクルード=========
 #include "Scene/Common/Enemy/H/EnemyController.h"
 #include "Scene/Common/Stage/H/StageController.h"
+#include "Scene/Common/Weapon/H/ShotController.h"
 
 //========= 初期化・終了関数=========
-// 参照先を登録し、Collision可視化とHUDと演出を初期化する。
+// 参照先を登録し、Collision可視化とHUDと演出と一人称の銃を初期化する。
 bool GameRenderer::Initialize(GraphicsSystem& graphicsSystem,const GAME_RENDERER_LINKS& links)
 {
   // 参照先が1つでも欠けている場合は、以後の描画で空の参照を使ってしまうため、何も登録せず失敗を返す。
-  if(links.stage == nullptr || links.enemyController == nullptr || links.camera == nullptr){
+  if(links.stage == nullptr || links.enemyController == nullptr || links.camera == nullptr || links.shotController == nullptr){
     Logger::Write(e_LogLevel::e_ERROR,e_LogCategory::e_SCENE,L"GameRendererの参照先の登録に失敗しました。");
     return false;
   }
@@ -27,6 +28,10 @@ bool GameRenderer::Initialize(GraphicsSystem& graphicsSystem,const GAME_RENDERER
   m_stage = links.stage;
   m_enemyController = links.enemyController;
   m_camera = links.camera;
+  m_shotController = links.shotController;
+
+  // 一人称の銃のモデルを読み込む。読み込めない武器があっても、その武器を描かないだけで、ゲームは続ける。失敗の理由は、WeaponViewと各Loaderがログへ記録する。
+  static_cast<void>(m_weaponView.Initialize(graphicsSystem));
 
   // 3つの初期化を、この順に実行する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。
   // 後始末は、呼出側のUninitで行う。
@@ -38,10 +43,11 @@ bool GameRenderer::Initialize(GraphicsSystem& graphicsSystem,const GAME_RENDERER
     && InitCheck::Succeeded(m_effectController.Initialize(m_stage->GetModelRegistry()),e_LogCategory::e_SCENE,L"GameRendererの演出の初期化に失敗しました。");
 }
 
-// HUDとCollision可視化と演出を解放し、参照先を手放す。
+// HUDとCollision可視化と演出と一人称の銃を解放し、参照先を手放す。
 void GameRenderer::Uninit()
 {
-  // 演出の借用を手放し、HUDと線描画Rendererを解放する。
+  // 銃のモデルと、演出の借用を手放し、HUDと線描画Rendererを解放する。
+  m_weaponView.Uninit();
   m_effectController.Uninit();
   m_gameHud.Uninit();
   m_collisionDebugView.Uninit();
@@ -49,14 +55,15 @@ void GameRenderer::Uninit()
   m_stage = nullptr;
   m_enemyController = nullptr;
   m_camera = nullptr;
+  m_shotController = nullptr;
 }
 
 //========= 描画関数=========
-// 床・壁・範囲の予告・出口・敵・敵の弾・演出・Collisionの線を、この順に3Dで描画する。
+// 床・壁・範囲の予告・出口・敵・敵の弾・演出・Collisionの線・一人称の銃を、この順に3Dで描画する。
 void GameRenderer::DrawWorld(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix)
 {
   // 参照先が未登録の場合は、描画しない。
-  if(m_stage == nullptr || m_enemyController == nullptr || m_camera == nullptr)return;
+  if(m_stage == nullptr || m_enemyController == nullptr || m_camera == nullptr || m_shotController == nullptr)return;
 
   // 床・壁・範囲の予告・出口・敵・敵の弾・演出はOPAQUE Passで描画するため、描画前にPassを設定する。
   graphicsSystem.SetRenderPass(e_RenderPass::e_OPAQUE);
@@ -76,6 +83,9 @@ void GameRenderer::DrawWorld(GraphicsSystem& graphicsSystem,const XMMATRIX& view
   // 演出の後に、表示中ならCollisionの線を重ねる。View行列とProjection行列は、1つの構造体にまとめて渡す。
   const CAMERA_MATRICES camera_matrices{viewMatrix,projectionMatrix};
   m_collisionDebugView.Draw(graphicsSystem,m_stage->GetCollisionWorld(),*m_camera,camera_matrices);
+
+  // 最後に、一人称の銃を、ワールドの上に重ねて描く。
+  DrawWeaponView(graphicsSystem,projectionMatrix);
 }
 
 // 3Dの上に、画像のHUDを描画する。
@@ -84,4 +94,18 @@ void GameRenderer::DrawHud(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& 
   // 3Dの上に画像のHUDを重ねるため、深度比較なし・アルファ合成の画面UI用Passへ切り替える。
   graphicsSystem.SetRenderPass(e_RenderPass::e_SCREEN_UI);
   m_gameHud.Draw(graphicsSystem,hudState);
+}
+
+//========= 描画の補助関数=========
+// 装備中の武器を、一人称の銃として描く。
+void GameRenderer::DrawWeaponView(GraphicsSystem& graphicsSystem,const XMMATRIX& projectionMatrix)
+{
+  // 装備中の武器を選び、深度を消して、不透明用のPassで描く。深度を消すことで、壁や敵に近づいても、銃が、めり込んだり、隠れたりしない。
+  m_weaponView.SelectWeapon(m_shotController->GetWeaponSystem().GetWeaponData());
+  graphicsSystem.ClearDepth();
+  graphicsSystem.SetRenderPass(e_RenderPass::e_OPAQUE);
+  m_weaponView.Draw(graphicsSystem,projectionMatrix);
+
+  // 調整の画面を出す。表示の位置が決まったら、この呼出しを削除する。
+  m_weaponView.DrawTuningUi();
 }

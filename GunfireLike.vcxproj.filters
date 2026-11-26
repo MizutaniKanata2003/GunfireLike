@@ -258,6 +258,9 @@
     <ClCompile Include="Source\Framework\SceneParts\CPP\LoadingScreen.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Scene\GameScene\CPP\WeaponView.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Framework\Imgui\H\ImGuiManager.h">
@@ -608,15 +611,18 @@
     <ClInclude Include="Source\Framework\SceneParts\H\LoadingScreen.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Scene\GameScene\H\WeaponView.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Source\Framework\Shaders\BasicColorVS.hlsl" />
-    <FxCompile Include="Source\Framework\Shaders\ShaderCommon.hlsl" />
-    <FxCompile Include="Source\Framework\Shaders\BasicColorPS.hlsl" />
-    <FxCompile Include="Source\Framework\Shaders\HudPS.hlsl" />
-    <FxCompile Include="Source\Framework\Shaders\HudVS.hlsl" />
-    <FxCompile Include="Source\Framework\Shaders\SkinnedVS.hlsl" />
-    <FxCompile Include="Source\Framework\Shaders\SkinnedPS.hlsl" />
+    <FxCompile Include="Source\Framework\SceneParts\Shaders\BasicColorVS.hlsl" />
+    <FxCompile Include="Source\Framework\SceneParts\Shaders\BasicColorPS.hlsl" />
+    <FxCompile Include="Source\Framework\SceneParts\Shaders\HudPS.hlsl" />
+    <FxCompile Include="Source\Framework\SceneParts\Shaders\HudVS.hlsl" />
+    <FxCompile Include="Source\Framework\SceneParts\Shaders\ShaderCommon.hlsl" />
+    <FxCompile Include="Source\Framework\SceneParts\Shaders\SkinnedPS.hlsl" />
+    <FxCompile Include="Source\Framework\SceneParts\Shaders\SkinnedVS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

@@ -274,6 +274,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClCompile Include="Source\Scene\GameScene\CPP\GameSession.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\SessionEconomyFlow.cpp" />
     <ClCompile Include="Source\Scene\GameScene\CPP\ShopFlow.cpp" />
+    <ClCompile Include="Source\Scene\GameScene\CPP\WeaponView.cpp" />
     <ClCompile Include="Source\Scene\ResultScene\CPP\ResultScene.cpp" />
     <ClCompile Include="Source\Scene\TitleScene\CPP\TitleScene.cpp" />
   </ItemGroup>
@@ -392,6 +393,7 @@ xcopy /E /I /Y "$(ProjectDir)Assets" "$(OutDir)Assets"</Command>
     <ClInclude Include="Source\Scene\GameScene\H\RunController.h" />
     <ClInclude Include="Source\Scene\GameScene\H\SessionEconomyFlow.h" />
     <ClInclude Include="Source\Scene\GameScene\H\ShopFlow.h" />
+    <ClInclude Include="Source\Scene\GameScene\H\WeaponView.h" />
     <ClInclude Include="Source\Scene\ResultScene\H\ResultScene.h" />
     <ClInclude Include="Source\Scene\TitleScene\H\TitleScene.h" />
   </ItemGroup>

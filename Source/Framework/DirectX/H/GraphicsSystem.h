@@ -64,7 +64,13 @@ public:
   // Depthだけを切り替える。Contextなしでは何もしない。
   // isEnabled: trueで既定Depth、falseで比較・書込を無効化したState。BlendやCullは変更しない。
   void SetDepthTestEnabled(bool isEnabled);
+  // 深度だけを、最も遠い値（1.0）へ戻す。一人称の銃を、ワールドの上に重ねて描く前に使う。Contextか深度のViewがなければ、何もしない。
+  void ClearDepth()
+  {
+    if(m_context.Get() == nullptr || m_depthStencilView.Get() == nullptr)return;
 
+    m_context->ClearDepthStencilView(m_depthStencilView.Get(),D3D11_CLEAR_DEPTH,1.0f,0);
+  }
 private:
   //========= 補助関数=========
   // Device・即時Context・SwapChainを同時生成する。Debug構成では、Debug Layer付きを先に試し、失敗したら通常生成へ再試行する。

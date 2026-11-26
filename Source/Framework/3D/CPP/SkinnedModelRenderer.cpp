@@ -4,6 +4,7 @@
 
 //========= C++標準ライブラリ インクルード=========
 #include <cstddef> // offsetofで、頂点の属性のOffsetを、Input Layoutへ指定する。
+#include <cstdint> // std::uint32_tで、画像のない材質に使う、1画素の色を表す。
 #include <string> // std::stringで、材質の画像のパスを扱い、std::wstringで、画像の名前を作る。
 #include <unordered_map> // 画像のパスから、読み込み済みの材質の番号を引き、同じ画像を共有する。
 #include <vector> // std::vector<char>で、CSOのバイナリデータを連続領域へ保持する。
@@ -41,13 +42,17 @@ namespace
   //========= Pixel Shader・光の設定=========
   // 光の定数BufferをBindするPixel Shaderのslot。ShaderCommon.hlslの、Light用の割当と同じ。
   constexpr UINT ns_LIGHT_CONSTANT_SLOT = 3;
-  // 光の進む向き（正規化前）。奥（+Z）へ向かい、やや下へ。見た目を確認して、調整する仮値。
+  // 光の進む向き（正規化前）。奥（+Z）へ向かい、やや下へ。
   constexpr float ns_LIGHT_DIRECTION_X = 0.2f;
   constexpr float ns_LIGHT_DIRECTION_Y = -0.7f;
   constexpr float ns_LIGHT_DIRECTION_Z = 0.7f;
-  // 平行光源の強さと、環境光の強さ。仮値。
+  // 平行光源の強さと、環境光の強さ。
   constexpr float ns_LIGHT_INTENSITY = 0.8f;
   constexpr float ns_AMBIENT_INTENSITY = 0.45f;
+
+  //========= 画像のない材質=========
+  // 画像のない材質に使う、1画素の画像の色。灰色で、不透明。メモリ上の並びは、R・G・B・Aの順（下位から）で、各8bit。画像が1枚でもあるモデルで、画像のない材質が、透明になって消えないようにする。
+  constexpr std::uint32_t ns_MISSING_TEXTURE_PIXEL = 0xFF969696;
 
   // 光の定数を作る。向きは、正規化して保存する。
   LIGHT_CONSTANTS MakeLightConstants()
@@ -58,6 +63,39 @@ namespace
     light.color = XMFLOAT3{1.0f,0.97f,0.92f};
     light.ambientIntensity = ns_AMBIENT_INTENSITY;
     return light;
+  }
+
+  // 1画素（灰色）の画像を作り、Shader Resource Viewを返す。画像のない材質に使う。
+  // device: 生成に使うDevice。
+  // outView: 出力先。失敗した場合は、空のまま。
+  // 戻り値: 生成できたらtrue。失敗の理由は、ログへ記録する。
+  bool CreateMissingTextureView(ID3D11Device* device,ComPtr<ID3D11ShaderResourceView>& outView)
+  {
+    D3D11_TEXTURE2D_DESC texture_desc{};
+    texture_desc.Width = 1;
+    texture_desc.Height = 1;
+    texture_desc.MipLevels = 1;
+    texture_desc.ArraySize = 1;
+    texture_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texture_desc.SampleDesc.Count = 1;
+    texture_desc.Usage = D3D11_USAGE_IMMUTABLE;
+    texture_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+    const std::uint32_t pixel = ns_MISSING_TEXTURE_PIXEL;
+    const D3D11_SUBRESOURCE_DATA initial_data{&pixel,sizeof(pixel),0};
+    ComPtr<ID3D11Texture2D> texture;
+    const HRESULT texture_result = device->CreateTexture2D(&texture_desc,&initial_data,texture.GetAddressOf());
+    if(FAILED(texture_result)){
+      GraphicsErrorLog::Write(L"ID3D11Device::CreateTexture2D(MissingTexture)",texture_result);
+      return false;
+    }
+
+    const HRESULT view_result = device->CreateShaderResourceView(texture.Get(),nullptr,outView.GetAddressOf());
+    if(FAILED(view_result)){
+      GraphicsErrorLog::Write(L"ID3D11Device::CreateShaderResourceView(MissingTexture)",view_result);
+      return false;
+    }
+    return true;
   }
 }
 
@@ -223,6 +261,18 @@ bool SkinnedModelRenderer::CreateMaterialTextures(ID3D11Device* device,const SKI
     if(!TextureLoader::LoadWicTextureFromMemory(device,image,m_materialViews[material_index]))return false;
     loaded_materials[material.diffuseTexturePath] = material_index;
     m_hasTexture = true;
+  }
+
+  // 画像が1枚でもあるモデルでは、全ての描画範囲が、画像で色を決めるため、画像のない材質は、灰色の1画素の画像で描く。空のままだと、画像の色が透明の黒になり、その部分が、消えてしまう。
+  if(!m_hasTexture)return true;
+
+  ComPtr<ID3D11ShaderResourceView> missing_view;
+  for(ComPtr<ID3D11ShaderResourceView>& view : m_materialViews){
+    if(view)continue;
+
+    // 最初に必要になった時に、1回だけ作り、以後は共有する。
+    if(!missing_view && !CreateMissingTextureView(device,missing_view))return false;
+    view = missing_view;
   }
   return true;
 }
