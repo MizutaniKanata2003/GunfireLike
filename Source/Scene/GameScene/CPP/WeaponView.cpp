@@ -146,15 +146,18 @@ namespace
 // 武器の読込元の数が、武器の種類の数と一致していることを確認する。
 static_assert(sizeof(ns_WEAPON_MODEL_PATHS) / sizeof(ns_WEAPON_MODEL_PATHS[0]) == WEAPON_TABLE::ns_WEAPON_COUNT,"銃のモデルのパスの数と、武器の種類の数を一致させること。");
 
-// 4種の銃を読み込み、拳銃の表示位置を確定した設定へ戻す。
+// 4種の銃を読み込み、確認済みの表示位置を武器ごとに設定する。
 bool WeaponView::Initialize(GraphicsSystem& graphicsSystem)
 {
   // 旧Resourceを先に解放する。以後の失敗でも、旧状態へは復帰しない。
   Uninit();
 
-  // 拳銃だけに確認済みの配置を設定する。回転は度、Offsetはモデル内カメラで変換した後のカメラ空間の移動量。
-  // Scale 0.01、Rotation (0,-180,0)、Offset (0,-33,3)。他の武器の配置は変更しない。
+  // 武器ごとに確認した配置を設定する。構造体の順は、大きさ・回転（度）・カメラ空間の位置。
+  // 4種とも、モデル内のカメラを基準に、Y軸を-180度回して銃口を奥へ向ける。
   m_placements[static_cast<int>(WEAPON_TYPE::e_PISTOL)] = WEAPON_VIEW_PLACEMENT{0.01f,XMFLOAT3{0.0f,-180.0f,0.0f},XMFLOAT3{0.0f,-33.0f,3.0f}};
+  m_placements[static_cast<int>(WEAPON_TYPE::e_SHOTGUN)] = WEAPON_VIEW_PLACEMENT{0.01f,XMFLOAT3{0.0f,-180.0f,0.0f},XMFLOAT3{0.0f,-34.0f,0.0f}};
+  m_placements[static_cast<int>(WEAPON_TYPE::e_SCAR)] = WEAPON_VIEW_PLACEMENT{0.01f,XMFLOAT3{0.0f,-180.0f,0.0f},XMFLOAT3{0.0f,-32.0f,1.0f}};
+  m_placements[static_cast<int>(WEAPON_TYPE::e_MAGNUM)] = WEAPON_VIEW_PLACEMENT{0.01f,XMFLOAT3{0.0f,-180.0f,0.0f},XMFLOAT3{0.0f,-32.5f,1.0f}};
 
   // 全ての武器を順に読み込む。1つ失敗しても残りは読み込み、全て成功した場合だけtrueを返す。
   bool is_all_loaded = true;
