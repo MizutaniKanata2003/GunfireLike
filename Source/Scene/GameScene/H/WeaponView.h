@@ -2,7 +2,7 @@
 
 // 一人称の銃（腕を含む）を表示する。4種の武器のモデルと、待機（Idle）の動きを、武器ごとに読み込み、現在の武器を、カメラの前に置いて描く。
 // 視点は、モデルに入っている「camera」ノードの位置から、「camera_target」ノードの位置を見る向きにする。モデルの作者が決めた見え方に合わせるため。
-// 表示の位置・大きさ・向きは、武器ごとに持ち、調整の画面（ImGui）で変えられる。調整した値は、WeaponView::Prepareの配置へ書き込む。
+// 表示の位置・大きさ・向き・銃口の位置は、武器ごとに持ち、調整の画面（ImGui）で変えられる。調整した値は、WeaponView::Prepareの配置へ書き込む。
 // 動きの再生（発砲・リロード・持ち替え）は、担当しない。今は、待機の姿勢を、止めたまま描く。武器の切替と、ゲームの状態は、呼出側が渡す。
 // 描画先・Render Pass・深度の準備は、呼出側が行う。モデルの読込は、Resourceを生成するため、Scene初期化中にだけ呼ぶ。
 
@@ -23,7 +23,7 @@
 //========= 前方宣言=========
 class GraphicsSystem;
 
-// 銃を、カメラの前に置く位置・大きさ・向き。モデルの視点（cameraノード）から見た後に、追加で掛ける。
+// 銃を、カメラの前に置く位置・大きさ・向きと、マズルフラッシュを出す銃口の位置。モデルの視点（cameraノード）から見た後に、追加で掛ける。
 struct WEAPON_VIEW_PLACEMENT
 {
   // モデルの大きさの倍率。視点を原点として拡大するため、画面上の見え方は変わらず、近距離Clip面で欠ける範囲だけが変わる。
@@ -32,6 +32,8 @@ struct WEAPON_VIEW_PLACEMENT
   XMFLOAT3 rotationDegrees{};
   // 位置。単位はワールド距離単位。カメラの空間（カメラが原点で、+Zが正面、+Xが右、+Yが上）での位置。
   XMFLOAT3 offset{};
+  // マズルフラッシュを出す銃口の位置。単位はワールド距離単位。視点からの、右（X）・上（Y）・前（Z）のずれ。既存の値は、右0.25・下0.3（上は-0.3）・前0.5。
+  XMFLOAT3 muzzleOffset{0.25f,-0.3f,0.5f};
 };
 
 // 一人称の銃を描くクラス。
@@ -53,7 +55,7 @@ public:
   // graphicsSystem: 描画基盤。Render Passと、深度の準備は、呼出側が済ませておくこと。
   // projectionMatrix: View空間からClip空間への変換行列。ワールドの描画と同じ値。
   void Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& projectionMatrix);
-  // 選んだ武器の、位置・大きさ・向きを変える調整の画面を、ImGuiに出す。ImGuiのフレームの中で呼ぶ。調整の間だけ使い、値が決まったら、呼出しを削除する。
+  // 選んだ武器の、位置・大きさ・向き・銃口の位置を変える調整の画面を、ImGuiに出す。ImGuiのフレームの中で呼ぶ。調整の間だけ使い、値が決まったら、呼出しを削除する。
   void DrawTuningUi();
 
   //========= 読込関数=========
@@ -63,6 +65,11 @@ public:
   // weaponIndex: 武器の種類の値（表の添字）。0以上、WEAPON_TABLE::ns_WEAPON_COUNT未満。範囲外ならfalse。
   // 戻り値: モデル・待機の動き・描画部が、全て揃ったらtrue。失敗した武器は、描かず、失敗をログへ記録する（残りの武器は、使える）。
   [[nodiscard]] bool LoadWeapon(GraphicsSystem& graphicsSystem,int weaponIndex);
+
+  //========= Getter関数=========
+  // 選んでいる武器の、マズルフラッシュを出す銃口の位置を返す。視点からの、右（X）・上（Y）・前（Z）のずれで、単位はワールド距離単位。
+  // 戻り値の参照は、次にPrepareを呼ぶまで有効。
+  [[nodiscard]] const XMFLOAT3& GetMuzzleOffset() const { return m_placements[m_selectedWeaponIndex].muzzleOffset; }
 
 private:
   //========= 内部の型=========
@@ -93,7 +100,7 @@ private:
   //========= 所有状態=========
   // 武器ごとの所有物。添字は、WEAPON_TYPEの値。
   std::array<WEAPON_VIEW_ASSETS,WEAPON_TABLE::ns_WEAPON_COUNT> m_assets{};
-  // 武器ごとの表示の位置。添字は、WEAPON_TYPEの値。
+  // 武器ごとの表示の位置と銃口の位置。添字は、WEAPON_TYPEの値。
   std::array<WEAPON_VIEW_PLACEMENT,WEAPON_TABLE::ns_WEAPON_COUNT> m_placements{};
   // 選んでいる武器の種類の値。表の範囲内。
   int m_selectedWeaponIndex{};

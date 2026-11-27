@@ -154,7 +154,7 @@ void WeaponView::Prepare()
   // 旧Resourceを先に解放する。以後の読込の失敗でも、旧状態へは復帰しない。
   Uninit();
 
-  // 武器ごとに確認した配置を設定する。構造体の順は、大きさ・回転（度）・カメラ空間の位置。
+  // 武器ごとに確認した配置を設定する。構造体の順は、大きさ・回転（度）・カメラ空間の位置。銃口の位置は、構造体の既定値のまま。
   // 4種とも、モデル内のカメラを基準に、Y軸を-180度回して銃口を奥へ向ける。
   m_placements[static_cast<int>(WEAPON_TYPE::e_PISTOL)] = WEAPON_VIEW_PLACEMENT{0.01f,XMFLOAT3{0.0f,-180.0f,0.0f},XMFLOAT3{0.0f,-33.0f,3.0f}};
   m_placements[static_cast<int>(WEAPON_TYPE::e_SHOTGUN)] = WEAPON_VIEW_PLACEMENT{0.01f,XMFLOAT3{0.0f,-180.0f,0.0f},XMFLOAT3{0.0f,-34.0f,0.0f}};
@@ -232,10 +232,14 @@ void WeaponView::DrawTuningUi()
   // 移動量だけを解除し、回転と縮尺は維持する。
   if(ImGui::Button("Reset offset"))placement.offset = XMFLOAT3{};
 
+  // マズルフラッシュを出す銃口の位置を、視点からの右・上・前のずれとして入力する。発砲するたびに、この位置へ出る。
+  ImGui::InputFloat3("Muzzle flash (right up forward)",&placement.muzzleOffset.x,"%.3f");
+
   // 報告用の値を、入力と同じ精度で表示する。
   ImGui::Text("Scale %.6f / Rotation %.3f %.3f %.3f",placement.scale,
               placement.rotationDegrees.x,placement.rotationDegrees.y,placement.rotationDegrees.z);
   ImGui::Text("Offset %.6f %.6f %.6f",placement.offset.x,placement.offset.y,placement.offset.z);
+  ImGui::Text("Muzzle %.3f %.3f %.3f",placement.muzzleOffset.x,placement.muzzleOffset.y,placement.muzzleOffset.z);
   ImGui::TextUnformatted("Direct input has no offset limits. Ctrl-click a drag field to type a value.");
   ImGui::End();
 }

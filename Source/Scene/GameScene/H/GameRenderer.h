@@ -67,12 +67,15 @@ public:
   void DrawHud(GraphicsSystem& graphicsSystem,const GAME_HUD_STATE& hudState);
 
   //========= Getter関数=========
-  // Collision可視化を返す。表示の切替・弾道の通知・視線のRayの更新に、プレイヤー・デバッグ・GameSessionが使う。
-  // 戻り値の参照は、このGameRendererの寿命を超えて保持しない。
+    // Collision可視化を返す。表示の切替・弾道の通知・視線のRayの更新に、プレイヤー・デバッグ・GameSessionが使う。
+    // 戻り値の参照は、このGameRendererの寿命を超えて保持しない。
   [[nodiscard]] CollisionDebugView& GetCollisionDebugView() { return m_collisionDebugView; }
   // 演出を返す。粒の生成と更新を、GameSessionが行う。
   // 戻り値の参照は、このGameRendererの寿命を超えて保持しない。
   [[nodiscard]] EffectController& GetEffectController() { return m_effectController; }
+  // 装備中の武器の、マズルフラッシュを出す銃口の位置を返す。視点からの、右（X）・上（Y）・前（Z）のずれで、単位はワールド距離単位。調整の画面で、武器ごとに変えられる。
+  // 戻り値の参照は、このGameRendererの寿命を超えて保持しない。
+  [[nodiscard]] const XMFLOAT3& GetMuzzleOffset() const { return m_weaponView.GetMuzzleOffset(); }
 
 private:
   //========= 描画の補助関数=========
