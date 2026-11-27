@@ -40,13 +40,20 @@ class GameRenderer final
 {
 public:
   //========= 初期化・終了関数=========
-  // 参照先を登録し、Collision可視化とHUDと演出と一人称の銃を初期化する。ステージの初期化の後に呼ぶ。
-  // graphicsSystem: Resource生成に使う描画基盤。Uninitまで有効であること。
-  // links: 借用する参照先。1つでも欠けている場合は、何も登録せず失敗する。
-  // 戻り値: 登録と初期化に成功したらtrue。失敗した場合は、失敗した対象をログへ記録してfalse。後始末は、呼出側がUninitで行う。銃のモデルを読み込めない場合は、その武器を描かないだけで、失敗にはしない。
+    // 参照先を登録し、Collision可視化とHUDと演出を初期化し、一人称の銃の表示の位置を設定する。ステージの初期化の後に呼ぶ。銃のモデルは、ここでは読み込まない（LoadWeaponStepで、武器ごとに読み込む）。
+    // graphicsSystem: Resource生成に使う描画基盤。Uninitまで有効であること。
+    // links: 借用する参照先。1つでも欠けている場合は、何も登録せず失敗する。
+    // 戻り値: 登録と初期化に成功したらtrue。失敗した場合は、失敗した対象をログへ記録してfalse。後始末は、呼出側がUninitで行う。
   [[nodiscard]] bool Initialize(GraphicsSystem& graphicsSystem,const GAME_RENDERER_LINKS& links);
   // HUDとCollision可視化と演出と一人称の銃を解放し、参照先を手放す。未初期化でも、繰り返しても呼出可能。
   void Uninit();
+
+  //========= 読込関数=========
+  // 一人称の銃の、武器1種類のモデルを読み込む。Initializeの後に、読み込む武器ごとに呼ぶ。Resourceを生成するため、Scene初期化中にだけ呼ぶ。
+  // graphicsSystem: Resource生成に使う描画基盤。Uninitまで有効であること。
+  // weaponIndex: 武器の種類の値（表の添字）。0以上、WEAPON_TABLE::ns_WEAPON_COUNT未満。
+  // 戻り値: 読み込めたらtrue。読み込めなかった武器は、描かないだけで、ゲームは続ける。失敗の理由は、WeaponViewと各Loaderがログへ記録する。
+  bool LoadWeaponStep(GraphicsSystem& graphicsSystem,int weaponIndex);
 
   //========= 描画関数=========
   // 床・壁・範囲の予告・出口・敵・敵の弾・演出・Collisionの線・一人称の銃を、この順に3Dで描画する。参照先が未登録の場合は何もしない。

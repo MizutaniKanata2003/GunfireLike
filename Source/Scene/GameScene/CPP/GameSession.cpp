@@ -65,28 +65,34 @@ void GameSession::Initialize()
 // 工程の、バーの進み具合への重みを返す。
 float GameSession::GetInitStepWeight(int stepIndex)
 {
-  // Debugの実測で、敵のモデルの読込が全体の大半を占めたため、その工程の重みを大きくしている。バーの進み具合は、見た目を確認して調整する。
+  // Debugの実測で、銃のモデルの読込は4種で約10秒、敵のモデルの読込は見た目1つで約0.5秒だった。重みは、その時間に比例させている。バーの進み具合は、見た目を確認して調整する。
   constexpr float render_weight = 1.0f;
   constexpr float model_weight = 5.0f;
+  constexpr float weapon_weight = 25.0f;
   constexpr float enemy_controller_weight = 0.2f;
   constexpr float player_weight = 0.5f;
   constexpr float wave_weight = 0.5f;
 
-  // 工程の並びは、RunInitStepと同じ。
+  // 工程の並びは、RunInitStepと同じ。描画、敵の見た目ごとの読込、銃の武器ごとの読込、敵の更新への参照の登録、プレイヤー側、第1ウェーブの順。
   const int model_count = static_cast<int>(ENEMY_MODEL::ns_APPEARANCE_COUNT);
+  const int weapon_end = model_count + static_cast<int>(WEAPON_TABLE::ns_WEAPON_COUNT);
+  // 各工程の番号の範囲を先頭から調べ、最初に当てはまった工程の重みを返す。
   if(stepIndex == 0)return render_weight;
   if(stepIndex <= model_count)return model_weight;
-  if(stepIndex == model_count + 1)return enemy_controller_weight;
-  if(stepIndex == model_count + 2)return player_weight;
-  if(stepIndex == model_count + 3)return wave_weight;
+  if(stepIndex <= weapon_end)return weapon_weight;
+  if(stepIndex == weapon_end + 1)return enemy_controller_weight;
+  if(stepIndex == weapon_end + 2)return player_weight;
+  if(stepIndex == weapon_end + 3)return wave_weight;
+  // どの工程にも当てはまらない番号は、重み1として扱う。
   return 1.0f;
 }
 
 // 初期化の工程を、番号の順に1つ実行する。
 bool GameSession::RunInitStep(int stepIndex)
 {
-  // 工程の並び: 描画Resource、敵の見た目ごとの読込、敵の更新への参照の登録、プレイヤー側とデバッグ、第1ウェーブ。順序は、後の対象が前の対象の参照を借用するため変えない。
+  // 工程の並び: 描画Resource、敵の見た目ごとの読込、銃の武器ごとの読込、敵の更新への参照の登録、プレイヤー側とデバッグ、第1ウェーブ。順序は、後の対象が前の対象の参照を借用するため変えない。
   const int model_count = static_cast<int>(ENEMY_MODEL::ns_APPEARANCE_COUNT);
+  const int weapon_end = model_count + static_cast<int>(WEAPON_TABLE::ns_WEAPON_COUNT);
   if(stepIndex == 0)return InitRenderResources();
 
   // 敵の見た目を1つ読み込む。読み込めなくても、ゲームは続ける。失敗した場合は、全て解放し、敵の更新の初期化（InitModelLibrary）が、もう一度、読み込みを試みる。
@@ -99,9 +105,15 @@ bool GameSession::RunInitStep(int stepIndex)
     return true;
   }
 
-  if(stepIndex == model_count + 1)return InitEnemyController();
-  if(stepIndex == model_count + 2)return InitPlayerAndDebug();
-  if(stepIndex == model_count + 3)return TrySpawnCurrentWave();
+  // 銃の武器を1種類読み込む。読み込めない武器は、描かないだけで、ゲームは続ける。失敗の理由は、WeaponViewと各Loaderがログへ記録する。
+  if(stepIndex > model_count && stepIndex <= weapon_end){
+    static_cast<void>(m_renderer.LoadWeaponStep(m_graphicsSystem,stepIndex - model_count - 1));
+    return true;
+  }
+
+  if(stepIndex == weapon_end + 1)return InitEnemyController();
+  if(stepIndex == weapon_end + 2)return InitPlayerAndDebug();
+  if(stepIndex == weapon_end + 3)return TrySpawnCurrentWave();
   return false;
 }
 

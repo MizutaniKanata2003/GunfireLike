@@ -15,7 +15,7 @@
 #include "Scene/Common/Weapon/H/ShotController.h"
 
 //========= 初期化・終了関数=========
-// 参照先を登録し、Collision可視化とHUDと演出と一人称の銃を初期化する。
+// 参照先を登録し、Collision可視化とHUDと演出を初期化し、一人称の銃の表示の位置を設定する。
 bool GameRenderer::Initialize(GraphicsSystem& graphicsSystem,const GAME_RENDERER_LINKS& links)
 {
   // 参照先が1つでも欠けている場合は、以後の描画で空の参照を使ってしまうため、何も登録せず失敗を返す。
@@ -30,12 +30,8 @@ bool GameRenderer::Initialize(GraphicsSystem& graphicsSystem,const GAME_RENDERER
   m_camera = links.camera;
   m_shotController = links.shotController;
 
-  // 一人称の銃の表示の位置を設定し、4種のモデルを順に読み込む。読み込めない武器があっても、その武器を描かないだけで、ゲームは続ける。失敗の理由は、WeaponViewと各Loaderがログへ記録する。
+  // 一人称の銃の表示の位置を設定する。モデルの読込は、GPU Resourceを作る重い処理のため、ここでは行わず、LoadWeaponStepで、武器ごとに行う。
   m_weaponView.Prepare();
-  // 武器の種類の数だけ、先頭から順に、1種類ずつ読み込む。1種類の失敗は、残りの武器の読込を止めない。
-  for(int weapon_index = 0; weapon_index < WEAPON_TABLE::ns_WEAPON_COUNT; ++weapon_index){
-    static_cast<void>(m_weaponView.LoadWeapon(graphicsSystem,weapon_index));
-  }
 
   // 3つの初期化を、この順に実行する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。
   // 後始末は、呼出側のUninitで行う。
@@ -62,6 +58,13 @@ void GameRenderer::Uninit()
   m_shotController = nullptr;
 }
 
+//========= 読込関数=========
+// 一人称の銃の、武器1種類のモデルを読み込む。
+bool GameRenderer::LoadWeaponStep(GraphicsSystem& graphicsSystem,int weaponIndex)
+{
+  // 読込は、WeaponViewが行う。範囲外の武器の値や、読込の失敗は、WeaponViewがログへ記録し、falseを返す。
+  return m_weaponView.LoadWeapon(graphicsSystem,weaponIndex);
+}
 //========= 描画関数=========
 // 床・壁・範囲の予告・出口・敵・敵の弾・演出・Collisionの線・一人称の銃を、この順に3Dで描画する。
 void GameRenderer::DrawWorld(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix)
