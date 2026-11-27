@@ -67,7 +67,8 @@ namespace
     for(std::size_t clip_index = 0; clip_index < clips.size(); ++clip_index){
       const std::string& clip_name = clips[clip_index].name;
       const bool is_exact = clip_name == target;
-      const bool is_suffix = clip_name.size() > target_with_separator.size() && clip_name.compare(clip_name.size() - target_with_separator.size(),target_with_separator.size(),target_with_separator) == 0;
+      const bool is_suffix = clip_name.size() > target_with_separator.size()
+        && clip_name.compare(clip_name.size() - target_with_separator.size(),target_with_separator.size(),target_with_separator) == 0;
       if(is_exact || is_suffix)return static_cast<int>(clip_index);
     }
     return -1;
@@ -146,10 +147,11 @@ namespace
 // 武器の読込元の数が、武器の種類の数と一致していることを確認する。
 static_assert(sizeof(ns_WEAPON_MODEL_PATHS) / sizeof(ns_WEAPON_MODEL_PATHS[0]) == WEAPON_TABLE::ns_WEAPON_COUNT,"銃のモデルのパスの数と、武器の種類の数を一致させること。");
 
-// 4種の銃を読み込み、確認済みの表示位置を武器ごとに設定する。
-bool WeaponView::Initialize(GraphicsSystem& graphicsSystem)
+//========= 初期化・終了関数=========
+// 旧Resourceを解放し、武器ごとの表示の位置を、確認済みの値へ設定する。
+void WeaponView::Prepare()
 {
-  // 旧Resourceを先に解放する。以後の失敗でも、旧状態へは復帰しない。
+  // 旧Resourceを先に解放する。以後の読込の失敗でも、旧状態へは復帰しない。
   Uninit();
 
   // 武器ごとに確認した配置を設定する。構造体の順は、大きさ・回転（度）・カメラ空間の位置。
@@ -158,13 +160,6 @@ bool WeaponView::Initialize(GraphicsSystem& graphicsSystem)
   m_placements[static_cast<int>(WEAPON_TYPE::e_SHOTGUN)] = WEAPON_VIEW_PLACEMENT{0.01f,XMFLOAT3{0.0f,-180.0f,0.0f},XMFLOAT3{0.0f,-34.0f,0.0f}};
   m_placements[static_cast<int>(WEAPON_TYPE::e_SCAR)] = WEAPON_VIEW_PLACEMENT{0.01f,XMFLOAT3{0.0f,-180.0f,0.0f},XMFLOAT3{0.0f,-32.0f,1.0f}};
   m_placements[static_cast<int>(WEAPON_TYPE::e_MAGNUM)] = WEAPON_VIEW_PLACEMENT{0.01f,XMFLOAT3{0.0f,-180.0f,0.0f},XMFLOAT3{0.0f,-32.5f,1.0f}};
-
-  // 全ての武器を順に読み込む。1つ失敗しても残りは読み込み、全て成功した場合だけtrueを返す。
-  bool is_all_loaded = true;
-  for(int weapon_index = 0; weapon_index < WEAPON_TABLE::ns_WEAPON_COUNT; ++weapon_index){
-    is_all_loaded = LoadWeapon(graphicsSystem,weapon_index) && is_all_loaded;
-  }
-  return is_all_loaded;
 }
 
 // 全てのResourceを解放し、選択を先頭へ戻す。
@@ -245,11 +240,20 @@ void WeaponView::DrawTuningUi()
   ImGui::End();
 }
 
-//========= 補助関数=========
+//========= 読込関数=========
 // 武器1種類のモデル・アニメーション・待機の姿勢・描画部を用意する。
 bool WeaponView::LoadWeapon(GraphicsSystem& graphicsSystem,int weaponIndex)
 {
+  // 範囲外の武器の値では、配列の外を読み書きするため、何も読み込まず失敗を返す。
+  if(weaponIndex < 0 || weaponIndex >= WEAPON_TABLE::ns_WEAPON_COUNT){
+    Logger::Write(e_LogLevel::e_WARNING,e_LogCategory::e_ASSET,L"銃の武器の値が範囲外のため、読み込めません: " + std::to_wstring(weaponIndex));
+    return false;
+  }
+
+  // 同じ武器を読み込み直す場合に備え、旧い描画部と再生部を先に解放する。
   WEAPON_VIEW_ASSETS& assets = m_assets[weaponIndex];
+  assets.renderer.Uninit();
+  assets.idlePlayer.Uninit();
   const wchar_t* model_path = ns_WEAPON_MODEL_PATHS[weaponIndex];
 
   // モデルと、全てのアニメーションを読み込む。失敗の理由は、各Loaderがログへ記録する。
@@ -269,7 +273,8 @@ bool WeaponView::LoadWeapon(GraphicsSystem& graphicsSystem,int weaponIndex)
   }
 
   // 再生部と描画部を初期化する。
-  if(pose_clip_index < 0 || !assets.idlePlayer.Initialize(assets.model,assets.clips[static_cast<std::size_t>(pose_clip_index)]) || !assets.renderer.Initialize(graphicsSystem,assets.model)){
+  if(pose_clip_index < 0 || !assets.idlePlayer.Initialize(assets.model,assets.clips[static_cast<std::size_t>(pose_clip_index)])
+     || !assets.renderer.Initialize(graphicsSystem,assets.model)){
     Logger::Write(e_LogLevel::e_WARNING,e_LogCategory::e_ASSET,std::wstring{L"銃の待機の姿勢の動きまたは描画部を用意できませんでした: "} + model_path);
     assets.renderer.Uninit();
     assets.idlePlayer.Uninit();
@@ -285,6 +290,7 @@ bool WeaponView::LoadWeapon(GraphicsSystem& graphicsSystem,int weaponIndex)
   return true;
 }
 
+//========= 補助関数=========
 // 視点・大きさ・向き・位置を、この順に合成する。
 XMMATRIX WeaponView::BuildWorldMatrix() const
 {

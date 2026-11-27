@@ -1,10 +1,10 @@
 ﻿#pragma once
 
-// 一人称の銃（腕を含む）を表示する。4種の武器のモデルと、待機（Idle）の動きを読み込み、現在の武器を、カメラの前に置いて描く。
+// 一人称の銃（腕を含む）を表示する。4種の武器のモデルと、待機（Idle）の動きを、武器ごとに読み込み、現在の武器を、カメラの前に置いて描く。
 // 視点は、モデルに入っている「camera」ノードの位置から、「camera_target」ノードの位置を見る向きにする。モデルの作者が決めた見え方に合わせるため。
-// 表示の位置・大きさ・向きは、武器ごとに持ち、調整の画面（ImGui）で変えられる。調整した値は、WeaponView.cppの表へ書き込む。
+// 表示の位置・大きさ・向きは、武器ごとに持ち、調整の画面（ImGui）で変えられる。調整した値は、WeaponView::Prepareの配置へ書き込む。
 // 動きの再生（発砲・リロード・持ち替え）は、担当しない。今は、待機の姿勢を、止めたまま描く。武器の切替と、ゲームの状態は、呼出側が渡す。
-// 描画先・Render Pass・深度の準備は、呼出側が行う。読込は、Resourceを生成するため、Scene初期化中にだけ呼ぶ。
+// 描画先・Render Pass・深度の準備は、呼出側が行う。モデルの読込は、Resourceを生成するため、Scene初期化中にだけ呼ぶ。
 
 //========= C++標準ライブラリ インクルード=========
 #include <array> // 武器ごとの所有物と、表示の位置を、固定長で保持する。
@@ -39,10 +39,8 @@ class WeaponView final
 {
 public:
   //========= 初期化・終了関数=========
-  // 旧Resourceを解放した後、4種の銃のモデルと、全てのアニメーションを読み込み、待機の姿勢を計算し、描画のRendererを生成する。
-  // graphicsSystem: Resource生成に使う描画基盤。Uninitまで有効であること。
-  // 戻り値: 4種とも読み込めたらtrue。読み込めなかった武器は、描かず、失敗をログへ記録する（残りの武器は、使える）。
-  [[nodiscard]] bool Initialize(GraphicsSystem& graphicsSystem);
+  // 旧Resourceを解放し、武器ごとの表示の位置を、確認済みの値へ設定する。GPU Resourceは作らない。モデルの読込は、LoadWeaponを武器ごとに呼んで行う。
+  void Prepare();
   // 全てのResourceを解放する。未初期化・終了済みでも、繰り返しても呼出可能。
   void Uninit();
 
@@ -58,6 +56,14 @@ public:
   // 選んだ武器の、位置・大きさ・向きを変える調整の画面を、ImGuiに出す。ImGuiのフレームの中で呼ぶ。調整の間だけ使い、値が決まったら、呼出しを削除する。
   void DrawTuningUi();
 
+  //========= 読込関数=========
+  // 武器1種類の、モデル・全てのアニメーション・待機の姿勢・描画部を読み込む。Prepareの後に、読み込む武器ごとに呼ぶ。
+  // 同じ武器をもう一度呼んだ場合は、読込済みの内容を、そのまま上書きする。
+  // graphicsSystem: 描画部の生成に使う描画基盤。Uninitまで有効であること。
+  // weaponIndex: 武器の種類の値（表の添字）。0以上、WEAPON_TABLE::ns_WEAPON_COUNT未満。範囲外ならfalse。
+  // 戻り値: モデル・待機の動き・描画部が、全て揃ったらtrue。失敗した武器は、描かず、失敗をログへ記録する（残りの武器は、使える）。
+  [[nodiscard]] bool LoadWeapon(GraphicsSystem& graphicsSystem,int weaponIndex);
+
 private:
   //========= 内部の型=========
   // 武器1種類の所有物。再生部が、モデルとアニメーションを借用するため、同じ構造体の中に置く。
@@ -71,20 +77,15 @@ private:
     SkinnedAnimationPlayer idlePlayer{};
     // 描画部。
     SkinnedModelRenderer renderer{};
-    // 待機の姿勢の、全ボーンの最終の行列。Initializeで、1回だけ計算する。
+    // 待機の姿勢の、全ボーンの最終の行列。LoadWeaponで、1回だけ計算する。
     BoneMatrixArray idleBoneMatrices{};
-    // モデルの空間から、モデルの視点（cameraノード）の空間への変換行列。待機の姿勢で、Initializeで、1回だけ計算する。視点のノードがなければ、単位行列。
+    // モデルの空間から、モデルの視点（cameraノード）の空間への変換行列。待機の姿勢で、LoadWeaponで、1回だけ計算する。視点のノードがなければ、単位行列。
     XMFLOAT4X4 eyeMatrix{};
     // モデルと待機の動きを読み込み、描画部まで生成できたか。
     bool isLoaded{};
   };
 
   //========= 補助関数=========
-  // 武器1種類を読み込む。
-  // graphicsSystem: 描画基盤。
-  // weaponIndex: 武器の種類の値（表の添字）。範囲内であること。
-  // 戻り値: モデル・待機の動き・描画部が、全て揃ったらtrue。失敗は、ログへ記録する。
-  [[nodiscard]] bool LoadWeapon(GraphicsSystem& graphicsSystem,int weaponIndex);
   // 選んだ武器の視点の行列と表示の位置から、モデルの空間からカメラの空間への変換行列を作る。
   // 戻り値: 視点・大きさ・向き・位置を、この順に合成した行列。
   [[nodiscard]] XMMATRIX BuildWorldMatrix() const;

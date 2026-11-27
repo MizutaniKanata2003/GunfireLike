@@ -30,8 +30,12 @@ bool GameRenderer::Initialize(GraphicsSystem& graphicsSystem,const GAME_RENDERER
   m_camera = links.camera;
   m_shotController = links.shotController;
 
-  // 一人称の銃のモデルを読み込む。読み込めない武器があっても、その武器を描かないだけで、ゲームは続ける。失敗の理由は、WeaponViewと各Loaderがログへ記録する。
-  static_cast<void>(m_weaponView.Initialize(graphicsSystem));
+  // 一人称の銃の表示の位置を設定し、4種のモデルを順に読み込む。読み込めない武器があっても、その武器を描かないだけで、ゲームは続ける。失敗の理由は、WeaponViewと各Loaderがログへ記録する。
+  m_weaponView.Prepare();
+  // 武器の種類の数だけ、先頭から順に、1種類ずつ読み込む。1種類の失敗は、残りの武器の読込を止めない。
+  for(int weapon_index = 0; weapon_index < WEAPON_TABLE::ns_WEAPON_COUNT; ++weapon_index){
+    static_cast<void>(m_weaponView.LoadWeapon(graphicsSystem,weapon_index));
+  }
 
   // 3つの初期化を、この順に実行する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。
   // 後始末は、呼出側のUninitで行う。
