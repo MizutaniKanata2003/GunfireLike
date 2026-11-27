@@ -393,9 +393,9 @@ void GameSession::UpdateCombat(float gameplayDeltaTime,float worldDeltaTime)
   // 近接攻撃・接触・回復・射撃を、この順に更新する。
   m_player.UpdateCombat(gameplayDeltaTime);
 
-  // 発射があった場合だけ、その結果から、マズルフラッシュと命中の火花を出す。結果は、取り出すと捨てられ、同じ発射の演出を二度出さない。
+  // 発射があった場合だけ、その結果から、マズルフラッシュと命中の火花を出す。マズルフラッシュは、装備中の武器の銃口の位置へ出す。結果は、取り出すと捨てられ、同じ発射の演出を二度出さない。
   WEAPON_UPDATE_RESULT shot_result{};
-  if(m_player.GetShotController().TryTakeShotResult(shot_result))m_renderer.GetEffectController().SpawnShotEffects(shot_result);
+  if(m_player.GetShotController().TryTakeShotResult(shot_result))m_renderer.GetEffectController().SpawnShotEffects(shot_result,m_renderer.GetMuzzleOffset());
 
   // 射撃・近接攻撃で倒された敵の破片を出す。倒された敵が、次のウェーブの生成で入れ替わる前に出すため、ここで呼ぶ。
   m_renderer.GetEffectController().SpawnDefeatEffects(m_enemyController.GetEnemyManager());

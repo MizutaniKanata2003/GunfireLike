@@ -23,7 +23,7 @@ struct WEAPON_UPDATE_RESULT;
 namespace EFFECT_CONTROLLER
 {
   //========= 上限=========
-  // 同時に保持できる粒の最大数。満杯の時の生成は、最も古い粒を置き換える。仮値。
+  // 同時に保持できる粒の最大数。満杯の時の生成は、最も古い粒を置き換える。
   inline constexpr std::size_t ns_MAX_COUNT = 64;
 }
 
@@ -70,16 +70,18 @@ public:
   void Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewMatrix,const XMMATRIX& projectionMatrix) const;
 
   //========= 場面の生成関数=========
-  // 発砲のマズルフラッシュを、銃口の位置へ、黄色の粒1個で出す。銃口は、視点から、右・下・前へずらした位置（Collision可視化の弾道の始点と同じ側）。
+  // 発砲のマズルフラッシュを、銃口の位置へ、黄色の粒1個で出す。銃口は、視点から、視線の右・上・前へ、指定した分だけずらした位置。
   // eyePosition: 発砲した時の視点のワールド座標。
   // forward: 発砲の方向。長さ1に正規化済みであること。
-  void SpawnMuzzleFlash(const XMFLOAT3& eyePosition,const XMFLOAT3& forward);
+  // muzzleOffset: 視点からの銃口のずれ。右（X）・上（Y）・前（Z）の順。単位はワールド距離単位。装備中の武器ごとに決まる値。
+  void SpawnMuzzleFlash(const XMFLOAT3& eyePosition,const XMFLOAT3& forward,const XMFLOAT3& muzzleOffset);
   // 命中の火花を、命中点から、斜め上へ散る橙色の粒として、複数個出す。命中した相手が敵か地形かは問わない。
   // hitPoint: 命中点のワールド座標。
   void SpawnHitSparks(const XMFLOAT3& hitPoint);
   // 1回の発射の結果から、マズルフラッシュ1個と、命中した弾ごとの火花を出す。マズルフラッシュは、先頭の弾の始点と方向を使う。
   // shotResult: 発射の結果。発射していない結果や、弾が0個の結果の場合は、何も出さない。
-  void SpawnShotEffects(const WEAPON_UPDATE_RESULT& shotResult);
+  // muzzleOffset: 視点からの銃口のずれ。右（X）・上（Y）・前（Z）の順。単位はワールド距離単位。マズルフラッシュの位置に使う。
+  void SpawnShotEffects(const WEAPON_UPDATE_RESULT& shotResult,const XMFLOAT3& muzzleOffset);
   // 倒された敵の演出を、まだ出していない敵ごとに、敵の位置から上へ散る赤みの粒として、複数個出す。出した敵は、出した旨を敵へ記録し、同じ敵の演出を二度出さない。
   // enemyManager: 敵の枠の取得元。参照は保持しない。
   void SpawnDefeatEffects(EnemyManager& enemyManager);

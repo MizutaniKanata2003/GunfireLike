@@ -16,14 +16,10 @@
 #include "Scene/Common/Object/H/Transform.h"
 #include "Scene/Common/Weapon/H/WeaponSystem.h"
 
-// 場面ごとの演出の数値をまとめる。企画書で未確定の数値は、プレイ確認後に調整する仮値。
+// 場面ごとの演出の数値をまとめる。数値は、プレイ確認で調整する。
 namespace
 {
   //========= マズルフラッシュ=========
-  // 銃口の位置の、視点からのずれ。右・下・前の順。単位はワールド距離単位。Collision可視化の弾道の始点（右0.25・下0.3）と、同じ側にそろえる。
-  constexpr float ns_MUZZLE_OFFSET_RIGHT = 0.25f;
-  constexpr float ns_MUZZLE_OFFSET_DOWN = 0.3f;
-  constexpr float ns_MUZZLE_OFFSET_FORWARD = 0.5f;
   // マズルフラッシュの粒の1辺の長さ。単位はワールド距離単位。
   constexpr float ns_MUZZLE_FLASH_SIZE = 0.15f;
   // マズルフラッシュが残る時間。単位は秒。
@@ -83,7 +79,7 @@ namespace
   //========= スライディングの砂煙=========
   // 砂煙を出す間隔。単位は秒。
   constexpr float ns_SLIDE_DUST_INTERVAL_SECONDS = 0.05f;
-  // 砂煙を出す位置の、プレイヤーの位置（視点の高さ）からの高さのずれ。足元へ下げる量。単位はワールド距離単位。仮値。
+  // 砂煙を出す位置の、プレイヤーの位置（視点の高さ）からの高さのずれ。足元へ下げる量。単位はワールド距離単位。
   constexpr float ns_SLIDE_DUST_OFFSET_Y = 0.8f;
   // 砂煙が、滑る向きの後ろへ流れる速さ。単位は、ワールド距離単位毎秒。
   constexpr float ns_SLIDE_DUST_BACK_SPEED = 1.5f;
@@ -203,7 +199,7 @@ void EffectController::Draw(GraphicsSystem& graphicsSystem,const XMMATRIX& viewM
 
 //========= 場面の生成関数=========
 // マズルフラッシュを、銃口の位置へ出す。
-void EffectController::SpawnMuzzleFlash(const XMFLOAT3& eyePosition,const XMFLOAT3& forward)
+void EffectController::SpawnMuzzleFlash(const XMFLOAT3& eyePosition,const XMFLOAT3& forward,const XMFLOAT3& muzzleOffset)
 {
   // 視線の右方向を、ワールドの上方向と正面方向の外積から求める。左手系のため、右 = 上 × 正面。
   // 上方向は(0,1,0)のため、外積は(正面のZ,0,正面のX × -1)になり、水平方向の長さで割って、長さ1にする。
@@ -217,11 +213,11 @@ void EffectController::SpawnMuzzleFlash(const XMFLOAT3& eyePosition,const XMFLOA
   // 視線の上方向を、正面方向と右方向の外積から求める。右方向のY成分は0のため、式が簡単になる。
   const XMFLOAT3 up{forward.y * right.z,forward.z * right.x - forward.x * right.z,-forward.y * right.x};
 
-  // 視点から、右・下（上方向の逆）・前へずらした位置へ、動かない粒を1個出す。
+  // 視点から、視線の右・上・前へ、銃口のずれの分だけずらした位置へ、動かない粒を1個出す。ずれの上方向が負なら、視点より下になる。
   EFFECT_SPAWN_PARAMS params{};
-  params.position = XMFLOAT3{eyePosition.x + right.x * ns_MUZZLE_OFFSET_RIGHT - up.x * ns_MUZZLE_OFFSET_DOWN + forward.x * ns_MUZZLE_OFFSET_FORWARD,
-    eyePosition.y + right.y * ns_MUZZLE_OFFSET_RIGHT - up.y * ns_MUZZLE_OFFSET_DOWN + forward.y * ns_MUZZLE_OFFSET_FORWARD,
-    eyePosition.z + right.z * ns_MUZZLE_OFFSET_RIGHT - up.z * ns_MUZZLE_OFFSET_DOWN + forward.z * ns_MUZZLE_OFFSET_FORWARD};
+  params.position = XMFLOAT3{eyePosition.x + right.x * muzzleOffset.x + up.x * muzzleOffset.y + forward.x * muzzleOffset.z,
+    eyePosition.y + right.y * muzzleOffset.x + up.y * muzzleOffset.y + forward.y * muzzleOffset.z,
+    eyePosition.z + right.z * muzzleOffset.x + up.z * muzzleOffset.y + forward.z * muzzleOffset.z};
   params.color = ns_MUZZLE_FLASH_COLOR;
   params.size = ns_MUZZLE_FLASH_SIZE;
   params.lifetimeSeconds = ns_MUZZLE_FLASH_SECONDS;
@@ -246,14 +242,14 @@ void EffectController::SpawnHitSparks(const XMFLOAT3& hitPoint)
 }
 
 // 発射の結果から、マズルフラッシュと、命中した弾ごとの火花を出す。
-void EffectController::SpawnShotEffects(const WEAPON_UPDATE_RESULT& shotResult)
+void EffectController::SpawnShotEffects(const WEAPON_UPDATE_RESULT& shotResult,const XMFLOAT3& muzzleOffset)
 {
   // 発射していない結果と、弾が0個の結果は、出す対象がないため、何も出さない。
   if(!shotResult.didFire || shotResult.pelletCount <= 0)return;
 
-  // マズルフラッシュは、1回の発射につき1個だけ、先頭の弾の始点（視点）と方向で出す。
+  // マズルフラッシュは、1回の発射につき1個だけ、先頭の弾の始点（視点）と方向で、装備中の武器の銃口の位置へ出す。
   const SHOT_PELLET_RESULT& first_pellet = shotResult.pellets[0];
-  SpawnMuzzleFlash(first_pellet.ray.origin,first_pellet.ray.direction);
+  SpawnMuzzleFlash(first_pellet.ray.origin,first_pellet.ray.direction,muzzleOffset);
 
   // 弾ごとに、命中した弾だけ、命中点へ火花を出す。命中しなかった弾は、次の弾へ進む。
   for(int pellet_index = 0; pellet_index < shotResult.pelletCount; ++pellet_index){
