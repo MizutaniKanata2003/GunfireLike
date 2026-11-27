@@ -1,7 +1,7 @@
 ﻿#include "../H/GameSession.h"
 
-// 1回のプレイの初期化、入力に応じた状態更新、プレイの終了の判定、射撃・近接攻撃・回避・回復・被弾の反映、部屋のクリア後の報酬選択とショップへの入力の受渡し（SessionEconomyFlowへ任せる）、
-// ジャスト回避の効果、部屋ごとの敵と敵の弾と範囲の予告と出口、描画とデバッグUIの呼出し、Resource終了を実装する。
+// 1回のプレイの初期化、入力に応じた状態更新、プレイの終了の判定、射撃・近接攻撃・回避・回復の更新、部屋のクリア後の報酬選択とショップへの入力の受渡し（SessionEconomyFlowへ任せる）、
+// 被弾とジャスト回避の効果の反映（SessionDamageFlowへ任せる）、部屋ごとの敵と敵の弾と範囲の予告と出口、描画とデバッグUIの呼出し、Resource終了を実装する。
 
 //========= Windows インクルード=========
 #include <windows.h> // VK_F1・VK_F2・VK_F4・VK_LBUTTONの仮想キーコードで、Capture切替・タイトルへ戻る要求・再開・クリックを指定する。
@@ -65,7 +65,7 @@ void GameSession::Initialize()
 // 工程の、バーの進み具合への重みを返す。
 float GameSession::GetInitStepWeight(int stepIndex)
 {
-  // 重みは、Debugの実測（敵のモデルの読込が、全体の大半）を参考にした仮値。見た目を確認して調整する。
+  // Debugの実測で、敵のモデルの読込が全体の大半を占めたため、その工程の重みを大きくしている。バーの進み具合は、見た目を確認して調整する。
   constexpr float render_weight = 1.0f;
   constexpr float model_weight = 5.0f;
   constexpr float enemy_controller_weight = 0.2f;
@@ -197,6 +197,7 @@ void GameSession::Finalize()
   // 遷移先のInit後に呼ばれても、遷移先が設定したCaptureやBGMを上書きしない。
   // 各Controllerの参照を先に手放し、敵・敵の弾・範囲の予告は、Collisionと共有Rendererを借用しているため、ステージを解放する前に先に終了する。
   m_debugController.Uninit();
+  m_sessionDamage.Unlink();
   m_sessionEconomy.Unlink();
   m_shopFlow.Unlink();
   m_player.Uninit();
@@ -233,13 +234,13 @@ bool GameSession::InitEnemyController()
   enemy_links.graphicsSystem = &m_graphicsSystem;
   enemy_links.playerController = &m_player.GetPlayerController();
   enemy_links.playerHealth = &m_player.GetPlayerHealth();
-  enemy_links.onAttackEvent = [this](const ENEMY_ATTACK_EVENT& attackEvent){ApplyEnemyAttackEvent(attackEvent); };
+  enemy_links.onAttackEvent = [this](const ENEMY_ATTACK_EVENT& attackEvent){m_sessionDamage.ApplyEnemyAttackEvent(attackEvent); };
 
   // 敵の弾と範囲の予告のCube Rendererを借用する。借用できなければ、敵の更新の登録は失敗する。
   return InitCheck::Succeeded(m_enemyController.Initialize(enemy_links),e_LogCategory::e_SCENE,L"GameSessionの敵の更新の初期化に失敗しました。");
 }
 
-// プレイヤー側一式・ショップ・報酬とショップの入力の受渡し・デバッグ操作へ、使用する参照と通知先を渡す。
+// プレイヤー側一式・ショップ・報酬とショップの入力の受渡し・被弾の反映・デバッグ操作へ、使用する参照と通知先を渡す。
 bool GameSession::InitPlayerAndDebug()
 {
   // プレイヤー側一式に使う参照と、ヒットストップの通知先を用意する。ヒットストップは、すでに残っている場合は長い方を使う。
@@ -278,13 +279,30 @@ bool GameSession::InitPlayerAndDebug()
   debug_links.shotController = &m_player.GetShotController();
   debug_links.timeScale = &m_timeScale;
 
-  // プレイヤー側一式、ショップ、報酬とショップの入力の受渡し、デバッグ操作の順に登録する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。
-  // プレイヤー側一式の失敗のログは、PlayerSuiteが、ショップの失敗のログは、ShopFlowが、入力の受渡しの失敗のログは、SessionEconomyFlowが記録する。
+  // プレイヤー側一式、ショップ、報酬とショップの入力の受渡し、被弾の反映、デバッグ操作の順に登録する。最初に失敗した対象のメッセージだけをログへ記録し、後続は実行せずfalseを返す。
+  // プレイヤー側一式の失敗のログは、PlayerSuiteが、ショップの失敗のログは、ShopFlowが、入力の受渡しの失敗のログは、SessionEconomyFlowが、被弾の反映の失敗のログは、SessionDamageFlowが記録する。
   return m_player.Init(player_links)
     && m_shopFlow.Link(shop_links)
     && m_sessionEconomy.Link(economy_flow_links)
+    && LinkSessionDamage()
     // 参照先の登録に失敗した場合は、デバッグ操作の登録が失敗する。
     && InitCheck::Succeeded(m_debugController.Initialize(debug_links),e_LogCategory::e_SCENE,L"GameSessionのデバッグ操作の初期化に失敗しました。");
+}
+
+// 被弾とジャスト回避の効果の反映へ、使用する参照を渡す。
+bool GameSession::LinkSessionDamage()
+{
+  // ジャスト回避のスロー・演出・回避反撃と、被弾の反応に使う、時間・演出・プレイヤー・射撃・報酬・デバッグ操作を用意する。
+  // 参照先は、このクラスが所有するため、Finalizeまで有効。
+  SESSION_DAMAGE_FLOW_LINKS damage_links{};
+  damage_links.timeScale = &m_timeScale;
+  damage_links.effectController = &m_renderer.GetEffectController();
+  damage_links.playerController = &m_player.GetPlayerController();
+  damage_links.playerCombat = &m_player.GetPlayerCombat();
+  damage_links.shotController = &m_player.GetShotController();
+  damage_links.economyController = &m_economy;
+  damage_links.debugController = &m_debugController;
+  return m_sessionDamage.Link(damage_links);
 }
 
 //========= 更新の補助関数=========
@@ -317,7 +335,7 @@ bool GameSession::UpdateSessionInput()
 void GameSession::UpdateWorldAndRoom(float worldDeltaTime)
 {
   // 確認用の攻撃の判定、敵の怯み・転倒を、Captureに関係なく進める。続けて、重なった敵どうしを押し離す。
-  UpdateDodgeJudge(worldDeltaTime);
+  m_sessionDamage.UpdateDodgeJudge(worldDeltaTime);
   m_enemyController.GetEnemyManager().Update(worldDeltaTime);
   m_enemyController.GetEnemyManager().SeparateEnemies(m_stage.GetCollisionWorld());
 
@@ -342,22 +360,6 @@ void GameSession::UpdateTimers(float deltaTime,float gameplayDeltaTime)
   const PlayerController& player_controller = m_player.GetPlayerController();
   const bool is_sliding = player_controller.GetActionState() == PLAYER_ACTION_STATE::e_SLIDE;
   m_renderer.GetEffectController().UpdateSlideDust(is_sliding,player_controller.GetPosition(),player_controller.GetFixedDirection(),deltaTime);
-}
-
-// ジャスト回避が成立した時の効果を反映する。
-void GameSession::StartJustDodgeEffects()
-{
-  // ジャスト回避のスローを開始する。連続した場合は、時間を数え直す。
-  m_timeScale.StartSlowMotion();
-
-  // ジャスト回避の演出を、プレイヤーの付近から広げて出す。連続した場合も、そのたびに出す。
-  m_renderer.GetEffectController().SpawnJustDodgeEffect(m_player.GetPlayerController().GetPosition());
-
-  // 回避反撃を取得している（倍率が1.0より大きい）場合だけ、一定時間、射撃のダメージを増やす。未取得なら、何も増やさない。
-  const float damage_scale = m_economy.GetReward().GetCounterDodgeDamageScale();
-  if(damage_scale > 1.0f){
-    m_player.GetShotController().ActivateDamageBoost(damage_scale,REWARD_TABLE::ns_COUNTER_DODGE_SECONDS);
-  }
 }
 
 // 視点・プレイヤーの動作・出口の通過・殴打でのリロードのキャンセル・視野角を更新する。
@@ -390,38 +392,6 @@ void GameSession::UpdateCombat(float gameplayDeltaTime,float worldDeltaTime)
 
   // 更新後のカメラから、Collision可視化の視線のRayを更新する。非表示の間は判定を行わない。
   m_renderer.GetCollisionDebugView().UpdateRay(m_player.GetCamera(),m_stage.GetCollisionWorld());
-}
-
-// 確認用の攻撃が当たる瞬間の判定結果を、プレイヤーへのダメージとジャスト回避の効果へ反映する。
-void GameSession::UpdateDodgeJudge(float worldDeltaTime)
-{
-  // 予告した攻撃が当たる瞬間だけ、結果が返る。結果の記録は、GameDebugControllerが行う。
-  const DODGE_JUDGE_RESULT judge_result = m_debugController.UpdateDodgeJudge(worldDeltaTime);
-
-  // 命中した場合は、ダメージ・怯み・ヒットストップを与える。
-  if(judge_result == DODGE_JUDGE_RESULT::e_HIT){
-    m_player.GetPlayerCombat().ApplyHitReaction(COMBAT_TABLE::ns_SIMULATED_ATTACK_DAMAGE,COMBAT_TABLE::ns_DAMAGE_HIT_STOP_SECONDS);
-  }
-  // ジャスト回避の場合は、スローと回避反撃を開始する。
-  else if(judge_result == DODGE_JUDGE_RESULT::e_JUST_DODGED){
-    StartJustDodgeEffects();
-  }
-}
-
-// 敵の攻撃イベントを、プレイヤーへの被弾・ジャスト回避の効果・表示用の記録へ反映する。
-void GameSession::ApplyEnemyAttackEvent(const ENEMY_ATTACK_EVENT& attackEvent)
-{
-  // 表示用の記録が求められた場合だけ、直近の判定結果を更新する。接近型の結果は求めない。
-  if(attackEvent.shouldRecordResult)m_debugController.RecordJudgeResult(attackEvent.result);
-
-  // 無敵でなく命中した場合は、ダメージ・怯み・ヒットストップを与える。
-  if(attackEvent.result == DODGE_JUDGE_RESULT::e_HIT){
-    m_player.GetPlayerCombat().ApplyHitReaction(attackEvent.damage,COMBAT_TABLE::ns_DAMAGE_HIT_STOP_SECONDS);
-  }
-  // 実際に回避中のジャスト回避の場合は、スローと回避反撃を開始する。
-  else if(attackEvent.shouldStartSlowMotion){
-    StartJustDodgeEffects();
-  }
 }
 
 // 現在の部屋とウェーブをEnemyControllerへ生成させ、成功した場合だけ転倒の記録と進行状態を新しい編成に合わせる。

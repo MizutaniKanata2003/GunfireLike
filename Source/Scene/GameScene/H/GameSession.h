@@ -1,7 +1,8 @@
 ﻿#pragma once
 
 // 1回のプレイの流れを担当する。初期化・更新・描画・終了の中で、ステージ・プレイヤー側一式・敵・時間（ヒットストップとスロー）・通貨と報酬・ショップと武器の所持・プレイの終了・デバッグ・描画の順序と仲介を行う。
-// 移動・戦闘・射撃などの個別の規則は、各クラスが持つ。Scene遷移は担当せず、タイトルへ戻る・やり直す・クリアした、という要求を、更新の結果として呼出側へ返す。
+// 移動・戦闘・射撃などの個別の規則は、各クラスが持つ。被弾とジャスト回避の効果の反映は、SessionDamageFlowへ任せる。
+// Scene遷移は担当せず、タイトルへ戻る・やり直す・クリアした、という要求を、更新の結果として呼出側へ返す。
 
 //========= Debug インクルード=========
 #include "Debug/H/GameDebugController.h"
@@ -17,6 +18,7 @@
 #include "Scene/GameScene/H/EconomyController.h"
 #include "Scene/GameScene/H/GameRenderer.h"
 #include "Scene/GameScene/H/RunController.h"
+#include "Scene/GameScene/H/SessionDamageFlow.h"
 #include "Scene/GameScene/H/SessionEconomyFlow.h"
 #include "Scene/GameScene/H/ShopFlow.h"
 
@@ -55,7 +57,7 @@ public:
   [[nodiscard]] static float GetInitStepWeight(int stepIndex);
   // 初期化の工程を、番号の順に1つ実行する。順序は、後の対象が前の対象の参照を借用するため変えない。失敗した場合の後始末（Finalize）は、呼出側が行う。
   // 0は、ステージ・描画（HUDとCollision可視化）。1から敵の見た目の数までは、敵のモデルと動きを、見た目ごとに1つ読み込む。
-  // その次は、敵の更新への参照の登録、プレイヤー側・ショップ・報酬とショップの入力の受渡し・デバッグ操作、第1部屋の敵の生成。
+  // その次は、敵の更新への参照の登録、プレイヤー側・ショップ・報酬とショップの入力の受渡し・被弾の反映・デバッグ操作、第1部屋の敵の生成。
   // stepIndex: 工程の番号。0以上、GetInitStepCount()未満。範囲外ならfalse。
   // 戻り値: 工程が成功したらtrue。敵のモデルの読込の失敗は、警告を出して、trueを返す（Cubeで描画して続ける）。それ以外の失敗は、対象をログへ記録してfalse。
   [[nodiscard]] bool RunInitStep(int stepIndex);
@@ -81,9 +83,12 @@ private:
   // 敵の更新へ、使用する参照と通知先を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
   // 戻り値: 登録に成功したらtrue。
   [[nodiscard]] bool InitEnemyController();
-  // プレイヤー側一式・ショップ・報酬とショップの入力の受渡し・デバッグ操作へ、使用する参照と通知先を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
+  // プレイヤー側一式・ショップ・報酬とショップの入力の受渡し・被弾の反映・デバッグ操作へ、使用する参照と通知先を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
   // 戻り値: 全ての登録に成功したらtrue。
   [[nodiscard]] bool InitPlayerAndDebug();
+  // 被弾とジャスト回避の効果の反映へ、使用する参照を渡す。失敗の後始末は、呼出側のInitがFinalizeで行う。
+  // 戻り値: 登録に成功したらtrue。失敗した場合は、SessionDamageFlowが、ログへ記録する。
+  [[nodiscard]] bool LinkSessionDamage();
 
   //========= 更新の補助関数=========
   // F2の確認、F1のCapture切替、F4の最初の部屋からの再開を処理する。再開では、報酬選択とショップも解除する。
@@ -96,8 +101,6 @@ private:
   // deltaTime: 実時間の経過時間。単位は秒。表示用と反動の時間に使う。報酬選択中とショップが開いている間は0。
   // gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。回復アイテムの間隔に使う。
   void UpdateTimers(float deltaTime,float gameplayDeltaTime);
-  // ジャスト回避が成立した時の効果を反映する。スローを開始し、演出を出し、回避反撃を取得していれば、一定時間、射撃のダメージを増やす。
-  void StartJustDodgeEffects();
   // 視点・プレイヤーの動作・出口の通過・殴打でのリロードのキャンセル・視野角を更新する。Capture中だけ呼ぶ。
   // deltaTime: 実時間の経過時間。単位は秒。視野角の補間に使う。
   // gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。プレイヤーの動作に使う。
@@ -106,12 +109,6 @@ private:
   // gameplayDeltaTime: ヒットストップを反映した経過時間。単位は秒。プレイヤーの戦闘と射撃に使う。
   // worldDeltaTime: スローを反映した経過時間。単位は秒。敵の行動と弾に使う。
   void UpdateCombat(float gameplayDeltaTime,float worldDeltaTime);
-  // 確認用の攻撃が当たる瞬間を判定し、結果に応じてプレイヤーへのダメージとジャスト回避の効果を反映する。
-  // worldDeltaTime: スローを反映した経過時間。単位は秒。ヒットストップ中は0。
-  void UpdateDodgeJudge(float worldDeltaTime);
-  // 敵の攻撃イベントを受け取り、命中ならプレイヤーへの被弾の反応を、ジャスト回避ならその効果を反映し、求められた場合は直近の判定結果を記録する。
-  // attackEvent: EnemyControllerが通知した攻撃イベント。敵の更新の途中で呼ばれる。
-  void ApplyEnemyAttackEvent(const ENEMY_ATTACK_EVENT& attackEvent);
   // 現在の部屋とウェーブの敵をEnemyControllerへ生成させ、成功した場合は、スライディングの転倒記録を初期化して、進行管理へ生成完了を通知する。
   // 生成の成否に関係なく、敵の枠ごとの生死の記録を、生成後の状態へ揃える。置き換えられた敵を、倒された敵として扱わないため。
   // 戻り値: 登録に成功したらtrue。失敗した場合はEnemyManagerが空にし、進行管理には通知しない。
@@ -154,4 +151,6 @@ private:
   GameRenderer m_renderer{};
   // 1回のプレイの状態（プレイ中・死亡・クリア）と、終了後の待ち時間を担当する。終了した後は、世界の更新を止める。
   RunController m_runController{};
+  // 被弾とジャスト回避の効果の反映を担当する。時間・演出・プレイヤー・報酬・デバッグを借用するため、それらの後に宣言する。
+  SessionDamageFlow m_sessionDamage{};
 };
